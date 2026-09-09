@@ -52,6 +52,8 @@ function PhotoSlot({
   onAdd,
   onEdit,
   onMove,
+  like,
+  onToggleLike,
 }: {
   photo?: EventGalleryPhoto;
   placeholder: string;
@@ -62,6 +64,8 @@ function PhotoSlot({
   onAdd: () => void;
   onEdit: (photo: EventGalleryPhoto) => void;
   onMove: (photo: EventGalleryPhoto, direction: -1 | 1) => void;
+  like?: PhotoLikeState;
+  onToggleLike: (photo: EventGalleryPhoto, liked: boolean) => void;
 }) {
   if (photo?.url) {
     return (
