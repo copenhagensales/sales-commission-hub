@@ -26,7 +26,9 @@ import {
   Info,
   CalendarX,
   Pencil,
+  Check,
 } from "lucide-react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -692,166 +694,217 @@ const Home = () => {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-            <div className="space-y-1.5 md:space-y-2">
-              {companyEvents.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                  <CalendarX className="w-8 h-8 mb-2 opacity-50" />
-                  <p className="text-xs md:text-sm font-medium">Ingen kommende begivenheder</p>
-                  <p className="text-[10px] md:text-xs opacity-70">Tilføj en begivenhed med + knappen ovenfor</p>
-                </div>
-              ) : (
-                companyEvents.slice(0, 3).map((event, index) => {
-                  const attendees = getEventAttendees(event.id);
-                  const myStatus = getMyAttendance(event.id);
-                  
-                  return (
-                    <div key={event.id} className={`flex items-center gap-2 md:gap-3 p-2 md:p-2 rounded-lg group min-h-[52px] md:min-h-0 transition-colors ${index === 0 ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}>
-                      <div className="bg-primary rounded-lg p-1.5 text-center min-w-[36px] md:min-w-[40px]">
-                        <div className="text-lg md:text-xl font-bold text-primary-foreground">
-                          {format(parseISO(event.event_date), "d")}
+          <CardContent className="flex flex-col px-6 pb-6">
+            {companyEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <CalendarX className="mb-2 h-8 w-8 opacity-50" />
+                <p className="text-sm font-medium">Ingen kommende begivenheder</p>
+                <p className="text-xs opacity-70">Tilføj en begivenhed med + knappen ovenfor</p>
+              </div>
+            ) : (
+              (() => {
+                const [featured, ...rest] = companyEvents.slice(0, 3);
+                const attendees = getEventAttendees(featured.id);
+                const myStatus = getMyAttendance(featured.id);
+                const daysUntil = differenceInDays(parseISO(featured.event_date), new Date());
+                const whenLabel =
+                  daysUntil < 0
+                    ? null
+                    : daysUntil === 0
+                      ? "I dag"
+                      : daysUntil === 1
+                        ? "I morgen"
+                        : `Om ${daysUntil} dage`;
+                const initials = (a: any) =>
+                  `${a.employee?.first_name?.[0] ?? ""}${a.employee?.last_name?.[0] ?? ""}`.toUpperCase();
+
+                return (
+                  <div className="flex flex-col gap-5">
+                    {/* Fremhævet begivenhed */}
+                    <div className="flex items-start gap-4">
+                      <div className="min-w-[60px] flex-none rounded-2xl bg-[hsl(var(--cph-onyx))] px-3.5 py-2.5 text-center text-[hsl(var(--cph-light-blue))]">
+                        <div className="text-[26px] font-extrabold leading-none tracking-[-0.02em] text-[hsl(var(--cph-emerald))] tabular-nums">
+                          {format(parseISO(featured.event_date), "d")}
                         </div>
-                        <div className="text-[9px] md:text-[10px] text-primary-foreground/80 uppercase">
-                          {format(parseISO(event.event_date), "MMM", { locale: da })}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p 
-                            className="font-medium text-xs md:text-sm truncate cursor-pointer hover:text-primary hover:underline transition-colors"
-                            onClick={() => setSelectedEventForDetail(event.id)}
-                          >
-                            {event.title}
-                          </p>
-                          {index === 0 && (() => {
-                            const daysUntil = differenceInDays(parseISO(event.event_date), new Date());
-                            return daysUntil >= 0 ? (
-                              <Badge variant="secondary" className="text-[9px] md:text-[10px] px-1.5 py-0 shrink-0">
-                                {daysUntil === 0 ? 'I dag' : daysUntil === 1 ? 'I morgen' : `om ${daysUntil} dage`}
-                              </Badge>
-                            ) : null;
-                          })()}
-                        </div>
-                        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-                          <p className="text-[10px] md:text-xs text-muted-foreground truncate">
-                            {event.event_time && `Kl. ${event.event_time.slice(0, 5)}`}
-                            {event.event_time && event.location && " - "}
-                            {event.location}
-                          </p>
-                          {attendees.length > 0 && (
-                            <HoverCard>
-                              <HoverCardTrigger asChild>
-                                <Badge variant="outline" className="cursor-pointer gap-0.5 text-[10px] md:text-xs px-1 md:px-1.5 py-0">
-                                  <Users className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                                  {attendees.length}
-                                </Badge>
-                              </HoverCardTrigger>
-                              <HoverCardContent className="w-56 p-3">
-                                <p className="font-medium text-sm mb-2">Deltagere</p>
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                  {attendees.map((a) => (
-                                    <div key={a.id} className="flex items-center gap-2 text-sm">
-                                      <Avatar className="h-5 w-5">
-                                        <AvatarFallback className="text-[10px]">
-                                          {(a.employee as any)?.first_name?.[0]}{(a.employee as any)?.last_name?.[0]}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <span className="truncate">
-                                        {(a.employee as any)?.first_name} {(a.employee as any)?.last_name}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </HoverCardContent>
-                            </HoverCard>
-                          )}
+                        <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.12em]">
+                          {format(parseISO(featured.event_date), "MMM", { locale: da })}
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
-                        {(event as any).requires_registration ? (
-                          <>
-                            <Button
-                              variant={myStatus === 'attending' ? "default" : "outline"}
-                              size="sm"
-                              className={`h-8 px-2 md:px-3 gap-1 text-xs ${myStatus === 'attending' ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'border-emerald-600/50 text-emerald-600 hover:bg-emerald-50'}`}
-                              onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
-                              disabled={toggleAttendanceMutation.isPending}
-                            >
-                              <UserPlus className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">{myStatus === 'attending' ? 'Tilmeldt' : 'Tilmeld'}</span>
-                            </Button>
-                            {myStatus === 'attending' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 gap-1 text-xs text-muted-foreground hover:text-destructive"
-                                onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
-                                disabled={toggleAttendanceMutation.isPending}
-                              >
-                                <UserMinus className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Afmeld</span>
-                              </Button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant={myStatus === 'attending' ? "default" : "ghost"}
-                              size="sm"
-                              className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'attending' ? 'bg-primary text-primary-foreground' : ''}`}
-                              onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'attending' })}
-                              disabled={toggleAttendanceMutation.isPending}
-                            >
-                              <ThumbsUp className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant={myStatus === 'not_attending' ? "default" : "ghost"}
-                              size="sm"
-                              className={`h-8 w-8 md:h-7 md:w-7 p-0 ${myStatus === 'not_attending' ? 'bg-muted-foreground text-background' : ''}`}
-                              onClick={() => toggleAttendanceMutation.mutate({ eventId: event.id, status: 'not_attending' })}
-                              disabled={toggleAttendanceMutation.isPending}
-                            >
-                              <ThumbsDown className="w-3.5 h-3.5" />
-                            </Button>
-                          </>
-                        )}
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="cursor-pointer text-[17px] font-extrabold leading-[1.3] hover:underline"
+                          onClick={() => setSelectedEventForDetail(featured.id)}
+                        >
+                          {featured.title}
+                        </p>
+                        <p className="mt-1 text-[13px] text-foreground/70">
+                          {[
+                            whenLabel,
+                            featured.event_time ? `Kl. ${featured.event_time.slice(0, 5)}` : null,
+                            featured.location,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      <div className="flex flex-none items-center gap-0">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 md:h-7 md:w-7 p-0 hidden sm:flex"
-                          onClick={() => setSelectedEventForDetail(event.id)}
+                          className="h-7 w-7 p-0"
+                          onClick={() => setSelectedEventForDetail(featured.id)}
                           title="Læs mere"
                         >
-                          <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
-                        {(isOwner || event.created_by === user?.id) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-                            onClick={() => setEditingEvent(event.id)}
-                            title="Rediger"
-                          >
-                            <Pencil className="w-3 h-3 text-muted-foreground" />
-                          </Button>
-                        )}
-                        {(isOwner || event.created_by === user?.id) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-                            onClick={() => deleteEventMutation.mutate(event.id)}
-                          >
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </Button>
+                        {(isOwner || featured.created_by === user?.id) && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => setEditingEvent(featured.id)}
+                              title="Rediger"
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => deleteEventMutation.mutate(featured.id)}
+                              title="Slet"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+
+                    {/* Deltagere */}
+                    {attendees.length > 0 && (
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <div className="flex cursor-pointer items-center gap-2.5">
+                            <div className="flex">
+                              {attendees.slice(0, 3).map((a, i) => (
+                                <span
+                                  key={a.id}
+                                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-card text-[10px] font-extrabold ${
+                                    i % 2 === 0
+                                      ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                                      : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
+                                  } ${i > 0 ? "-ml-2" : ""}`}
+                                >
+                                  {initials(a)}
+                                </span>
+                              ))}
+                              {attendees.length > 3 && (
+                                <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-[hsl(var(--cph-light-blue))] text-[10px] font-extrabold text-[hsl(var(--cph-onyx))]">
+                                  +{attendees.length - 3}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[13px] text-foreground/70">
+                              {attendees.length} deltager
+                            </span>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-56 p-3">
+                          <p className="mb-2 text-sm font-medium">Deltagere</p>
+                          <div className="max-h-40 space-y-2 overflow-y-auto">
+                            {attendees.map((a) => (
+                              <div key={a.id} className="flex items-center gap-2 text-sm">
+                                <Avatar className="h-5 w-5">
+                                  <AvatarFallback className="text-[10px]">
+                                    {initials(a)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="truncate">
+                                  {(a.employee as any)?.first_name} {(a.employee as any)?.last_name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    )}
+
+                    {/* Deltag / afbud */}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleAttendanceMutation.mutate({
+                            eventId: featured.id,
+                            status: "attending",
+                          })
+                        }
+                        disabled={toggleAttendanceMutation.isPending}
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
+                          myStatus === "attending"
+                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                        }`}
+                      >
+                        <Check
+                          className={`h-3.5 w-3.5 ${
+                            myStatus === "attending" ? "text-[hsl(var(--cph-emerald))]" : ""
+                          }`}
+                        />
+                        {(featured as any).requires_registration
+                          ? myStatus === "attending"
+                            ? "Tilmeldt"
+                            : "Tilmeld"
+                          : "Deltager"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleAttendanceMutation.mutate({
+                            eventId: featured.id,
+                            status: "not_attending",
+                          })
+                        }
+                        disabled={toggleAttendanceMutation.isPending}
+                        className={`flex-1 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
+                          myStatus === "not_attending"
+                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                        }`}
+                      >
+                        Afbud
+                      </button>
+                    </div>
+
+                    {/* Øvrige begivenheder */}
+                    {rest.length > 0 && (
+                      <div className="divide-y divide-[hsl(var(--cph-onyx)/0.1)] border-t border-[hsl(var(--cph-onyx)/0.1)] pt-1">
+                        {rest.map((event) => (
+                          <div key={event.id} className="flex items-center gap-3 py-2.5">
+                            <span className="w-11 flex-none text-[12px] font-extrabold uppercase tracking-[0.06em] text-foreground/70 tabular-nums">
+                              {format(parseISO(event.event_date), "d. MMM", { locale: da })}
+                            </span>
+                            <span
+                              className="min-w-0 flex-1 cursor-pointer truncate text-[14px] font-extrabold hover:underline"
+                              onClick={() => setSelectedEventForDetail(event.id)}
+                            >
+                              {event.title}
+                            </span>
+                            <span className="flex-none text-[12px] text-foreground/70">
+                              {event.event_time ? `Kl. ${event.event_time.slice(0, 5)}` : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
+            )}
           </CardContent>
+
         </Card>
         </div>
 
