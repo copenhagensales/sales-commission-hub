@@ -257,6 +257,13 @@ export default function DpaOverview() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{row.archive}</TableCell>
                     <TableCell>
+                      <ArchiveCell
+                        vendor={row.vendor}
+                        documents={byVendor(row.vendor)}
+                        canManage={!!canManage}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <Badge
                         variant="outline"
                         className="bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-normal text-left"
