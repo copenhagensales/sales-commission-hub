@@ -366,6 +366,21 @@ export default function LocationProfitabilityContent() {
       const selectedPlacement = locPlacements.find(p => p.id === booking.placement_id);
       const effectiveRate = booking.daily_rate_override ?? selectedPlacement?.daily_rate ?? loc?.daily_rate ?? 0;
 
+      // Brutto/netto pr. booking - netto bruger bookingens LÅSTE rabatsats
+      const grossInfo = bookingGross(booking as any);
+      const lockedPercent =
+        (booking as any).discount_percent_locked == null
+          ? null
+          : Number((booking as any).discount_percent_locked);
+      const bookingNet =
+        lockedPercent == null ? grossInfo.total : grossInfo.total * (1 - lockedPercent / 100);
+      const cost = costByRow.get(key) ?? { gross: 0, net: 0, missingLocked: false };
+      cost.gross += grossInfo.total;
+      cost.net += bookingNet;
+      if (lockedPercent == null) cost.missingLocked = true;
+      costByRow.set(key, cost);
+
+
       if (!locationMap.has(key)) {
         locationMap.set(key, {
           locationId: locId,
