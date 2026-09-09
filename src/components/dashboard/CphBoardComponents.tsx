@@ -153,8 +153,8 @@ export function CphLeaderboard({
           gridTemplateColumns: cols,
           columnGap: 14,
           padding: tvMode ? "16px 0 10px" : "12px 0 8px",
-          fontSize: tvMode ? 15 : 11,
-          letterSpacing: "0.08em",
+          fontSize: tvMode ? 15 : 10,
+          letterSpacing: tvMode ? "0.08em" : "0.02em",
           color: fgDim,
         }}
       >
@@ -164,7 +164,7 @@ export function CphLeaderboard({
         <span style={{ textAlign: "right" }}>Salg</span>
         {showCrossSales && <span style={{ textAlign: "right" }}>{crossSalesLabel}</span>}
         {showFiber && <span style={{ textAlign: "right" }}>Fiber</span>}
-        <span style={{ textAlign: "right", minWidth: tvMode ? 118 : 78 }}>Provision</span>
+        <span style={{ textAlign: "right", minWidth: tvMode ? 118 : 66 }}>Provision</span>
       </div>
 
       {isLoading ? (
@@ -212,8 +212,8 @@ export function CphLeaderboard({
                 <span
                   className="flex items-center justify-center font-extrabold"
                   style={{
-                    width: tvMode ? 46 : 34,
-                    height: tvMode ? 46 : 34,
+                    width: tvMode ? 46 : 30,
+                    height: tvMode ? 46 : 30,
                     borderRadius: "50%",
                     fontSize: tvMode ? 17 : 12,
                     background: isTop
@@ -272,7 +272,7 @@ export function CphLeaderboard({
                     fontSize: tvMode ? (isTop ? 28 : 26) : 16,
                     textAlign: "right",
                     letterSpacing: "-0.02em",
-                    minWidth: tvMode ? 118 : 78,
+                    minWidth: tvMode ? 118 : 66,
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
