@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authorizeGdprRequest, corsHeaders } from "../_shared/gdpr-auth.ts";
+import { employeeAnonymizationPatch } from "../_shared/employee-anonymization.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

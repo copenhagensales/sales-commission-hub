@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authorizeGdprRequest, corsHeaders } from "../_shared/gdpr-auth.ts";
+import {
+  employeeAnonymizationPatch,
+  EMPLOYEE_ANONYMIZED_FIRST_NAME,
+  EMPLOYEE_ANONYMIZED_LAST_NAME,
+} from "../_shared/employee-anonymization.ts";
 
 interface FieldDefinition {
   id: string;
