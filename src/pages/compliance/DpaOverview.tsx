@@ -204,7 +204,7 @@ function ArchiveCell({
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.docx"
+            accept="application/pdf,.pdf"
             className="hidden"
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
