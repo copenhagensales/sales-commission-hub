@@ -470,6 +470,7 @@ export default function LocationHistoryContent() {
     return Array.from(locAgg.entries()).map(([groupKey, entry]) => {
       let totalRevenue = 0, totalCommission = 0, totalSales = 0, totalDays = 0;
       let totalLocCost = 0, totalHotelCost = 0, totalDietCost = 0;
+      let totalLocCostGross = 0, totalLocCostNet = 0, anyMissingLocked = false;
 
       const weeklyBreakdown = Array.from(entry.weeks.values())
         .sort((a, b) => a.year - b.year || a.week - b.week)
