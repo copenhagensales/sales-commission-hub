@@ -117,34 +117,52 @@ export default function ProcessingRegistry() {
         </DocSection>
 
         <DocSection heading="D. Modtagere og databehandlere">
+          <p className="text-muted-foreground">
+            Aftalegrundlag, links og arkiveringsstatus pr. leverandør fremgår af
+            dokumentet{" "}
+            <a
+              href="/compliance/documents/dpa-overview"
+              className="text-primary underline"
+            >
+              Databehandleraftaler (DPA) — oversigt og status
+            </a>
+            .
+          </p>
           <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
             <li>
-              Lovable — udviklings- og driftsplatform. <Confirm>DPA</Confirm>
+              Lovable — udviklings- og driftsplatform. Se DPA-oversigten; status:
+              mangler arkivering.
             </li>
             <li>
               Supabase — hosting, database og auth. Region: eu-west-3 (Paris, EU),
-              aflæst i projektets forbindelsesopsætning. <Confirm>DPA</Confirm>
+              aflæst i projektets forbindelsesopsætning. Se DPA-oversigten; status:
+              mangler arkivering.
             </li>
             <li>
               Microsoft (Entra ID / Microsoft 365) — login samt udsendelse af mail
-              og kalenderopslag via Graph. <Confirm>DPA</Confirm>
+              og kalenderopslag via Graph. Se DPA-oversigten; status: mangler
+              arkivering.
             </li>
             <li>
-              Adversus — dialer/kampagneintegration. <Confirm>DPA</Confirm>
+              Adversus — dialer/kampagneintegration. Se DPA-oversigten; status:
+              mangler arkivering (tjek onboarding-dokumenter / rekvirér).
             </li>
             <li>
-              Enreach — dialer/telefoniintegration. <Confirm>DPA</Confirm>
+              Enreach — dialer/telefoniintegration. Se DPA-oversigten; status:
+              mangler arkivering (tjek onboarding-dokumenter).
             </li>
             <li>
-              Twilio — SMS og telefoni. <Confirm>DPA</Confirm>
+              Twilio — SMS og telefoni. Se DPA-oversigten; status: mangler
+              arkivering.
             </li>
             <li>
-              e-conomic — økonomi og bogføring. <Confirm>DPA</Confirm>
+              e-conomic — økonomi og bogføring. Se DPA-oversigten; status: mangler
+              arkivering.
             </li>
           </ul>
           <p className="text-muted-foreground">
-            Databehandleraftalerne samles i én fælles mappe. Hver post markeret
-            [BEKRÆFTES] mangler dokumenteret aftale på plads i mappen.
+            Databehandleraftalerne samles i én fælles mappe. Status pr. leverandør
+            opdateres i DPA-oversigten, når aftalen er arkiveret.
           </p>
         </DocSection>
 
