@@ -623,40 +623,9 @@ export default function EmployeeDetail() {
                 )}
               </>
             )}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={async () => {
-                if (!employee.private_email) {
-                  toast({ 
-                    title: "Mangler email", 
-                    description: "Medarbejderen har ikke en email registreret.",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                
-                const { data, error } = await supabase.functions.invoke("initiate-password-reset", {
-                  body: { email: employee.private_email }
-                });
-                
-                if (error) {
-                  toast({ 
-                    title: "Fejl ved nulstilling", 
-                    description: error.message,
-                    variant: "destructive"
-                  });
-                } else {
-                  toast({ 
-                    title: "Email sendt", 
-                    description: `En email til nulstilling af adgangskode er sendt til ${employee.private_email}` 
-                  });
-                }
-              }}
-            >
-              <KeyRound className="h-4 w-4 mr-2" />
-              Nulstil kode
-            </Button>
+            {/* "Nulstil kode" er fjernet: password-login er lukket, og login sker
+                udelukkende med Microsoft-kontoen (arbejdsmailen). */}
+
             <Button 
               variant="outline" 
               size="sm"
