@@ -118,7 +118,16 @@ export default function Auth() {
       {/* Login */}
       <div className="flex flex-col justify-center border-t border-white/[0.07] bg-[#0f1a2e] px-8 py-14 sm:px-14 lg:border-l lg:border-t-0">
         <div className="mx-auto w-full max-w-[420px]">
-          <h2 className="text-[30px] font-extrabold tracking-[-0.01em] text-white">{greeting}</h2>
+          <h2 className="flex items-center gap-2.5 text-[30px] font-extrabold tracking-[-0.01em] text-white">
+            <span
+              className="inline-block animate-bounce text-[32px] [animation-duration:2.4s]"
+              role="img"
+              aria-label="Stork"
+            >
+              🦩
+            </span>
+            <span>Storken siger {greeting.toLowerCase()} til dig</span>
+          </h2>
           <p className="mt-2 text-[16px] leading-relaxed text-[#8a97b1]">
             Log ind med din arbejdsmail for at fortsætte.
           </p>
