@@ -36,6 +36,15 @@ interface DataRetentionPolicy {
   cleanup_mode: string;
 }
 
+/** Datatyper hvor anonymisering er mulig (statistik bevares). Øvrige slettes. */
+const ANONYMIZABLE_DATA_TYPES = [
+  "candidates",
+  "customer_inquiries",
+  "communication_logs",
+  "login_events",
+  "inactive_employees",
+];
+
 export default function RetentionPolicies() {
   const queryClient = useQueryClient();
 
@@ -202,14 +211,15 @@ export default function RetentionPolicies() {
   };
 
   const dataTypeTooltips: Record<string, string> = {
-    customer_inquiries: "Kundehenvendelser slettes permanent efter udløb.",
-    candidates: "Kandidatdata anonymiseres eller slettes efter udløb.",
-    inactive_employees: "Deaktiverede medarbejdere slettes fra master data efter udløb.",
+    customer_inquiries: "Anonymisér: navn → 'Anonymiseret', email/telefon/besked fjernes, men tidspunkt og antal bevares til statistik. Slet alt: henvendelsen fjernes helt.",
+    candidates: "Anonymisér: navn/email/telefon/CV fjernes, men ansøgningsdato, kilde, stilling og status bevares, så du kan se antal ansøgere over tid. Slet alt: kandidaten fjernes helt.",
+    inactive_employees: "Anonymisér: navn, CPR, bank, adresse og kontaktdata fjernes, men ansættelsesperiode og historik bevares. Slet alt: medarbejderen fjernes fra stamdata.",
     integration_logs: "Integrationslogfiler med potentielle persondata slettes.",
-    login_events: "Login-historik (email, IP, user agent) slettes.",
+    login_events: "Anonymisér: email, navn, IP og enhed fjernes, men login-tidspunkt bevares til statistik. Slet alt: login-historikken fjernes.",
     password_reset_tokens: "Udløbne password reset tokens slettes.",
-    communication_logs: "Rekrutteringskommunikation (SMS/email) slettes.",
+    communication_logs: "Anonymisér: beskedtekst og telefonnummer fjernes, men tidspunkt, type og udfald bevares til statistik. Slet alt: loggen fjernes.",
   };
+
 
   return (
     <MainLayout>
@@ -448,10 +458,28 @@ export default function RetentionPolicies() {
                           />
                         </td>
                         <td className="py-3 pr-4">
-                          <Badge variant="outline" className="text-xs">
-                            <Trash2 className="h-3 w-3 mr-1" /> Slet alt
-                          </Badge>
+                          {ANONYMIZABLE_DATA_TYPES.includes(policy.data_type) ? (
+                            <Select
+                              value={policy.cleanup_mode === "anonymize" ? "anonymize" : "delete_all"}
+                              onValueChange={(v) =>
+                                dataUpsertMutation.mutate({ data_type: policy.data_type, cleanup_mode: v })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-44 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="anonymize">Anonymisér (bevar statistik)</SelectItem>
+                                <SelectItem value="delete_all">Slet alt</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              <Trash2 className="h-3 w-3 mr-1" /> Slet alt
+                            </Badge>
+                          )}
                         </td>
+
                         <td className="py-3">
                           <Switch
                             checked={policy.is_active}
