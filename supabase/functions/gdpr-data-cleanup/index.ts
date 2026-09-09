@@ -969,7 +969,16 @@ Deno.serve(async (req) => {
     }
 
 
-    // ===== PART 4: Summary and audit log =====
+    // ===== PART 4: Summary, audit log and gdpr_cleanup_log =====
+    addLog("sales_field_retention_cleaned", totalFieldsCleaned, { fields: fieldCleanupResults });
+    addLog("candidates_processed", candidatesProcessed);
+    addLog("customer_inquiries_deleted", customerInquiriesDeleted);
+    addLog("customer_inquiries_anonymized", customerInquiriesAnonymized);
+    addLog("communication_logs_anonymized", communicationLogsAnonymized);
+    addLog("login_events_anonymized", loginEventsAnonymized);
+    addLog("inactive_employees_deleted", inactiveEmployeesDeleted);
+    addLog("inactive_employees_anonymized", inactiveEmployeesAnonymized);
+
     const totalActions =
       totalFieldsCleaned +
       campaignSalesAnonymized +
@@ -980,29 +989,45 @@ Deno.serve(async (req) => {
       communicationLogsAnonymized +
       loginEventsAnonymized +
       inactiveEmployeesDeleted +
-      inactiveEmployeesAnonymized;
+      inactiveEmployeesAnonymized +
+      fmSalesAnonymized +
+      eesyRowsAnonymized +
+      cancellationRowsAnonymized +
+      adversusEventsDeleted;
 
-    log("INFO", `GDPR cleanup complete. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}`);
+    log("INFO", `GDPR cleanup complete${dryRun ? " (DRY RUN)" : ""}. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Skipped unmapped: ${campaignSalesSkippedUnmapped}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}, FM phones: ${fmSalesAnonymized}, Eesy rows: ${eesyRowsAnonymized}, Cancellation rows: ${cancellationRowsAnonymized}, Adversus events: ${adversusEventsDeleted}`);
 
-    if (totalActions > 0) {
+    const summaryDetails = {
+      dry_run: dryRun,
+      fields_cleaned: totalFieldsCleaned,
+      field_results: fieldCleanupResults,
+      campaign_sales_anonymized: campaignSalesAnonymized,
+      campaign_sales_deleted: campaignSalesDeleted,
+      campaign_sales_skipped_unmapped: campaignSalesSkippedUnmapped,
+      campaign_results: campaignResults,
+      references_preserved: referencesPreserved,
+      commissions_backfilled: commissionsBackfilled,
+      normalized_keys_stripped: normalizedKeysStripped,
+      system_copy_results: systemCopyResults,
+      fieldmarketing_sales_phone_cleared: fmSalesAnonymized,
+      eesy_fm_powerbi_rows_phone_cleared: eesyRowsAnonymized,
+      cancellation_queue_uploaded_data_cleaned: cancellationRowsAnonymized,
+      adversus_events_deleted: adversusEventsDeleted,
+      candidates_processed: candidatesProcessed,
+      customer_inquiries_deleted: customerInquiriesDeleted,
+      customer_inquiries_anonymized: customerInquiriesAnonymized,
+      communication_logs_anonymized: communicationLogsAnonymized,
+      login_events_anonymized: loginEventsAnonymized,
+      inactive_employees_deleted: inactiveEmployeesDeleted,
+      inactive_employees_anonymized: inactiveEmployeesAnonymized,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (totalActions > 0 && !dryRun) {
       try {
         const { error: auditError } = await supabase.from("audit_logs").insert({
           action: "gdpr_data_cleanup",
-          details: {
-            fields_cleaned: totalFieldsCleaned,
-            field_results: fieldCleanupResults,
-            campaign_sales_anonymized: campaignSalesAnonymized,
-            campaign_sales_deleted: campaignSalesDeleted,
-            campaign_results: campaignResults,
-            candidates_processed: candidatesProcessed,
-            customer_inquiries_deleted: customerInquiriesDeleted,
-            customer_inquiries_anonymized: customerInquiriesAnonymized,
-            communication_logs_anonymized: communicationLogsAnonymized,
-            login_events_anonymized: loginEventsAnonymized,
-            inactive_employees_deleted: inactiveEmployeesDeleted,
-            inactive_employees_anonymized: inactiveEmployeesAnonymized,
-            timestamp: new Date().toISOString(),
-          },
+          details: summaryDetails,
         });
         if (auditError) {
           log("WARN", "Could not write to audit_logs table", auditError.message);
@@ -1010,14 +1035,40 @@ Deno.serve(async (req) => {
       } catch (_e) {
         log("WARN", "Could not write to audit_logs table (table may not exist)");
       }
+
+      // One row per performed action. Dry runs are never logged here.
+      if (cleanupLog.length > 0) {
+        const runAt = new Date().toISOString();
+        const { error: logError } = await supabase.from("gdpr_cleanup_log").insert(
+          cleanupLog.map((entry) => ({
+            run_at: runAt,
+            action: entry.action,
+            records_affected: entry.records_affected,
+            details: entry.details ?? {},
+            triggered_by: "gdpr-data-cleanup",
+          }))
+        );
+        if (logError) {
+          log("WARN", `Could not write to gdpr_cleanup_log: ${logError.message}`);
+        }
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
+        dryRun,
         fieldsCleaned: totalFieldsCleaned,
         campaignSalesAnonymized,
         campaignSalesDeleted,
+        campaignSalesSkippedUnmapped,
+        referencesPreserved,
+        commissionsBackfilled,
+        normalizedKeysStripped,
+        fmSalesAnonymized,
+        eesyRowsAnonymized,
+        cancellationRowsAnonymized,
+        adversusEventsDeleted,
         candidatesProcessed,
         customerInquiriesDeleted,
         customerInquiriesAnonymized,
@@ -1027,10 +1078,15 @@ Deno.serve(async (req) => {
         inactiveEmployeesAnonymized,
         fieldResults: fieldCleanupResults,
         campaignResults,
-        message: `GDPR cleanup complete. ${totalActions} total actions performed.`,
+        systemCopyResults,
+        plannedLogEntries: dryRun ? cleanupLog : undefined,
+        message: dryRun
+          ? `DRY RUN — ${totalActions} actions would be performed. Nothing was written.`
+          : `GDPR cleanup complete. ${totalActions} total actions performed.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
