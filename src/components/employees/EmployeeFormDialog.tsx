@@ -292,9 +292,16 @@ export function EmployeeFormDialog({
           });
         }
       } else {
+        const match = await findExistingEmployeeByEmail(formData.work_email, formData.private_email);
+        if (match) {
+          setSaving(false);
+          setDuplicateMatch(match);
+          return;
+        }
         const { error } = await supabase.from("employee_master_data").insert(formData);
         if (error) throw error;
       }
+
 
       
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
