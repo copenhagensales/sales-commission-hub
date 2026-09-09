@@ -417,6 +417,10 @@ export function CphBoardFrame({
         </section>
       )}
 
+      {extraContent ? <section className="relative">{extraContent}</section> : null}
+
+
+
       <section
         className={
           tvMode
