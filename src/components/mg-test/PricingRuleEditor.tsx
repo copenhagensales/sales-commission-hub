@@ -736,7 +736,7 @@ export function PricingRuleEditor({
                   </>
                 ) : (
                   <>
-                    <span className="flex-shrink-0 font-medium text-sm">{key}</span>
+                    <span className="flex-shrink-0 font-medium text-sm">{displayConditionKey(key)}</span>
 
                     {isNumericCondition(value) ? (
                       // Numeric condition UI: operator dropdown + number input
