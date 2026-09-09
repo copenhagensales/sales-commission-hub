@@ -166,6 +166,7 @@ import {
   ComplianceBackupPolicy,
   ComplianceProcessingRegistry,
   ComplianceDpaOverview,
+  ComplianceClientAgreements,
   ShortLinkRedirect,
   PublicUnsubscribe,
   MenuEditor,
