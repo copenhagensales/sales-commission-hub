@@ -42,6 +42,49 @@ interface DataRetentionPolicy {
   is_active: boolean;
 }
 
+
+interface CleanupLogEntry {
+  action: string;
+  records_affected: number;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Dry-run wrapper: selects are delegated to the real client, while every write
+ * becomes a no-op. Row-count deletes are translated into an equivalent
+ * head-count select so the dry run can report exactly what it would remove.
+ */
+function makeDryRunClient(sb: ReturnType<typeof createClient>) {
+  const noopChain = (): any => {
+    const chain: any = new Proxy(function () {}, {
+      get(_target, prop) {
+        if (prop === "then") {
+          return (resolve: (v: unknown) => unknown) =>
+            Promise.resolve({ data: null, error: null, count: 0 }).then(resolve);
+        }
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    });
+    return chain;
+  };
+
+  return {
+    from(table: string) {
+      return {
+        select: (...args: unknown[]) => (sb.from(table) as any).select(...args),
+        // Count what would be deleted instead of deleting it.
+        delete: () => (sb.from(table) as any).select("id", { count: "exact", head: true }),
+        update: () => noopChain(),
+        insert: () => Promise.resolve({ data: null, error: null }),
+        upsert: () => Promise.resolve({ data: null, error: null }),
+      };
+    },
+  } as unknown as ReturnType<typeof createClient>;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -60,8 +103,27 @@ Deno.serve(async (req) => {
     console.log(JSON.stringify({ type, msg, data, timestamp: new Date().toISOString() }));
   };
 
+  // Dry run: compute and report everything, write nothing.
+  let dryRun = false;
   try {
-    log("INFO", "Starting GDPR data cleanup job");
+    if (req.method === "POST") {
+      const body = await req.json().catch(() => null);
+      dryRun = body?.dry_run === true;
+    }
+  } catch (_e) {
+    dryRun = false;
+  }
+
+  // Every mutation in this function goes through `db`.
+  const db = dryRun ? makeDryRunClient(supabase) : supabase;
+  const cleanupLog: CleanupLogEntry[] = [];
+  const addLog = (action: string, records_affected: number, details?: Record<string, unknown>) => {
+    if (records_affected > 0) cleanupLog.push({ action, records_affected, details });
+  };
+
+  try {
+    log("INFO", `Starting GDPR data cleanup job${dryRun ? " (DRY RUN — no writes)" : ""}`);
+
 
     // ===== PART 1: Field retention cleanup (legacy logic — kept as-is) =====
     const { data: fields, error: fieldsError } = await supabase
