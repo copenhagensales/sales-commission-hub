@@ -12,6 +12,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useRef, useState } from "react";
+import { FileText, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
+import {
+  useCanManageDpaDocuments,
+  useDeleteDpaDocument,
+  useDpaDocuments,
+  useOpenDpaDocument,
+  useUploadDpaDocument,
+  type DpaDocument,
+} from "@/hooks/useDpaDocuments";
 
 interface DpaRow {
   vendor: string;
