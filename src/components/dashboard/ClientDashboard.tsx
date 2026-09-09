@@ -51,7 +51,10 @@ export interface ClientDashboardConfig {
     secondaryLabel?: string;
     /** Show fiber-point and fiber-provi columns (TDC Erhverv only). */
     fiberBoard?: boolean;
+    /** Visuel stil: "cph" = Copenhagen Sales board-look (kun præsentation). */
+    theme?: "cph";
   };
+
 
   /** Extra content rendered between KPIs and leaderboards (e.g. client breakdown) */
   extraContent?: React.ReactNode;
