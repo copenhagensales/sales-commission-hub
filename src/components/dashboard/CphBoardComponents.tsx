@@ -153,7 +153,7 @@ export function CphLeaderboard({
         className="grid items-center font-extrabold uppercase"
         style={{
           gridTemplateColumns: cols,
-          columnGap: 14,
+          columnGap: colGap,
           padding: tvMode ? "12px 0 8px" : "12px 0 8px",
           fontSize: tvMode ? 15 : 10,
           letterSpacing: tvMode ? "0.08em" : "0.02em",
@@ -193,7 +193,7 @@ export function CphLeaderboard({
                 className="grid items-center"
                 style={{
                   gridTemplateColumns: cols,
-                  columnGap: 14,
+                  columnGap: colGap,
                   padding: tvMode ? (isTop ? "10px 14px 10px 10px" : "12px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
                   margin: isTop ? (tvMode ? "0 -14px 0 -10px" : "0 -10px 0 -8px") : undefined,
                   background: isTop ? (light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)") : undefined,
