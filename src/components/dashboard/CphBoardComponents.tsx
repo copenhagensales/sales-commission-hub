@@ -1,7 +1,7 @@
 import React from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import cphLogo from "@/assets/cph-sales-logo-dark.png";
+import cphLogo from "@/assets/cph-sales-logo.png";
 import { formatNumber } from "@/lib/calculations";
 import type { LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 
@@ -125,11 +125,11 @@ export function CphLeaderboard({
 
   return (
     <div
-      className="flex min-h-0 flex-col rounded-[20px]"
+      className="flex min-h-0 flex-col overflow-hidden rounded-[20px]"
       style={{
         background: light ? LIGHT : SURFACE,
         color: fg,
-        padding: tvMode ? "22px 26px" : "18px 20px",
+        padding: tvMode ? "18px 26px" : "18px 20px",
       }}
     >
       <div
@@ -152,7 +152,7 @@ export function CphLeaderboard({
         style={{
           gridTemplateColumns: cols,
           columnGap: 14,
-          padding: tvMode ? "16px 0 10px" : "12px 0 8px",
+          padding: tvMode ? "12px 0 8px" : "12px 0 8px",
           fontSize: tvMode ? 15 : 10,
           letterSpacing: tvMode ? "0.08em" : "0.02em",
           color: fgDim,
@@ -192,7 +192,7 @@ export function CphLeaderboard({
                 style={{
                   gridTemplateColumns: cols,
                   columnGap: 14,
-                  padding: tvMode ? (isTop ? "14px 14px 14px 10px" : "16px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
+                  padding: tvMode ? (isTop ? "10px 14px 10px 10px" : "12px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
                   margin: isTop ? (tvMode ? "0 -14px 0 -10px" : "0 -10px 0 -8px") : undefined,
                   background: isTop ? (light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)") : undefined,
                   color: isTop && light ? LIGHT : undefined,

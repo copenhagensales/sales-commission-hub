@@ -422,7 +422,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 showFiber={showFiber}
-                maxRows={tvMode ? 10 : undefined}
+                maxRows={tvMode ? 8 : undefined}
               />
               <CphLeaderboard
                 title="Top uge"
@@ -432,7 +432,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 showFiber={showFiber}
-                maxRows={tvMode ? 10 : undefined}
+                maxRows={tvMode ? 8 : undefined}
               />
               <CphLeaderboard
                 title="Top i dag"
@@ -442,7 +442,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 showFiber={showFiber}
-                maxRows={tvMode ? 10 : undefined}
+                maxRows={tvMode ? 8 : undefined}
               />
             </>
           ) : (
@@ -514,7 +514,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 showFiber={showFiber}
-                maxRows={tvMode ? 10 : undefined}
+                maxRows={tvMode ? 8 : undefined}
               />
               <TvLeaderboardTable
                 title="Top Uge"
@@ -524,7 +524,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 showFiber={showFiber}
-                maxRows={tvMode ? 10 : undefined}
+                maxRows={tvMode ? 8 : undefined}
               />
               <TvLeaderboardTable
                 title="Top Dag"
@@ -534,7 +534,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 showFiber={showFiber}
-                maxRows={tvMode ? 10 : undefined}
+                maxRows={tvMode ? 8 : undefined}
               />
             </div>
 
