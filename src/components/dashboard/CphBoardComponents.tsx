@@ -157,7 +157,7 @@ export function CphLeaderboard({
         style={{
           gridTemplateColumns: cols,
           columnGap: colGap,
-          padding: tvMode ? "12px 0 8px" : "12px 0 8px",
+          padding: tvMode ? `12px ${padR}px 8px ${padL}px` : `12px ${padR}px 8px ${padL}px`,
           fontSize: tvMode ? 15 : 10,
           letterSpacing: tvMode ? "0.08em" : "0.02em",
           color: fgDim,
@@ -165,11 +165,12 @@ export function CphLeaderboard({
       >
         <span>#</span>
         <span />
-        <span>Navn</span>
+        <span className="truncate">Navn</span>
         <span style={{ textAlign: "right" }}>Salg</span>
         {showCrossSales && <span style={{ textAlign: "right" }}>{crossSalesLabel}</span>}
         {showFiber && <span style={{ textAlign: "right" }}>Fiber</span>}
-        <span style={{ textAlign: "right", minWidth: tvMode ? 118 : 66 }}>Provision</span>
+        <span style={{ textAlign: "right" }}>Provision</span>
+
       </div>
 
       {isLoading ? (
