@@ -69,7 +69,7 @@ function PhotoSlot({
 }) {
   if (photo?.url) {
     return (
-      <div className="group relative h-full w-full overflow-hidden rounded-2xl bg-[hsl(var(--cph-light-blue)/0.06)]">
+      <div className="group relative h-full w-full overflow-hidden rounded-xl bg-[hsl(var(--cph-light-blue)/0.06)]">
         <img
           src={photo.url}
           alt={photo.title || "Billede fra seneste event"}
