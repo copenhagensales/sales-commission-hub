@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { PartyPopper, Calendar, MapPin, ThumbsUp, ThumbsDown, Clock } from "lucide-react";
+import { PartyPopper, Calendar, MapPin, ThumbsUp, ThumbsDown, Clock, HelpCircle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
