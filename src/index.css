@@ -22,7 +22,14 @@
 
 @layer base {
   :root {
+    /* Login-side (Copenhagen Sales) */
+    --cph-light-blue: 185 25% 92%;
+    --cph-onyx: 220 7% 20%;
+    --cph-onyx-pressed: 220 8% 14%;
+    --cph-emerald: 146 73% 56%;
+
     /* Dark theme matching sidebar */
+
     --background: 222 47% 9%;
     --foreground: 0 0% 98%;
 
