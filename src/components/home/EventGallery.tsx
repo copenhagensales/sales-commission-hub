@@ -304,6 +304,8 @@ export function EventGallery() {
             onAdd={openDialog}
             onEdit={openEdit}
             onMove={handleMove}
+            like={slots[0].photo ? likes[slots[0].photo.id] : undefined}
+            onToggleLike={handleToggleLike}
           />
         </div>
         {slots.slice(1).map((slot, index) => (
