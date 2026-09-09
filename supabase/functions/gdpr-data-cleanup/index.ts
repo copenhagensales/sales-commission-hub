@@ -454,6 +454,174 @@ Deno.serve(async (req) => {
       log("WARN", `Campaign cleanup error: ${cpErr instanceof Error ? cpErr.message : String(cpErr)}`);
     }
 
+    addLog("campaign_sales_anonymized", campaignSalesAnonymized, { campaigns: campaignResults });
+    addLog("campaign_sales_deleted", campaignSalesDeleted, { campaigns: campaignResults });
+    addLog("sales_references_preserved", referencesPreserved);
+    addLog("sale_items_commission_backfilled", commissionsBackfilled);
+    addLog("sales_normalized_keys_stripped", normalizedKeysStripped);
+
+    // ===== PART 2B: System copies of the same personal data =====
+    // Retention window per client comes from the campaign policies; when no
+    // policy covers the client we fall back to FALLBACK_RETENTION_DAYS.
+    let fmSalesAnonymized = 0;
+    let eesyRowsAnonymized = 0;
+    let cancellationRowsAnonymized = 0;
+    let adversusEventsDeleted = 0;
+    const systemCopyResults: { table: string; count: number; retention_days: number }[] = [];
+
+    const retentionForClient = (clientId: string | null | undefined): number =>
+      (clientId && clientRetentionDays.get(clientId)) || FALLBACK_RETENTION_DAYS;
+
+    // --- a) fieldmarketing_sales.phone_number ---
+    try {
+      const { data: fmRows, error: fmErr } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, client_id, registered_at")
+        .not("phone_number", "is", null);
+
+      if (fmErr) {
+        log("WARN", `Error selecting fieldmarketing_sales: ${fmErr.message}`);
+      } else {
+        for (const row of fmRows ?? []) {
+          const days = retentionForClient(row.client_id as string | null);
+          const cutoff = cutoffIso(days);
+          if (!row.registered_at || String(row.registered_at) >= cutoff) continue;
+
+          const { error: updErr } = await db
+            .from("fieldmarketing_sales")
+            .update({ phone_number: null })
+            .eq("id", row.id);
+
+          if (updErr) {
+            log("WARN", `Failed to anonymize fieldmarketing_sales ${row.id}: ${updErr.message}`);
+          } else {
+            fmSalesAnonymized++;
+          }
+        }
+        if (fmSalesAnonymized > 0) {
+          systemCopyResults.push({
+            table: "fieldmarketing_sales",
+            count: fmSalesAnonymized,
+            retention_days: FALLBACK_RETENTION_DAYS,
+          });
+        }
+        log("INFO", `fieldmarketing_sales phone numbers cleared: ${fmSalesAnonymized}`);
+      }
+    } catch (e) {
+      log("WARN", `fieldmarketing_sales cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // --- b) eesy_fm_powerbi_rows phone columns ---
+    try {
+      const eesyCutoff = cutoffIso(FALLBACK_RETENTION_DAYS);
+      const { data: eesyRows, error: eesyErr } = await supabase
+        .from("eesy_fm_powerbi_rows")
+        .select("id")
+        .lt("sale_date", eesyCutoff.slice(0, 10))
+        .or("phone_raw.not.is.null,phone_normalized.not.is.null");
+
+      if (eesyErr) {
+        log("WARN", `Error selecting eesy_fm_powerbi_rows: ${eesyErr.message}`);
+      } else {
+        for (const row of eesyRows ?? []) {
+          const { error: updErr } = await db
+            .from("eesy_fm_powerbi_rows")
+            .update({ phone_raw: null, phone_normalized: null })
+            .eq("id", row.id);
+
+          if (updErr) {
+            log("WARN", `Failed to anonymize eesy_fm_powerbi_rows ${row.id}: ${updErr.message}`);
+          } else {
+            eesyRowsAnonymized++;
+          }
+        }
+        if (eesyRowsAnonymized > 0) {
+          systemCopyResults.push({
+            table: "eesy_fm_powerbi_rows",
+            count: eesyRowsAnonymized,
+            retention_days: FALLBACK_RETENTION_DAYS,
+          });
+        }
+        log("INFO", `eesy_fm_powerbi_rows phone numbers cleared: ${eesyRowsAnonymized}`);
+      }
+    } catch (e) {
+      log("WARN", `eesy_fm_powerbi_rows cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // --- c) cancellation_queue.uploaded_data identity keys ---
+    try {
+      const { data: cqRows, error: cqErr } = await supabase
+        .from("cancellation_queue")
+        .select("id, client_id, created_at, uploaded_data")
+        .not("uploaded_data", "is", null);
+
+      if (cqErr) {
+        log("WARN", `Error selecting cancellation_queue: ${cqErr.message}`);
+      } else {
+        for (const row of cqRows ?? []) {
+          const days = retentionForClient(row.client_id as string | null);
+          const cutoff = cutoffIso(days);
+          if (!row.created_at || String(row.created_at) >= cutoff) continue;
+
+          const stripped = stripKeys(row.uploaded_data, CANCELLATION_IDENTITY_KEYS);
+          if (!stripped.changed) continue;
+
+          const { error: updErr } = await db
+            .from("cancellation_queue")
+            .update({ uploaded_data: stripped.result })
+            .eq("id", row.id);
+
+          if (updErr) {
+            log("WARN", `Failed to anonymize cancellation_queue ${row.id}: ${updErr.message}`);
+          } else {
+            cancellationRowsAnonymized++;
+          }
+        }
+        if (cancellationRowsAnonymized > 0) {
+          systemCopyResults.push({
+            table: "cancellation_queue",
+            count: cancellationRowsAnonymized,
+            retention_days: FALLBACK_RETENTION_DAYS,
+          });
+        }
+        log("INFO", `cancellation_queue rows cleaned: ${cancellationRowsAnonymized}`);
+      }
+    } catch (e) {
+      log("WARN", `cancellation_queue cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // --- d) adversus_events: processing artefacts, deleted after 90 days ---
+    try {
+      const eventCutoff = cutoffIso(ADVERSUS_EVENTS_RETENTION_DAYS);
+      const { error: delErr, count } = await db
+        .from("adversus_events")
+        .delete({ count: "exact" })
+        .lt("received_at", eventCutoff);
+
+      if (delErr) {
+        log("WARN", `Error deleting adversus_events: ${delErr.message}`);
+      } else {
+        adversusEventsDeleted = count ?? 0;
+        if (adversusEventsDeleted > 0) {
+          systemCopyResults.push({
+            table: "adversus_events",
+            count: adversusEventsDeleted,
+            retention_days: ADVERSUS_EVENTS_RETENTION_DAYS,
+          });
+        }
+        log("INFO", `adversus_events deleted: ${adversusEventsDeleted}`);
+      }
+    } catch (e) {
+      log("WARN", `adversus_events cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    addLog("fieldmarketing_sales_phone_cleared", fmSalesAnonymized);
+    addLog("eesy_fm_powerbi_rows_phone_cleared", eesyRowsAnonymized);
+    addLog("cancellation_queue_uploaded_data_cleaned", cancellationRowsAnonymized);
+    addLog("adversus_events_deleted", adversusEventsDeleted);
+
+
+
     // ===== PART 3: General data type cleanup =====
     // cleanup_mode:
     //   "delete_all"  -> rows are removed permanently
