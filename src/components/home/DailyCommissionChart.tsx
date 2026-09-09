@@ -86,7 +86,7 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
 
   if (workdayData.length === 0) {
     return (
-      <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+      <Card className="border border-border bg-card rounded-3xl">
         <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
           <CardTitle className="flex items-center gap-2 text-sm md:text-base font-semibold">
             <BarChart className="w-4 h-4 text-primary" />
@@ -103,7 +103,7 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
   }
 
   return (
-    <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+    <Card className="border border-border bg-card rounded-3xl">
       <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
