@@ -84,6 +84,7 @@ const Home = () => {
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   
   const { isOwner } = usePermissions();
+  const lookupAvatar = useAvatarLookup();
 
   const handleLogout = async () => {
     queryClient.clear();
