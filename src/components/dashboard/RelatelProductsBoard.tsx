@@ -44,6 +44,7 @@ export default function RelatelProductsBoard() {
 
   return (
     <DashboardShell>
+      <div className="cph-board rounded-[20px] p-6">
       <DashboardHeader
         title="Relatel – Produktoversigt"
         subtitle={`Produkter oprettet i perioden: ${periodLabel}`}
