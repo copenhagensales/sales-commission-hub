@@ -5500,6 +5500,42 @@ export type Database = {
           },
         ]
       }
+      dpa_documents: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          file_name: string
+          file_size: number | null
+          id: string
+          note: string | null
+          storage_path: string
+          uploaded_by: string | null
+          vendor: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          note?: string | null
+          storage_path: string
+          uploaded_by?: string | null
+          vendor: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          note?: string | null
+          storage_path?: string
+          uploaded_by?: string | null
+          vendor?: string
+        }
+        Relationships: []
+      }
       economic_baseline_exclusions: {
         Row: {
           created_at: string | null
@@ -15284,6 +15320,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      can_manage_dpa_documents: { Args: { _user_id: string }; Returns: boolean }
       can_manage_event_gallery: { Args: { _user_id: string }; Returns: boolean }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {

@@ -12,6 +12,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useRef, useState } from "react";
+import { FileText, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
+import {
+  useCanManageDpaDocuments,
+  useDeleteDpaDocument,
+  useDpaDocuments,
+  useOpenDpaDocument,
+  useUploadDpaDocument,
+  type DpaDocument,
+} from "@/hooks/useDpaDocuments";
 
 interface DpaRow {
   vendor: string;
@@ -102,7 +114,106 @@ const rows: DpaRow[] = [
   },
 ];
 
+function ArchiveCell({
+  vendor,
+  documents,
+  canManage,
+}: {
+  vendor: string;
+  documents: DpaDocument[];
+  canManage: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const uploadMut = useUploadDpaDocument();
+  const deleteMut = useDeleteDpaDocument();
+  const openMut = useOpenDpaDocument();
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Filen må højst være 25 MB");
+      return;
+    }
+    setBusy(true);
+    try {
+      await uploadMut.mutateAsync({ vendor, file });
+      toast.success(`Aftalen er arkiveret for ${vendor}`);
+    } catch {
+      toast.error("Kunne ikke arkivere filen");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {documents.length === 0 && (
+        <p className="text-muted-foreground">Ingen fil arkiveret</p>
+      )}
+      {documents.map((doc) => (
+        <div key={doc.id} className="flex items-start gap-1">
+          <button
+            type="button"
+            onClick={() => openMut.mutate(doc.storage_path)}
+            className="flex items-start gap-1 text-left text-primary underline break-all"
+          >
+            <FileText className="h-4 w-4 shrink-0" />
+            <span>{doc.file_name}</span>
+          </button>
+          {canManage && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={async () => {
+                if (!window.confirm(`Slet ${doc.file_name} fra arkivet?`)) return;
+                try {
+                  await deleteMut.mutateAsync(doc);
+                  toast.success("Filen er slettet fra arkivet");
+                } catch {
+                  toast.error("Kunne ikke slette filen");
+                }
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            </Button>
+          )}
+        </div>
+      ))}
+
+      {canManage && (
+        <div data-no-print>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.docx"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5 mr-2" />
+            {busy ? "Uploader..." : "Upload aftale"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DpaOverview() {
+  const { data: documents } = useDpaDocuments();
+  const { data: canManage } = useCanManageDpaDocuments();
+
+  const byVendor = (vendor: string) =>
+    (documents || []).filter((doc) => doc.vendor === vendor);
+
   return (
     <MainLayout>
       <ComplianceDocument
@@ -119,7 +230,8 @@ export default function DpaOverview() {
                   <TableHead className="w-[130px]">Leverandør</TableHead>
                   <TableHead className="w-[200px]">Rolle/formål</TableHead>
                   <TableHead>DPA-link</TableHead>
-                  <TableHead className="w-[220px]">Hvad der skal arkiveres</TableHead>
+                  <TableHead className="w-[200px]">Hvad der skal arkiveres</TableHead>
+                  <TableHead className="w-[200px]">Arkiveret fil</TableHead>
                   <TableHead className="w-[180px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -145,6 +257,13 @@ export default function DpaOverview() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{row.archive}</TableCell>
                     <TableCell>
+                      <ArchiveCell
+                        vendor={row.vendor}
+                        documents={byVendor(row.vendor)}
+                        canManage={!!canManage}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <Badge
                         variant="outline"
                         className="bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-normal text-left"
@@ -161,12 +280,10 @@ export default function DpaOverview() {
 
         <DocSection heading="Arkivering">
           <p className="text-muted-foreground">
-            Dokumenterne arkiveres samlet ét sted. Compliance-sektionen understøtter
-            i dag ikke filupload, så aftalerne lægges i en fælles mappe:{" "}
-            <span className="font-medium text-amber-700">
-              Arkiveres i [mappe — udfyldes]
-            </span>
-            .
+            Aftalerne arkiveres direkte i Stork via kolonnen "Arkiveret fil".
+            Filerne ligger i et lukket arkiv, hvor kun ejere og superadmins kan
+            uploade, åbne og slette dem. Maks. 25 MB pr. fil (PDF, billede eller
+            Word).
           </p>
           <p className="text-muted-foreground">
             Status opdateres pr. leverandør, når aftalen er arkiveret.
