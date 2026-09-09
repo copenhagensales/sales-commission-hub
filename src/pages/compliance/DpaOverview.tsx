@@ -296,10 +296,10 @@ export default function DpaOverview() {
 
         <DocSection heading="Arkivering">
           <p className="text-muted-foreground">
-            Aftalerne arkiveres direkte i Stork via kolonnen "Arkiveret fil".
-            Filerne ligger i et lukket arkiv, hvor kun ejere og superadmins kan
-            uploade, åbne og slette dem. Maks. 25 MB pr. fil (PDF, billede eller
-            Word).
+            Aftalerne arkiveres som PDF direkte i Stork via kolonnen "Arkiveret
+            fil", og arkiveringsdatoen vises ved hver fil. Filerne ligger i et
+            lukket arkiv, hvor kun ejere og superadmins kan uploade, åbne og
+            slette dem. Maks. 25 MB pr. fil.
           </p>
           <p className="text-muted-foreground">
             Status opdateres pr. leverandør, når aftalen er arkiveret.
