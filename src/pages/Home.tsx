@@ -473,12 +473,27 @@ const Home = () => {
         periodCommission={personalStats?.periodCommission || 0}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-3 md:p-8 space-y-3 md:space-y-6">
+      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-10 md:pt-8">
+        <div className="flex flex-col gap-8">
+          {/* Topbar */}
+          <div className="flex flex-col gap-3 border-b-2 border-[hsl(var(--cph-onyx))] pb-6">
+            <div className="flex items-center gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-onyx))]" />
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-foreground/70">
+                {format(new Date(), "EEEE d. MMMM", { locale: da })} · Live
+              </span>
+            </div>
+            <h1 className="text-[clamp(28px,4vw,40px)] font-extrabold leading-[1.05] tracking-[-0.02em] text-foreground">
+              {greetingLabel}, {firstName}
+            </h1>
+          </div>
+
         {/* Kontrakt der afventer underskrift */}
         <PendingContractBanner employeeId={employee?.id} />
 
         {/* Pulsmåling der mangler besvarelse */}
         <PendingPulseSurveyBanner />
+
 
         {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
         <HeroPerformanceCard
