@@ -737,3 +737,16 @@
   min-height: 1.25rem;
 }
 
+
+/* Compliance-dokumenter: ren udskrift uden navigation og knapper */
+@media print {
+  [data-no-print],
+  aside,
+  nav {
+    display: none !important;
+  }
+  .doc-print-root {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}
