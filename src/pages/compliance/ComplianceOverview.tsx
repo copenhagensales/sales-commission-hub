@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye, Database } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye, Database, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -159,6 +159,16 @@ export default function ComplianceOverview() {
       badge: "Godkendt 1.0",
       badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
       href: "/compliance/documents/dpa-overview",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Kundeaftaler: DPA og kontrakt",
+      description:
+        "Én boks pr. kunde med databehandleraftale og kontrakt. Filerne uploades og gemmes i et lukket arkiv.",
+      icon: Building2,
+      badge: "Kunder",
+      badgeColor: "bg-sky-500/10 text-sky-700 border-sky-500/30",
+      href: "/compliance/documents/client-agreements",
       permKey: "menu_compliance_admin",
     },
   ];
