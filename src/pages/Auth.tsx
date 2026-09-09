@@ -81,13 +81,13 @@ export default function Auth() {
           />
           <span className="h-10 w-px bg-white/15" />
           <span className="text-[13px] font-bold uppercase tracking-[0.16em] text-[#8a97b1]">
-            Provision
+            Stork
           </span>
         </div>
 
         <div className="relative flex max-w-[460px] flex-col gap-6">
           <div className="text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#E8B23A]">
-            Stork
+            Provision
           </div>
           <h1 className="text-[clamp(34px,4.2vw,52px)] font-extrabold leading-[1.04] tracking-[-0.02em] text-white">
             Dine tal. Opdateret hver dag.
