@@ -892,7 +892,9 @@ const Home = () => {
             </Card>
           </Collapsible>
         )}
+        </div>
       </div>
+
     </MainLayout>
   );
 };
