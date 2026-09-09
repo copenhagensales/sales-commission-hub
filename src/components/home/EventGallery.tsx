@@ -155,7 +155,7 @@ function PhotoSlot({
 }
 
 export function EventGallery() {
-  const { data: photos = [] } = useEventGalleryPhotos(5);
+  const { data: photos = [] } = useEventGalleryPhotos(4);
   const { data: canManage = false } = useCanManageEventGallery();
   const uploadMutation = useUploadEventPhotos();
   const deleteMutation = useDeleteEventPhoto();
