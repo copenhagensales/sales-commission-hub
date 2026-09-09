@@ -8,8 +8,10 @@ export default function SalaryTypes() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Receipt className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+        <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-sm ring-1 ring-foreground/5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Receipt className="h-6 w-6" />
+          </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold">Lønstyring</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Administrer lønarter og personalelønninger</p>
