@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Trophy, ArrowRight, Users } from "lucide-react";
+import { Trophy, ArrowRight, Users, Medal } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,7 +81,7 @@ export function CompactLeagueView() {
       <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500" />
+            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-[hsl(var(--cph-emerald))]" />
             Din liga-position
           </CardTitle>
           <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">

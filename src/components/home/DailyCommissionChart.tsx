@@ -53,13 +53,13 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
     const todayData = workdayData.find((d) => d.isToday);
     
     if (hasStreak) {
-      return { emoji: "🔥", text: "Du er på en streak!" };
+      return { emoji: "", text: "Du er på en streak!" };
     }
     if (todayData && todayData.commission > average) {
-      return { emoji: "💪", text: "Stærk dag!" };
+      return { emoji: "", text: "Stærk dag!" };
     }
     if (daysAboveAverage >= workdayData.length / 2) {
-      return { emoji: "📈", text: `${daysAboveAverage} dage over snit` };
+      return { emoji: "", text: `${daysAboveAverage} dage over snit` };
     }
     return { emoji: "💡", text: "Tid til comeback!" };
   };

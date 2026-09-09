@@ -546,11 +546,11 @@ const Home = () => {
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
                           ? `${celebration.years} års jubilæum 🏆`
-                          : `Tillykke med fødselsdagen! 🎈`
+                          : `Tillykke med fødselsdagen!`
                         }
                       </p>
                     </div>
-                    <span className="text-xl">🎉</span>
+                    <PartyPopper className="w-5 h-5 text-foreground" />
                   </div>
                 ))}
               </div>
@@ -879,7 +879,7 @@ const Home = () => {
                         }`}
                       >
                         {celebration.type === 'birthday' ? (
-                          <span className="text-base">🎂</span>
+                          <Cake className="w-4 h-4 text-foreground" />
                         ) : (
                           <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-500" />
                         )}
