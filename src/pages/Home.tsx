@@ -403,6 +403,15 @@ const Home = () => {
 
   const firstName = employee?.first_name || "kollega";
 
+  const greetingLabel = (() => {
+    const hour = new Date().getHours();
+    if (hour < 10) return "Godmorgen";
+    if (hour < 12) return "God formiddag";
+    if (hour < 17) return "God eftermiddag";
+    return "Godaften";
+  })();
+
+
   const formatCelebrationDate = (date: Date, isToday: boolean) => {
     if (isToday) return "I dag";
     return format(date, "d. MMM", { locale: da });
