@@ -447,6 +447,8 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
 
+  const lookupAvatar = useAvatarLookup();
+
   // Get initials from agent name
   const getInitials = (name: string | null) => {
     if (!name) return "?";
