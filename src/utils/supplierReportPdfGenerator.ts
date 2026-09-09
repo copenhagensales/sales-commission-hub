@@ -23,6 +23,10 @@ interface LocationRow {
   finalAmount: number;
   isExcluded: boolean;
   maxDiscount: number | null;
+  /** Låste satser pr. booking (annual_revenue) */
+  lockedPercents?: number[];
+  isMixedDiscount?: boolean;
+  missingLocked?: boolean;
 }
 
 interface SupplierReportPdfConfig {
@@ -36,6 +40,8 @@ interface SupplierReportPdfConfig {
     subtotal: number;
     discountAmount: number;
     finalAmount: number;
+    /** Vægtet effektiv rabatprocent for perioden */
+    effectivePercent?: number;
   };
   discountInfo: {
     uniquePlacements: number;
@@ -44,6 +50,14 @@ interface SupplierReportPdfConfig {
     ytdRevenue?: number;
     monthlyRevenue?: number;
     staircaseSteps?: Array<{ minRevenue: number; discountPercent: number }>;
+    /** Leverandørens aktuelle status (annual_revenue) */
+    currentBasis?: number | null;
+    currentPercent?: number | null;
+    currentRuleId?: string | null;
+    nextPercent?: number | null;
+    nextMinRevenue?: number | null;
+    remainingToNext?: number | null;
+    staircaseIds?: string[];
   };
   exceptions: Array<{ name: string; type: string; maxDiscount: number | null }>;
 }
