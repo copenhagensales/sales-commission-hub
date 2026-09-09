@@ -1024,7 +1024,7 @@ export default function CphSalesDashboard() {
 
   // Skip layout wrapper in TV mode to avoid lock checks
   const content = (
-    <div className="space-y-6">
+    <div className="cph-board space-y-6 rounded-[20px] p-6">
       <DashboardHeader 
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
