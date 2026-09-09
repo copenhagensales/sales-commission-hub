@@ -42,7 +42,7 @@ export function stripNoteFields<T>(input: T): T {
     // Filter {label,value} items whose label matches note pattern; recurse into the rest
     const filtered = input.filter((item) => {
       if (isLabelValueItem(item) && typeof item.label === "string") {
-        return !NOTE_REGEX.test(item.label);
+        return !NOTE_REGEX.test(item.label) && !isBlockedLabel(item.label);
       }
       return true;
     });
@@ -54,6 +54,8 @@ export function stripNoteFields<T>(input: T): T {
     for (const [key, value] of Object.entries(input)) {
       if (key.toLowerCase() === "fm_comment") continue;
       if (NOTE_REGEX.test(key)) continue;
+      if (isBlockedLabel(key)) continue;
+
       out[key] = stripNoteFields(value);
     }
     return out as unknown as T;
