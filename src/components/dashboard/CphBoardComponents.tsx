@@ -118,10 +118,13 @@ export function CphLeaderboard({
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
-  const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${tvMode ? "66px" : "32px"}${
-    showCrossSales ? (tvMode ? " 62px" : " 32px") : ""
-  }${showFiber ? (tvMode ? " 70px" : " 32px") : ""} ${tvMode ? "auto" : "minmax(56px,auto)"}`;
-  const colGap = tvMode ? 14 : showCrossSales || showFiber ? 8 : 14;
+  const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${
+    tvMode ? "minmax(66px,auto)" : "minmax(38px,auto)"
+  }${showCrossSales ? (tvMode ? " minmax(62px,auto)" : " minmax(44px,auto)") : ""}${
+    showFiber ? (tvMode ? " minmax(70px,auto)" : " minmax(44px,auto)") : ""
+  } ${tvMode ? "minmax(130px,auto)" : "minmax(72px,auto)"}`;
+  const colGap = tvMode ? 14 : showCrossSales || showFiber ? 10 : 14;
+
 
 
 
