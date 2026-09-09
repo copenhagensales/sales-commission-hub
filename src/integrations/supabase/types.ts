@@ -1222,6 +1222,60 @@ export type Database = {
           },
         ]
       }
+      auth_account_merge_log: {
+        Row: {
+          created_at: string
+          details: Json | null
+          duplicate_email: string | null
+          duplicate_user_id: string
+          employee_id: string | null
+          employee_name: string | null
+          id: string
+          kept_email_after: string | null
+          kept_email_before: string | null
+          kept_user_id: string
+          login_events_moved: number
+          roles_deleted: number
+          roles_moved: number
+          sensitive_access_moved: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          duplicate_email?: string | null
+          duplicate_user_id: string
+          employee_id?: string | null
+          employee_name?: string | null
+          id?: string
+          kept_email_after?: string | null
+          kept_email_before?: string | null
+          kept_user_id: string
+          login_events_moved?: number
+          roles_deleted?: number
+          roles_moved?: number
+          sensitive_access_moved?: number
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          duplicate_email?: string | null
+          duplicate_user_id?: string
+          employee_id?: string | null
+          employee_name?: string | null
+          id?: string
+          kept_email_after?: string | null
+          kept_email_before?: string | null
+          kept_user_id?: string
+          login_events_moved?: number
+          roles_deleted?: number
+          roles_moved?: number
+          sensitive_access_moved?: number
+          status?: string
+        }
+        Relationships: []
+      }
       billing_manual_expenses: {
         Row: {
           amount: number
@@ -15189,6 +15243,15 @@ export type Database = {
       create_onboarding_coaching_tasks_for_employee: {
         Args: { p_employee_id: string; p_start_date?: string }
         Returns: number
+      }
+      find_auth_uuid_references: {
+        Args: { _uids: string[] }
+        Returns: {
+          ref_column: string
+          ref_count: number
+          ref_table: string
+          uid: string
+        }[]
       }
       generate_access_code: { Args: never; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
