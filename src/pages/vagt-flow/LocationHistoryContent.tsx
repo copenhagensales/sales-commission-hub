@@ -385,6 +385,18 @@ export default function LocationHistoryContent() {
       const days = (b.booked_days || []).length;
       wb.days += days;
       wb.locationCost += effectiveRate * days;
+
+      // Brutto/netto pr. booking - netto bruger bookingens LÅSTE rabatsats
+      const grossInfo = bookingGross(b as any);
+      const lockedPercent =
+        (b as any).discount_percent_locked == null
+          ? null
+          : Number((b as any).discount_percent_locked);
+      wb.locationCostGross += grossInfo.total;
+      wb.locationCostNet +=
+        lockedPercent == null ? grossInfo.total : grossInfo.total * (1 - lockedPercent / 100);
+      if (lockedPercent == null) wb.missingLockedDiscount = true;
+
       wb.hotelCost += hotelCostByBooking.get(b.id) || 0;
       wb.dietCost += dietCostByBooking.get(b.id) || 0;
     }
