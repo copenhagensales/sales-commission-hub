@@ -107,6 +107,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
           ${loc.locationName}
           ${loc.isExcluded ? ' <span class="badge badge-excluded">Udelukket</span>' : ""}
           ${loc.maxDiscount != null && !loc.isExcluded ? ` <span class="badge badge-max">Max ${loc.maxDiscount}%</span>` : ""}
+          ${loc.missingLocked ? ' <span class="badge badge-excluded">Ingen låst sats</span>' : ""}
         </td>
         <td>${loc.externalId || "-"}</td>
         <td>${loc.city || "-"}</td>
@@ -118,7 +119,15 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
         <td class="num">${fmtKr(loc.amount)}</td>
         ${
           showDiscount
-            ? `<td class="num accent">${loc.isExcluded ? '<span class="muted">Separat</span>' : `-${loc.discount}%`}</td>
+            ? `<td class="num accent">${
+                loc.isExcluded
+                  ? '<span class="muted">Separat</span>'
+                  : `-${loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%${
+                      loc.isMixedDiscount
+                        ? `<br><span class="muted">blandet (${(loc.lockedPercents ?? []).join(" / ")}%)</span>`
+                        : ""
+                    }`
+              }</td>
                <td class="num">${loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}</td>`
             : ""
         }
