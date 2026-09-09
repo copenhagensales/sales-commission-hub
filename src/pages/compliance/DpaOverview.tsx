@@ -79,19 +79,6 @@ const rows: DpaRow[] = [
     status: "Tjek onboarding-dokumenter / rekvirér",
   },
   {
-    vendor: "Enreach",
-    purpose: "Dialer (Enreach Campaigns)",
-    link: {
-      href: "https://enreach.com/en/our-labels/enreach-campaigns/legal-documents",
-      label: "enreach.com — legal documents",
-    },
-    linkNote:
-      "Generisk DPA-skabelon kan downloades, men siden angiver, at den individuelt underskrevne DPA er den gældende.",
-    archive:
-      "Den signerede version fra onboarding hvis den findes, ellers skabelonen + afklaring",
-    status: "Tjek onboarding-dokumenter",
-  },
-  {
     vendor: "Twilio",
     purpose: "SMS/telefoni",
     link: {
