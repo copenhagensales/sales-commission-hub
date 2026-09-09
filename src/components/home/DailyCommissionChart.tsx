@@ -87,21 +87,23 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
 
   if (workdayData.length === 0) {
     return (
-      <Card className="border border-border bg-card rounded-3xl">
-        <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-          <CardTitle className="flex items-center gap-2 text-sm md:text-base font-semibold">
-            <BarChart className="w-4 h-4 text-primary" />
-            Dine seneste 10 dage
+      <Card className="border-0 bg-card rounded-3xl">
+        <CardHeader className="px-6 pb-2 pt-6">
+          <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+            <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+            Seneste 10 dage
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-          <p className="text-xs md:text-sm text-muted-foreground">
-            Ingen salgsdata tilgængelig endnu.
+        <CardContent className="px-6 pb-6">
+          <p className="text-[14px] text-foreground/70">
+            <strong className="font-extrabold text-foreground">Tid til comeback.</strong> Første
+            salg tegner den første søjle.
           </p>
         </CardContent>
       </Card>
     );
   }
+
 
   return (
     <Card className="border-0 bg-card rounded-3xl">
@@ -162,11 +164,12 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
           </RechartsBarChart>
         </ChartContainer>
 
-        {/* Motivational feedback - larger emoji on mobile */}
-        <div className="mt-2 md:mt-3 flex items-center justify-center md:justify-start gap-2 text-sm">
-          <span className="text-lg md:text-base">{motivation.emoji}</span>
-          <span className="text-xs md:text-sm text-muted-foreground">{motivation.text}</span>
-        </div>
+        {/* Motiverende feedback */}
+        <p className="mt-3 text-[14px] leading-[1.5] text-foreground/70">
+          <strong className="font-extrabold text-foreground">{motivation.headline}</strong>{" "}
+          {motivation.text}
+        </p>
+
       </CardContent>
     </Card>
   );
