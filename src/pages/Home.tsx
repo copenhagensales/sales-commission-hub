@@ -747,11 +747,11 @@ const Home = () => {
                             .join(" · ")}
                         </p>
                       </div>
-                      <div className="flex flex-none items-center gap-1">
+                      <div className="flex flex-none items-center gap-0">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0"
+                          className="h-7 w-7 p-0"
                           onClick={() => setSelectedEventForDetail(featured.id)}
                           title="Læs mere"
                         >
@@ -762,7 +762,7 @@ const Home = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => setEditingEvent(featured.id)}
                               title="Rediger"
                             >
@@ -771,7 +771,7 @@ const Home = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => deleteEventMutation.mutate(featured.id)}
                               title="Slet"
                             >
