@@ -47,12 +47,42 @@ export default function ClientAgreements() {
   const { data: documents = [] } = useClientAgreementDocuments();
   const { data: canManage = false } = useCanManageDpaDocuments();
 
+  const { data: hiddenIds = [] } = useHiddenAgreementClients();
+
   const upload = useUploadClientAgreement();
   const remove = useDeleteClientAgreement();
   const open = useOpenClientAgreement();
+  const hideClient = useHideAgreementClient();
+  const restoreClient = useRestoreAgreementClient();
 
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [pendingHide, setPendingHide] = useState<{ id: string; name: string } | null>(null);
+
+  const hiddenSet = new Set(hiddenIds);
+  const visibleClients = clients.filter((c) => !hiddenSet.has(c.id));
+  const hiddenClients = clients.filter((c) => hiddenSet.has(c.id));
+
+  const confirmHide = async () => {
+    if (!pendingHide) return;
+    try {
+      await hideClient.mutateAsync(pendingHide.id);
+      toast.success(`${pendingHide.name} er fjernet fra oversigten`);
+    } catch {
+      toast.error("Kunden kunne ikke fjernes");
+    } finally {
+      setPendingHide(null);
+    }
+  };
+
+  const handleRestore = async (client: { id: string; name: string }) => {
+    try {
+      await restoreClient.mutateAsync(client.id);
+      toast.success(`${client.name} er tilbage i oversigten`);
+    } catch {
+      toast.error("Kunden kunne ikke gendannes");
+    }
+  };
 
   const docsFor = (clientId: string, docType: ClientAgreementType) =>
     documents.filter((d) => d.client_id === clientId && d.doc_type === docType);
