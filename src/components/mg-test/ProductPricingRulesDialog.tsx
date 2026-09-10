@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import {
+  useProductClientDisplayName,
+  useUpdateProductClientDisplayName,
+} from "@/hooks/useProductClientDisplayName";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay, isBefore, startOfDay } from "date-fns";
