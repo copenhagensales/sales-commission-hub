@@ -35,6 +35,7 @@ import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMen
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
+import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
@@ -57,6 +58,9 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isSuperadmin } = useIsSuperadmin();
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
   const { count: complianceReviewCount } = useComplianceReviewStatus();
+  const { data: pendingDispatchCount = 0 } = usePendingSupplierDispatchCount(
+    p.canViewFmBilling,
+  );
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
