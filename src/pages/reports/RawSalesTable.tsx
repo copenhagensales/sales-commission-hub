@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, AlertCircle } from "lucide-react";
+import { displayExternalReference } from "@/lib/salesAnonymized";
 
 interface RawRow {
   employee_name: string;
@@ -110,8 +111,8 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
               <TableCell>{r.customer_company ?? ""}</TableCell>
               <TableCell>{r.status ?? ""}</TableCell>
               <TableCell>{r.internal_reference ?? ""}</TableCell>
-              <TableCell>{r.adversus_opp_number ?? ""}</TableCell>
-              <TableCell>{r.cvr_number ?? ""}</TableCell>
+              <TableCell>{displayExternalReference(r.adversus_opp_number, r)}</TableCell>
+              <TableCell>{displayExternalReference(r.cvr_number, r)}</TableCell>
               <TableCell>{r.tilskud ?? ""}</TableCell>
             </TableRow>
           ))}
