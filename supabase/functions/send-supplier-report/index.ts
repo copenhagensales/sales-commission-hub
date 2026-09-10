@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendM365Mail, toBase64, type MailAttachment } from "../_shared/m365-mail.ts";
+import {
+  buildSupplierReportEmail,
+  type SurchargeSummary,
+} from "../_shared/supplier-report-mail.ts";
+import {
+  buildSupplierReportXlsx,
+  xlsxFileName,
+} from "../_shared/supplier-report-xlsx.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
