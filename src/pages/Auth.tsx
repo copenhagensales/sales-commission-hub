@@ -32,7 +32,61 @@ const FEATURES = [
 
 export default function Auth() {
   const [msLoading, setMsLoading] = useState(false);
+  const [ssoError, setSsoError] = useState<SsoError | null>(null);
+  const loggedUrlError = useRef(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (loggedUrlError.current) return;
+
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+    const pick = (key: string) => search.get(key) || hash.get(key) || "";
+    const error = pick("error");
+    const errorCode = pick("error_code");
+    const errorDescription = pick("error_description");
+
+    if (!error && !errorCode && !errorDescription) return;
+
+    loggedUrlError.current = true;
+
+    const code = errorCode || error || "ukendt_fejl";
+    const description = errorDescription || error || "Ingen beskrivelse fra Microsoft.";
+
+    setSsoError({ code, description, origin: window.location.origin });
+    logFailedLogin(`sso: ${code} — ${description}`);
+
+    // Ryd fejl-parametre, så et refresh ikke logger samme fejl igen.
+    ["error", "error_code", "error_description"].forEach((key) => {
+      search.delete(key);
+      hash.delete(key);
+    });
+    const nextSearch = search.toString();
+    const nextHash = hash.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${nextHash ? `#${nextHash}` : ""}`
+    );
+  }, []);
+
+  const copyErrorDetails = async () => {
+    if (!ssoError) return;
+    const text = [
+      `Fejlkode: ${ssoError.code}`,
+      `Beskrivelse: ${ssoError.description}`,
+      `Origin: ${ssoError.origin}`,
+      `Tidspunkt: ${new Date().toISOString()}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Fejldetaljer kopieret" });
+    } catch {
+      toast({ title: "Kunne ikke kopiere", variant: "destructive" });
+    }
+  };
+
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
