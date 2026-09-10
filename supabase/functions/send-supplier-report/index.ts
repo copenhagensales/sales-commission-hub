@@ -161,7 +161,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules, supplierName } = await req.json();
+    const body = await req.json();
+
+    // ---- Automatisk udsendelse: dispatch_id styrer modtagere, tekst og bilag ----
+    if (body?.dispatch_id) {
+      return await sendDispatch(String(body.dispatch_id));
+    }
+
+    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules, supplierName } = body;
 
     if (!recipients?.length || !subject) {
       return new Response(
