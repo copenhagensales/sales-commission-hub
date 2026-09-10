@@ -139,16 +139,15 @@ export function useApproverCandidates() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, full_name, work_email, private_email")
+        .select("id, first_name, last_name, work_email, private_email")
         .eq("is_active", true)
-        .order("full_name");
+        .order("first_name");
       if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        full_name: string | null;
-        work_email: string | null;
-        private_email: string | null;
-      }>;
+      return (data ?? []).map((e) => ({
+        id: e.id,
+        name: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim(),
+        email: e.work_email || e.private_email || null,
+      }));
     },
   });
 }
