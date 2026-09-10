@@ -58,10 +58,19 @@ export default function UpcomingInterviews() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Samtaler bliver liggende under "Kommende" resten af dagen og flytter
+  // først til "Tidligere samtaler" dagen efter (midnat).
+  const startOfToday = (): string => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  };
+
   const { data: upcomingInterviews = [], isLoading } = useQuery({
     queryKey: ["upcoming-interviews"],
     queryFn: async () => {
-      const now = new Date().toISOString();
+      const now = startOfToday();
+
 
       const { data: candidates, error } = await supabase
         .from("candidates")
@@ -116,7 +125,7 @@ export default function UpcomingInterviews() {
   const { data: pastInterviews = [] } = useQuery({
     queryKey: ["past-interviews"],
     queryFn: async () => {
-      const now = new Date().toISOString();
+      const now = startOfToday();
 
       const { data: candidates, error } = await supabase
         .from("candidates")
