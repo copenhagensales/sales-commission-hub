@@ -432,7 +432,8 @@ Deno.serve(async (req) => {
 
               campaignSalesAnonymized += anonCount;
               campaignSalesSkippedUnmapped += skippedUnmapped;
-              referencesPreserved += refsThisCampaign;
+              externalRefsCleared += extRefsCleared;
+              externalSalesIdsCleared += extSalesIdsCleared;
               commissionsBackfilled += commissionsThisCampaign;
               normalizedKeysStripped += normalizedThisCampaign;
               campaignResults.push({
@@ -440,7 +441,8 @@ Deno.serve(async (req) => {
                 mode: "anonymize_customer",
                 count: anonCount,
                 skipped_unmapped: skippedUnmapped,
-                references_preserved: refsThisCampaign,
+                external_reference_number_cleared: extRefsCleared,
+                external_sales_id_cleared: extSalesIdsCleared,
                 commissions_backfilled: commissionsThisCampaign,
                 normalized_stripped: normalizedThisCampaign,
               });
@@ -461,7 +463,9 @@ Deno.serve(async (req) => {
 
     addLog("campaign_sales_anonymized", campaignSalesAnonymized, { campaigns: campaignResults });
     addLog("campaign_sales_deleted", campaignSalesDeleted, { campaigns: campaignResults });
-    addLog("sales_references_preserved", referencesPreserved);
+    // One log line per field per table.
+    addLog("anonymize_sales_external_reference_number", externalRefsCleared);
+    addLog("anonymize_sales_external_sales_id", externalSalesIdsCleared);
     addLog("sale_items_commission_backfilled", commissionsBackfilled);
     addLog("sales_normalized_keys_stripped", normalizedKeysStripped);
 
