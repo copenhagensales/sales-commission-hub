@@ -173,9 +173,11 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           </div>
           <p className="text-sm text-muted-foreground">
             Periode:{" "}
-            {weekPlan
-              ? weekPeriodLabel(dispatch.period_start)
-              : periodLabel(dispatch.period_start)}{" "}
+            {isDailySales(sub)
+              ? dayPeriodLabel(dispatch.period_start)
+              : isWeekPlan(sub)
+                ? weekPeriodLabel(dispatch.period_start)
+                : periodLabel(dispatch.period_start)}{" "}
             &middot; Modtager: {sub?.recipient_email || "ikke udfyldt"}
           </p>
           {dispatch.reminder_count > 0 && dispatch.status === "pending_approval" && (
@@ -192,7 +194,7 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           {dispatch.error_message && (
             <p className="text-sm text-destructive">{dispatch.error_message}</p>
           )}
-          {!weekPlan && dispatch.status === "pending_approval" && !reportApproved && (
+          {!clientReport && dispatch.status === "pending_approval" && !reportApproved && (
             <p className="text-sm text-amber-700">
               Rapporten for perioden er ikke godkendt endnu. Godkend rapporten nedenfor
               først.
@@ -200,7 +202,7 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           )}
         </div>
         <div className="flex gap-2">
-          {!weekPlan && dispatch.status === "pending_approval" && (
+          {!clientReport && dispatch.status === "pending_approval" && (
             <Button
               size="sm"
               disabled={!canApprove || approve.isPending}
