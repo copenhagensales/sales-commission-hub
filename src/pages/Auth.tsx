@@ -107,9 +107,11 @@ export default function Auth() {
       });
 
       if (result.error) {
+        const message = result.error.message || "Prøv igen om et øjeblik.";
+        logFailedLogin(`sso-klient: ${message}`);
         toast({
           title: "Microsoft-login fejlede",
-          description: result.error.message || "Prøv igen om et øjeblik.",
+          description: message,
           variant: "destructive",
         });
         setMsLoading(false);
@@ -118,9 +120,11 @@ export default function Auth() {
 
       if (result.redirected) return;
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Ukendt fejl";
+      logFailedLogin(`sso-klient: ${message}`);
       toast({
         title: "Microsoft-login fejlede",
-        description: err instanceof Error ? err.message : "Ukendt fejl",
+        description: message,
         variant: "destructive",
       });
       setMsLoading(false);
