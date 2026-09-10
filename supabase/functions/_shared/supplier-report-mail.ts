@@ -369,3 +369,177 @@ export function buildWeekPlanEmptyWarningEmail(params: {
 </body></html>`;
   return { subject, html };
 }
+
+// ---------------------------------------------------------------------------
+// Daglig salgsrapport til kunde (report_type = 'client_daily_sales')
+// Samme CS-skabelon og samme kontrastregler som de to andre typer.
+// Ingen beløb, ingen priser, ingen provision - og ingen sælger- eller lokationsnavne.
+// Søjlerne er indlejrede HTML-tabeller (ikke SVG, ikke billeder), og tallet
+// står altid som tekst ved siden af søjlen.
+// Søjlefarve #2E3136 på sporets baggrund #E6F0F1 = 11.2:1 (krav: mindst 3:1).
+// ---------------------------------------------------------------------------
+
+export interface DailySalesProductRow {
+  productName: string;
+  quantity: number;
+}
+
+export interface DailySalesTrendPoint {
+  date: string; // yyyy-mm-dd
+  quantity: number;
+}
+
+const DAY_SHORT = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
+
+function dayLabel(iso: string): string {
+  return DAY_SHORT[new Date(`${iso}T00:00:00Z`).getUTCDay()];
+}
+
+function dateShort(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
+}
+
+export function buildClientDailySalesEmail(params: {
+  clientName: string;
+  date: string; // yyyy-mm-dd (i går)
+  totalQuantity: number;
+  saleCount: number;
+  products: DailySalesProductRow[];
+  trend: DailySalesTrendPoint[];
+  comparison: { date: string; quantity: number } | null;
+}): { subject: string; html: string; text: string } {
+  const { clientName, date, totalQuantity, saleCount, products, trend, comparison } =
+    params;
+
+  const dateLabel = new Intl.DateTimeFormat("da-DK", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
+  const subject = `Salg i går - ${clientName} (${dateShort(date)})`;
+
+  const sorted = [...products].sort(
+    (a, b) => b.quantity - a.quantity || a.productName.localeCompare(b.productName, "da"),
+  );
+
+  const th = (align: string) =>
+    `padding:10px 12px;text-align:${align};font-size:12px;font-weight:700;color:${ONYX};font-family:${FONT};border-bottom:2px solid ${ONYX};`;
+  const td = (align: string) =>
+    `padding:10px 12px;text-align:${align};font-size:14px;color:${ONYX};font-family:${FONT};border-bottom:1px solid ${BORDER};`;
+
+  const productRows = sorted
+    .map(
+      (p) => `<tr>
+        <td style="${td("left")}">${p.productName}</td>
+        <td style="${td("right")}"><strong>${p.quantity}</strong></td>
+      </tr>`,
+    )
+    .join("");
+
+  const maxTrend = trend.reduce((m, t) => Math.max(m, t.quantity), 0) || 1;
+  const trendRows = trend
+    .map((t) => {
+      const pct = Math.max(3, Math.round((t.quantity / maxTrend) * 100));
+      return `<tr>
+        <td style="padding:5px 8px 5px 0;font-size:12px;color:${ONYX};font-family:${FONT};white-space:nowrap;">${dateShort(t.date)} ${dayLabel(t.date)}</td>
+        <td style="padding:5px 8px;width:100%;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${LIGHT};border:1px solid ${BORDER};border-radius:3px;">
+            <tr><td style="padding:0;">
+              <table width="${pct}%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr><td style="height:14px;background:${ONYX};line-height:14px;font-size:0;border-radius:3px;">&nbsp;</td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td>
+        <td align="right" style="padding:5px 0 5px 8px;font-size:13px;font-weight:700;color:${ONYX};font-family:${FONT};white-space:nowrap;">${t.quantity}</td>
+      </tr>`;
+    })
+    .join("");
+
+  let comparisonLine: string;
+  if (!comparison) {
+    comparisonLine = `Der er ikke et sammenligneligt tal for samme ugedag i ugen før.`;
+  } else {
+    const diff = totalQuantity - comparison.quantity;
+    const direction = diff > 0 ? "flere" : diff < 0 ? "færre" : "det samme antal som";
+    comparisonLine =
+      diff === 0
+        ? `Samme antal som ${dayLabel(comparison.date)} den ${dateShort(comparison.date)} (${comparison.quantity}).`
+        : `${Math.abs(diff)} ${direction} end ${dayLabel(comparison.date)} den ${dateShort(comparison.date)}, hvor der var ${comparison.quantity}.`;
+  }
+
+  const countNote =
+    saleCount !== totalQuantity
+      ? `<p style="margin:4px 0 0;font-size:13px;color:${SECONDARY};font-family:${FONT};">Fordelt på ${saleCount} salg.</p>`
+      : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
+<body style="margin:0;padding:0;background:${LIGHT};">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${LIGHT};padding:24px 12px;">
+<tr><td align="center">
+  <table width="640" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:640px;background:#FFFFFF;border:1px solid ${BORDER};border-radius:12px;">
+    <tr><td style="background:${ONYX};padding:20px 24px;border-radius:12px 12px 0 0;">
+      <p style="margin:0;font-size:18px;font-weight:800;color:#FFFFFF;font-family:${FONT};letter-spacing:0.5px;">COPENHAGEN SALES</p>
+    </td></tr>
+    <tr><td style="height:4px;background:${EMERALD};line-height:4px;font-size:0;">&nbsp;</td></tr>
+    <tr><td style="padding:24px 24px 8px;">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:800;color:${ONYX};font-family:${FONT};">Salg i går - ${clientName}</h1>
+      <p style="margin:0;font-size:14px;color:${ONYX};font-family:${FONT};">${dateLabel}</p>
+    </td></tr>
+    <tr><td style="padding:12px 24px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${LIGHT};border:1px solid ${BORDER};border-radius:8px;">
+        <tr><td style="padding:18px 20px;">
+          <p style="margin:0;font-size:34px;font-weight:800;color:${ONYX};font-family:${FONT};line-height:1.1;">${totalQuantity}</p>
+          <p style="margin:2px 0 0;font-size:14px;color:${ONYX};font-family:${FONT};">salg i alt</p>
+          ${countNote}
+        </td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:20px 24px 0;">
+      <p style="margin:0 0 6px;font-size:15px;font-weight:800;color:${ONYX};font-family:${FONT};">Fordeling pr. produkt</p>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;">
+        <thead><tr>
+          <th style="${th("left")}">Produkt</th>
+          <th style="${th("right")}">Antal</th>
+        </tr></thead>
+        <tbody>${productRows}</tbody>
+      </table>
+    </td></tr>
+    <tr><td style="padding:22px 24px 0;">
+      <p style="margin:0 0 6px;font-size:15px;font-weight:800;color:${ONYX};font-family:${FONT};">Seneste dage med salg</p>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${trendRows}</table>
+      <p style="margin:10px 0 0;font-size:13px;color:${ONYX};font-family:${FONT};">${comparisonLine}</p>
+    </td></tr>
+    <tr><td style="padding:20px 24px 24px;">
+      <p style="margin:0;font-size:12px;color:${SECONDARY};font-family:${FONT};">Tallene er foreløbige. Efterfølgende annulleringer kan ændre dem.</p>
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>`;
+
+  const textLines = [
+    `Salg i går - ${clientName}`,
+    dateLabel,
+    "",
+    `Salg i alt: ${totalQuantity}`,
+  ];
+  if (saleCount !== totalQuantity) textLines.push(`Fordelt på ${saleCount} salg.`);
+  textLines.push("", "Fordeling pr. produkt:");
+  for (const p of sorted) textLines.push(`  ${p.productName}: ${p.quantity}`);
+  textLines.push("", "Seneste dage med salg:");
+  for (const t of trend) {
+    textLines.push(`  ${dateShort(t.date)} ${dayLabel(t.date)}: ${t.quantity}`);
+  }
+  textLines.push(
+    "",
+    comparisonLine,
+    "",
+    "Tallene er foreløbige. Efterfølgende annulleringer kan ændre dem.",
+  );
+
+  return { subject, html, text: textLines.join("\n") };
+}

@@ -1,8 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-/** 'supplier_invoice' = månedlig leverandørrapport, 'client_week_plan' = ugeplan til kunde. */
-export type ReportType = "supplier_invoice" | "client_week_plan";
+/**
+ * 'supplier_invoice' = månedlig leverandørrapport,
+ * 'client_week_plan' = ugeplan til kunde,
+ * 'client_daily_sales' = daglig salgsrapport til kunde.
+ */
+export type ReportType = "supplier_invoice" | "client_week_plan" | "client_daily_sales";
+
+/** Rapporttyper der sendes direkte til kunden uden godkendelse. */
+export const CLIENT_REPORT_TYPES: ReportType[] = [
+  "client_week_plan",
+  "client_daily_sales",
+];
 
 export interface SupplierReportSubscription {
   id: string;
@@ -119,14 +129,23 @@ export function useCreateSupplierReportSubscription() {
       if (reportType === "client_week_plan" && (!values.client_id || !values.weekday)) {
         throw new Error("Kunde og ugedag mangler");
       }
+      if (reportType === "client_daily_sales" && !values.client_id) {
+        throw new Error("Kunde mangler");
+      }
+      const cadence =
+        reportType === "client_week_plan"
+          ? "weekly"
+          : reportType === "client_daily_sales"
+            ? "daily"
+            : "monthly";
       const { data, error } = await supabase
         .from("supplier_report_subscriptions")
         .insert({
           ...values,
           report_type: reportType,
-          cadence: reportType === "client_week_plan" ? "weekly" : "monthly",
+          cadence,
           location_type: reportType === "supplier_invoice" ? locationType : null,
-          client_id: reportType === "client_week_plan" ? values.client_id : null,
+          client_id: reportType === "supplier_invoice" ? null : values.client_id,
           weekday: reportType === "client_week_plan" ? values.weekday : null,
           // Nye abonnementer er altid inaktive indtil modtager er udfyldt og godkendt
           is_active: false,

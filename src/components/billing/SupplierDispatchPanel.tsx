@@ -71,18 +71,34 @@ function weekPeriodLabel(periodStart: string): string {
   return `uge ${format(start, "I", { locale: da })} (${format(start, "dd/MM")})`;
 }
 
+function dayPeriodLabel(periodStart: string): string {
+  return format(new Date(`${periodStart}T00:00:00`), "EEEE d. MMMM yyyy", { locale: da });
+}
+
 function isWeekPlan(sub: SupplierReportSubscription | null | undefined): boolean {
   return sub?.report_type === "client_week_plan";
 }
 
+function isDailySales(sub: SupplierReportSubscription | null | undefined): boolean {
+  return sub?.report_type === "client_daily_sales";
+}
+
+/** Kundevendte rapporttyper godkendes ikke og sendes ikke manuelt herfra. */
+function isClientReport(sub: SupplierReportSubscription | null | undefined): boolean {
+  return isWeekPlan(sub) || isDailySales(sub);
+}
+
+const REPORT_TYPE_LABELS: Record<ReportType, string> = {
+  supplier_invoice: "Leverandørrapport",
+  client_week_plan: "Ugeplan til kunde",
+  client_daily_sales: "Daglig salgsrapport til kunde",
+};
+
 function ReportTypeBadge({ reportType }: { reportType: ReportType }) {
-  return reportType === "client_week_plan" ? (
+  const Icon = reportType === "supplier_invoice" ? FileText : CalendarDays;
+  return (
     <Badge variant="outline" className="gap-1">
-      <CalendarDays className="h-3 w-3" /> Ugeplan til kunde
-    </Badge>
-  ) : (
-    <Badge variant="outline" className="gap-1">
-      <FileText className="h-3 w-3" /> Leverandørrapport
+      <Icon className="h-3 w-3" /> {REPORT_TYPE_LABELS[reportType]}
     </Badge>
   );
 }
@@ -125,20 +141,23 @@ function StatusBadge({ status }: { status: string }) {
 
 function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
   const sub = dispatch.supplier_report_subscriptions;
-  const weekPlan = isWeekPlan(sub);
+  const clientReport = isClientReport(sub);
   const { data: report } = useApprovedReportForPeriod(
-    weekPlan ? undefined : sub?.location_type ?? undefined,
+    clientReport ? undefined : sub?.location_type ?? undefined,
     dispatch.period_start,
   );
   const approve = useApproveDispatch();
   const send = useSendDispatch();
 
   const reportApproved = report?.status === "approved";
-  // Ugeplaner godkendes ikke og sendes ikke manuelt herfra.
+  // Kundevendte rapporter godkendes ikke og sendes ikke manuelt herfra.
   const canApprove =
-    !weekPlan && dispatch.status === "pending_approval" && reportApproved && !!report?.id;
+    !clientReport &&
+    dispatch.status === "pending_approval" &&
+    reportApproved &&
+    !!report?.id;
   const canSend =
-    !weekPlan &&
+    !clientReport &&
     (dispatch.status === "approved" || dispatch.status === "failed") &&
     !!sub?.is_active &&
     !!sub?.recipient_email;
@@ -154,9 +173,11 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           </div>
           <p className="text-sm text-muted-foreground">
             Periode:{" "}
-            {weekPlan
-              ? weekPeriodLabel(dispatch.period_start)
-              : periodLabel(dispatch.period_start)}{" "}
+            {isDailySales(sub)
+              ? dayPeriodLabel(dispatch.period_start)
+              : isWeekPlan(sub)
+                ? weekPeriodLabel(dispatch.period_start)
+                : periodLabel(dispatch.period_start)}{" "}
             &middot; Modtager: {sub?.recipient_email || "ikke udfyldt"}
           </p>
           {dispatch.reminder_count > 0 && dispatch.status === "pending_approval" && (
@@ -173,7 +194,7 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           {dispatch.error_message && (
             <p className="text-sm text-destructive">{dispatch.error_message}</p>
           )}
-          {!weekPlan && dispatch.status === "pending_approval" && !reportApproved && (
+          {!clientReport && dispatch.status === "pending_approval" && !reportApproved && (
             <p className="text-sm text-amber-700">
               Rapporten for perioden er ikke godkendt endnu. Godkend rapporten nedenfor
               først.
@@ -181,7 +202,7 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           )}
         </div>
         <div className="flex gap-2">
-          {!weekPlan && dispatch.status === "pending_approval" && (
+          {!clientReport && dispatch.status === "pending_approval" && (
             <Button
               size="sm"
               disabled={!canApprove || approve.isPending}
@@ -249,11 +270,14 @@ function SubscriptionDialog({
     cc: (subscription?.cc_emails ?? []).join(", "),
     approver_employee_id: subscription?.approver_employee_id ?? "",
     send_day: String(subscription?.send_day ?? 1),
+    send_hour: String(subscription?.send_hour ?? 8),
     attach_xlsx: subscription?.attach_xlsx ?? true,
     include_surcharge_summary: subscription?.include_surcharge_summary ?? true,
     is_active: subscription?.is_active ?? false,
   });
   const weekPlanForm = form.report_type === "client_week_plan";
+  const dailySalesForm = form.report_type === "client_daily_sales";
+  const clientForm = weekPlanForm || dailySalesForm;
 
   const isPending = update.isPending || create.isPending;
 
@@ -265,12 +289,17 @@ function SubscriptionDialog({
     }
     const day = Number(form.send_day);
     const weekday = Number(form.weekday);
+    const hour = Number(form.send_hour);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+      toast.error("Klokketime skal være mellem 0 og 23");
+      return;
+    }
     if (weekPlanForm) {
       if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
         toast.error("Vælg en ugedag");
         return;
       }
-    } else if (!Number.isInteger(day) || day < 1 || day > 28) {
+    } else if (!dailySalesForm && (!Number.isInteger(day) || day < 1 || day > 28)) {
       toast.error("Sendedag skal være mellem 1 og 28");
       return;
     }
@@ -283,15 +312,16 @@ function SubscriptionDialog({
         .map((e) => e.trim())
         .filter((e) => e.includes("@")),
       approver_employee_id: form.approver_employee_id || null,
-      send_day: weekPlanForm ? 1 : day,
+      send_day: clientForm ? 1 : day,
+      send_hour: hour,
       weekday: weekPlanForm ? weekday : null,
-      attach_xlsx: weekPlanForm ? false : form.attach_xlsx,
+      attach_xlsx: clientForm ? false : form.attach_xlsx,
       include_surcharge_summary: form.include_surcharge_summary,
       is_active: form.is_active,
     };
 
     if (isNew) {
-      if (weekPlanForm) {
+      if (clientForm) {
         if (!form.client_id) {
           toast.error("Vælg en kunde");
           return;
@@ -304,8 +334,8 @@ function SubscriptionDialog({
         {
           ...values,
           report_type: form.report_type,
-          location_type: weekPlanForm ? null : form.location_type.trim(),
-          client_id: weekPlanForm ? form.client_id : null,
+          location_type: clientForm ? null : form.location_type.trim(),
+          client_id: clientForm ? form.client_id : null,
           is_active: false,
         },
         {
@@ -380,6 +410,9 @@ function SubscriptionDialog({
                   <SelectItem value="client_week_plan">
                     Ugeplan til kunde (ugentlig)
                   </SelectItem>
+                  <SelectItem value="client_daily_sales">
+                    Daglig salgsrapport til kunde (dagligt)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -391,7 +424,7 @@ function SubscriptionDialog({
               </div>
             </div>
           )}
-          {weekPlanForm ? (
+          {clientForm ? (
             isNew ? (
               <div className="space-y-2">
                 <Label>Kunde</Label>
@@ -483,9 +516,7 @@ function SubscriptionDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>
-                {weekPlanForm ? "Modtager af interne advarsler" : "Godkender"}
-              </Label>
+              <Label>{clientForm ? "Modtager af interne advarsler" : "Godkender"}</Label>
               <Select
                 value={form.approver_employee_id || "none"}
                 onValueChange={(v) =>
@@ -494,7 +525,7 @@ function SubscriptionDialog({
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={weekPlanForm ? "Vælg modtager" : "Vælg godkender"}
+                    placeholder={clientForm ? "Vælg modtager" : "Vælg godkender"}
                   />
                 </SelectTrigger>
                 <SelectContent>
@@ -526,6 +557,20 @@ function SubscriptionDialog({
                   </SelectContent>
                 </Select>
               </div>
+            ) : dailySalesForm ? (
+              <div className="space-y-2">
+                <Label>Klokketime (0-23)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={form.send_hour}
+                  onChange={(e) => setForm({ ...form, send_hour: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Dansk tid. Rapporten dækker altid dagen før.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 <Label>Dag i måneden (1-28)</Label>
@@ -539,7 +584,7 @@ function SubscriptionDialog({
               </div>
             )}
           </div>
-          {!weekPlanForm && (
+          {!clientForm && (
             <>
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <div>
@@ -675,7 +720,9 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
                 <span className="text-[11px] font-normal text-muted-foreground">
                   {s.report_type === "client_week_plan"
                     ? `Ugeplan til kunde - ${WEEKDAY_LABELS[s.weekday ?? 1]}`
-                    : `Leverandørrapport - ${s.location_type}`}
+                    : s.report_type === "client_daily_sales"
+                      ? `Daglig salgsrapport til kunde - kl. ${s.send_hour}`
+                      : `Leverandørrapport - ${s.location_type}`}
                 </span>
               </span>
               {!s.is_active && (
