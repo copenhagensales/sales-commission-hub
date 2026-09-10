@@ -793,19 +793,38 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
     return map;
   }, [clients]);
 
-  const groups = useMemo(
-    () =>
-      REPORT_TYPE_ORDER.map((type) => {
-        const rows = relevantSubscriptions.filter((s) => s.report_type === type);
-        return {
+  /** Øverste niveau = kunde (eller leverandørens lokationstype), så man ser hvem der modtager hvad. */
+  const ownerGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      { label: string; isClient: boolean; rows: SupplierReportSubscription[] }
+    >();
+    for (const s of relevantSubscriptions) {
+      const isClient = s.report_type !== "supplier_invoice";
+      const label = isClient
+        ? (s.client_id ? clientNameById.get(s.client_id) : null) ?? "Ukendt kunde"
+        : s.location_type || "Ukendt leverandør";
+      const key = `${isClient ? "client" : "supplier"}:${label}`;
+      const entry = map.get(key) ?? { label, isClient, rows: [] };
+      entry.rows.push(s);
+      map.set(key, entry);
+    }
+    return [...map.values()]
+      .map((g) => ({
+        ...g,
+        activeCount: g.rows.filter((r) => r.is_active).length,
+        types: REPORT_TYPE_ORDER.map((type) => ({
           type,
-          active: rows.filter((s) => s.is_active),
-          inactive: rows.filter((s) => !s.is_active),
-          count: rows.length,
-        };
-      }).filter((g) => g.count > 0),
-    [relevantSubscriptions],
-  );
+          active: g.rows.filter((r) => r.report_type === type && r.is_active),
+          inactive: g.rows.filter((r) => r.report_type === type && !r.is_active),
+        })).filter((t) => t.active.length + t.inactive.length > 0),
+      }))
+      .sort(
+        (a, b) =>
+          Number(a.isClient) - Number(b.isClient) ||
+          a.label.localeCompare(b.label, "da"),
+      );
+  }, [relevantSubscriptions, clientNameById]);
 
   const renderRows = (rows: SupplierReportSubscription[]) =>
     rows.map((s) => (
@@ -826,38 +845,48 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
           <Plus className="mr-2 h-4 w-4" /> Nyt abonnement
         </Button>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {groups.length === 0 ? (
+      <CardContent className="space-y-8">
+        {ownerGroups.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Ingen abonnementer endnu. Opret et abonnement for at sende rapporten
             automatisk til en leverandør eller kunde.
           </p>
         ) : (
-          groups.map((g) => (
-            <div key={g.type} className="space-y-3">
+          ownerGroups.map((g) => (
+            <div key={`${g.isClient}-${g.label}`} className="space-y-4">
               <div className="flex flex-wrap items-center gap-2 border-b pb-2">
-                <ReportTypeBadge reportType={g.type} />
-                <span className="font-semibold">{REPORT_GROUP_TITLES[g.type]}</span>
+                <span className="text-base font-semibold">{g.label}</span>
+                <Badge variant="outline">{g.isClient ? "Kunde" : "Leverandør"}</Badge>
                 <span className="text-sm text-muted-foreground">
-                  {g.active.length} aktiv(e), {g.inactive.length} inaktiv(e)
+                  {g.rows.length} rapport(er) &middot; {g.activeCount} aktiv(e)
                 </span>
               </div>
-              {g.active.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase text-muted-foreground">
-                    Aktive
-                  </p>
-                  {renderRows(g.active)}
+              {g.types.map((t) => (
+                <div key={t.type} className="space-y-2 pl-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ReportTypeBadge reportType={t.type} />
+                    <span className="text-sm text-muted-foreground">
+                      {REPORT_GROUP_TITLES[t.type]}
+                    </span>
+                  </div>
+                  {t.active.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium uppercase text-muted-foreground">
+                        Aktive
+                      </p>
+                      {renderRows(t.active)}
+                    </div>
+                  )}
+                  {t.inactive.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium uppercase text-muted-foreground">
+                        Ikke aktive
+                      </p>
+                      {renderRows(t.inactive)}
+                    </div>
+                  )}
                 </div>
-              )}
-              {g.inactive.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase text-muted-foreground">
-                    Ikke aktive
-                  </p>
-                  {renderRows(g.inactive)}
-                </div>
-              )}
+              ))}
             </div>
           ))
         )}
