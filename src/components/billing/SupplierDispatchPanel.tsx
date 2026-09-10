@@ -516,9 +516,7 @@ function SubscriptionDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>
-                {weekPlanForm ? "Modtager af interne advarsler" : "Godkender"}
-              </Label>
+              <Label>{clientForm ? "Modtager af interne advarsler" : "Godkender"}</Label>
               <Select
                 value={form.approver_employee_id || "none"}
                 onValueChange={(v) =>
@@ -527,7 +525,7 @@ function SubscriptionDialog({
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={weekPlanForm ? "Vælg modtager" : "Vælg godkender"}
+                    placeholder={clientForm ? "Vælg modtager" : "Vælg godkender"}
                   />
                 </SelectTrigger>
                 <SelectContent>
@@ -559,6 +557,20 @@ function SubscriptionDialog({
                   </SelectContent>
                 </Select>
               </div>
+            ) : dailySalesForm ? (
+              <div className="space-y-2">
+                <Label>Klokketime (0-23)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={form.send_hour}
+                  onChange={(e) => setForm({ ...form, send_hour: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Dansk tid. Rapporten dækker altid dagen før.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 <Label>Dag i måneden (1-28)</Label>
@@ -572,7 +584,7 @@ function SubscriptionDialog({
               </div>
             )}
           </div>
-          {!weekPlanForm && (
+          {!clientForm && (
             <>
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <div>
