@@ -679,6 +679,46 @@ export function ProductPricingRulesDialog({
                 </>
               )}
             </div>
+
+            <div className="border rounded-lg p-4 space-y-2 mt-4">
+              <Label htmlFor="client-display-name" className="text-sm font-medium">
+                Kundevendt navn
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Vises til kunden i daglige rapporter. Er feltet tomt, bruges det interne
+                navn.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  id="client-display-name"
+                  value={clientDisplayName}
+                  placeholder={productName}
+                  onChange={(e) => setClientDisplayName(e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={updateClientDisplayName.isPending}
+                  onClick={() =>
+                    updateClientDisplayName.mutate(
+                      { productId, value: clientDisplayName },
+                      {
+                        onSuccess: () => toast.success("Kundevendt navn gemt"),
+                        onError: (e: unknown) =>
+                          toast.error(
+                            e instanceof Error ? e.message : "Kunne ikke gemme navnet",
+                          ),
+                      },
+                    )
+                  }
+                >
+                  {updateClientDisplayName.isPending && (
+                    <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                  )}
+                  Gem
+                </Button>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Regler Tab */}
