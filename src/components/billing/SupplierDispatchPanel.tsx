@@ -141,20 +141,23 @@ function StatusBadge({ status }: { status: string }) {
 
 function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
   const sub = dispatch.supplier_report_subscriptions;
-  const weekPlan = isWeekPlan(sub);
+  const clientReport = isClientReport(sub);
   const { data: report } = useApprovedReportForPeriod(
-    weekPlan ? undefined : sub?.location_type ?? undefined,
+    clientReport ? undefined : sub?.location_type ?? undefined,
     dispatch.period_start,
   );
   const approve = useApproveDispatch();
   const send = useSendDispatch();
 
   const reportApproved = report?.status === "approved";
-  // Ugeplaner godkendes ikke og sendes ikke manuelt herfra.
+  // Kundevendte rapporter godkendes ikke og sendes ikke manuelt herfra.
   const canApprove =
-    !weekPlan && dispatch.status === "pending_approval" && reportApproved && !!report?.id;
+    !clientReport &&
+    dispatch.status === "pending_approval" &&
+    reportApproved &&
+    !!report?.id;
   const canSend =
-    !weekPlan &&
+    !clientReport &&
     (dispatch.status === "approved" || dispatch.status === "failed") &&
     !!sub?.is_active &&
     !!sub?.recipient_email;
