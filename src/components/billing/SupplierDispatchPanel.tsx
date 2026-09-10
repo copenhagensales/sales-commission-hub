@@ -71,18 +71,34 @@ function weekPeriodLabel(periodStart: string): string {
   return `uge ${format(start, "I", { locale: da })} (${format(start, "dd/MM")})`;
 }
 
+function dayPeriodLabel(periodStart: string): string {
+  return format(new Date(`${periodStart}T00:00:00`), "EEEE d. MMMM yyyy", { locale: da });
+}
+
 function isWeekPlan(sub: SupplierReportSubscription | null | undefined): boolean {
   return sub?.report_type === "client_week_plan";
 }
 
+function isDailySales(sub: SupplierReportSubscription | null | undefined): boolean {
+  return sub?.report_type === "client_daily_sales";
+}
+
+/** Kundevendte rapporttyper godkendes ikke og sendes ikke manuelt herfra. */
+function isClientReport(sub: SupplierReportSubscription | null | undefined): boolean {
+  return isWeekPlan(sub) || isDailySales(sub);
+}
+
+const REPORT_TYPE_LABELS: Record<ReportType, string> = {
+  supplier_invoice: "Leverandørrapport",
+  client_week_plan: "Ugeplan til kunde",
+  client_daily_sales: "Daglig salgsrapport til kunde",
+};
+
 function ReportTypeBadge({ reportType }: { reportType: ReportType }) {
-  return reportType === "client_week_plan" ? (
+  const Icon = reportType === "supplier_invoice" ? FileText : CalendarDays;
+  return (
     <Badge variant="outline" className="gap-1">
-      <CalendarDays className="h-3 w-3" /> Ugeplan til kunde
-    </Badge>
-  ) : (
-    <Badge variant="outline" className="gap-1">
-      <FileText className="h-3 w-3" /> Leverandørrapport
+      <Icon className="h-3 w-3" /> {REPORT_TYPE_LABELS[reportType]}
     </Badge>
   );
 }
