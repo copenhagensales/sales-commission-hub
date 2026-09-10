@@ -391,26 +391,24 @@ Deno.serve(async (req) => {
                   continue;
                 }
 
-                // --- 2) Preserve business references before dropping payload ---
+                // --- 2) Wipe external customer references at the deadline ---
+                // OPP number and Sales ID are on the personal-data positive list:
+                // the client can look them up in their own system. They are kept
+                // untouched inside the retention window (cancellation matching)
+                // and cleared here, together with customer_phone and raw_payload.
                 const patch: Record<string, unknown> = {
                   customer_phone: null,
                   customer_company: "Anonymiseret",
                   raw_payload: null,
                 };
 
-                if (!sale.external_reference_number) {
-                  const opp = extractOppNumber(payload);
-                  if (opp) {
-                    patch.external_reference_number = opp;
-                    refsThisCampaign++;
-                  }
+                if (sale.external_reference_number) {
+                  patch.external_reference_number = null;
+                  extRefsCleared++;
                 }
-                if (!sale.external_sales_id) {
-                  const salesId = extractSalesId(payload);
-                  if (salesId) {
-                    patch.external_sales_id = salesId;
-                    refsThisCampaign++;
-                  }
+                if (sale.external_sales_id) {
+                  patch.external_sales_id = null;
+                  extSalesIdsCleared++;
                 }
 
                 // --- 3) Strip identity keys from normalized_data ---
