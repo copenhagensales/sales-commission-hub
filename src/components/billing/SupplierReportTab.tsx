@@ -831,6 +831,26 @@ export function SupplierReportTab() {
                           `${loc.dailyRate.toLocaleString("da-DK")} kr`
                         )}
                       </TableCell>
+                      {hasSurcharge && (
+                        <>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                            {(loc.baseAmount ?? 0).toLocaleString("da-DK")} kr
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {loc.surchargeAmount > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span>{loc.surchargeAmount.toLocaleString("da-DK")} kr</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {loc.surchargeDays} dg × {loc.surchargePerDay.toLocaleString("da-DK")} kr
+                                  {loc.surchargeRefundable ? " · refusion" : ""}
+                                </span>
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                        </>
+                      )}
                       <TableCell className="text-right font-semibold">
                         {loc.totalAmount.toLocaleString("da-DK")} kr
                       </TableCell>
