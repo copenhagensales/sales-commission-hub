@@ -9,9 +9,7 @@ import {
   ADVERSUS_EVENTS_RETENTION_DAYS,
   CANCELLATION_IDENTITY_KEYS,
   cutoffIso,
-  extractOppNumber,
   extractPayloadLineCommissions,
-  extractSalesId,
   FALLBACK_RETENTION_DAYS,
   NORMALIZED_IDENTITY_KEYS,
   stripKeys,
@@ -323,7 +321,9 @@ Deno.serve(async (req) => {
               )
               .eq("client_campaign_id", policy.client_campaign_id)
               .lt("sale_datetime", cutoffISO)
-              .or("customer_phone.not.is.null,raw_payload.not.is.null")
+              .or(
+                "customer_phone.not.is.null,raw_payload.not.is.null,external_reference_number.not.is.null,external_sales_id.not.is.null"
+              )
               // Oldest first, batched. Anonymised sales drop out of this filter,
               // so consecutive nightly runs work through the backlog safely.
               .order("sale_datetime", { ascending: true })
@@ -475,6 +475,7 @@ Deno.serve(async (req) => {
     let fmSalesAnonymized = 0;
     let eesyRowsAnonymized = 0;
     let cancellationRowsAnonymized = 0;
+    let cancellationOppGroupsCleared = 0;
     let adversusEventsDeleted = 0;
     const systemCopyResults: { table: string; count: number; retention_days: number }[] = [];
 
@@ -587,8 +588,8 @@ Deno.serve(async (req) => {
       while (!done) {
         const { data: cqRows, error: cqErr } = await supabase
           .from("cancellation_queue")
-          .select("id, client_id, created_at, uploaded_data")
-          .not("uploaded_data", "is", null)
+          .select("id, client_id, created_at, uploaded_data, opp_group")
+          .or("uploaded_data.not.is.null,opp_group.not.is.null")
           .order("created_at", { ascending: true })
           .range(offset, offset + pageSize - 1);
 
@@ -606,17 +607,25 @@ Deno.serve(async (req) => {
           if (!row.created_at || String(row.created_at) >= cutoff) continue;
 
           const stripped = stripKeys(row.uploaded_data, CANCELLATION_IDENTITY_KEYS);
-          if (!stripped.changed) continue;
+          // opp_group is a plain copy of the sale's OPP number and is the TDC
+          // match key. It is cleared on the same deadline as the OPP number.
+          const clearOppGroup = row.opp_group !== null && row.opp_group !== undefined;
+          if (!stripped.changed && !clearOppGroup) continue;
+
+          const cqPatch: Record<string, unknown> = {};
+          if (stripped.changed) cqPatch.uploaded_data = stripped.result;
+          if (clearOppGroup) cqPatch.opp_group = null;
 
           const { error: updErr } = await db
             .from("cancellation_queue")
-            .update({ uploaded_data: stripped.result })
+            .update(cqPatch)
             .eq("id", row.id);
 
           if (updErr) {
             log("WARN", `Failed to anonymize cancellation_queue ${row.id}: ${updErr.message}`);
           } else {
             cancellationRowsAnonymized++;
+            if (clearOppGroup) cancellationOppGroupsCleared++;
           }
         }
       }
@@ -662,6 +671,7 @@ Deno.serve(async (req) => {
     addLog("fieldmarketing_sales_phone_cleared", fmSalesAnonymized);
     addLog("eesy_fm_powerbi_rows_phone_cleared", eesyRowsAnonymized);
     addLog("cancellation_queue_uploaded_data_cleaned", cancellationRowsAnonymized);
+    addLog("anonymize_cancellation_queue_opp_group", cancellationOppGroupsCleared);
     addLog("adversus_events_deleted", adversusEventsDeleted);
 
 
