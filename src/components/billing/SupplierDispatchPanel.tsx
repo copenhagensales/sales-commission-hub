@@ -410,6 +410,9 @@ function SubscriptionDialog({
                   <SelectItem value="client_week_plan">
                     Ugeplan til kunde (ugentlig)
                   </SelectItem>
+                  <SelectItem value="client_daily_sales">
+                    Daglig salgsrapport til kunde (dagligt)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -421,7 +424,7 @@ function SubscriptionDialog({
               </div>
             </div>
           )}
-          {weekPlanForm ? (
+          {clientForm ? (
             isNew ? (
               <div className="space-y-2">
                 <Label>Kunde</Label>
