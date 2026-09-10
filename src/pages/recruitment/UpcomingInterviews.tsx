@@ -125,7 +125,7 @@ export default function UpcomingInterviews() {
   const { data: pastInterviews = [] } = useQuery({
     queryKey: ["past-interviews"],
     queryFn: async () => {
-      const now = new Date().toISOString();
+      const now = startOfToday();
 
       const { data: candidates, error } = await supabase
         .from("candidates")
