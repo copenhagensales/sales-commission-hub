@@ -1,8 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Bird, ShieldCheck, TrendingUp, BarChart3, Trophy } from "lucide-react";
+import { Bird, ShieldCheck, TrendingUp, BarChart3, Trophy, AlertTriangle, Copy } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
+
+type SsoError = {
+  code: string;
+  description: string;
+  origin: string;
+};
+
+const logFailedLogin = (failureReason: string) => {
+  supabase.functions
+    .invoke("log-failed-login", {
+      body: {
+        failure_reason: failureReason,
+        origin: window.location.origin,
+      },
+    })
+    .catch(() => {
+      // Logning må ikke blokere loginsiden.
+    });
+};
 
 const FEATURES = [
   { icon: TrendingUp, label: "Provision og bonus i realtid" },
@@ -12,7 +32,61 @@ const FEATURES = [
 
 export default function Auth() {
   const [msLoading, setMsLoading] = useState(false);
+  const [ssoError, setSsoError] = useState<SsoError | null>(null);
+  const loggedUrlError = useRef(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (loggedUrlError.current) return;
+
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+    const pick = (key: string) => search.get(key) || hash.get(key) || "";
+    const error = pick("error");
+    const errorCode = pick("error_code");
+    const errorDescription = pick("error_description");
+
+    if (!error && !errorCode && !errorDescription) return;
+
+    loggedUrlError.current = true;
+
+    const code = errorCode || error || "ukendt_fejl";
+    const description = errorDescription || error || "Ingen beskrivelse fra Microsoft.";
+
+    setSsoError({ code, description, origin: window.location.origin });
+    logFailedLogin(`sso: ${code} — ${description}`);
+
+    // Ryd fejl-parametre, så et refresh ikke logger samme fejl igen.
+    ["error", "error_code", "error_description"].forEach((key) => {
+      search.delete(key);
+      hash.delete(key);
+    });
+    const nextSearch = search.toString();
+    const nextHash = hash.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${nextHash ? `#${nextHash}` : ""}`
+    );
+  }, []);
+
+  const copyErrorDetails = async () => {
+    if (!ssoError) return;
+    const text = [
+      `Fejlkode: ${ssoError.code}`,
+      `Beskrivelse: ${ssoError.description}`,
+      `Origin: ${ssoError.origin}`,
+      `Tidspunkt: ${new Date().toISOString()}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Fejldetaljer kopieret" });
+    } catch {
+      toast({ title: "Kunne ikke kopiere", variant: "destructive" });
+    }
+  };
+
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -33,9 +107,11 @@ export default function Auth() {
       });
 
       if (result.error) {
+        const message = result.error.message || "Prøv igen om et øjeblik.";
+        logFailedLogin(`sso-klient: ${message}`);
         toast({
           title: "Microsoft-login fejlede",
-          description: result.error.message || "Prøv igen om et øjeblik.",
+          description: message,
           variant: "destructive",
         });
         setMsLoading(false);
@@ -44,9 +120,11 @@ export default function Auth() {
 
       if (result.redirected) return;
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Ukendt fejl";
+      logFailedLogin(`sso-klient: ${message}`);
       toast({
         title: "Microsoft-login fejlede",
-        description: err instanceof Error ? err.message : "Ukendt fejl",
+        description: message,
         variant: "destructive",
       });
       setMsLoading(false);
@@ -143,6 +221,40 @@ export default function Auth() {
             <p className="mt-4 text-[17px] leading-relaxed text-[hsl(var(--cph-onyx))]/70">
               Log ind med din arbejdsmail for at fortsætte.
             </p>
+
+            {ssoError && (
+              <div
+                role="alert"
+                className="mt-6 rounded-[16px] border border-destructive/40 bg-destructive/10 p-5 text-[hsl(var(--cph-onyx))]"
+              >
+                <div className="flex items-center gap-2.5 text-[13px] font-extrabold uppercase tracking-[0.16em] text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Login mislykkedes
+                </div>
+                <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                  {ssoError.description}
+                </p>
+                <dl className="mt-4 space-y-1 text-[13px] font-medium text-[hsl(var(--cph-onyx))]/70">
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-extrabold">Fejlkode:</dt>
+                    <dd className="break-all">{ssoError.code}</dd>
+                  </div>
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-extrabold">Origin:</dt>
+                    <dd className="break-all">{ssoError.origin}</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  onClick={copyErrorDetails}
+                  className="mt-4 inline-flex items-center gap-2 rounded-[12px] border border-[hsl(var(--cph-onyx))]/20 bg-white px-4 py-2.5 text-[14px] font-extrabold text-[hsl(var(--cph-onyx))] transition-colors hover:bg-white/70"
+                >
+                  <Copy className="h-4 w-4" />
+                  Kopiér fejldetaljer
+                </button>
+              </div>
+            )}
+
 
             <button
               type="button"

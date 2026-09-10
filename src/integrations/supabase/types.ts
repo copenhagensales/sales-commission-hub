@@ -7914,26 +7914,29 @@ export type Database = {
       failed_login_attempts: {
         Row: {
           attempted_at: string | null
-          email: string
+          email: string | null
           failure_reason: string | null
           id: string
           ip_address: string | null
+          origin: string | null
           user_agent: string | null
         }
         Insert: {
           attempted_at?: string | null
-          email: string
+          email?: string | null
           failure_reason?: string | null
           id?: string
           ip_address?: string | null
+          origin?: string | null
           user_agent?: string | null
         }
         Update: {
           attempted_at?: string | null
-          email?: string
+          email?: string | null
           failure_reason?: string | null
           id?: string
           ip_address?: string | null
+          origin?: string | null
           user_agent?: string | null
         }
         Relationships: []

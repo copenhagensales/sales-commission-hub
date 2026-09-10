@@ -7,8 +7,9 @@ const corsHeaders = {
 };
 
 interface LogFailedLoginRequest {
-  email: string;
+  email?: string | null;
   failure_reason?: string;
+  origin?: string;
 }
 
 serve(async (req) => {
@@ -23,14 +24,28 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { email, failure_reason } = await req.json() as LogFailedLoginRequest;
+    const { email, failure_reason, origin } = await req.json() as LogFailedLoginRequest;
 
-    if (!email || typeof email !== "string" || email.length > 255 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return new Response(
-        JSON.stringify({ error: "Email is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Email er optional: ved SSO-fejl oplyser Entra ikke hvem der forsøgte.
+    let emailValue: string | null = null;
+    if (typeof email === "string" && email.trim() !== "") {
+      const trimmed = email.trim();
+      if (trimmed.length > 255 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid email format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      emailValue = trimmed;
     }
+
+    const originValue = typeof origin === "string" && origin.trim() !== ""
+      ? origin.trim().slice(0, 255)
+      : null;
+
+    const reasonValue = typeof failure_reason === "string" && failure_reason.trim() !== ""
+      ? failure_reason.slice(0, 1000)
+      : "invalid_credentials";
 
     // Get IP and user agent from request headers
     const ip_address = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
@@ -42,10 +57,11 @@ serve(async (req) => {
     const { error: logError } = await supabaseAdmin
       .from("failed_login_attempts")
       .insert({
-        email,
+        email: emailValue,
         ip_address,
         user_agent,
-        failure_reason: failure_reason || "invalid_credentials",
+        failure_reason: reasonValue,
+        origin: originValue,
       });
 
     if (logError) {
