@@ -5,6 +5,7 @@ import { requireCronOrOwner } from "../_shared/auth.ts";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import { buildApprovalRequestEmail } from "../_shared/supplier-report-mail.ts";
 import { runWeekPlans } from "./weekplan.ts";
+import { runDailySales } from "./dailysales.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,6 +89,30 @@ Deno.serve(async (req) => {
       );
     }
   }
+
+  // ---- Daglig salgsrapport til kunder (report_type = 'client_daily_sales') ----
+  if (mode === "dailysales") {
+    try {
+      const results = await runDailySales(svc, {
+        local,
+        force,
+        dryRun: body.dry_run === true,
+        dateOverride: (body.sale_date as string) || undefined,
+        subscriptionId: (body.subscription_id as string) || undefined,
+        testEmail: (body.test_email as string) || undefined,
+      });
+      return new Response(JSON.stringify({ success: true, mode, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  }
+
+
 
   const created: string[] = [];
   const skipped: Array<{ subscription: string; reason: string }> = [];
