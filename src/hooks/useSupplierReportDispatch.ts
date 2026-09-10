@@ -52,6 +52,93 @@ export function useSupplierReportSubscriptions() {
   });
 }
 
+/** Faktiske lokationstyper fra `location` - tomme/blanke filtreres væk. */
+export function useSupplierLocationTypes() {
+  return useQuery({
+    queryKey: ["supplier-report-location-types"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("location")
+        .select("type")
+        .not("type", "is", null);
+      if (error) throw error;
+      const types = new Set<string>();
+      for (const row of data ?? []) {
+        const value = (row.type ?? "").trim();
+        if (value) types.add(value);
+      }
+      return [...types].sort((a, b) => a.localeCompare(b, "da"));
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateSupplierReportSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: Partial<SupplierReportSubscription>) => {
+      const locationType = (values.location_type ?? "").trim();
+      if (!locationType) throw new Error("Lokationstype mangler");
+      const { data, error } = await supabase
+        .from("supplier_report_subscriptions")
+        .insert({
+          ...values,
+          location_type: locationType,
+          // Nye abonnementer er altid inaktive indtil modtager er udfyldt og godkendt
+          is_active: false,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_KEY });
+      queryClient.invalidateQueries({ queryKey: DISPATCHES_KEY });
+    },
+  });
+}
+
+/**
+ * Sletter et abonnement - men bevarer afsendelseshistorik: findes der en
+ * dispatch med status 'sent', deaktiveres abonnementet i stedet.
+ */
+export function useDeleteSupplierReportSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { count, error: countError } = await supabase
+        .from("supplier_report_dispatches")
+        .select("id", { count: "exact", head: true })
+        .eq("subscription_id", id)
+        .eq("status", "sent");
+      if (countError) throw countError;
+
+      if ((count ?? 0) > 0) {
+        const { error } = await supabase
+          .from("supplier_report_subscriptions")
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq("id", id);
+        if (error) throw error;
+        return { deactivated: true as const, sentCount: count ?? 0 };
+      }
+
+      const { error } = await supabase
+        .from("supplier_report_subscriptions")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      return { deactivated: false as const, sentCount: 0 };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_KEY });
+      queryClient.invalidateQueries({ queryKey: DISPATCHES_KEY });
+    },
+  });
+}
+
+
+
 export function useUpdateSupplierReportSubscription() {
   const queryClient = useQueryClient();
   return useMutation({

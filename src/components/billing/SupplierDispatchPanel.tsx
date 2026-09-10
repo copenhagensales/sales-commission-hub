@@ -22,9 +22,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Clock, Mail, Send, Settings } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Mail,
+  Plus,
+  Send,
+  Settings,
+  Trash2,
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   useApproveDispatch,
+  useCreateSupplierReportSubscription,
+  useDeleteSupplierReportSubscription,
+  useSupplierLocationTypes,
   useApprovedReportForPeriod,
   useApproverCandidates,
   useSendDispatch,
@@ -163,23 +185,32 @@ function SubscriptionDialog({
   open,
   onOpenChange,
 }: {
-  subscription: SupplierReportSubscription;
+  /** null = opret nyt abonnement */
+  subscription: SupplierReportSubscription | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const isNew = subscription === null;
   const { data: approvers } = useApproverCandidates();
+  const { data: locationTypes } = useSupplierLocationTypes();
   const update = useUpdateSupplierReportSubscription();
+  const create = useCreateSupplierReportSubscription();
+  const remove = useDeleteSupplierReportSubscription();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [form, setForm] = useState({
-    name: subscription.name ?? "",
-    recipient_name: subscription.recipient_name ?? "",
-    recipient_email: subscription.recipient_email ?? "",
-    cc: (subscription.cc_emails ?? []).join(", "),
-    approver_employee_id: subscription.approver_employee_id ?? "",
-    send_day: String(subscription.send_day),
-    attach_xlsx: subscription.attach_xlsx,
-    include_surcharge_summary: subscription.include_surcharge_summary,
-    is_active: subscription.is_active,
+    location_type: subscription?.location_type ?? "",
+    name: subscription?.name ?? "",
+    recipient_name: subscription?.recipient_name ?? "",
+    recipient_email: subscription?.recipient_email ?? "",
+    cc: (subscription?.cc_emails ?? []).join(", "),
+    approver_employee_id: subscription?.approver_employee_id ?? "",
+    send_day: String(subscription?.send_day ?? 1),
+    attach_xlsx: subscription?.attach_xlsx ?? true,
+    include_surcharge_summary: subscription?.include_surcharge_summary ?? true,
+    is_active: subscription?.is_active ?? false,
   });
+
+  const isPending = update.isPending || create.isPending;
 
   const save = () => {
     const email = form.recipient_email.trim();
@@ -192,24 +223,42 @@ function SubscriptionDialog({
       toast.error("Sendedag skal være mellem 1 og 28");
       return;
     }
-    update.mutate(
-      {
-        id: subscription.id,
-        values: {
-          name: form.name.trim() || null,
-          recipient_name: form.recipient_name.trim() || null,
-          recipient_email: email || null,
-          cc_emails: form.cc
-            .split(",")
-            .map((e) => e.trim())
-            .filter((e) => e.includes("@")),
-          approver_employee_id: form.approver_employee_id || null,
-          send_day: day,
-          attach_xlsx: form.attach_xlsx,
-          include_surcharge_summary: form.include_surcharge_summary,
-          is_active: form.is_active,
+    const values = {
+      name: form.name.trim() || null,
+      recipient_name: form.recipient_name.trim() || null,
+      recipient_email: email || null,
+      cc_emails: form.cc
+        .split(",")
+        .map((e) => e.trim())
+        .filter((e) => e.includes("@")),
+      approver_employee_id: form.approver_employee_id || null,
+      send_day: day,
+      attach_xlsx: form.attach_xlsx,
+      include_surcharge_summary: form.include_surcharge_summary,
+      is_active: form.is_active,
+    };
+
+    if (isNew) {
+      const locationType = form.location_type.trim();
+      if (!locationType) {
+        toast.error("Vælg en lokationstype");
+        return;
+      }
+      create.mutate(
+        { ...values, location_type: locationType, is_active: false },
+        {
+          onSuccess: () => {
+            toast.success("Abonnement oprettet - det er inaktivt indtil du aktiverer det");
+            onOpenChange(false);
+          },
+          onError: (e: Error) => toast.error("Fejl: " + e.message),
         },
-      },
+      );
+      return;
+    }
+
+    update.mutate(
+      { id: subscription.id, values },
       {
         onSuccess: () => {
           toast.success("Abonnement gemt");
@@ -220,20 +269,73 @@ function SubscriptionDialog({
     );
   };
 
+  const handleDelete = () => {
+    if (!subscription) return;
+    remove.mutate(subscription.id, {
+      onSuccess: (result) => {
+        if (result.deactivated) {
+          toast.warning(
+            `Abonnementet er deaktiveret i stedet for slettet: der findes ${result.sentCount} afsendt rapport(er), og afsendelseshistorikken skal bevares.`,
+          );
+        } else {
+          toast.success("Abonnement slettet");
+        }
+        setConfirmDelete(false);
+        onOpenChange(false);
+      },
+      onError: (e: Error) => toast.error("Fejl: " + e.message),
+    });
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Automatisk udsendelse - {subscription.location_type}</DialogTitle>
+          <DialogTitle>
+            {isNew
+              ? "Nyt abonnement"
+              : `Automatisk udsendelse - ${subscription.location_type}`}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {isNew ? (
+            <div className="space-y-2">
+              <Label>Lokationstype</Label>
+              <Select
+                value={form.location_type}
+                onValueChange={(v) => setForm({ ...form, location_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg lokationstype" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(locationTypes ?? []).map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Lokationstype</Label>
+              <p className="text-sm font-medium">{subscription.location_type}</p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Navn på abonnement</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
+            <p className="text-xs text-muted-foreground">
+              Navnet står i mailens overskrift hos modtageren - skriv det, som modtageren
+              skal læse det.
+            </p>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Modtager (navn)</Label>
@@ -328,14 +430,54 @@ function SubscriptionDialog({
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Annuller
-          </Button>
-          <Button onClick={save} disabled={update.isPending}>
-            {update.isPending ? "Gemmer..." : "Gem"}
-          </Button>
+        <DialogFooter className="sm:justify-between">
+          {!isNew ? (
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmDelete(true)}
+              disabled={remove.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Slet
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Annuller
+            </Button>
+            <Button onClick={save} disabled={isPending}>
+              {isPending ? "Gemmer..." : isNew ? "Opret" : "Gem"}
+            </Button>
+          </div>
         </DialogFooter>
+        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Slet "{subscription?.name || subscription?.location_type}"?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Abonnementet fjernes, så der ikke længere oprettes udsendelser. Har
+                abonnementet allerede sendt rapporter, bliver det i stedet deaktiveret,
+                så afsendelseshistorikken bevares.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }}
+                disabled={remove.isPending}
+              >
+                {remove.isPending ? "Arbejder..." : "Slet"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </DialogContent>
     </Dialog>
   );
@@ -345,7 +487,9 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
   const { data: subscriptions } = useSupplierReportSubscriptions();
   const { data: dispatches } = useSupplierReportDispatches({ pendingOnly: false });
   const [editing, setEditing] = useState<SupplierReportSubscription | null>(null);
+  const [creating, setCreating] = useState(false);
 
+  // Uden valgt lokationstype vises alle abonnementer, så man ser hele billedet.
   const relevantSubscriptions = useMemo(
     () =>
       (subscriptions ?? []).filter(
@@ -361,8 +505,6 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
       .slice(0, 6);
   }, [dispatches, relevantSubscriptions]);
 
-  if (relevantSubscriptions.length === 0) return null;
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
@@ -376,7 +518,12 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
               onClick={() => setEditing(s)}
             >
               <Settings className="mr-2 h-4 w-4" />
-              {s.name || s.location_type}
+              <span className="flex flex-col items-start leading-tight">
+                <span>{s.name || s.location_type}</span>
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  {s.location_type}
+                </span>
+              </span>
               {!s.is_active && (
                 <Badge variant="secondary" className="ml-2">
                   Inaktiv
@@ -384,10 +531,18 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
               )}
             </Button>
           ))}
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Nyt abonnement
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {relevantDispatches.length === 0 ? (
+        {relevantSubscriptions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Ingen abonnementer endnu. Opret et abonnement for at sende rapporten
+            automatisk til en leverandør eller kunde.
+          </p>
+        ) : relevantDispatches.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Ingen udsendelser oprettet endnu. Jobbet opretter en udsendelse til
             godkendelse på den valgte dag i måneden.
@@ -403,6 +558,14 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
           onOpenChange={(o) => !o && setEditing(null)}
         />
       )}
+      {creating && (
+        <SubscriptionDialog
+          subscription={null}
+          open={creating}
+          onOpenChange={(o) => !o && setCreating(false)}
+        />
+      )}
     </Card>
   );
 }
+
