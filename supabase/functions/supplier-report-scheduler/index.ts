@@ -49,11 +49,11 @@ function baseUrl(): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const svc = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
+  // Kun cron eller ejer må trigge udsendelser/påmindelser.
+  const auth = await requireCronOrOwner(req);
+  if (auth instanceof Response) return auth;
+  const svc = auth.svc;
+
 
   let body: Record<string, unknown> = {};
   try {
