@@ -3520,6 +3520,32 @@ export type Database = {
           },
         ]
       }
+      client_agreement_hidden_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          hidden_by: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          hidden_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          hidden_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agreement_hidden_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_campaigns: {
         Row: {
           client_id: string
