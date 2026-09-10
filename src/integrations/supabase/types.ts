@@ -10405,6 +10405,56 @@ export type Database = {
           },
         ]
       }
+      location_rate_surcharges: {
+        Row: {
+          chain_match: string
+          created_at: string
+          funded_by_client_id: string | null
+          id: string
+          is_active: boolean
+          location_type: string
+          note: string | null
+          surcharge_per_day: number
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          chain_match: string
+          created_at?: string
+          funded_by_client_id?: string | null
+          id?: string
+          is_active?: boolean
+          location_type: string
+          note?: string | null
+          surcharge_per_day: number
+          updated_at?: string
+          valid_from: string
+          valid_to?: string | null
+        }
+        Update: {
+          chain_match?: string
+          created_at?: string
+          funded_by_client_id?: string | null
+          id?: string
+          is_active?: boolean
+          location_type?: string
+          note?: string | null
+          surcharge_per_day?: number
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_rate_surcharges_funded_by_client_id_fkey"
+            columns: ["funded_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_events: {
         Row: {
           id: string
@@ -13338,6 +13388,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          base_amount: number | null
           created_at: string
           discount_amount: number
           discount_percent: number
@@ -13350,12 +13401,15 @@ export type Database = {
           sent_at: string | null
           sent_to: string[] | null
           status: string
+          surcharge_amount: number | null
+          surcharge_refundable_amount: number | null
           total_amount: number
           unique_locations: number
         }
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          base_amount?: number | null
           created_at?: string
           discount_amount?: number
           discount_percent?: number
@@ -13368,12 +13422,15 @@ export type Database = {
           sent_at?: string | null
           sent_to?: string[] | null
           status?: string
+          surcharge_amount?: number | null
+          surcharge_refundable_amount?: number | null
           total_amount?: number
           unique_locations?: number
         }
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          base_amount?: number | null
           created_at?: string
           discount_amount?: number
           discount_percent?: number
@@ -13386,6 +13443,8 @@ export type Database = {
           sent_at?: string | null
           sent_to?: string[] | null
           status?: string
+          surcharge_amount?: number | null
+          surcharge_refundable_amount?: number | null
           total_amount?: number
           unique_locations?: number
         }
