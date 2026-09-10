@@ -201,7 +201,8 @@ Deno.serve(async (req) => {
     let campaignSalesAnonymized = 0;
     let campaignSalesDeleted = 0;
     let campaignSalesSkippedUnmapped = 0;
-    let referencesPreserved = 0;
+    let externalRefsCleared = 0;
+    let externalSalesIdsCleared = 0;
     let commissionsBackfilled = 0;
     let normalizedKeysStripped = 0;
     const campaignResults: {
@@ -209,7 +210,8 @@ Deno.serve(async (req) => {
       mode: string;
       count: number;
       skipped_unmapped?: number;
-      references_preserved?: number;
+      external_reference_number_cleared?: number;
+      external_sales_id_cleared?: number;
       commissions_backfilled?: number;
       normalized_stripped?: number;
     }[] = [];
@@ -335,7 +337,8 @@ Deno.serve(async (req) => {
             if (salesToAnon && salesToAnon.length > 0) {
               let anonCount = 0;
               let skippedUnmapped = 0;
-              let refsThisCampaign = 0;
+              let extRefsCleared = 0;
+              let extSalesIdsCleared = 0;
               let commissionsThisCampaign = 0;
               let normalizedThisCampaign = 0;
 
