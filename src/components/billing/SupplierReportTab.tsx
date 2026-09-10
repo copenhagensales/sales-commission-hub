@@ -760,6 +760,12 @@ export function SupplierReportTab() {
                      <TableHead className="text-right">Bookinger</TableHead>
                      <TableHead className="text-right">Dage</TableHead>
                      <TableHead className="text-right">Dagspris</TableHead>
+                    {hasSurcharge && (
+                      <>
+                        <TableHead className="text-right">Grundbeløb</TableHead>
+                        <TableHead className="text-right">Merpris</TableHead>
+                      </>
+                    )}
                     <TableHead className="text-right">Beløb</TableHead>
                     {discountRules && discountRules.length > 0 && (
                       <>
