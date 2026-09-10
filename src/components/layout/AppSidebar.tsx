@@ -1228,6 +1228,11 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Receipt className="h-4 w-4" />
                     {t("sidebar.billing")}
+                    {pendingDispatchCount > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground">
+                        {pendingDispatchCount}
+                      </span>
+                    )}
                   </NavLink>
                 )}
                 {p.canViewFmTravelExpenses && (
