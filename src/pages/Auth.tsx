@@ -1,8 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Bird, ShieldCheck, TrendingUp, BarChart3, Trophy } from "lucide-react";
+import { Bird, ShieldCheck, TrendingUp, BarChart3, Trophy, AlertTriangle, Copy } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
+
+type SsoError = {
+  code: string;
+  description: string;
+  origin: string;
+};
+
+const logFailedLogin = (failureReason: string) => {
+  supabase.functions
+    .invoke("log-failed-login", {
+      body: {
+        failure_reason: failureReason,
+        origin: window.location.origin,
+      },
+    })
+    .catch(() => {
+      // Logning må ikke blokere loginsiden.
+    });
+};
 
 const FEATURES = [
   { icon: TrendingUp, label: "Provision og bonus i realtid" },
