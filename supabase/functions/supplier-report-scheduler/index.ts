@@ -1,7 +1,7 @@
 // Dagligt job: opretter dispatches til godkendelse og sender påmindelser.
 // Styrer KUN tidsplan, godkendelsesbesked og påmindelser.
 // Selve rapportberegningen ligger i frontenden (SupplierReportTab) og reimplementeres ikke her.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireCronOrOwner } from "../_shared/auth.ts";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import { buildApprovalRequestEmail } from "../_shared/supplier-report-mail.ts";
 
