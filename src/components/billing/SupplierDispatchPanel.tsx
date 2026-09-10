@@ -24,8 +24,10 @@ import {
 } from "@/components/ui/select";
 import {
   AlertCircle,
+  CalendarDays,
   CheckCircle2,
   Clock,
+  FileText,
   Mail,
   Plus,
   Send,
@@ -49,10 +51,13 @@ import {
   useSupplierLocationTypes,
   useApprovedReportForPeriod,
   useApproverCandidates,
+  useReportClients,
   useSendDispatch,
   useSupplierReportDispatches,
   useSupplierReportSubscriptions,
   useUpdateSupplierReportSubscription,
+  WEEKDAY_LABELS,
+  type ReportType,
   type SupplierReportDispatch,
   type SupplierReportSubscription,
 } from "@/hooks/useSupplierReportDispatch";
@@ -61,11 +66,39 @@ function periodLabel(periodStart: string): string {
   return format(new Date(`${periodStart}T00:00:00`), "LLLL yyyy", { locale: da });
 }
 
+function weekPeriodLabel(periodStart: string): string {
+  const start = new Date(`${periodStart}T00:00:00`);
+  return `uge ${format(start, "I", { locale: da })} (${format(start, "dd/MM")})`;
+}
+
+function isWeekPlan(sub: SupplierReportSubscription | null | undefined): boolean {
+  return sub?.report_type === "client_week_plan";
+}
+
+function ReportTypeBadge({ reportType }: { reportType: ReportType }) {
+  return reportType === "client_week_plan" ? (
+    <Badge variant="outline" className="gap-1">
+      <CalendarDays className="h-3 w-3" /> Ugeplan til kunde
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="gap-1">
+      <FileText className="h-3 w-3" /> Leverandørrapport
+    </Badge>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   if (status === "sent") {
     return (
       <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
         <CheckCircle2 className="h-3 w-3" /> Sendt
+      </Badge>
+    );
+  }
+  if (status === "skipped") {
+    return (
+      <Badge variant="secondary" className="gap-1">
+        <AlertCircle className="h-3 w-3" /> Sprunget over
       </Badge>
     );
   }
@@ -92,17 +125,20 @@ function StatusBadge({ status }: { status: string }) {
 
 function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
   const sub = dispatch.supplier_report_subscriptions;
+  const weekPlan = isWeekPlan(sub);
   const { data: report } = useApprovedReportForPeriod(
-    sub?.location_type,
+    weekPlan ? undefined : sub?.location_type ?? undefined,
     dispatch.period_start,
   );
   const approve = useApproveDispatch();
   const send = useSendDispatch();
 
   const reportApproved = report?.status === "approved";
+  // Ugeplaner godkendes ikke og sendes ikke manuelt herfra.
   const canApprove =
-    dispatch.status === "pending_approval" && reportApproved && !!report?.id;
+    !weekPlan && dispatch.status === "pending_approval" && reportApproved && !!report?.id;
   const canSend =
+    !weekPlan &&
     (dispatch.status === "approved" || dispatch.status === "failed") &&
     !!sub?.is_active &&
     !!sub?.recipient_email;
@@ -111,13 +147,17 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
     <div className="rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">{sub?.name || sub?.location_type}</span>
+            {sub?.report_type && <ReportTypeBadge reportType={sub.report_type} />}
             <StatusBadge status={dispatch.status} />
           </div>
           <p className="text-sm text-muted-foreground">
-            Periode: {periodLabel(dispatch.period_start)} &middot; Modtager:{" "}
-            {sub?.recipient_email || "ikke udfyldt"}
+            Periode:{" "}
+            {weekPlan
+              ? weekPeriodLabel(dispatch.period_start)
+              : periodLabel(dispatch.period_start)}{" "}
+            &middot; Modtager: {sub?.recipient_email || "ikke udfyldt"}
           </p>
           {dispatch.reminder_count > 0 && dispatch.status === "pending_approval" && (
             <p className="text-sm text-muted-foreground">
@@ -133,7 +173,7 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           {dispatch.error_message && (
             <p className="text-sm text-destructive">{dispatch.error_message}</p>
           )}
-          {dispatch.status === "pending_approval" && !reportApproved && (
+          {!weekPlan && dispatch.status === "pending_approval" && !reportApproved && (
             <p className="text-sm text-amber-700">
               Rapporten for perioden er ikke godkendt endnu. Godkend rapporten nedenfor
               først.
@@ -141,7 +181,7 @@ function DispatchRow({ dispatch }: { dispatch: SupplierReportDispatch }) {
           )}
         </div>
         <div className="flex gap-2">
-          {dispatch.status === "pending_approval" && (
+          {!weekPlan && dispatch.status === "pending_approval" && (
             <Button
               size="sm"
               disabled={!canApprove || approve.isPending}
@@ -193,12 +233,16 @@ function SubscriptionDialog({
   const isNew = subscription === null;
   const { data: approvers } = useApproverCandidates();
   const { data: locationTypes } = useSupplierLocationTypes();
+  const { data: clients } = useReportClients();
   const update = useUpdateSupplierReportSubscription();
   const create = useCreateSupplierReportSubscription();
   const remove = useDeleteSupplierReportSubscription();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [form, setForm] = useState({
+    report_type: (subscription?.report_type ?? "supplier_invoice") as ReportType,
     location_type: subscription?.location_type ?? "",
+    client_id: subscription?.client_id ?? "",
+    weekday: String(subscription?.weekday ?? 1),
     name: subscription?.name ?? "",
     recipient_name: subscription?.recipient_name ?? "",
     recipient_email: subscription?.recipient_email ?? "",
@@ -209,6 +253,7 @@ function SubscriptionDialog({
     include_surcharge_summary: subscription?.include_surcharge_summary ?? true,
     is_active: subscription?.is_active ?? false,
   });
+  const weekPlanForm = form.report_type === "client_week_plan";
 
   const isPending = update.isPending || create.isPending;
 
@@ -219,7 +264,13 @@ function SubscriptionDialog({
       return;
     }
     const day = Number(form.send_day);
-    if (!Number.isInteger(day) || day < 1 || day > 28) {
+    const weekday = Number(form.weekday);
+    if (weekPlanForm) {
+      if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
+        toast.error("Vælg en ugedag");
+        return;
+      }
+    } else if (!Number.isInteger(day) || day < 1 || day > 28) {
       toast.error("Sendedag skal være mellem 1 og 28");
       return;
     }
@@ -232,20 +283,31 @@ function SubscriptionDialog({
         .map((e) => e.trim())
         .filter((e) => e.includes("@")),
       approver_employee_id: form.approver_employee_id || null,
-      send_day: day,
-      attach_xlsx: form.attach_xlsx,
+      send_day: weekPlanForm ? 1 : day,
+      weekday: weekPlanForm ? weekday : null,
+      attach_xlsx: weekPlanForm ? false : form.attach_xlsx,
       include_surcharge_summary: form.include_surcharge_summary,
       is_active: form.is_active,
     };
 
     if (isNew) {
-      const locationType = form.location_type.trim();
-      if (!locationType) {
+      if (weekPlanForm) {
+        if (!form.client_id) {
+          toast.error("Vælg en kunde");
+          return;
+        }
+      } else if (!form.location_type.trim()) {
         toast.error("Vælg en lokationstype");
         return;
       }
       create.mutate(
-        { ...values, location_type: locationType, is_active: false },
+        {
+          ...values,
+          report_type: form.report_type,
+          location_type: weekPlanForm ? null : form.location_type.trim(),
+          client_id: weekPlanForm ? form.client_id : null,
+          is_active: false,
+        },
         {
           onSuccess: () => {
             toast.success("Abonnement oprettet - det er inaktivt indtil du aktiverer det");
@@ -295,11 +357,70 @@ function SubscriptionDialog({
           <DialogTitle>
             {isNew
               ? "Nyt abonnement"
-              : `Automatisk udsendelse - ${subscription.location_type}`}
+              : `Automatisk udsendelse - ${subscription.name || subscription.location_type}`}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           {isNew ? (
+            <div className="space-y-2">
+              <Label>Rapporttype</Label>
+              <Select
+                value={form.report_type}
+                onValueChange={(v) =>
+                  setForm({ ...form, report_type: v as ReportType })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="supplier_invoice">
+                    Leverandørrapport (månedlig)
+                  </SelectItem>
+                  <SelectItem value="client_week_plan">
+                    Ugeplan til kunde (ugentlig)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Rapporttype</Label>
+              <div>
+                <ReportTypeBadge reportType={form.report_type} />
+              </div>
+            </div>
+          )}
+          {weekPlanForm ? (
+            isNew ? (
+              <div className="space-y-2">
+                <Label>Kunde</Label>
+                <Select
+                  value={form.client_id}
+                  onValueChange={(v) => setForm({ ...form, client_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg kunde" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(clients ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Kunde</Label>
+                <p className="text-sm font-medium">
+                  {(clients ?? []).find((c) => c.id === subscription.client_id)?.name ??
+                    "ukendt"}
+                </p>
+              </div>
+            )
+          ) : isNew ? (
             <div className="space-y-2">
               <Label>Lokationstype</Label>
               <Select
@@ -362,7 +483,9 @@ function SubscriptionDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Godkender</Label>
+              <Label>
+                {weekPlanForm ? "Modtager af interne advarsler" : "Godkender"}
+              </Label>
               <Select
                 value={form.approver_employee_id || "none"}
                 onValueChange={(v) =>
@@ -370,7 +493,9 @@ function SubscriptionDialog({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Vælg godkender" />
+                  <SelectValue
+                    placeholder={weekPlanForm ? "Vælg modtager" : "Vælg godkender"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Ingen</SelectItem>
@@ -382,41 +507,68 @@ function SubscriptionDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Dag i måneden (1-28)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={28}
-                value={form.send_day}
-                onChange={(e) => setForm({ ...form, send_day: e.target.value })}
-              />
-            </div>
+            {weekPlanForm ? (
+              <div className="space-y-2">
+                <Label>Ugedag</Label>
+                <Select
+                  value={form.weekday}
+                  onValueChange={(v) => setForm({ ...form, weekday: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg ugedag" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(WEEKDAY_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Dag i måneden (1-28)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={form.send_day}
+                  onChange={(e) => setForm({ ...form, send_day: e.target.value })}
+                />
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <p className="text-sm font-medium">Vedhæft Excel-ark</p>
-              <p className="text-xs text-muted-foreground">
-                Kun lokation, butiksnr, by, dage og beløb
-              </p>
-            </div>
-            <Switch
-              checked={form.attach_xlsx}
-              onCheckedChange={(v) => setForm({ ...form, attach_xlsx: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <p className="text-sm font-medium">Vis merpris/refusion i mailteksten</p>
-              <p className="text-xs text-muted-foreground">
-                Kommer aldrig med i Excel-bilaget
-              </p>
-            </div>
-            <Switch
-              checked={form.include_surcharge_summary}
-              onCheckedChange={(v) => setForm({ ...form, include_surcharge_summary: v })}
-            />
-          </div>
+          {!weekPlanForm && (
+            <>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Vedhæft Excel-ark</p>
+                  <p className="text-xs text-muted-foreground">
+                    Kun lokation, butiksnr, by, dage og beløb
+                  </p>
+                </div>
+                <Switch
+                  checked={form.attach_xlsx}
+                  onCheckedChange={(v) => setForm({ ...form, attach_xlsx: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Vis merpris/refusion i mailteksten</p>
+                  <p className="text-xs text-muted-foreground">
+                    Kommer aldrig med i Excel-bilaget
+                  </p>
+                </div>
+                <Switch
+                  checked={form.include_surcharge_summary}
+                  onCheckedChange={(v) =>
+                    setForm({ ...form, include_surcharge_summary: v })
+                  }
+                />
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <p className="text-sm font-medium">Aktiv</p>
@@ -521,7 +673,9 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
               <span className="flex flex-col items-start leading-tight">
                 <span>{s.name || s.location_type}</span>
                 <span className="text-[11px] font-normal text-muted-foreground">
-                  {s.location_type}
+                  {s.report_type === "client_week_plan"
+                    ? `Ugeplan til kunde - ${WEEKDAY_LABELS[s.weekday ?? 1]}`
+                    : `Leverandørrapport - ${s.location_type}`}
                 </span>
               </span>
               {!s.is_active && (

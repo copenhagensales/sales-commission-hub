@@ -4,6 +4,7 @@
 import { requireCronOrOwner } from "../_shared/auth.ts";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import { buildApprovalRequestEmail } from "../_shared/supplier-report-mail.ts";
+import { runWeekPlans } from "./weekplan.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,14 +66,39 @@ Deno.serve(async (req) => {
   const force = body.force === true;
 
   const local = copenhagenNow();
+
+  // ---- Ugeplan til kunder (report_type = 'client_week_plan') ----
+  if (mode === "weekplan") {
+    try {
+      const results = await runWeekPlans(svc, {
+        local,
+        force,
+        dryRun: body.dry_run === true,
+        weekStartOverride: (body.week_start as string) || undefined,
+        subscriptionId: (body.subscription_id as string) || undefined,
+        testEmail: (body.test_email as string) || undefined,
+      });
+      return new Response(JSON.stringify({ success: true, mode, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  }
+
   const created: string[] = [];
   const skipped: Array<{ subscription: string; reason: string }> = [];
   const reminders: string[] = [];
   const errors: string[] = [];
 
+  // Kun månedlige leverandørrapporter håndteres af create/remind-flowet.
   const { data: subscriptions, error: subError } = await svc
     .from("supplier_report_subscriptions")
-    .select("*");
+    .select("*")
+    .eq("report_type", "supplier_invoice");
   if (subError) {
     return new Response(JSON.stringify({ error: subError.message }), {
       status: 500,

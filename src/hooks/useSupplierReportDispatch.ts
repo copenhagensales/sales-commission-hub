@@ -1,10 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+/** 'supplier_invoice' = månedlig leverandørrapport, 'client_week_plan' = ugeplan til kunde. */
+export type ReportType = "supplier_invoice" | "client_week_plan";
+
 export interface SupplierReportSubscription {
   id: string;
   name: string | null;
-  location_type: string;
+  location_type: string | null;
+  report_type: ReportType;
+  client_id: string | null;
+  cadence: string;
+  weekday: number | null;
   recipient_name: string | null;
   recipient_email: string | null;
   cc_emails: string[];
@@ -17,6 +24,16 @@ export interface SupplierReportSubscription {
   is_active: boolean;
   last_run_at: string | null;
 }
+
+export const WEEKDAY_LABELS: Record<number, string> = {
+  1: "Mandag",
+  2: "Tirsdag",
+  3: "Onsdag",
+  4: "Torsdag",
+  5: "Fredag",
+  6: "Lørdag",
+  7: "Søndag",
+};
 
 export interface SupplierReportDispatch {
   id: string;
@@ -45,10 +62,27 @@ export function useSupplierReportSubscriptions() {
       const { data, error } = await supabase
         .from("supplier_report_subscriptions")
         .select("*")
-        .order("location_type");
+        .order("report_type")
+        .order("name");
       if (error) throw error;
       return (data ?? []) as SupplierReportSubscription[];
     },
+  });
+}
+
+/** Kunder til ugeplan-abonnementer. */
+export function useReportClients() {
+  return useQuery({
+    queryKey: ["supplier-report-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -77,13 +111,23 @@ export function useCreateSupplierReportSubscription() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (values: Partial<SupplierReportSubscription>) => {
+      const reportType: ReportType = values.report_type ?? "supplier_invoice";
       const locationType = (values.location_type ?? "").trim();
-      if (!locationType) throw new Error("Lokationstype mangler");
+      if (reportType === "supplier_invoice" && !locationType) {
+        throw new Error("Lokationstype mangler");
+      }
+      if (reportType === "client_week_plan" && (!values.client_id || !values.weekday)) {
+        throw new Error("Kunde og ugedag mangler");
+      }
       const { data, error } = await supabase
         .from("supplier_report_subscriptions")
         .insert({
           ...values,
-          location_type: locationType,
+          report_type: reportType,
+          cadence: reportType === "client_week_plan" ? "weekly" : "monthly",
+          location_type: reportType === "supplier_invoice" ? locationType : null,
+          client_id: reportType === "client_week_plan" ? values.client_id : null,
+          weekday: reportType === "client_week_plan" ? values.weekday : null,
           // Nye abonnementer er altid inaktive indtil modtager er udfyldt og godkendt
           is_active: false,
         })
@@ -181,7 +225,10 @@ export function useSupplierReportDispatches(options?: { pendingOnly?: boolean })
   });
 }
 
-/** Antal udsendelser der venter på handling - bruges til badge i menuen. */
+/**
+ * Antal udsendelser der venter på handling - bruges til badge i menuen.
+ * Kun leverandørrapporter: ugeplaner godkendes ikke.
+ */
 export function usePendingSupplierDispatchCount(enabled = true) {
   return useQuery({
     queryKey: [...DISPATCHES_KEY, "pending-count"],
@@ -189,7 +236,11 @@ export function usePendingSupplierDispatchCount(enabled = true) {
     queryFn: async () => {
       const { count, error } = await supabase
         .from("supplier_report_dispatches")
-        .select("id", { count: "exact", head: true })
+        .select("id, supplier_report_subscriptions!inner(report_type)", {
+          count: "exact",
+          head: true,
+        })
+        .eq("supplier_report_subscriptions.report_type", "supplier_invoice")
         .in("status", ["pending_approval", "approved", "failed"]);
       if (error) throw error;
       return count ?? 0;
