@@ -5,6 +5,27 @@
  * and verified without touching the database.
  */
 
+/**
+ * External customer references (OPP number, Sales ID/CVR). They are personal
+ * data on the positive list: the client can look the number up in their own
+ * system, so a sale that keeps them is pseudonymised, not anonymised.
+ * Same deadline as customer_phone — the campaign retention window.
+ */
+export const EXTERNAL_REFERENCE_KEYS = [
+  "opp_nr",
+  "opp_nr.",
+  "opp-nr",
+  "opp-nr.",
+  "opp nr",
+  "opp nr.",
+  "opp_number",
+  "opp",
+  "legacy_opp_number",
+  "sales_id",
+  "sales id",
+  "salesid",
+] as const;
+
 /** Identity keys removed from sales.normalized_data on anonymisation. */
 export const NORMALIZED_IDENTITY_KEYS = [
   "customer_name",
@@ -15,6 +36,7 @@ export const NORMALIZED_IDENTITY_KEYS = [
   "phone_number",
   "member_number",
   "current_akasse",
+  ...EXTERNAL_REFERENCE_KEYS,
 ] as const;
 
 /** Keys removed from cancellation_queue.uploaded_data on anonymisation. */
@@ -25,6 +47,7 @@ export const CANCELLATION_IDENTITY_KEYS = [
   "A-kasse",
   "Medlemsnummer",
   "Indmeldelsesdato",
+  ...EXTERNAL_REFERENCE_KEYS,
 ] as const;
 
 type Json = Record<string, unknown>;
