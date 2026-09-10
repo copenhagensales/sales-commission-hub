@@ -13483,6 +13483,154 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_report_dispatches: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          last_reminder_at: string | null
+          period_end: string
+          period_start: string
+          reminder_count: number
+          report_id: string | null
+          sent_at: string | null
+          sent_to: string[] | null
+          status: string
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_reminder_at?: string | null
+          period_end: string
+          period_start: string
+          reminder_count?: number
+          report_id?: string | null
+          sent_at?: string | null
+          sent_to?: string[] | null
+          status?: string
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_reminder_at?: string | null
+          period_end?: string
+          period_start?: string
+          reminder_count?: number
+          report_id?: string | null
+          sent_at?: string | null
+          sent_to?: string[] | null
+          status?: string
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_report_dispatches_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoice_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_report_dispatches_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_report_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_report_subscriptions: {
+        Row: {
+          approver_employee_id: string | null
+          attach_xlsx: boolean
+          cc_emails: string[]
+          created_at: string
+          id: string
+          include_surcharge_summary: boolean
+          is_active: boolean
+          last_run_at: string | null
+          location_type: string
+          name: string | null
+          period_mode: string
+          recipient_email: string | null
+          recipient_name: string | null
+          send_day: number
+          send_hour: number
+          updated_at: string
+        }
+        Insert: {
+          approver_employee_id?: string | null
+          attach_xlsx?: boolean
+          cc_emails?: string[]
+          created_at?: string
+          id?: string
+          include_surcharge_summary?: boolean
+          is_active?: boolean
+          last_run_at?: string | null
+          location_type: string
+          name?: string | null
+          period_mode?: string
+          recipient_email?: string | null
+          recipient_name?: string | null
+          send_day?: number
+          send_hour?: number
+          updated_at?: string
+        }
+        Update: {
+          approver_employee_id?: string | null
+          attach_xlsx?: boolean
+          cc_emails?: string[]
+          created_at?: string
+          id?: string
+          include_surcharge_summary?: boolean
+          is_active?: boolean
+          last_run_at?: string | null
+          location_type?: string
+          name?: string | null
+          period_mode?: string
+          recipient_email?: string | null
+          recipient_name?: string | null
+          send_day?: number
+          send_hour?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_report_subscriptions_approver_employee_id_fkey"
+            columns: ["approver_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_report_subscriptions_approver_employee_id_fkey"
+            columns: ["approver_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_report_subscriptions_approver_employee_id_fkey"
+            columns: ["approver_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_daily_summary: {
         Row: {
           avg_duration_ms: number
