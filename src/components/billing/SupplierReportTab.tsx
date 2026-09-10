@@ -348,6 +348,9 @@ export function SupplierReportTab() {
 
     if (days === 0) return acc; // Skip bookings with no days in period
 
+    // Merpris (butikstillæg) for denne booking i perioden
+    const sur = bookingSurcharge(booking, rateSurcharges, periodStart, periodEnd);
+
     if (!acc[locationId]) {
       acc[locationId] = {
         location: booking.location,
@@ -357,6 +360,13 @@ export function SupplierReportTab() {
         bookingAmounts: [] as Array<{ id: string; amount: number; lockedPercent: number | null }>,
         totalDays: 0,
         totalAmount: 0,
+        baseAmount: 0,
+        surchargeAmount: 0,
+        surchargeDays: 0,
+        surchargePerDay: sur.perDay,
+        surchargeChain: sur.chain,
+        surchargeRefundable: false,
+        surchargeRefundableAmount: 0,
         dailyRate,
         usesTotalPrice,
         missingRate: false,
@@ -366,16 +376,29 @@ export function SupplierReportTab() {
       };
     }
 
+    const amountWithSurcharge = total + sur.amount;
+
     acc[locationId].bookings.push(booking);
     acc[locationId].bookingAmounts.push({
       id: booking.id,
-      amount: total,
+      amount: amountWithSurcharge,
       lockedPercent:
         booking.discount_percent_locked == null ? null : Number(booking.discount_percent_locked),
     });
     acc[locationId].totalDays += days;
-    acc[locationId].totalAmount += total;
+    acc[locationId].baseAmount += total;
+    acc[locationId].surchargeAmount += sur.amount;
+    acc[locationId].surchargeDays += sur.days;
+    acc[locationId].surchargeRefundableAmount += sur.refundableAmount;
+    if (sur.refundableAmount > 0) acc[locationId].surchargeRefundable = true;
+    if (sur.chain && !acc[locationId].surchargeChain) {
+      acc[locationId].surchargeChain = sur.chain;
+      acc[locationId].surchargePerDay = sur.perDay;
+    }
+    // Butikken skal have grundbeløb + merpris. Rabatten regnes fortsat på dette beløb.
+    acc[locationId].totalAmount += amountWithSurcharge;
     if (missingRate) acc[locationId].missingRate = true;
+
 
 
     // Merge weekdays (clipped to period)
