@@ -3,18 +3,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRef, useState } from "react";
-import { Building2, FileSignature, FileText, ShieldCheck, Trash2, Upload } from "lucide-react";
+import { Building2, FileSignature, FileText, RotateCcw, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCanManageDpaDocuments } from "@/hooks/useDpaDocuments";
 import {
   useClientAgreementDocuments,
   useComplianceClients,
   useDeleteClientAgreement,
+  useHiddenAgreementClients,
+  useHideAgreementClient,
   useOpenClientAgreement,
+  useRestoreAgreementClient,
   useUploadClientAgreement,
   type ClientAgreementDocument,
   type ClientAgreementType,
 } from "@/hooks/useClientAgreementDocuments";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const TYPE_LABEL: Record<ClientAgreementType, string> = {
   dpa: "Databehandleraftale",
