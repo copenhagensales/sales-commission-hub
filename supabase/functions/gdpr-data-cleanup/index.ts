@@ -9,9 +9,7 @@ import {
   ADVERSUS_EVENTS_RETENTION_DAYS,
   CANCELLATION_IDENTITY_KEYS,
   cutoffIso,
-  extractOppNumber,
   extractPayloadLineCommissions,
-  extractSalesId,
   FALLBACK_RETENTION_DAYS,
   NORMALIZED_IDENTITY_KEYS,
   stripKeys,
@@ -201,7 +199,8 @@ Deno.serve(async (req) => {
     let campaignSalesAnonymized = 0;
     let campaignSalesDeleted = 0;
     let campaignSalesSkippedUnmapped = 0;
-    let referencesPreserved = 0;
+    let externalRefsCleared = 0;
+    let externalSalesIdsCleared = 0;
     let commissionsBackfilled = 0;
     let normalizedKeysStripped = 0;
     const campaignResults: {
@@ -209,7 +208,8 @@ Deno.serve(async (req) => {
       mode: string;
       count: number;
       skipped_unmapped?: number;
-      references_preserved?: number;
+      external_reference_number_cleared?: number;
+      external_sales_id_cleared?: number;
       commissions_backfilled?: number;
       normalized_stripped?: number;
     }[] = [];
@@ -321,7 +321,9 @@ Deno.serve(async (req) => {
               )
               .eq("client_campaign_id", policy.client_campaign_id)
               .lt("sale_datetime", cutoffISO)
-              .or("customer_phone.not.is.null,raw_payload.not.is.null")
+              .or(
+                "customer_phone.not.is.null,raw_payload.not.is.null,external_reference_number.not.is.null,external_sales_id.not.is.null"
+              )
               // Oldest first, batched. Anonymised sales drop out of this filter,
               // so consecutive nightly runs work through the backlog safely.
               .order("sale_datetime", { ascending: true })
@@ -335,7 +337,8 @@ Deno.serve(async (req) => {
             if (salesToAnon && salesToAnon.length > 0) {
               let anonCount = 0;
               let skippedUnmapped = 0;
-              let refsThisCampaign = 0;
+              let extRefsCleared = 0;
+              let extSalesIdsCleared = 0;
               let commissionsThisCampaign = 0;
               let normalizedThisCampaign = 0;
 
@@ -391,26 +394,24 @@ Deno.serve(async (req) => {
                   continue;
                 }
 
-                // --- 2) Preserve business references before dropping payload ---
+                // --- 2) Wipe external customer references at the deadline ---
+                // OPP number and Sales ID are on the personal-data positive list:
+                // the client can look them up in their own system. They are kept
+                // untouched inside the retention window (cancellation matching)
+                // and cleared here, together with customer_phone and raw_payload.
                 const patch: Record<string, unknown> = {
                   customer_phone: null,
                   customer_company: "Anonymiseret",
                   raw_payload: null,
                 };
 
-                if (!sale.external_reference_number) {
-                  const opp = extractOppNumber(payload);
-                  if (opp) {
-                    patch.external_reference_number = opp;
-                    refsThisCampaign++;
-                  }
+                if (sale.external_reference_number) {
+                  patch.external_reference_number = null;
+                  extRefsCleared++;
                 }
-                if (!sale.external_sales_id) {
-                  const salesId = extractSalesId(payload);
-                  if (salesId) {
-                    patch.external_sales_id = salesId;
-                    refsThisCampaign++;
-                  }
+                if (sale.external_sales_id) {
+                  patch.external_sales_id = null;
+                  extSalesIdsCleared++;
                 }
 
                 // --- 3) Strip identity keys from normalized_data ---
@@ -431,7 +432,8 @@ Deno.serve(async (req) => {
 
               campaignSalesAnonymized += anonCount;
               campaignSalesSkippedUnmapped += skippedUnmapped;
-              referencesPreserved += refsThisCampaign;
+              externalRefsCleared += extRefsCleared;
+              externalSalesIdsCleared += extSalesIdsCleared;
               commissionsBackfilled += commissionsThisCampaign;
               normalizedKeysStripped += normalizedThisCampaign;
               campaignResults.push({
@@ -439,7 +441,8 @@ Deno.serve(async (req) => {
                 mode: "anonymize_customer",
                 count: anonCount,
                 skipped_unmapped: skippedUnmapped,
-                references_preserved: refsThisCampaign,
+                external_reference_number_cleared: extRefsCleared,
+                external_sales_id_cleared: extSalesIdsCleared,
                 commissions_backfilled: commissionsThisCampaign,
                 normalized_stripped: normalizedThisCampaign,
               });
@@ -460,7 +463,9 @@ Deno.serve(async (req) => {
 
     addLog("campaign_sales_anonymized", campaignSalesAnonymized, { campaigns: campaignResults });
     addLog("campaign_sales_deleted", campaignSalesDeleted, { campaigns: campaignResults });
-    addLog("sales_references_preserved", referencesPreserved);
+    // One log line per field per table.
+    addLog("anonymize_sales_external_reference_number", externalRefsCleared);
+    addLog("anonymize_sales_external_sales_id", externalSalesIdsCleared);
     addLog("sale_items_commission_backfilled", commissionsBackfilled);
     addLog("sales_normalized_keys_stripped", normalizedKeysStripped);
 
@@ -470,6 +475,7 @@ Deno.serve(async (req) => {
     let fmSalesAnonymized = 0;
     let eesyRowsAnonymized = 0;
     let cancellationRowsAnonymized = 0;
+    let cancellationOppGroupsCleared = 0;
     let adversusEventsDeleted = 0;
     const systemCopyResults: { table: string; count: number; retention_days: number }[] = [];
 
@@ -582,8 +588,8 @@ Deno.serve(async (req) => {
       while (!done) {
         const { data: cqRows, error: cqErr } = await supabase
           .from("cancellation_queue")
-          .select("id, client_id, created_at, uploaded_data")
-          .not("uploaded_data", "is", null)
+          .select("id, client_id, created_at, uploaded_data, opp_group")
+          .or("uploaded_data.not.is.null,opp_group.not.is.null")
           .order("created_at", { ascending: true })
           .range(offset, offset + pageSize - 1);
 
@@ -601,17 +607,25 @@ Deno.serve(async (req) => {
           if (!row.created_at || String(row.created_at) >= cutoff) continue;
 
           const stripped = stripKeys(row.uploaded_data, CANCELLATION_IDENTITY_KEYS);
-          if (!stripped.changed) continue;
+          // opp_group is a plain copy of the sale's OPP number and is the TDC
+          // match key. It is cleared on the same deadline as the OPP number.
+          const clearOppGroup = row.opp_group !== null && row.opp_group !== undefined;
+          if (!stripped.changed && !clearOppGroup) continue;
+
+          const cqPatch: Record<string, unknown> = {};
+          if (stripped.changed) cqPatch.uploaded_data = stripped.result;
+          if (clearOppGroup) cqPatch.opp_group = null;
 
           const { error: updErr } = await db
             .from("cancellation_queue")
-            .update({ uploaded_data: stripped.result })
+            .update(cqPatch)
             .eq("id", row.id);
 
           if (updErr) {
             log("WARN", `Failed to anonymize cancellation_queue ${row.id}: ${updErr.message}`);
           } else {
             cancellationRowsAnonymized++;
+            if (clearOppGroup) cancellationOppGroupsCleared++;
           }
         }
       }
@@ -657,6 +671,7 @@ Deno.serve(async (req) => {
     addLog("fieldmarketing_sales_phone_cleared", fmSalesAnonymized);
     addLog("eesy_fm_powerbi_rows_phone_cleared", eesyRowsAnonymized);
     addLog("cancellation_queue_uploaded_data_cleaned", cancellationRowsAnonymized);
+    addLog("anonymize_cancellation_queue_opp_group", cancellationOppGroupsCleared);
     addLog("adversus_events_deleted", adversusEventsDeleted);
 
 
@@ -1044,7 +1059,9 @@ Deno.serve(async (req) => {
       campaign_sales_deleted: campaignSalesDeleted,
       campaign_sales_skipped_unmapped: campaignSalesSkippedUnmapped,
       campaign_results: campaignResults,
-      references_preserved: referencesPreserved,
+      external_reference_number_cleared: externalRefsCleared,
+      external_sales_id_cleared: externalSalesIdsCleared,
+      cancellation_queue_opp_group_cleared: cancellationOppGroupsCleared,
       commissions_backfilled: commissionsBackfilled,
       normalized_keys_stripped: normalizedKeysStripped,
       system_copy_results: systemCopyResults,
@@ -1101,7 +1118,9 @@ Deno.serve(async (req) => {
         campaignSalesAnonymized,
         campaignSalesDeleted,
         campaignSalesSkippedUnmapped,
-        referencesPreserved,
+        externalRefsCleared,
+        externalSalesIdsCleared,
+        cancellationOppGroupsCleared,
         commissionsBackfilled,
         normalizedKeysStripped,
         fmSalesAnonymized,

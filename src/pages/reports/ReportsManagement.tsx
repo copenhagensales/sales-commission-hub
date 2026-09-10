@@ -28,6 +28,7 @@ import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { RawSalesTable } from "./RawSalesTable";
 import { LocationReportTab } from "./LocationReportTab";
+import { displayExternalReference } from "@/lib/salesAnonymized";
 
 const CLIENT_OPTIONS = Object.entries(CLIENT_IDS).filter(
   ([name]) => name !== "Eesy"
@@ -203,8 +204,8 @@ export default function ReportsManagement() {
       Virksomhed: r.customer_company ?? "",
       Status: r.status ?? "",
       Reference: r.internal_reference ?? "",
-      "OPP-nummer": r.adversus_opp_number ?? "",
-      "CVR-nummer": r.cvr_number ?? "",
+      "OPP-nummer": displayExternalReference(r.adversus_opp_number, r),
+      "CVR-nummer": displayExternalReference(r.cvr_number, r),
       "Tilskud": r.tilskud ?? "",
     }));
 
