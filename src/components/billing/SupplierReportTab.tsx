@@ -201,6 +201,9 @@ export function SupplierReportTab() {
     enabled: !!selectedLocationType,
   });
 
+  // Butikstillæg (merpris) pr. kæde - grundsatsen på lokationen ændres ikke
+  const { data: rateSurcharges } = useLocationRateSurcharges(selectedLocationType);
+
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
 
