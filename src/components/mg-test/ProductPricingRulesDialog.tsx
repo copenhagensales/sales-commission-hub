@@ -101,6 +101,15 @@ export function ProductPricingRulesDialog({
   const [localCountsAsCrossSale, setLocalCountsAsCrossSale] = useState(countsAsCrossSale);
   const [localIsActive, setLocalIsActive] = useState(true);
 
+  // Kundevendt navn - uafhængigt af pris/provision
+  const { data: savedClientDisplayName } = useProductClientDisplayName(productId);
+  const updateClientDisplayName = useUpdateProductClientDisplayName();
+  const [clientDisplayName, setClientDisplayName] = useState("");
+
+  useEffect(() => {
+    setClientDisplayName(savedClientDisplayName ?? "");
+  }, [savedClientDisplayName]);
+
   // Update local state when props change
   useEffect(() => {
     setLocalCommission(String(baseCommission));
