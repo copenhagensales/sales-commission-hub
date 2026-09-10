@@ -39,6 +39,58 @@ export function useComplianceClients() {
   });
 }
 
+/**
+ * Kunder der er skjult på aftalesiden. Kunden slettes IKKE i systemet —
+ * kun boksen på denne side skjules, så salg, provision og rapporter er urørt.
+ */
+export function useHiddenAgreementClients() {
+  return useQuery({
+    queryKey: ["client-agreement-hidden-clients"],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("client_agreement_hidden_clients")
+        .select("client_id");
+      if (error) throw error;
+      return (data || []).map((row) => row.client_id);
+    },
+    staleTime: 60000,
+  });
+}
+
+export function useHideAgreementClient() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (clientId: string) => {
+      const { error } = await supabase
+        .from("client_agreement_hidden_clients")
+        .insert({ client_id: clientId, hidden_by: user?.id ?? null });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-agreement-hidden-clients"] });
+    },
+  });
+}
+
+export function useRestoreAgreementClient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (clientId: string) => {
+      const { error } = await supabase
+        .from("client_agreement_hidden_clients")
+        .delete()
+        .eq("client_id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-agreement-hidden-clients"] });
+    },
+  });
+}
+
 /** Arkiverede kundeaftaler (DPA og kontrakt) pr. kunde. */
 export function useClientAgreementDocuments() {
   return useQuery({
