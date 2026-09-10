@@ -680,76 +680,186 @@ function SubscriptionDialog({
   );
 }
 
+const REPORT_TYPE_ORDER: ReportType[] = [
+  "supplier_invoice",
+  "client_week_plan",
+  "client_daily_sales",
+];
+
+const REPORT_GROUP_TITLES: Record<ReportType, string> = {
+  supplier_invoice: "Leverandørrapporter (månedligt)",
+  client_week_plan: "Ugeplaner til kunder (ugentligt)",
+  client_daily_sales: "Daglige salgsrapporter til kunder",
+};
+
+function scheduleLabel(s: SupplierReportSubscription): string {
+  if (s.report_type === "client_week_plan") {
+    return `${WEEKDAY_LABELS[s.weekday ?? 1]} kl. ${s.send_hour}`;
+  }
+  if (s.report_type === "client_daily_sales") {
+    return `Hver dag kl. ${s.send_hour}`;
+  }
+  return `Den ${s.send_day}. i måneden kl. ${s.send_hour}`;
+}
+
+function SubscriptionCard({
+  subscription,
+  clientName,
+  dispatches,
+  onEdit,
+}: {
+  subscription: SupplierReportSubscription;
+  clientName: string | null;
+  dispatches: SupplierReportDispatch[];
+  onEdit: () => void;
+}) {
+  const s = subscription;
+  const target =
+    s.report_type === "supplier_invoice" ? s.location_type : clientName;
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">{s.name || target || "Uden navn"}</span>
+            {s.is_active ? (
+              <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                <CheckCircle2 className="h-3 w-3" /> Aktiv
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Inaktiv</Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {s.report_type === "supplier_invoice" ? "Leverandør" : "Kunde"}:{" "}
+            {target || "ikke valgt"} &middot; {scheduleLabel(s)} &middot; Modtager:{" "}
+            {s.recipient_email || "ikke udfyldt"}
+          </p>
+          {!s.is_active && !s.recipient_email && (
+            <p className="text-sm text-amber-700">
+              Kan ikke aktiveres før der er udfyldt en modtagermail.
+            </p>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <Settings className="mr-2 h-4 w-4" /> Indstil
+        </Button>
+      </div>
+      {dispatches.length > 0 && (
+        <div className="space-y-2">
+          {dispatches.map((d) => (
+            <DispatchRow key={d.id} dispatch={d} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SupplierDispatchPanel({ locationType }: { locationType?: string }) {
   const { data: subscriptions } = useSupplierReportSubscriptions();
   const { data: dispatches } = useSupplierReportDispatches({ pendingOnly: false });
+  const { data: clients } = useReportClients();
   const [editing, setEditing] = useState<SupplierReportSubscription | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Uden valgt lokationstype vises alle abonnementer, så man ser hele billedet.
+  // Kundevendte rapporter hænger ikke på lokationstype og vises altid.
   const relevantSubscriptions = useMemo(
     () =>
       (subscriptions ?? []).filter(
-        (s) => !locationType || s.location_type === locationType,
+        (s) =>
+          !locationType ||
+          s.report_type !== "supplier_invoice" ||
+          s.location_type === locationType,
       ),
     [subscriptions, locationType],
   );
 
-  const relevantDispatches = useMemo(() => {
-    const ids = new Set(relevantSubscriptions.map((s) => s.id));
-    return (dispatches ?? [])
-      .filter((d) => ids.has(d.subscription_id))
-      .slice(0, 6);
-  }, [dispatches, relevantSubscriptions]);
+  const dispatchesBySubscription = useMemo(() => {
+    const map = new Map<string, SupplierReportDispatch[]>();
+    for (const d of dispatches ?? []) {
+      const list = map.get(d.subscription_id) ?? [];
+      if (list.length < 3) list.push(d);
+      map.set(d.subscription_id, list);
+    }
+    return map;
+  }, [dispatches]);
+
+  const clientNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of clients ?? []) map.set(c.id, c.name);
+    return map;
+  }, [clients]);
+
+  const groups = useMemo(
+    () =>
+      REPORT_TYPE_ORDER.map((type) => {
+        const rows = relevantSubscriptions.filter((s) => s.report_type === type);
+        return {
+          type,
+          active: rows.filter((s) => s.is_active),
+          inactive: rows.filter((s) => !s.is_active),
+          count: rows.length,
+        };
+      }).filter((g) => g.count > 0),
+    [relevantSubscriptions],
+  );
+
+  const renderRows = (rows: SupplierReportSubscription[]) =>
+    rows.map((s) => (
+      <SubscriptionCard
+        key={s.id}
+        subscription={s}
+        clientName={s.client_id ? clientNameById.get(s.client_id) ?? null : null}
+        dispatches={dispatchesBySubscription.get(s.id) ?? []}
+        onEdit={() => setEditing(s)}
+      />
+    ));
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle className="text-base">Automatisk udsendelse</CardTitle>
-        <div className="flex flex-wrap gap-2">
-          {relevantSubscriptions.map((s) => (
-            <Button
-              key={s.id}
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(s)}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span className="flex flex-col items-start leading-tight">
-                <span>{s.name || s.location_type}</span>
-                <span className="text-[11px] font-normal text-muted-foreground">
-                  {s.report_type === "client_week_plan"
-                    ? `Ugeplan til kunde - ${WEEKDAY_LABELS[s.weekday ?? 1]}`
-                    : s.report_type === "client_daily_sales"
-                      ? `Daglig salgsrapport til kunde - kl. ${s.send_hour}`
-                      : `Leverandørrapport - ${s.location_type}`}
-                </span>
-              </span>
-              {!s.is_active && (
-                <Badge variant="secondary" className="ml-2">
-                  Inaktiv
-                </Badge>
-              )}
-            </Button>
-          ))}
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Nyt abonnement
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Nyt abonnement
+        </Button>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {relevantSubscriptions.length === 0 ? (
+      <CardContent className="space-y-6">
+        {groups.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Ingen abonnementer endnu. Opret et abonnement for at sende rapporten
             automatisk til en leverandør eller kunde.
           </p>
-        ) : relevantDispatches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Ingen udsendelser oprettet endnu. Jobbet opretter en udsendelse til
-            godkendelse på den valgte dag i måneden.
-          </p>
         ) : (
-          relevantDispatches.map((d) => <DispatchRow key={d.id} dispatch={d} />)
+          groups.map((g) => (
+            <div key={g.type} className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 border-b pb-2">
+                <ReportTypeBadge reportType={g.type} />
+                <span className="font-semibold">{REPORT_GROUP_TITLES[g.type]}</span>
+                <span className="text-sm text-muted-foreground">
+                  {g.active.length} aktiv(e), {g.inactive.length} inaktiv(e)
+                </span>
+              </div>
+              {g.active.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
+                    Aktive
+                  </p>
+                  {renderRows(g.active)}
+                </div>
+              )}
+              {g.inactive.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
+                    Ikke aktive
+                  </p>
+                  {renderRows(g.inactive)}
+                </div>
+              )}
+            </div>
+          ))
         )}
       </CardContent>
       {editing && (
@@ -769,4 +879,5 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
     </Card>
   );
 }
+
 
