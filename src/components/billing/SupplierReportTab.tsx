@@ -453,6 +453,33 @@ export function SupplierReportTab() {
 
   const totalAmountAll = locationEntries.reduce((sum, loc) => sum + loc.totalAmount, 0);
 
+  // Merpris-totaler
+  const totalBaseAmount = locationEntries.reduce((sum, loc) => sum + (loc.baseAmount || 0), 0);
+  const totalSurchargeAmount = locationEntries.reduce((sum, loc) => sum + (loc.surchargeAmount || 0), 0);
+  const totalSurchargeRefundable = locationEntries.reduce(
+    (sum, loc) => sum + (loc.surchargeRefundableAmount || 0),
+    0
+  );
+  const hasSurcharge = totalSurchargeAmount > 0;
+
+  // Refusion pr. kæde, så Kvickly og SuperBrugsen kan læses hver for sig
+  const refundByChain = locationEntries.reduce((acc: Record<string, { days: number; amount: number; perDay: number }>, loc: any) => {
+    if (!loc.surchargeChain || !loc.surchargeRefundableAmount) return acc;
+    if (!acc[loc.surchargeChain]) {
+      acc[loc.surchargeChain] = { days: 0, amount: 0, perDay: loc.surchargePerDay || 0 };
+    }
+    acc[loc.surchargeChain].days += loc.surchargeDays || 0;
+    acc[loc.surchargeChain].amount += loc.surchargeRefundableAmount || 0;
+    return acc;
+  }, {});
+  const refundChainEntries = Object.entries(refundByChain).sort(([a], [b]) => a.localeCompare(b));
+  const totalRefundDays = refundChainEntries.reduce((s, [, v]) => s + v.days, 0);
+  const refundClientName =
+    rateSurcharges?.find((s) => s.funded_by_client_id)?.funded_by_client_id
+      ? locationEntries.find((l: any) => l.surchargeRefundable)?.client?.name ?? "kunden"
+      : "kunden";
+
+
   const isAnnualRevenue = discountType === "annual_revenue";
 
   // Leverandørens aktuelle status (kun annual_revenue) - gælder NYE bookinger
