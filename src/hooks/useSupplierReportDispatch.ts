@@ -132,6 +132,27 @@ export function useApprovedReportForPeriod(
   });
 }
 
+/** Aktive medarbejdere til valg af godkender. */
+export function useApproverCandidates() {
+  return useQuery({
+    queryKey: ["supplier-report-approver-candidates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, full_name, work_email, private_email")
+        .eq("is_active", true)
+        .order("full_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        full_name: string | null;
+        work_email: string | null;
+        private_email: string | null;
+      }>;
+    },
+  });
+}
+
 export function useApproveDispatch() {
   const queryClient = useQueryClient();
   return useMutation({
