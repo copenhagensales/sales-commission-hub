@@ -31,6 +31,7 @@ import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/
 import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
 import { bookingSurcharge } from "@/utils/locationRateSurcharge";
+import { SupplierDispatchPanel } from "./SupplierDispatchPanel";
 
 interface DiscountRule {
   id: string;
@@ -720,6 +721,8 @@ export function SupplierReportTab() {
           </Badge>
         )}
       </div>
+
+      <SupplierDispatchPanel locationType={selectedLocationType || undefined} />
 
       {!selectedLocationType ? (
         <Card>

@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendM365Mail, toBase64, type MailAttachment } from "../_shared/m365-mail.ts";
+import {
+  buildSupplierReportEmail,
+  type SurchargeSummary,
+} from "../_shared/supplier-report-mail.ts";
+import {
+  buildSupplierReportXlsx,
+  xlsxFileName,
+} from "../_shared/supplier-report-xlsx.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -155,13 +164,197 @@ function buildReportHtml(locationType: string, month: string, locations: any[], 
 </html>`;
 }
 
+const jsonResponse = (status: number, payload: Record<string, unknown>) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+/**
+ * Sender en godkendt dispatch til leverandøren.
+ * Tallene kommer udelukkende fra supplier_invoice_reports.report_data,
+ * som er beregnet i frontenden. Der beregnes intet nyt her.
+ */
+async function sendDispatch(dispatchId: string): Promise<Response> {
+  const svc = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false } },
+  );
+
+  const { data: dispatch, error: dispatchError } = await svc
+    .from('supplier_report_dispatches')
+    .select('*, supplier_report_subscriptions(*)')
+    .eq('id', dispatchId)
+    .maybeSingle();
+
+  if (dispatchError || !dispatch) {
+    return jsonResponse(404, { error: 'Udsendelsen findes ikke' });
+  }
+  if (dispatch.status === 'sent') {
+    return jsonResponse(409, { error: 'Rapporten er allerede sendt' });
+  }
+  if (dispatch.status !== 'approved') {
+    return jsonResponse(409, { error: 'Rapporten er ikke godkendt endnu' });
+  }
+
+  const sub = (dispatch as Record<string, any>).supplier_report_subscriptions;
+  if (!sub?.is_active) {
+    return jsonResponse(409, { error: 'Abonnementet er ikke aktivt' });
+  }
+  const recipient = (sub.recipient_email || '').trim();
+  if (!recipient) {
+    return jsonResponse(409, { error: 'Abonnementet har ingen modtager' });
+  }
+
+  const { data: report } = await svc
+    .from('supplier_invoice_reports')
+    .select('*')
+    .eq('id', dispatch.report_id ?? '')
+    .maybeSingle();
+
+  const rows = (report?.report_data as any[] | null) ?? [];
+  if (!report || rows.length === 0) {
+    const msg = 'Ingen godkendt rapportdata knyttet til udsendelsen';
+    await svc
+      .from('supplier_report_dispatches')
+      .update({ status: 'failed', error_message: msg })
+      .eq('id', dispatchId);
+    return jsonResponse(409, { error: msg });
+  }
+
+  const periodLabel = new Intl.DateTimeFormat('da-DK', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${dispatch.period_start}T00:00:00Z`));
+  const yearMonth = String(dispatch.period_start).slice(0, 7);
+
+  const xlsxRows = rows.map((r) => ({
+    locationName: r.locationName ?? '',
+    externalId: r.externalId ?? '',
+    city: r.city ?? '',
+    days: Number(r.days) || 0,
+    amount: Number(r.amount) || 0,
+  }));
+
+  const totals = {
+    locations: xlsxRows.length,
+    days: xlsxRows.reduce((s, r) => s + r.days, 0),
+    amount: xlsxRows.reduce((s, r) => s + r.amount, 0),
+  };
+
+  // Merpris/refusion er intern og må kun med i mailteksten, aldrig i bilaget.
+  let surcharge: SurchargeSummary | null = null;
+  if (sub.include_surcharge_summary) {
+    const totalSurcharge = rows.reduce((s, r) => s + (Number(r.surchargeAmount) || 0), 0);
+    const refundable = rows.reduce(
+      (s, r) => s + (Number(r.surchargeRefundableAmount) || 0),
+      0,
+    );
+    if (totalSurcharge > 0) {
+      const byChain = new Map<string, { days: number; perDay: number; amount: number }>();
+      for (const r of rows) {
+        if (!r.surchargeChain || !Number(r.surchargeRefundableAmount)) continue;
+        const cur = byChain.get(r.surchargeChain) ?? {
+          days: 0,
+          perDay: Number(r.surchargePerDay) || 0,
+          amount: 0,
+        };
+        cur.days += Number(r.surchargeDays) || 0;
+        cur.amount += Number(r.surchargeRefundableAmount) || 0;
+        byChain.set(r.surchargeChain, cur);
+      }
+      surcharge = {
+        totalSurcharge,
+        refundableAmount: refundable,
+        refundClientName:
+          rows.find((r) => r.surchargeRefundable)?.client ?? 'kunden',
+        chains: [...byChain.entries()].map(([chain, v]) => ({ chain, ...v })),
+      };
+    }
+  }
+
+  const supplierDisplayName = sub.name || sub.location_type;
+  let attachmentName: string | null = null;
+  const attachments: MailAttachment[] = [];
+  if (sub.attach_xlsx) {
+    attachmentName = xlsxFileName(sub.location_type, yearMonth);
+    const bytes = await buildSupplierReportXlsx({
+      locationType: sub.location_type,
+      supplierName: supplierDisplayName,
+      periodLabel,
+      rows: xlsxRows,
+    });
+    attachments.push({
+      name: attachmentName,
+      contentType:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      contentBytes: toBase64(bytes),
+    });
+  }
+
+  const mail = buildSupplierReportEmail({
+    supplierName: supplierDisplayName,
+    locationType: sub.location_type,
+    periodLabel,
+    totals,
+    attachmentName,
+    surcharge,
+  });
+
+  const cc = ((sub.cc_emails as string[] | null) ?? []).filter((e) => !!e?.trim());
+
+  try {
+    await sendM365Mail({
+      to: [recipient],
+      cc,
+      subject: `Leverandørrapport ${supplierDisplayName} - ${periodLabel}`,
+      html: mail.html,
+      attachments,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await svc
+      .from('supplier_report_dispatches')
+      .update({ status: 'failed', error_message: msg })
+      .eq('id', dispatchId);
+    return jsonResponse(500, { error: msg });
+  }
+
+  const sentTo = [recipient, ...cc];
+  await svc
+    .from('supplier_report_dispatches')
+    .update({
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+      sent_to: sentTo,
+      error_message: null,
+    })
+    .eq('id', dispatchId);
+
+  await svc
+    .from('supplier_invoice_reports')
+    .update({ sent_at: new Date().toISOString(), sent_to: sentTo })
+    .eq('id', report.id);
+
+  return jsonResponse(200, { success: true, recipients: sentTo, attachmentName });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules, supplierName } = await req.json();
+    const body = await req.json();
+
+    // ---- Automatisk udsendelse: dispatch_id styrer modtagere, tekst og bilag ----
+    if (body?.dispatch_id) {
+      return await sendDispatch(String(body.dispatch_id));
+    }
+
+    const { locationType, month, recipients, subject, message, reportId, reportData, hasDiscountRules, supplierName } = body;
 
     if (!recipients?.length || !subject) {
       return new Response(
