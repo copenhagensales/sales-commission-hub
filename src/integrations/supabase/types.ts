@@ -13556,56 +13556,68 @@ export type Database = {
         Row: {
           approver_employee_id: string | null
           attach_xlsx: boolean
+          cadence: string
           cc_emails: string[]
+          client_id: string | null
           created_at: string
           id: string
           include_surcharge_summary: boolean
           is_active: boolean
           last_run_at: string | null
-          location_type: string
+          location_type: string | null
           name: string | null
           period_mode: string
           recipient_email: string | null
           recipient_name: string | null
+          report_type: string
           send_day: number
           send_hour: number
           updated_at: string
+          weekday: number | null
         }
         Insert: {
           approver_employee_id?: string | null
           attach_xlsx?: boolean
+          cadence?: string
           cc_emails?: string[]
+          client_id?: string | null
           created_at?: string
           id?: string
           include_surcharge_summary?: boolean
           is_active?: boolean
           last_run_at?: string | null
-          location_type: string
+          location_type?: string | null
           name?: string | null
           period_mode?: string
           recipient_email?: string | null
           recipient_name?: string | null
+          report_type?: string
           send_day?: number
           send_hour?: number
           updated_at?: string
+          weekday?: number | null
         }
         Update: {
           approver_employee_id?: string | null
           attach_xlsx?: boolean
+          cadence?: string
           cc_emails?: string[]
+          client_id?: string | null
           created_at?: string
           id?: string
           include_surcharge_summary?: boolean
           is_active?: boolean
           last_run_at?: string | null
-          location_type?: string
+          location_type?: string | null
           name?: string | null
           period_mode?: string
           recipient_email?: string | null
           recipient_name?: string | null
+          report_type?: string
           send_day?: number
           send_hour?: number
           updated_at?: string
+          weekday?: number | null
         }
         Relationships: [
           {
@@ -13627,6 +13639,13 @@ export type Database = {
             columns: ["approver_employee_id"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_report_subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
