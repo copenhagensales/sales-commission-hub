@@ -344,12 +344,11 @@ ${footer({ disclaimer: "", description: p.description })}
 // Rapport-mails: leverandørrapport, ugeplan og daglig salgsrapport.
 // ---------------------------------------------------------------------------
 // Mailskabeloner til rapport-mails (leverandørrapport, ugeplan, daglig salgsrapport).
-// Alt udseende kommer fra report-mail-kit.ts, så de tre rapporttyper er ét
+// Alt udseende kommer fra mail-kittet ovenfor, så de tre rapporttyper er ét
 // designsystem og ikke tre varianter. Beregningerne bag rapporterne ligger
 // uændret i frontenden / de eksisterende scheduler-moduler.
 
 
-export { fmtDKK };
 
 export interface SupplierMailTotals {
   locations: number;
