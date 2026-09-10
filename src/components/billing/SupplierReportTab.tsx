@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
 import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/bookingGross";
 import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
+import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { bookingSurcharge } from "@/utils/locationRateSurcharge";
 
 interface DiscountRule {
   id: string;
