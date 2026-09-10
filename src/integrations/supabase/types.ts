@@ -15796,6 +15796,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_client_daily_sales_counts: {
+        Args: { p_client_id: string; p_end: string; p_start: string }
+        Returns: {
+          product_name: string
+          quantity: number
+          sale_count: number
+          sale_date: string
+        }[]
+      }
       get_client_sales_stats: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
