@@ -885,6 +885,16 @@ export function SupplierReportTab() {
                     <TableCell colSpan={8} className="font-semibold">
                       Subtotal
                     </TableCell>
+                    {hasSurcharge && (
+                      <>
+                        <TableCell className="text-right font-bold tabular-nums">
+                          {totalBaseAmount.toLocaleString("da-DK")} kr
+                        </TableCell>
+                        <TableCell className="text-right font-bold tabular-nums">
+                          {totalSurchargeAmount.toLocaleString("da-DK")} kr
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell className="text-right font-bold">
                       {totalAmountAll.toLocaleString("da-DK")} kr
                     </TableCell>
