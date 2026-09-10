@@ -248,12 +248,26 @@ export async function runWeekPlans(
       continue;
     }
 
+    // Sammenligningstal til hero-panelet: samme beregning, forrige ISO-uge.
+    const prevStart = addDays(weekStart, -7);
+    const prevLocations = await computeWeekPlan(
+      svc,
+      sub.client_id,
+      prevStart,
+      addDays(prevStart, 6),
+    );
+    const previousWeek = {
+      isoWeek: isoWeekNumber(prevStart),
+      days: prevLocations.reduce((s, l) => s + l.days, 0),
+    };
+
     const mail = buildClientWeekPlanEmail({
       clientName,
       isoWeek,
       weekStart,
       weekEnd,
       locations,
+      previousWeek,
     });
 
     if (opts.testEmail) {
