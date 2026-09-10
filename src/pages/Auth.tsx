@@ -222,6 +222,40 @@ export default function Auth() {
               Log ind med din arbejdsmail for at fortsætte.
             </p>
 
+            {ssoError && (
+              <div
+                role="alert"
+                className="mt-6 rounded-[16px] border border-destructive/40 bg-destructive/10 p-5 text-[hsl(var(--cph-onyx))]"
+              >
+                <div className="flex items-center gap-2.5 text-[13px] font-extrabold uppercase tracking-[0.16em] text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Login mislykkedes
+                </div>
+                <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                  {ssoError.description}
+                </p>
+                <dl className="mt-4 space-y-1 text-[13px] font-medium text-[hsl(var(--cph-onyx))]/70">
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-extrabold">Fejlkode:</dt>
+                    <dd className="break-all">{ssoError.code}</dd>
+                  </div>
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-extrabold">Origin:</dt>
+                    <dd className="break-all">{ssoError.origin}</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  onClick={copyErrorDetails}
+                  className="mt-4 inline-flex items-center gap-2 rounded-[12px] border border-[hsl(var(--cph-onyx))]/20 bg-white px-4 py-2.5 text-[14px] font-extrabold text-[hsl(var(--cph-onyx))] transition-colors hover:bg-white/70"
+                >
+                  <Copy className="h-4 w-4" />
+                  Kopiér fejldetaljer
+                </button>
+              </div>
+            )}
+
+
             <button
               type="button"
               onClick={handleMicrosoftSignIn}
