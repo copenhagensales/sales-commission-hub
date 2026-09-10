@@ -924,6 +924,48 @@ export function SupplierReportTab() {
             </CardContent>
           </Card>
 
+          {/* Merpris til refusion - kun internt, ikke med i mailen til leverandøren */}
+          {hasSurcharge && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="text-lg font-semibold">Merpris og refusion</h2>
+                </div>
+                <div className="rounded-2xl border bg-muted/40 p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Til refusion fra {refundClientName}
+                  </p>
+                  <p className="text-3xl font-bold tabular-nums">
+                    {totalSurchargeRefundable.toLocaleString("da-DK")} kr
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {totalRefundDays} dage i alt
+                  </p>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {refundChainEntries.map(([chain, v]) => (
+                    <div key={chain} className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{chain}</span>
+                      <span className="text-muted-foreground tabular-nums">
+                        {v.days} dage × {v.perDay.toLocaleString("da-DK")} kr
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {v.amount.toLocaleString("da-DK")} kr
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {totalSurchargeAmount > totalSurchargeRefundable && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Merpris i alt {totalSurchargeAmount.toLocaleString("da-DK")} kr, hvoraf{" "}
+                    {(totalSurchargeAmount - totalSurchargeRefundable).toLocaleString("da-DK")} kr ikke
+                    refunderes, fordi bookingens kunde ikke afholder tillægget.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Discount section - only show when discount rules exist */}
           {discountRules && discountRules.length > 0 && (
