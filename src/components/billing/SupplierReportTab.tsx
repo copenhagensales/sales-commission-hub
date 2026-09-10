@@ -477,9 +477,7 @@ export function SupplierReportTab() {
   ).sort(([a], [b]) => a.localeCompare(b));
   const totalRefundDays = refundChainEntries.reduce((s, [, v]) => s + v.days, 0);
   const refundClientName =
-    rateSurcharges?.find((s) => s.funded_by_client_id)?.funded_by_client_id
-      ? locationEntries.find((l: any) => l.surchargeRefundable)?.client?.name ?? "kunden"
-      : "kunden";
+    locationEntries.find((l: any) => l.surchargeRefundable)?.client?.name ?? "kunden";
 
 
   const isAnnualRevenue = discountType === "annual_revenue";
