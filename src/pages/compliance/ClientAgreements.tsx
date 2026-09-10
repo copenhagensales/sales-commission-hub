@@ -217,10 +217,23 @@ export default function ClientAgreements() {
           <p className="text-sm text-muted-foreground">Henter kunder...</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {clients.map((client) => (
+            {visibleClients.map((client) => (
               <Card key={client.id}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">{client.name}</CardTitle>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg">{client.name}</CardTitle>
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        title="Fjern kunden fra denne oversigt"
+                        onClick={() => setPendingHide({ id: client.id, name: client.name })}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {renderSlot(client.id, "dpa")}
@@ -230,7 +243,45 @@ export default function ClientAgreements() {
             ))}
           </div>
         )}
+
+        {canManage && hiddenClients.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Fjernet fra oversigten</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {hiddenClients.map((client) => (
+                <Button
+                  key={client.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRestore(client)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                  {client.name}
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      <AlertDialog open={!!pendingHide} onOpenChange={(o) => !o && setPendingHide(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjern {pendingHide?.name} fra oversigten?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kunden vises ikke længere her, men bliver ikke slettet i systemet. Salg, provision og
+              rapporter er uændrede, og uploadede filer bevares. Du kan sætte kunden tilbage nederst
+              på siden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annullér</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmHide}>Fjern</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
