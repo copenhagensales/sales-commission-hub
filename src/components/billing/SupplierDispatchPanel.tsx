@@ -270,11 +270,14 @@ function SubscriptionDialog({
     cc: (subscription?.cc_emails ?? []).join(", "),
     approver_employee_id: subscription?.approver_employee_id ?? "",
     send_day: String(subscription?.send_day ?? 1),
+    send_hour: String(subscription?.send_hour ?? 8),
     attach_xlsx: subscription?.attach_xlsx ?? true,
     include_surcharge_summary: subscription?.include_surcharge_summary ?? true,
     is_active: subscription?.is_active ?? false,
   });
   const weekPlanForm = form.report_type === "client_week_plan";
+  const dailySalesForm = form.report_type === "client_daily_sales";
+  const clientForm = weekPlanForm || dailySalesForm;
 
   const isPending = update.isPending || create.isPending;
 
@@ -286,12 +289,17 @@ function SubscriptionDialog({
     }
     const day = Number(form.send_day);
     const weekday = Number(form.weekday);
+    const hour = Number(form.send_hour);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+      toast.error("Klokketime skal være mellem 0 og 23");
+      return;
+    }
     if (weekPlanForm) {
       if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
         toast.error("Vælg en ugedag");
         return;
       }
-    } else if (!Number.isInteger(day) || day < 1 || day > 28) {
+    } else if (!dailySalesForm && (!Number.isInteger(day) || day < 1 || day > 28)) {
       toast.error("Sendedag skal være mellem 1 og 28");
       return;
     }
@@ -304,15 +312,16 @@ function SubscriptionDialog({
         .map((e) => e.trim())
         .filter((e) => e.includes("@")),
       approver_employee_id: form.approver_employee_id || null,
-      send_day: weekPlanForm ? 1 : day,
+      send_day: clientForm ? 1 : day,
+      send_hour: hour,
       weekday: weekPlanForm ? weekday : null,
-      attach_xlsx: weekPlanForm ? false : form.attach_xlsx,
+      attach_xlsx: clientForm ? false : form.attach_xlsx,
       include_surcharge_summary: form.include_surcharge_summary,
       is_active: form.is_active,
     };
 
     if (isNew) {
-      if (weekPlanForm) {
+      if (clientForm) {
         if (!form.client_id) {
           toast.error("Vælg en kunde");
           return;
@@ -325,8 +334,8 @@ function SubscriptionDialog({
         {
           ...values,
           report_type: form.report_type,
-          location_type: weekPlanForm ? null : form.location_type.trim(),
-          client_id: weekPlanForm ? form.client_id : null,
+          location_type: clientForm ? null : form.location_type.trim(),
+          client_id: clientForm ? form.client_id : null,
           is_active: false,
         },
         {
