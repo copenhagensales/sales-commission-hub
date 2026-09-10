@@ -11779,6 +11779,7 @@ export type Database = {
       products: {
         Row: {
           client_campaign_id: string | null
+          client_display_name: string | null
           commission_dkk: number | null
           counts_as_cross_sale: boolean
           counts_as_sale: boolean
@@ -11795,6 +11796,7 @@ export type Database = {
         }
         Insert: {
           client_campaign_id?: string | null
+          client_display_name?: string | null
           commission_dkk?: number | null
           counts_as_cross_sale?: boolean
           counts_as_sale?: boolean
@@ -11811,6 +11813,7 @@ export type Database = {
         }
         Update: {
           client_campaign_id?: string | null
+          client_display_name?: string | null
           commission_dkk?: number | null
           counts_as_cross_sale?: boolean
           counts_as_sale?: boolean
