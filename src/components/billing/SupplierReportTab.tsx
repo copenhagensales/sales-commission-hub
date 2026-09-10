@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
 import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/bookingGross";
 import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
+import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { bookingSurcharge } from "@/utils/locationRateSurcharge";
 
 interface DiscountRule {
   id: string;
@@ -199,6 +201,9 @@ export function SupplierReportTab() {
     enabled: !!selectedLocationType,
   });
 
+  // Butikstillæg (merpris) pr. kæde - grundsatsen på lokationen ændres ikke
+  const { data: rateSurcharges } = useLocationRateSurcharges(selectedLocationType);
+
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
 
@@ -343,6 +348,9 @@ export function SupplierReportTab() {
 
     if (days === 0) return acc; // Skip bookings with no days in period
 
+    // Merpris (butikstillæg) for denne booking i perioden
+    const sur = bookingSurcharge(booking, rateSurcharges, periodStart, periodEnd);
+
     if (!acc[locationId]) {
       acc[locationId] = {
         location: booking.location,
@@ -352,6 +360,13 @@ export function SupplierReportTab() {
         bookingAmounts: [] as Array<{ id: string; amount: number; lockedPercent: number | null }>,
         totalDays: 0,
         totalAmount: 0,
+        baseAmount: 0,
+        surchargeAmount: 0,
+        surchargeDays: 0,
+        surchargePerDay: sur.perDay,
+        surchargeChain: sur.chain,
+        surchargeRefundable: false,
+        surchargeRefundableAmount: 0,
         dailyRate,
         usesTotalPrice,
         missingRate: false,
@@ -361,16 +376,29 @@ export function SupplierReportTab() {
       };
     }
 
+    const amountWithSurcharge = total + sur.amount;
+
     acc[locationId].bookings.push(booking);
     acc[locationId].bookingAmounts.push({
       id: booking.id,
-      amount: total,
+      amount: amountWithSurcharge,
       lockedPercent:
         booking.discount_percent_locked == null ? null : Number(booking.discount_percent_locked),
     });
     acc[locationId].totalDays += days;
-    acc[locationId].totalAmount += total;
+    acc[locationId].baseAmount += total;
+    acc[locationId].surchargeAmount += sur.amount;
+    acc[locationId].surchargeDays += sur.days;
+    acc[locationId].surchargeRefundableAmount += sur.refundableAmount;
+    if (sur.refundableAmount > 0) acc[locationId].surchargeRefundable = true;
+    if (sur.chain && !acc[locationId].surchargeChain) {
+      acc[locationId].surchargeChain = sur.chain;
+      acc[locationId].surchargePerDay = sur.perDay;
+    }
+    // Butikken skal have grundbeløb + merpris. Rabatten regnes fortsat på dette beløb.
+    acc[locationId].totalAmount += amountWithSurcharge;
     if (missingRate) acc[locationId].missingRate = true;
+
 
 
     // Merge weekdays (clipped to period)
@@ -424,6 +452,33 @@ export function SupplierReportTab() {
   }, 0);
 
   const totalAmountAll = locationEntries.reduce((sum, loc) => sum + loc.totalAmount, 0);
+
+  // Merpris-totaler
+  const totalBaseAmount = locationEntries.reduce((sum, loc) => sum + (loc.baseAmount || 0), 0);
+  const totalSurchargeAmount = locationEntries.reduce((sum, loc) => sum + (loc.surchargeAmount || 0), 0);
+  const totalSurchargeRefundable = locationEntries.reduce(
+    (sum, loc) => sum + (loc.surchargeRefundableAmount || 0),
+    0
+  );
+  const hasSurcharge = totalSurchargeAmount > 0;
+
+  // Refusion pr. kæde, så Kvickly og SuperBrugsen kan læses hver for sig
+  const refundByChain = locationEntries.reduce((acc: Record<string, { days: number; amount: number; perDay: number }>, loc: any) => {
+    if (!loc.surchargeChain || !loc.surchargeRefundableAmount) return acc;
+    if (!acc[loc.surchargeChain]) {
+      acc[loc.surchargeChain] = { days: 0, amount: 0, perDay: loc.surchargePerDay || 0 };
+    }
+    acc[loc.surchargeChain].days += loc.surchargeDays || 0;
+    acc[loc.surchargeChain].amount += loc.surchargeRefundableAmount || 0;
+    return acc;
+  }, {});
+  const refundChainEntries = (
+    Object.entries(refundByChain) as Array<[string, { days: number; amount: number; perDay: number }]>
+  ).sort(([a], [b]) => a.localeCompare(b));
+  const totalRefundDays = refundChainEntries.reduce((s, [, v]) => s + v.days, 0);
+  const refundClientName =
+    locationEntries.find((l: any) => l.surchargeRefundable)?.client?.name ?? "kunden";
+
 
   const isAnnualRevenue = discountType === "annual_revenue";
 
@@ -545,6 +600,13 @@ export function SupplierReportTab() {
         days: loc.totalDays,
         dailyRate: loc.dailyRate,
         amount: loc.totalAmount,
+        baseAmount: loc.baseAmount ?? loc.totalAmount,
+        surchargeChain: loc.surchargeChain ?? null,
+        surchargePerDay: loc.surchargePerDay ?? 0,
+        surchargeDays: loc.surchargeDays ?? 0,
+        surchargeAmount: loc.surchargeAmount ?? 0,
+        surchargeRefundable: !!loc.surchargeRefundable,
+        surchargeRefundableAmount: loc.surchargeRefundableAmount ?? 0,
         discount: loc.discount,
         discountAmount: loc.discountAmount,
         finalAmount: loc.finalAmount,
@@ -569,6 +631,9 @@ export function SupplierReportTab() {
         period_start: format(periodStart, "yyyy-MM-dd"),
         period_end: format(periodEnd, "yyyy-MM-dd"),
         total_amount: totalAmountAll,
+        base_amount: totalBaseAmount,
+        surcharge_amount: totalSurchargeAmount,
+        surcharge_refundable_amount: totalSurchargeRefundable,
         discount_percent: isAnnualRevenue ? effectiveDiscountPercent : appliedDiscount,
         discount_amount: totalDiscountAmount,
         final_amount: finalAmount,
@@ -693,6 +758,12 @@ export function SupplierReportTab() {
                      <TableHead className="text-right">Bookinger</TableHead>
                      <TableHead className="text-right">Dage</TableHead>
                      <TableHead className="text-right">Dagspris</TableHead>
+                    {hasSurcharge && (
+                      <>
+                        <TableHead className="text-right">Grundbeløb</TableHead>
+                        <TableHead className="text-right">Merpris</TableHead>
+                      </>
+                    )}
                     <TableHead className="text-right">Beløb</TableHead>
                     {discountRules && discountRules.length > 0 && (
                       <>
@@ -758,6 +829,26 @@ export function SupplierReportTab() {
                           `${loc.dailyRate.toLocaleString("da-DK")} kr`
                         )}
                       </TableCell>
+                      {hasSurcharge && (
+                        <>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                            {(loc.baseAmount ?? 0).toLocaleString("da-DK")} kr
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {loc.surchargeAmount > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span>{loc.surchargeAmount.toLocaleString("da-DK")} kr</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {loc.surchargeDays} dg × {loc.surchargePerDay.toLocaleString("da-DK")} kr
+                                  {loc.surchargeRefundable ? " · refusion" : ""}
+                                </span>
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                        </>
+                      )}
                       <TableCell className="text-right font-semibold">
                         {loc.totalAmount.toLocaleString("da-DK")} kr
                       </TableCell>
@@ -792,6 +883,16 @@ export function SupplierReportTab() {
                     <TableCell colSpan={8} className="font-semibold">
                       Subtotal
                     </TableCell>
+                    {hasSurcharge && (
+                      <>
+                        <TableCell className="text-right font-bold tabular-nums">
+                          {totalBaseAmount.toLocaleString("da-DK")} kr
+                        </TableCell>
+                        <TableCell className="text-right font-bold tabular-nums">
+                          {totalSurchargeAmount.toLocaleString("da-DK")} kr
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell className="text-right font-bold">
                       {totalAmountAll.toLocaleString("da-DK")} kr
                     </TableCell>
@@ -821,6 +922,48 @@ export function SupplierReportTab() {
             </CardContent>
           </Card>
 
+          {/* Merpris til refusion - kun internt, ikke med i mailen til leverandøren */}
+          {hasSurcharge && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="text-lg font-semibold">Merpris og refusion</h2>
+                </div>
+                <div className="rounded-2xl border bg-muted/40 p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Til refusion fra {refundClientName}
+                  </p>
+                  <p className="text-3xl font-bold tabular-nums">
+                    {totalSurchargeRefundable.toLocaleString("da-DK")} kr
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {totalRefundDays} dage i alt
+                  </p>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {refundChainEntries.map(([chain, v]) => (
+                    <div key={chain} className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{chain}</span>
+                      <span className="text-muted-foreground tabular-nums">
+                        {v.days} dage × {v.perDay.toLocaleString("da-DK")} kr
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {v.amount.toLocaleString("da-DK")} kr
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {totalSurchargeAmount > totalSurchargeRefundable && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Merpris i alt {totalSurchargeAmount.toLocaleString("da-DK")} kr, hvoraf{" "}
+                    {(totalSurchargeAmount - totalSurchargeRefundable).toLocaleString("da-DK")} kr ikke
+                    refunderes, fordi bookingens kunde ikke afholder tillægget.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Discount section - only show when discount rules exist */}
           {discountRules && discountRules.length > 0 && (
