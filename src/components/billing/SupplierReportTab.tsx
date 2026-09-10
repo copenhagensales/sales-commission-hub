@@ -472,7 +472,9 @@ export function SupplierReportTab() {
     acc[loc.surchargeChain].amount += loc.surchargeRefundableAmount || 0;
     return acc;
   }, {});
-  const refundChainEntries = Object.entries(refundByChain).sort(([a], [b]) => a.localeCompare(b));
+  const refundChainEntries = (
+    Object.entries(refundByChain) as Array<[string, { days: number; amount: number; perDay: number }]>
+  ).sort(([a], [b]) => a.localeCompare(b));
   const totalRefundDays = refundChainEntries.reduce((s, [, v]) => s + v.days, 0);
   const refundClientName =
     rateSurcharges?.find((s) => s.funded_by_client_id)?.funded_by_client_id
