@@ -720,7 +720,9 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
                 <span className="text-[11px] font-normal text-muted-foreground">
                   {s.report_type === "client_week_plan"
                     ? `Ugeplan til kunde - ${WEEKDAY_LABELS[s.weekday ?? 1]}`
-                    : `Leverandørrapport - ${s.location_type}`}
+                    : s.report_type === "client_daily_sales"
+                      ? `Daglig salgsrapport til kunde - kl. ${s.send_hour}`
+                      : `Leverandørrapport - ${s.location_type}`}
                 </span>
               </span>
               {!s.is_active && (
