@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.resolve_sales_employee_id(text) FROM anon, authenticated, PUBLIC;

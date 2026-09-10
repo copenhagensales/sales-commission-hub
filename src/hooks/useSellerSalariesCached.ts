@@ -350,13 +350,22 @@ export function useSellerSalariesCached(
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build work_email -> employee_id lookup (includes agent mappings)
+    // Build work_email -> employee_id lookup (includes agent mappings).
+    // Defensivt: hvis flere stamkort deler samme arbejdsmail (fx dubletter med
+    // forskellig store/små bogstaver), vinder det AKTIVE stamkort — og mailen
+    // peger altid på præcis ét employee_id, så provision ikke kan tælles dobbelt.
     const emailToEmployeeId: Record<string, string> = {};
+    const emailOwnerIsActive: Record<string, boolean> = {};
     for (const emp of employees) {
-      if (emp.work_email) {
-        emailToEmployeeId[emp.work_email.toLowerCase()] = emp.id;
+      if (!emp.work_email) continue;
+      const key = emp.work_email.toLowerCase();
+      const isActive = emp.is_active === true;
+      if (!(key in emailToEmployeeId) || (isActive && !emailOwnerIsActive[key])) {
+        emailToEmployeeId[key] = emp.id;
+        emailOwnerIsActive[key] = isActive;
       }
     }
+
     // Add agent emails from employee_agent_mapping
     for (const mapping of agentMappings || []) {
       const agentEmail = (mapping as any).agents?.email;

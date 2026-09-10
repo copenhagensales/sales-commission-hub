@@ -230,10 +230,11 @@ Deno.serve(async (req) => {
     // ============= FETCH EMPLOYEE DATA =============
     const { data: employees } = await supabase
       .from("employee_master_data")
-      .select("id, first_name, last_name, avatar_url, work_email");
+      .select("id, first_name, last_name, avatar_url, work_email, is_active");
     
     const employeeMap = new Map<string, { id: string; name: string; avatarUrl: string | null }>();
     const workEmailToEmployeeId = new Map<string, string>();
+    const workEmailOwnerIsActive = new Map<string, boolean>();
     (employees || []).forEach(emp => {
       const fullName = `${emp.first_name} ${emp.last_name}`;
       employeeMap.set(emp.id, {
@@ -241,10 +242,19 @@ Deno.serve(async (req) => {
         name: fullName,
         avatarUrl: emp.avatar_url,
       });
-      if ((emp as any).work_email) {
-        workEmailToEmployeeId.set((emp as any).work_email.toLowerCase(), emp.id);
+      // Defensivt: flere stamkort kan dele samme arbejdsmail (dubletter).
+      // Det aktive stamkort vinder, og mailen peger altid paa praecis ét id.
+      const workEmail = (emp as any).work_email;
+      if (workEmail) {
+        const key = String(workEmail).toLowerCase();
+        const isActive = (emp as any).is_active === true;
+        if (!workEmailToEmployeeId.has(key) || (isActive && !workEmailOwnerIsActive.get(key))) {
+          workEmailToEmployeeId.set(key, emp.id);
+          workEmailOwnerIsActive.set(key, isActive);
+        }
       }
     });
+
 
     // Fetch team memberships (inkl. fratraadtes sidste kendte team, saa historiske
     // leaderboards bevarer teamattributionen)

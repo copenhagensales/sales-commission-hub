@@ -16288,6 +16288,10 @@ export type Database = {
         Returns: undefined
       }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
+      resolve_sales_employee_id: {
+        Args: { p_agent_email: string }
+        Returns: string
+      }
       rollback_cancellation_import: {
         Args: { p_import_id: string }
         Returns: Json
