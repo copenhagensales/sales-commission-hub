@@ -11,13 +11,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 export type FeedTargetType = "birthday" | "anniversary" | "league_round";
-export type FeedEmoji = "clap" | "party" | "fire";
+/** Emoji gemmes som selve symbolet, så udvalget kan udvides uden databaseændring. */
+export type FeedEmoji = string;
 
-export const FEED_EMOJIS: { key: FeedEmoji; symbol: string; label: string }[] = [
-  { key: "clap", symbol: "👏", label: "Klap" },
-  { key: "party", symbol: "🎉", label: "Tillykke" },
-  { key: "fire", symbol: "🔥", label: "Sejt" },
+/** Udvalget i vælgeren. Labels bruges til skærmlæser og tooltip. */
+export const FEED_EMOJI_OPTIONS: { symbol: string; label: string }[] = [
+  { symbol: "👏", label: "Klap" },
+  { symbol: "🎉", label: "Tillykke" },
+  { symbol: "🔥", label: "Sejt" },
+  { symbol: "❤️", label: "Hjerte" },
+  { symbol: "😄", label: "Smil" },
+  { symbol: "🥳", label: "Fest" },
+  { symbol: "🎂", label: "Fødselsdagskage" },
+  { symbol: "🙌", label: "Hurra" },
+  { symbol: "💪", label: "Stærkt" },
+  { symbol: "⭐", label: "Stjerne" },
+  { symbol: "🏆", label: "Pokal" },
+  { symbol: "🚀", label: "Raket" },
 ];
+
+export function emojiLabel(symbol: string): string {
+  return FEED_EMOJI_OPTIONS.find((option) => option.symbol === symbol)?.label ?? "Reaktion";
+}
 
 export interface FeedReactionSummary {
   emoji: FeedEmoji;
@@ -192,10 +207,14 @@ export function useFeedReactions(targetKeys: string[]) {
   const getReactions = useCallback(
     (targetKey: string): FeedReactionSummary[] => {
       const rows = (reactionsQuery.data || []).filter((r) => r.target_key === targetKey);
-      return FEED_EMOJIS.map(({ key }) => {
-        const matching = rows.filter((r) => r.emoji === key);
+      const order: string[] = [];
+      rows.forEach((r) => {
+        if (!order.includes(r.emoji)) order.push(r.emoji);
+      });
+      return order.map((emoji) => {
+        const matching = rows.filter((r) => r.emoji === emoji);
         return {
-          emoji: key,
+          emoji,
           count: matching.length,
           names: matching.map((r) => lookupName(r.user_id)),
           mine: !!myUserId && matching.some((r) => r.user_id === myUserId),
