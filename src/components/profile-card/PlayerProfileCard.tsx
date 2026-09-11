@@ -27,6 +27,12 @@ const PANEL_STRONG = "hsl(var(--cph-light-blue) / 0.10)";
 const DIVIDER = "hsl(var(--cph-light-blue) / 0.12)";
 const GRID_LINE = "hsl(var(--cph-light-blue) / 0.035)";
 
+/** Responsive mål: kortet skal også kunne læses på en smal telefon. */
+const PAD_H = "clamp(14px, 4.5vw, 22px)";
+const PAD_V = "clamp(16px, 4.5vw, 22px)";
+const AVATAR = "clamp(56px, 16vw, 72px)";
+
+
 interface PlayerProfileCardProps {
   person: ProfilePerson;
   /** Antal personer i huset med Klub 200 — bruges til tekstforklaringen. */
