@@ -35,8 +35,9 @@ export interface ClientDashboardConfig {
     showMonth?: boolean;
     /** Show cross-sales in leaderboard + KPI suffixes (default: false) */
     crossSales?: boolean;
-    /** Enable live-mode fallback for custom periods (default: false) */
+    /** Live-mode for custom periods (default: true — set false to disable) */
     liveMode?: boolean;
+
     /**
      * If set, dashboard aggregates KPI + leaderboard cache across these client IDs
      * instead of querying a (non-existent) team-scoped cache.
