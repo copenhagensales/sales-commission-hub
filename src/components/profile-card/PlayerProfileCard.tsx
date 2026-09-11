@@ -110,9 +110,13 @@ export function PlayerProfileCard({
       meta:
         (streakDays > 0 ? formatDateSpan(s?.streak_start, s?.streak_end) : null) ??
         "ikke sat endnu",
-      hint: "Sammenhængende dage med mindst ét salg. Godkendt fravær og dage uden planlagt vagt springes over og bryder ikke striben.",
       icon: <Icon path={ICON_FLAME} />,
       bars: streakDays,
+      activeBars: currentStreak,
+      activeLabel:
+        currentStreak > 0
+          ? `Lige nu: ${count(currentStreak)} ${currentStreak === 1 ? "dag" : "dage"} i træk`
+          : undefined,
     },
   ];
 
