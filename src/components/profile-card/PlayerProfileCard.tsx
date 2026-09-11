@@ -105,7 +105,7 @@ export function PlayerProfileCard({
       icon: <Icon path={ICON_BARS} />,
     },
     {
-      label: "Længste stribe uden nuldag",
+      label: "Dage i træk over 1.500 kr.",
       value: streakDays > 0 ? `${count(streakDays)} dage` : "—",
       meta:
         (streakDays > 0 ? formatDateSpan(s?.streak_start, s?.streak_end) : null) ??
