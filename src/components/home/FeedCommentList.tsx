@@ -66,8 +66,8 @@ export function FeedCommentList({
         >
           {visible.map((comment) => (
             <li key={comment.id} className="flex items-start gap-2 text-[13px] text-foreground">
-              <span className="min-w-0 flex-1">
-                <span className="break-words">{comment.body}</span>
+              <span className={expanded ? "min-w-0 flex-1 break-words" : "min-w-0 flex-1 break-words line-clamp-2"}>
+                <span>{comment.body}</span>
                 <span className="text-foreground/70"> — {comment.authorName}</span>
               </span>
               {comment.isMine && (
