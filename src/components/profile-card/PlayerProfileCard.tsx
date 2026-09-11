@@ -446,17 +446,29 @@ export function PlayerProfileCard({
                     height: 18,
                   }}
                 >
-                  {Array.from({ length: Math.min(r.bars, 30) }).map((_, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        flex: "1 1 0",
-                        height: 12,
-                        borderRadius: 4,
-                        background: "hsl(var(--cph-emerald) / 0.55)",
-                      }}
-                    />
-                  ))}
+                  {(() => {
+                    const shown = Math.min(r.bars ?? 0, 30);
+                    const active = Math.min(r.activeBars ?? 0, shown);
+                    return Array.from({ length: shown }).map((_, i) => {
+                      const isActive = i >= shown - active;
+                      return (
+                        <span
+                          key={i}
+                          style={{
+                            flex: "1 1 0",
+                            height: isActive ? 18 : 12,
+                            borderRadius: 4,
+                            background: isActive
+                              ? EMERALD
+                              : "hsl(var(--cph-emerald) / 0.22)",
+                            boxShadow: isActive
+                              ? `0 0 8px hsl(var(--cph-emerald) / 0.55)`
+                              : undefined,
+                          }}
+                        />
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>
