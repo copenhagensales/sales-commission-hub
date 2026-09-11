@@ -366,7 +366,10 @@ Deno.serve(async (req) => {
         const cutoff = cutoffIso(group.days);
 
         const applyFilters = (builder: any) => {
-          let q = builder.not("phone_number", "is", null).lt("registered_at", cutoff);
+          // phone_number is NOT NULL on this table, so anonymisation writes an
+          // empty string instead of null. Already-cleared rows are excluded so
+          // repeated runs do not rewrite the same rows.
+          let q = builder.not("phone_number", "is", null).neq("phone_number", "").lt("registered_at", cutoff);
           if (group.clientId) {
             q = q.eq("client_id", group.clientId);
           } else if (mappedClientIds.length > 0) {
@@ -388,8 +391,9 @@ Deno.serve(async (req) => {
 
         if (!dryRun) {
           const { error: updErr } = await applyFilters(
-            supabase.from("fieldmarketing_sales").update({ phone_number: null })
+            supabase.from("fieldmarketing_sales").update({ phone_number: "" })
           );
+
           if (updErr) {
             log("WARN", `Failed to clear fieldmarketing_sales phones (${group.label}): ${updErr.message}`);
             continue;
