@@ -86,6 +86,21 @@ export default function RetentionPolicies() {
     },
   });
 
+  // Status for den natlige rensning af salg (aggregat, ingen persondata).
+  const { data: cleanupStatus } = useQuery({
+    queryKey: ["gdpr-campaign-sales-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("gdpr_campaign_sales_status");
+      if (error) throw error;
+      return (data ?? null) as {
+        overdue_sales: number;
+        last_run_at: string | null;
+        last_run_affected: number | null;
+      } | null;
+    },
+  });
+
+
   const dataUpsertMutation = useMutation({
     mutationFn: async (params: {
       data_type: string;
