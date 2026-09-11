@@ -53,6 +53,7 @@ import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
+import { CelebrationStrip } from "@/components/home/CelebrationStrip";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { PendingContractBanner } from "@/components/home/PendingContractBanner";
