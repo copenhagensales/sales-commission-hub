@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { 
   useActiveSeason, 
-  useMyEnrollment, 
+   
   useQualificationStandings,
   useEnrollmentCount,
   type QualificationStanding 
