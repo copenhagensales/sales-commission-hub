@@ -597,7 +597,6 @@ export function PlayerProfileCard({
       <footer
         style={{
           display: "flex",
-          gap: 2,
           gap: 6,
           padding: `16px ${PAD_H} 18px`,
           background: "hsl(var(--cph-light-blue) / 0.06)",
