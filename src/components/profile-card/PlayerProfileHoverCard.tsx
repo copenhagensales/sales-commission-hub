@@ -79,8 +79,10 @@ export function PlayerProfileHoverCard({
           sideOffset={10}
           collisionPadding={12}
           avoidCollisions
+          onOpenAutoFocus={(event) => event.preventDefault()}
           className={CONTENT_CLASS}
         >
+
           {card}
         </PopoverContent>
       </Popover>
