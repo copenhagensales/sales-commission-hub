@@ -126,6 +126,7 @@ export interface BulkImportRow {
   status: string | null;
   emne_id: string | null;
   sale_datetime: string | null;
+  moedetype: string | null;
 }
 
 export interface BulkImportResult {

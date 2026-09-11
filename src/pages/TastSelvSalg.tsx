@@ -198,6 +198,7 @@ export default function TastSelvSalg() {
                         <li>Status</li>
                         <li>Emne-ID</li>
                         <li>Sidste kontakttidspunkt</li>
+                        <li>Mødetype</li>
                       </ol>
                     </div>
                     <p>
@@ -315,6 +316,7 @@ type BulkRow = {
   status: string | null;
   emne_id: string | null;
   sale_datetime: string | null;
+  moedetype: string | null;
 };
 
 function pickCol(row: Record<string, unknown>, candidates: string[]): unknown {
@@ -370,6 +372,9 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
         status: (pickCol(r, ["status"]) as string | undefined) ?? null,
         emne_id: String(pickCol(r, ["emne-id", "emne id", "emneid"]) ?? "").trim() || null,
         sale_datetime: toIsoDatetime(pickCol(r, ["sidste kontakttidspunkt", "sidst kontaktet"])),
+        moedetype:
+          String(pickCol(r, ["mødetype", "modetype", "type møde", "hvilket type møde"]) ?? "").trim() ||
+          null,
       }));
       if (mapped.length === 0) {
         setParseError("Filen indeholder ingen rækker");
