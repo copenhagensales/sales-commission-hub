@@ -240,7 +240,8 @@ function matchPricingRule(
   const saleDateStr = saleDateObj ? saleDateObj.toISOString().split('T')[0] : null;
 
   const hasConditionalRules = sortedRules.some((r) => r.is_active && Object.keys(r.conditions || {}).length > 0);
-  const hasEmptyLeadData = allFields.length === 0;
+  // Fallbacken er lavet til manglende Adversus-leadfelter, ikke til manuelle salg.
+  const hasEmptyLeadData = allFields.length === 0 && !isManualSale;
 
   for (const rule of sortedRules) {
     if (!rule.is_active) continue;
