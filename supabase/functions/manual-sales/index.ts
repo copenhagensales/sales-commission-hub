@@ -241,6 +241,7 @@ serve(async (req) => {
           status?: string | null;
           emne_id?: string | null;
           sale_datetime?: string | null;
+          moedetype?: string | null;
         }>;
       } | null;
 
@@ -333,13 +334,16 @@ serve(async (req) => {
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
       const seenPhones = new Set<string>();
       const validIndices: number[] = [];
+      const createdSaleIds: string[] = [];
       let created = 0;
       let wouldCreate = 0;
+
 
       for (let idx = 0; idx < rows.length; idx++) {
         const r = rows[idx];
         const seller = String(r.saelger ?? "").trim();
         const subjectId = String(r.emne_id ?? "").trim();
+        const meetingType = String(r.moedetype ?? "").trim();
         const push = (reason: string) => errors.push({ reason, seller, subject_id: subjectId });
 
 
@@ -412,6 +416,9 @@ serve(async (req) => {
               channel_key: channel.key,
               subject_id: subjectId || null,
               campaign_name: r.kampagne ?? null,
+              // Mødetype gemmes under samme feltnavn som prissætningsreglerne bruger på
+              // øvrige produkter, så regelmotoren kan matche den uændret.
+              ...(meetingType ? { data: { "Hvilket type møde": meetingType } } : {}),
             },
           })
           .select("id")
@@ -439,7 +446,33 @@ serve(async (req) => {
         existingPhones.add(phone);
         seenPhones.add(phone);
         if (subjectId) existingSubjects.add(subjectId);
+        createdSaleIds.push(sale.id);
         created += 1;
+      }
+
+      // Lad den eksisterende prissætningsmotor sætte provision/omsætning på de nye salg,
+      // så regler (fx mødetype) gælder. Fejler kaldet, beholder salgene grundprisen.
+      if (!dryRun && createdSaleIds.length > 0) {
+        try {
+          const res = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/rematch-pricing-rules`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ sale_ids: createdSaleIds }),
+            },
+          );
+          if (!res.ok) {
+            console.error(
+              `[manual-sales] rematch-pricing-rules fejlede [${res.status}]: ${await res.text()}`,
+            );
+          }
+        } catch (e) {
+          console.error("[manual-sales] rematch-pricing-rules kunne ikke kaldes:", e);
+        }
       }
 
       return json(200, {
