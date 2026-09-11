@@ -408,17 +408,16 @@ export function PlayerProfileCard({
                     >
                       {r.meta}
                     </p>
-                    {r.hint && (
+                    {r.activeLabel && (
                       <p
                         style={{
                           margin: "4px 0 0",
                           fontSize: 13,
-                          fontWeight: 400,
-                          color: TEXT_SECONDARY,
-                          maxWidth: 300,
+                          fontWeight: 800,
+                          color: EMERALD,
                         }}
                       >
-                        {r.hint}
+                        {r.activeLabel}
                       </p>
                     )}
                   </div>
