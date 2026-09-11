@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { 
   useActiveSeason, 
-  useMyEnrollment, 
+   
   useQualificationStandings,
   useEnrollmentCount,
   type QualificationStanding 
 } from "@/hooks/useLeagueData";
+import { useCurrentRound } from "@/hooks/useLeagueActiveData";
+import { useLeagueRoundLeaders } from "@/hooks/useLeagueRoundLeaders";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
@@ -16,60 +18,32 @@ import { FeedReactionRow } from "@/components/home/FeedReactionRow";
 import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
-function getNeighborStandings(
-  allStandings: QualificationStanding[],
-  myEmployeeId: string | null
-): { visibleStandings: QualificationStanding[]; myIndex: number } {
-  if (!myEmployeeId || allStandings.length === 0) {
-    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
-  }
-
-  const myIndex = allStandings.findIndex(s => s.employee_id === myEmployeeId);
-  
-  if (myIndex === -1) {
-    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
-  }
-
-  const total = allStandings.length;
-  
-  if (total <= 5) {
-    return { visibleStandings: allStandings, myIndex };
-  }
-
-  let start = myIndex - 2;
-  let end = myIndex + 3;
-
-  if (start < 0) {
-    start = 0;
-    end = Math.min(5, total);
-  }
-  
-  if (end > total) {
-    end = total;
-    start = Math.max(0, total - 5);
-  }
-
-  return { 
-    visibleStandings: allStandings.slice(start, end), 
-    myIndex: myIndex - start
-  };
-}
-
 export function CompactLeagueView() {
   const { data: season } = useActiveSeason();
-  const { data: enrollment } = useMyEnrollment(season?.id);
-  const isEnrolled = !!enrollment;
   const { data: currentEmployeeId } = useCurrentEmployeeId();
   const { data: allStandings = [] } = useQualificationStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
+  const { data: currentRound } = useCurrentRound(season?.id);
+  const { data: roundLeaders = {} } = useLeagueRoundLeaders(currentRound);
   const lookupAvatar = useAvatarLookup();
+
+  // Top 3 for den igangvaerende runde (denne uge), uanset om man selv er tilmeldt
+  const weeklyTop3: QualificationStanding[] = allStandings
+    .map((standing) => {
+      const weekly = roundLeaders[standing.employee_id];
+      return {
+        ...standing,
+        current_provision: weekly?.provision ?? 0,
+        deals_count: weekly?.deals ?? 0,
+      };
+    })
+    .sort((a, b) => (b.current_provision || 0) - (a.current_provision || 0))
+    .slice(0, 3);
 
   const leagueTargetKey = (employeeId: string) =>
     buildTargetKey("league_round", [season?.id ?? "none", employeeId]);
 
-  const podiumKeys = allStandings
-    .slice(0, 3)
-    .map((standing) => leagueTargetKey(standing.employee_id));
+  const podiumKeys = weeklyTop3.map((standing) => leagueTargetKey(standing.employee_id));
 
   const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
 
@@ -85,9 +59,8 @@ export function CompactLeagueView() {
 
   if (!season) return null;
 
-  const { visibleStandings, myIndex } = isEnrolled
-    ? getNeighborStandings(allStandings, currentEmployeeId || null)
-    : { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+  const visibleStandings = weeklyTop3;
+
 
   const getInitials = (name: string) =>
     name
@@ -103,7 +76,7 @@ export function CompactLeagueView() {
         <div className="flex items-baseline justify-between gap-3">
           <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
             <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
-            Liga · denne periode
+            Liga · denne uge
           </CardTitle>
           <span className="text-[13px] text-foreground/70">{enrollmentCount} tilmeldt</span>
         </div>
@@ -114,7 +87,7 @@ export function CompactLeagueView() {
           <div className="divide-y divide-[hsl(var(--cph-onyx)/0.1)] border-t border-[hsl(var(--cph-onyx)/0.1)]">
             {visibleStandings.map((standing, index) => {
               const isMe = standing.employee_id === currentEmployeeId;
-              const rank = standing.overall_rank || index + 1;
+              const rank = index + 1;
               const name = formatPlayerName(standing.employee);
 
               return (
