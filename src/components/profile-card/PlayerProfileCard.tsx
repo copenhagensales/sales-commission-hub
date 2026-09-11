@@ -373,7 +373,7 @@ export function PlayerProfileCard({
                 background: PANEL,
                 border: `1px solid ${DIVIDER}`,
                 borderRadius: 18,
-                padding: "14px 16px",
+                padding: "14px clamp(11px, 3.5vw, 16px)",
               }}
             >
               <div
@@ -438,7 +438,7 @@ export function PlayerProfileCard({
                 <dd
                   style={{
                     margin: 0,
-                    fontSize: 21,
+                    fontSize: "clamp(17px, 5vw, 21px)",
                     fontWeight: 800,
                     whiteSpace: "nowrap",
                     color: r.bars ? EMERALD : TEXT_PRIMARY,
@@ -490,7 +490,7 @@ export function PlayerProfileCard({
       </section>
 
       {/* 4) Klubberne */}
-      <section style={{ padding: "0 22px 22px" }}>
+      <section style={{ padding: `0 ${PAD_H} ${PAD_V}` }}>
         <h4
           style={{
             display: "flex",
@@ -550,8 +550,9 @@ export function PlayerProfileCard({
                 <span
                   aria-hidden="true"
                   style={{
-                    width: 54,
-                    height: 54,
+                    width: "clamp(44px, 13vw, 54px)",
+                    height: "clamp(44px, 13vw, 54px)",
+                    flex: "0 0 auto",
                     borderRadius: "50%",
                     display: "flex",
                     alignItems: "center",
@@ -597,7 +598,8 @@ export function PlayerProfileCard({
         style={{
           display: "flex",
           gap: 2,
-          padding: "16px 22px 18px",
+          gap: 6,
+          padding: `16px ${PAD_H} 18px`,
           background: "hsl(var(--cph-light-blue) / 0.06)",
           borderTop: `1px solid ${DIVIDER}`,
         }}
