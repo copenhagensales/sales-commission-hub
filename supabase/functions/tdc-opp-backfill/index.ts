@@ -68,10 +68,8 @@ serve(async (req) => {
     const log = (msg: string) => { console.log(`[tdc-opp-backfill] ${msg}`); logs.push(msg); };
 
     // GDPR: fritekst må ikke persisteres ved backfill af OPP-data
-    const freetext = await createFreetextStripper(supabase, {
+    const gdprFilter = await createIngestionFilter(supabase, {
       integration: "adversus",
-      container: "raw_payload",
-      blockedLabels: BLOCKED_FIELD_LABELS,
       triggeredBy: "tdc-opp-backfill",
     });
 
@@ -210,7 +208,7 @@ serve(async (req) => {
 
         const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
 
-        const updatedPayload = freetext.strip({
+        const updatedPayload = gdprFilter.filter({
           ...sale.raw_payload,
           leadResultFields,
           leadResultData,
@@ -272,7 +270,7 @@ serve(async (req) => {
       }, 5000);
     }
 
-    await freetext.flush();
+    await gdprFilter.flush();
 
     return new Response(JSON.stringify({
       success: true, processed, failed, skipped, remaining, done, logs,

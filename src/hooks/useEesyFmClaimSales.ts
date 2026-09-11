@@ -232,7 +232,7 @@ export function useUpdateEesyFmClaimSale() {
             ...payload,
             fm_product_name: input.productName,
             fm_seller_id: input.sellerId || payload.fm_seller_id,
-            fm_comment: input.note || null,
+            // fm_comment: GDPR – fritekstnoter må ikke persisteres ved indtag
             fm_claim_reimport: input.keepClaim,
           },
         })

@@ -2,15 +2,10 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
-import { BLOCKED_FIELD_LABELS } from "../../_shared/strip-notes.ts"
 import {
-  createFreetextStripper,
-  type FreetextStripper,
-} from "../../_shared/freetext-runtime.ts"
-import {
-  stripIdentityFromPiiFields,
-  stripNormalizedIdentity,
-} from "../../_shared/normalized-identity.ts"
+  createIngestionFilter,
+  type IngestionFilter,
+} from "../../_shared/ingestion-filter-runtime.ts"
 
 /**
  * Check if a condition value is a NumericCondition object
@@ -422,12 +417,10 @@ async function processSalesBatch(
   pricingRulesMap: Map<string, PricingRule[]>,
   campaignMappingsMap: Map<string, string>,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  freetext: FreetextStripper
+  gdprFilter: IngestionFilter
 ) {
   let processed = 0
   let errors = 0
-  let identityFieldsStripped = 0
-  let identityStrippedSales = 0
 
   const externalIdsRaw = sales.map((s) => String(s.externalId || "").trim()).filter(Boolean)
   const externalIds = Array.from(new Set(externalIdsRaw))
@@ -504,21 +497,15 @@ async function processSalesBatch(
         }
       }
       
-      // GDPR: kundeidentitet må aldrig persisteres i normalized_data
-      const normalizedIdentity = stripNormalizedIdentity(
-        sale.normalizedData as Record<string, unknown> | null | undefined
-      )
-      if (normalizedIdentity.removedKeys.length > 0) {
-        identityFieldsStripped += normalizedIdentity.removedKeys.length
-        identityStrippedSales++
-        sale.piiFields = stripIdentityFromPiiFields(sale.piiFields) ?? undefined
-      }
-
-      // GDPR: fritekst må ikke persisteres — hverken i raw_payload eller normalized_data
-      freetext.countSale()
-      const cleanNormalized = normalizedIdentity.data
-        ? freetext.strip(normalizedIdentity.data)
+      // GDPR: ét databasedrevet indtagsfilter for begge beholdere
+      gdprFilter.countSale()
+      const cleanNormalized = sale.normalizedData
+        ? gdprFilter.filter(
+            sale.normalizedData as Record<string, unknown>,
+            "normalized_data"
+          )
         : null
+      sale.piiFields = gdprFilter.filterPii(sale.piiFields) ?? undefined
 
       const saleData: Record<string, unknown> = {
         adversus_external_id: sale.externalId,
@@ -531,7 +518,7 @@ async function processSalesBatch(
         dialer_campaign_id: sale.campaignId || null,
         source: sale.dialerName,
         integration_type: sale.integrationType,
-        raw_payload: sale.rawPayload ? freetext.strip(sale.rawPayload) : null,
+        raw_payload: sale.rawPayload ? gdprFilter.filter(sale.rawPayload) : null,
         normalized_data: cleanNormalized || null,
         updated_at: new Date().toISOString(),
         validation_status: 'pending',  // Eksplicit default for at undgå NULL
@@ -642,7 +629,7 @@ async function processSalesBatch(
     processed = 0
   }
 
-  return { processed, errors, identityFieldsStripped, identityStrippedSales }
+  return { processed, errors }
 }
 
 export async function processSales(
@@ -782,14 +769,10 @@ export async function processSales(
 
   let totalProcessed = 0
   let totalErrors = 0
-  let totalIdentityFieldsStripped = 0
-  let totalIdentityStrippedSales = 0
 
-  // GDPR: fritekstdetektor med BEHOLD-ventilen indlæst én gang pr. kørsel
-  const freetext = await createFreetextStripper(supabase, {
+  // GDPR: ét indtagsfilter med beslutningerne fra ingestion_known_fields
+  const gdprFilter = await createIngestionFilter(supabase, {
     integration: sampleSale.integrationType || "ukendt",
-    container: "raw_payload",
-    blockedLabels: BLOCKED_FIELD_LABELS,
     triggeredBy: "integration-engine",
   })
 
@@ -798,7 +781,7 @@ export async function processSales(
   for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
     const batch = batches[batchNum]
     log("INFO", `Procesando lote ${batchNum + 1}/${totalBatches} (${batch.length} ventas)...`)
-    const { processed, errors, identityFieldsStripped, identityStrippedSales } = await processSalesBatch(
+    const { processed, errors } = await processSalesBatch(
       supabase,
       batch,
       productMapByName,
@@ -807,51 +790,28 @@ export async function processSales(
       pricingRulesMap,
       campaignMappingsMap,
       log,
-      freetext
+      gdprFilter
     )
     totalProcessed += processed
     totalErrors += errors
-    totalIdentityFieldsStripped += identityFieldsStripped || 0
-    totalIdentityStrippedSales += identityStrippedSales || 0
     log(
       "INFO",
       `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${filteredSales.length}`
     )
   }
 
-  // GDPR: log kun feltnavn, antal og regel for fjernet fritekst — aldrig indhold
-  await freetext.flush()
-  const freetextRemovals = freetext.removals()
-  if (freetextRemovals.length > 0) {
+  // GDPR: log kun feltnavn, beholder, antal og regel — aldrig indhold
+  await gdprFilter.flush()
+  const removed = [...gdprFilter.stats().removed.values()]
+  if (removed.length > 0) {
     log(
       "INFO",
-      `GDPR: fjernede fritekstfelter: ${freetextRemovals
-        .map((r) => `${r.field} (${r.count}, regel ${r.rule})`)
+      `GDPR: indtagsfilter fjernede: ${removed
+        .map((r) => `${r.field} [${r.container}] (${r.count}, ${r.rule})`)
         .join(", ")}`
     )
   }
 
-  // GDPR: log kun tællinger for fjernede identitetsfelter, aldrig værdierne
-  if (totalIdentityFieldsStripped > 0) {
-    log(
-      "INFO",
-      `GDPR: fjernede ${totalIdentityFieldsStripped} identitetsfelter fra normalized_data i ${totalIdentityStrippedSales} salg`
-    )
-    const { error: logError } = await supabase.from("gdpr_cleanup_log").insert({
-      action: "normalized_data_identity_stripped",
-      records_affected: totalIdentityStrippedSales,
-      triggered_by: "integration-engine",
-      details: {
-        fields_removed: totalIdentityFieldsStripped,
-        sales_affected: totalIdentityStrippedSales,
-        source: sampleSale.dialerName,
-        integration_type: sampleSale.integrationType,
-      },
-    })
-    if (logError) {
-      log("WARN", `Kunne ikke skrive gdpr_cleanup_log: ${logError.message}`)
-    }
-  }
 
   return { processed: totalProcessed, errors: totalErrors }
 }

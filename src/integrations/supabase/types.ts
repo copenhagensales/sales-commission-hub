@@ -9190,6 +9190,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ingestion_filter_settings: {
+        Row: {
+          created_at: string
+          id: string
+          phone_filter_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phone_filter_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phone_filter_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       ingestion_known_fields: {
         Row: {
           container: string
@@ -16042,6 +16066,7 @@ export type Database = {
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
+      compliance_check_ingestion_filter: { Args: never; Returns: undefined }
       compliance_mail_payload: { Args: never; Returns: Json }
       compliance_raise: {
         Args: {
@@ -16641,6 +16666,17 @@ export type Database = {
       heal_fm_missing_sale_items: {
         Args: { p_sale_ids?: string[] }
         Returns: number
+      }
+      ingestion_filter_audit: {
+        Args: { p_hours?: number }
+        Returns: {
+          beholder: string
+          beslutning: string
+          dom: string
+          felt: string
+          salg: number
+          senest: string
+        }[]
       }
       ingestion_scan_fields: { Args: { p_days?: number }; Returns: number }
       is_active_employee: { Args: { _uid: string }; Returns: boolean }
