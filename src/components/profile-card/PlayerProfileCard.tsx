@@ -20,8 +20,8 @@ import {
 
 const ONYX = "hsl(var(--cph-onyx))";
 const EMERALD = "hsl(var(--cph-emerald))";
-const TEXT_PRIMARY = "hsl(var(--cph-light-blue) / 0.85)";
-const TEXT_SECONDARY = "hsl(var(--cph-light-blue) / 0.80)";
+const TEXT_PRIMARY = "hsl(var(--cph-light-blue) / 0.95)";
+const TEXT_SECONDARY = "hsl(var(--cph-light-blue) / 0.90)";
 const PANEL = "hsl(var(--cph-light-blue) / 0.07)";
 const PANEL_STRONG = "hsl(var(--cph-light-blue) / 0.10)";
 const DIVIDER = "hsl(var(--cph-light-blue) / 0.12)";
