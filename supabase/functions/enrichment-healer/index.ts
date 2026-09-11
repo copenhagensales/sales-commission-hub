@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { stripNoteFields } from "../_shared/strip-notes.ts";
+import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
+import { createFreetextStripper } from "../_shared/freetext-strip-runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +80,14 @@ async function healAdversus(
   turboMode = false
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
+
+  // GDPR: fritekst må ikke persisteres ved berigelse
+  const freetext = await createFreetextStripper(supabase, {
+    integration: "adversus",
+    container: "raw_payload",
+    blockedLabels: BLOCKED_FIELD_LABELS,
+    triggeredBy: "enrichment-healer",
+  });
 
   const user = credentials?.username || credentials?.ADVERSUS_API_USERNAME;
   const pass = credentials?.password || credentials?.ADVERSUS_API_PASSWORD;
@@ -167,7 +176,7 @@ async function healAdversus(
         throw new Error("API returned empty lead data");
       }
 
-      const updatedPayload = stripNoteFields({
+      const updatedPayload = freetext.strip({
         ...rawPayload,
         leadResultFields,
         leadResultData,
@@ -205,6 +214,8 @@ async function healAdversus(
     }
   }
 
+  await freetext.flush();
+
   return { healed, failed, skipped };
 }
 
@@ -220,6 +231,14 @@ async function healEnreach(
   turboMode = false
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
+
+  // GDPR: fritekst må ikke persisteres ved berigelse
+  const freetext = await createFreetextStripper(supabase, {
+    integration: "enreach",
+    container: "raw_payload",
+    blockedLabels: BLOCKED_FIELD_LABELS,
+    triggeredBy: "enrichment-healer",
+  });
 
   let apiUrl = integration?.api_url || credentials?.api_url || "https://wshero01.herobase.com/api";
   apiUrl = apiUrl.replace(/^(Web|URL|API|Endpoint):\s*/i, '').trim();
@@ -278,7 +297,7 @@ async function healEnreach(
 
       const leadData = leads[0];
       const rawPayload = sale.raw_payload || {};
-      const updatedPayload = stripNoteFields({
+      const updatedPayload = freetext.strip({
         ...rawPayload,
         data: leadData,
       });
@@ -307,6 +326,8 @@ async function healEnreach(
       log(`Failed to heal Enreach sale ${externalId}: ${errMsg}`);
     }
   }
+
+  await freetext.flush();
 
   return { healed, failed, skipped };
 }

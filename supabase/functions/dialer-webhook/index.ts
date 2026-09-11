@@ -2,7 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseWebhook, StandardWebhookPayload } from "./parsers/factory.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
-import { stripNoteFields } from "../_shared/strip-notes.ts";
+import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
+import { createFreetextStripper } from "../_shared/freetext-strip-runtime.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +46,15 @@ async function processWebhookPayload(
 ) {
   const dialerId = dialerInfo?.id || null;
   const dialerName = dialerInfo?.name || 'Unknown Dialer';
+
+  // GDPR: fritekst må aldrig persisteres — regel A (feltnavn) + regel B (værdi)
+  const freetext = await createFreetextStripper(supabase, {
+    integration: provider || 'ukendt',
+    container: 'raw_payload',
+    blockedLabels: BLOCKED_FIELD_LABELS,
+    triggeredBy: 'dialer-webhook',
+  });
+  
   
   // Handle same-day corrections and deduplication by leadId
   const newEventDate = payload.eventTime ? getDateOnly(payload.eventTime) : getDateOnly(new Date().toISOString());
@@ -104,7 +114,7 @@ async function processWebhookPayload(
     .insert({
       external_id: payload.externalId,
       event_type: payload.eventType,
-      payload: stripNoteFields({
+      payload: freetext.strip({
         ...payload.rawPayload,
         // Canonical campaign_status enum - SOURCE OF TRUTH for filtering/reporting
         campaign_status: payload.campaignStatus,
@@ -150,6 +160,7 @@ async function processWebhookPayload(
       dialer_name: dialerName,
       existing_sales_count: existingSales.length,
     });
+    await freetext.flush();
     return {
       success: true,
       message: 'Event stored but ignored due to day change or existing sale',
@@ -195,7 +206,7 @@ async function processWebhookPayload(
       validation_status: 'pending',
       source: dialerName,
       integration_type: provider,
-      raw_payload: stripNoteFields({
+      raw_payload: freetext.strip({
         ...payload.rawPayload,
         _webhook_parsed: {
           leadId: payload.leadId,
@@ -343,6 +354,8 @@ async function processWebhookPayload(
     items_created: saleItems.length,
     items_needing_mapping: itemsNeedingMapping,
   });
+
+  await freetext.flush();
 
   return {
     success: true,
