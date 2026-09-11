@@ -1016,60 +1016,11 @@ Deno.serve(async (req) => {
             }
 
             case "dialer_calls": {
-              // Calls without a sale are kept forever: they are the denominator in
-              // every call statistic. Only the identity keys expire. The technical
-              // fields (time, duration, status, agent, campaign) are never touched,
-              // so call counts, talk time and hit rate stay exactly the same.
-              // Ingestion already drops these fields (see _shared/dialer-call-privacy.ts);
-              // this section is the backstop for rows stored before that rule existed.
-              if (!anonymize) {
-                log("WARN", `dialer_calls policy must use cleanup_mode "anonymize" — skipping`);
-                break;
-              }
-
-              // Done set-based in the database: hundreds of thousands of calls are
-              // far beyond what row-by-row paging can handle inside one invocation.
-              // The allowlist is passed in from code so it stays a single source of truth.
-              const { data: dialerResult, error: dialerErr } = await supabase.rpc(
-                "gdpr_clean_dialer_calls",
-                {
-                  p_cutoff: cutoffISO,
-                  p_allowed_metadata_keys: [...DIALER_CALL_METADATA_ALLOWLIST],
-                  p_dry_run: dryRun,
-                }
-              );
-
-              if (dialerErr) {
-                log("WARN", `Error cleaning dialer_calls: ${dialerErr.message}`);
-                break;
-              }
-
-              const dialerCounts = (dialerResult ?? {}) as Record<string, number>;
-              dialerCallsRecordingsCleared += Number(dialerCounts.recordings_cleared ?? 0);
-              dialerCallsLeadKeysCleared += Number(dialerCounts.lead_keys_cleared ?? 0);
-              dialerCallsMetadataCleaned += Number(dialerCounts.metadata_rows_cleaned ?? 0);
-
-              if (
-                dialerCallsRecordingsCleared +
-                  dialerCallsLeadKeysCleared +
-                  dialerCallsMetadataCleaned >
-                0
-              ) {
-                systemCopyResults.push({
-                  table: "dialer_calls",
-                  count:
-                    dialerCallsRecordingsCleared +
-                    dialerCallsLeadKeysCleared +
-                    dialerCallsMetadataCleaned,
-                  retention_days: policy.retention_days,
-                });
-              }
-
-              log(
-                "INFO",
-                `dialer_calls cleaned: ${dialerCallsRecordingsCleared} recordings, ` +
-                  `${dialerCallsLeadKeysCleared} lead keys, ${dialerCallsMetadataCleaned} metadata rows`
-              );
+              // Owned by the daily pg_cron job `gdpr-dialer-calls-cleanup`, which
+              // calls public.gdpr_run_dialer_calls_cleanup() directly in Postgres.
+              // Doing it here as well would double-log and can exceed this
+              // function's CPU budget on large call volumes, so it is skipped.
+              log("INFO", `dialer_calls handled by pg_cron job gdpr-dialer-calls-cleanup — skipping here`);
               break;
             }
 
