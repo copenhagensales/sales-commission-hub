@@ -92,21 +92,26 @@ export function ComplianceReviewPanel() {
                 >
                   {overdue ? "Skal gennemgås" : "Gyldig"}
                 </Badge>
-                {canConfirm && (
-                  <Button
-                    size="sm"
-                    variant={overdue ? "default" : "outline"}
-                    disabled={confirm.isPending}
-                    onClick={() => handleConfirm(area.key, area.title)}
-                  >
-                    {confirm.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Check className="h-4 w-4" />
-                    )}
-                    Bekræft gennemgang
-                  </Button>
-                )}
+                {canConfirm &&
+                  (overdue ? (
+                    <Button
+                      size="sm"
+                      disabled={confirm.isPending}
+                      onClick={() => handleConfirm(area.key, area.title)}
+                    >
+                      {confirm.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Bekræft gennemgang
+                    </Button>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      Bekræftet {lastDate ? formatDa(lastDate) : ""}
+                    </span>
+                  ))}
               </div>
             </div>
           );
