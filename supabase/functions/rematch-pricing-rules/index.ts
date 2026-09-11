@@ -823,6 +823,7 @@ serve(async (req) => {
         campaignMappingId,
         saleDate,
         siblingProductIds,
+        ((item.sales as any)?.source ?? source) === "manual_entry",
       );
 
       if (matchedRule) {
