@@ -11,13 +11,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 export type FeedTargetType = "birthday" | "anniversary" | "league_round";
-export type FeedEmoji = "clap" | "party" | "fire";
+/** Emoji gemmes som selve symbolet, så udvalget kan udvides uden databaseændring. */
+export type FeedEmoji = string;
 
-export const FEED_EMOJIS: { key: FeedEmoji; symbol: string; label: string }[] = [
-  { key: "clap", symbol: "👏", label: "Klap" },
-  { key: "party", symbol: "🎉", label: "Tillykke" },
-  { key: "fire", symbol: "🔥", label: "Sejt" },
+/** Udvalget i vælgeren. Labels bruges til skærmlæser og tooltip. */
+export const FEED_EMOJI_OPTIONS: { symbol: string; label: string }[] = [
+  { symbol: "👏", label: "Klap" },
+  { symbol: "🎉", label: "Tillykke" },
+  { symbol: "🔥", label: "Sejt" },
+  { symbol: "❤️", label: "Hjerte" },
+  { symbol: "😄", label: "Smil" },
+  { symbol: "🥳", label: "Fest" },
+  { symbol: "🎂", label: "Fødselsdagskage" },
+  { symbol: "🙌", label: "Hurra" },
+  { symbol: "💪", label: "Stærkt" },
+  { symbol: "⭐", label: "Stjerne" },
+  { symbol: "🏆", label: "Pokal" },
+  { symbol: "🚀", label: "Raket" },
 ];
+
+export function emojiLabel(symbol: string): string {
+  return FEED_EMOJI_OPTIONS.find((option) => option.symbol === symbol)?.label ?? "Reaktion";
+}
 
 export interface FeedReactionSummary {
   emoji: FeedEmoji;
