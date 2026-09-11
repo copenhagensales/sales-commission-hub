@@ -241,6 +241,7 @@ serve(async (req) => {
           status?: string | null;
           emne_id?: string | null;
           sale_datetime?: string | null;
+          moedetype?: string | null;
         }>;
       } | null;
 
@@ -333,8 +334,10 @@ serve(async (req) => {
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
       const seenPhones = new Set<string>();
       const validIndices: number[] = [];
+      const createdSaleIds: string[] = [];
       let created = 0;
       let wouldCreate = 0;
+
 
       for (let idx = 0; idx < rows.length; idx++) {
         const r = rows[idx];
