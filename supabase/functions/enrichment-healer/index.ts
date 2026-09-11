@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
-import { createFreetextStripper } from "../_shared/freetext-runtime.ts";
+import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,10 +81,8 @@ async function healAdversus(
   let healed = 0, failed = 0, skipped = 0;
 
   // GDPR: fritekst må ikke persisteres ved berigelse
-  const freetext = await createFreetextStripper(supabase, {
+  const gdprFilter = await createIngestionFilter(supabase, {
     integration: "adversus",
-    container: "raw_payload",
-    blockedLabels: BLOCKED_FIELD_LABELS,
     triggeredBy: "enrichment-healer",
   });
 
@@ -176,7 +173,7 @@ async function healAdversus(
         throw new Error("API returned empty lead data");
       }
 
-      const updatedPayload = freetext.strip({
+      const updatedPayload = gdprFilter.filter({
         ...rawPayload,
         leadResultFields,
         leadResultData,
@@ -214,7 +211,7 @@ async function healAdversus(
     }
   }
 
-  await freetext.flush();
+  await gdprFilter.flush();
 
   return { healed, failed, skipped };
 }
@@ -233,10 +230,8 @@ async function healEnreach(
   let healed = 0, failed = 0, skipped = 0;
 
   // GDPR: fritekst må ikke persisteres ved berigelse
-  const freetext = await createFreetextStripper(supabase, {
+  const gdprFilter = await createIngestionFilter(supabase, {
     integration: "enreach",
-    container: "raw_payload",
-    blockedLabels: BLOCKED_FIELD_LABELS,
     triggeredBy: "enrichment-healer",
   });
 
@@ -297,7 +292,7 @@ async function healEnreach(
 
       const leadData = leads[0];
       const rawPayload = sale.raw_payload || {};
-      const updatedPayload = freetext.strip({
+      const updatedPayload = gdprFilter.filter({
         ...rawPayload,
         data: leadData,
       });
@@ -327,7 +322,7 @@ async function healEnreach(
     }
   }
 
-  await freetext.flush();
+  await gdprFilter.flush();
 
   return { healed, failed, skipped };
 }

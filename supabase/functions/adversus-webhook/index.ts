@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sanitizePayload } from "../_shared/sanitize.ts";
-import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
-import { createFreetextStripper } from "../_shared/freetext-runtime.ts";
+import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
@@ -124,10 +123,8 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   // GDPR: fritekst må aldrig persisteres — regel A (feltnavn) + regel B (værdi)
-  const freetext = await createFreetextStripper(supabase, {
+  const gdprFilter = await createIngestionFilter(supabase, {
     integration: 'adversus',
-    container: 'raw_payload',
-    blockedLabels: BLOCKED_FIELD_LABELS,
     triggeredBy: 'adversus-webhook',
   });
 
@@ -223,7 +220,7 @@ serve(async (req) => {
       .insert({
         external_id: externalId,
         event_type: body.type || 'result',
-        payload: freetext.strip(body),
+        payload: gdprFilter.filter(body),
         processed: false,
         received_at: new Date().toISOString(),
       })
@@ -243,7 +240,7 @@ serve(async (req) => {
         event_id: eventData.id,
         external_id: externalId,
       });
-      await freetext.flush();
+      await gdprFilter.flush();
       return new Response(
         JSON.stringify({
           success: true,
@@ -457,7 +454,7 @@ serve(async (req) => {
 
     console.log('Webhook processed successfully');
 
-    await freetext.flush();
+    await gdprFilter.flush();
 
     return new Response(
       JSON.stringify({

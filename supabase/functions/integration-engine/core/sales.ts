@@ -2,7 +2,6 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
-import { BLOCKED_FIELD_LABELS } from "../../_shared/strip-notes.ts"
 import {
   createFreetextStripper,
   type FreetextStripper,
@@ -515,9 +514,9 @@ async function processSalesBatch(
       }
 
       // GDPR: fritekst må ikke persisteres — hverken i raw_payload eller normalized_data
-      freetext.countSale()
+      gdprFilter.countSale()
       const cleanNormalized = normalizedIdentity.data
-        ? freetext.strip(normalizedIdentity.data)
+        ? gdprFilter.filter(normalizedIdentity.data)
         : null
 
       const saleData: Record<string, unknown> = {
@@ -531,7 +530,7 @@ async function processSalesBatch(
         dialer_campaign_id: sale.campaignId || null,
         source: sale.dialerName,
         integration_type: sale.integrationType,
-        raw_payload: sale.rawPayload ? freetext.strip(sale.rawPayload) : null,
+        raw_payload: sale.rawPayload ? gdprFilter.filter(sale.rawPayload) : null,
         normalized_data: cleanNormalized || null,
         updated_at: new Date().toISOString(),
         validation_status: 'pending',  // Eksplicit default for at undgå NULL
@@ -786,10 +785,8 @@ export async function processSales(
   let totalIdentityStrippedSales = 0
 
   // GDPR: fritekstdetektor med BEHOLD-ventilen indlæst én gang pr. kørsel
-  const freetext = await createFreetextStripper(supabase, {
+  const gdprFilter = await createIngestionFilter(supabase, {
     integration: sampleSale.integrationType || "ukendt",
-    container: "raw_payload",
-    blockedLabels: BLOCKED_FIELD_LABELS,
     triggeredBy: "integration-engine",
   })
 
@@ -820,8 +817,8 @@ export async function processSales(
   }
 
   // GDPR: log kun feltnavn, antal og regel for fjernet fritekst — aldrig indhold
-  await freetext.flush()
-  const freetextRemovals = freetext.removals()
+  await gdprFilter.flush()
+  const freetextRemovals = gdprFilter.stats()
   if (freetextRemovals.length > 0) {
     log(
       "INFO",

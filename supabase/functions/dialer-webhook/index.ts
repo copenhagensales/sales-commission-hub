@@ -2,8 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseWebhook, StandardWebhookPayload } from "./parsers/factory.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
-import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
-import { createFreetextStripper } from "../_shared/freetext-runtime.ts";
+import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,10 +47,8 @@ async function processWebhookPayload(
   const dialerName = dialerInfo?.name || 'Unknown Dialer';
 
   // GDPR: fritekst må aldrig persisteres — regel A (feltnavn) + regel B (værdi)
-  const freetext = await createFreetextStripper(supabase, {
+  const gdprFilter = await createIngestionFilter(supabase, {
     integration: provider || 'ukendt',
-    container: 'raw_payload',
-    blockedLabels: BLOCKED_FIELD_LABELS,
     triggeredBy: 'dialer-webhook',
   });
   
@@ -114,7 +111,7 @@ async function processWebhookPayload(
     .insert({
       external_id: payload.externalId,
       event_type: payload.eventType,
-      payload: freetext.strip({
+      payload: gdprFilter.filter({
         ...payload.rawPayload,
         // Canonical campaign_status enum - SOURCE OF TRUTH for filtering/reporting
         campaign_status: payload.campaignStatus,
@@ -160,7 +157,7 @@ async function processWebhookPayload(
       dialer_name: dialerName,
       existing_sales_count: existingSales.length,
     });
-    await freetext.flush();
+    await gdprFilter.flush();
     return {
       success: true,
       message: 'Event stored but ignored due to day change or existing sale',
@@ -206,7 +203,7 @@ async function processWebhookPayload(
       validation_status: 'pending',
       source: dialerName,
       integration_type: provider,
-      raw_payload: freetext.strip({
+      raw_payload: gdprFilter.filter({
         ...payload.rawPayload,
         _webhook_parsed: {
           leadId: payload.leadId,
@@ -355,7 +352,7 @@ async function processWebhookPayload(
     items_needing_mapping: itemsNeedingMapping,
   });
 
-  await freetext.flush();
+  await gdprFilter.flush();
 
   return {
     success: true,
