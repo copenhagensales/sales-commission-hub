@@ -465,7 +465,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 isLoading={isLoading}
                 tvMode={false}
                 light
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
               />
+
             </div>
           )}
         </CphBoardFrame>
