@@ -273,21 +273,21 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
 
   // Live sellers (only used in live mode)
   const liveSellers: LeaderboardSeller[] = useMemo(() => {
-    if (!liveData?.byEmployee) return [];
-    return Object.entries(liveData.byEmployee)
-      .map(([key, emp]) => {
-        const name = employeeData?.idToNameMap?.get(key) || emp.name;
-        return {
-          id: key,
-          name,
-          displayName: getDisplayName(name),
-          avatarUrl: employeeData?.idToAvatarMap?.get(key) ?? null,
-          salesCount: emp.sales,
-          commission: emp.commission,
-        };
-      })
-      .sort((a, b) => b.commission - a.commission);
+    if (!liveData?.sellers) return [];
+    return liveData.sellers.map((s) => {
+      const name = employeeData?.idToNameMap?.get(s.employeeId) || s.employeeName;
+      return {
+        id: s.employeeId,
+        name,
+        displayName: getDisplayName(name),
+        avatarUrl: employeeData?.idToAvatarMap?.get(s.employeeId) ?? null,
+        salesCount: s.salesCount,
+        commission: s.commission,
+        crossSales: s.crossSaleCount,
+      };
+    });
   }, [liveData, employeeData]);
+
 
   const isLoading = useCached ? (kpisLoading || leaderboardsLoading || aggKpisLoading) : liveLoading;
 
