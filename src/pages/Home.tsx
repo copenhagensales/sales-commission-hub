@@ -1008,7 +1008,6 @@ const Home = () => {
                       </p>
                     </div>
                   </div>
-                  </PlayerProfileHoverCard>
                 );
               })}
             </div>
