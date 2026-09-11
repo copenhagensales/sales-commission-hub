@@ -142,15 +142,17 @@ export function CompactLeagueView() {
                       getInitials(name)
                     )}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-extrabold text-foreground">
-                      {name}
-                      {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
-                    </p>
-                    <p className="text-[13px] text-foreground/70">
-                      {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
-                    </p>
-                  </div>
+                  <PlayerProfileHoverCard employeeId={standing.employee_id}>
+                    <div className="min-w-0 flex-1 cursor-default">
+                      <p className="truncate text-[15px] font-extrabold text-foreground">
+                        {name}
+                        {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
+                      </p>
+                      <p className="text-[13px] text-foreground/70">
+                        {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
+                      </p>
+                    </div>
+                  </PlayerProfileHoverCard>
                   <div className="flex flex-none items-center gap-3">
                     {isPodium(rank) && (
                       <FeedReactionRow
