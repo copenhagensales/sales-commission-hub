@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FeedReactionRow } from "@/components/home/FeedReactionRow";
 import { FeedCommentList } from "@/components/home/FeedCommentList";
 import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
+import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
 export interface Celebration {
   employeeId: string;
