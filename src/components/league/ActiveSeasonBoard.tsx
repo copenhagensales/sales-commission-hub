@@ -313,8 +313,12 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           )}
         </div>
 
+        {/* Avatar med profilkort ved hover */}
+        <LeaguePlayerAvatar employeeId={standing.employee_id} name={playerName} />
+
         {/* Name + movement – fixed width for sparkline alignment */}
         <div className="w-[180px] sm:w-[220px] shrink-0">
+
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
