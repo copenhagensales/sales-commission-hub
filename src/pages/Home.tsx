@@ -968,29 +968,31 @@ const Home = () => {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {upcomingCelebrations.map((celebration, idx) => {
                 const isAnniversary = celebration.type === 'anniversary';
-                return (
-                  <PlayerProfileHoverCard key={idx} employeeId={celebration.employeeId} side="top">
-                  <div
-                    className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${
-                      isAnniversary
-                        ? 'bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]'
-                        : 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
-                    }`}
-                  >
-                    <span
-                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-full text-[12px] font-extrabold ${
-                        isAnniversary
-                          ? 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
-                          : 'bg-white text-[hsl(var(--cph-onyx))]'
-                      }`}
-                    >
-                      {celebration.name
-                        .split(' ')
-                        .map((part) => part[0])
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase()}
-                    </span>
+                 return (
+                   <div
+                     key={idx}
+                     className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${
+                       isAnniversary
+                         ? 'bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]'
+                         : 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
+                     }`}
+                   >
+                     <PlayerProfileHoverCard employeeId={celebration.employeeId} side="top">
+                     <span
+                       className={`flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-[12px] font-extrabold ${
+                         isAnniversary
+                           ? 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
+                           : 'bg-white text-[hsl(var(--cph-onyx))]'
+                       }`}
+                     >
+                       {celebration.name
+                         .split(' ')
+                         .map((part) => part[0])
+                         .slice(0, 2)
+                         .join('')
+                         .toUpperCase()}
+                     </span>
+                     </PlayerProfileHoverCard>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-extrabold">{celebration.name}</p>
                       <p
