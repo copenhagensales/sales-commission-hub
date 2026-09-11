@@ -12,6 +12,8 @@ import {
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
+import { FeedReactionRow } from "@/components/home/FeedReactionRow";
+import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 
 function getNeighborStandings(
   allStandings: QualificationStanding[],
@@ -60,6 +62,15 @@ export function CompactLeagueView() {
   const { data: allStandings = [] } = useQualificationStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
   const lookupAvatar = useAvatarLookup();
+
+  const leagueTargetKey = (employeeId: string) =>
+    buildTargetKey("league_round", [season?.id ?? "none", employeeId]);
+
+  const podiumKeys = allStandings
+    .slice(0, 3)
+    .map((standing) => leagueTargetKey(standing.employee_id));
+
+  const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
 
   const formatProvision = (amount: number) => {
     return new Intl.NumberFormat("da-DK", {
@@ -140,9 +151,20 @@ export function CompactLeagueView() {
                       {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
                     </p>
                   </div>
-                  <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
-                    {formatProvision(standing.current_provision || 0)}
-                  </span>
+                  <div className="flex flex-none items-center gap-3">
+                    {isPodium(rank) && (
+                      <FeedReactionRow
+                        targetType="league_round"
+                        targetKey={leagueTargetKey(standing.employee_id)}
+                        reactions={getReactions(leagueTargetKey(standing.employee_id))}
+                        disabled={!canInteract}
+                        onToggle={(args) => toggleReaction.mutate(args)}
+                      />
+                    )}
+                    <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
+                      {formatProvision(standing.current_provision || 0)}
+                    </span>
+                  </div>
                 </div>
               );
             })}

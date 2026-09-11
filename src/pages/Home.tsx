@@ -53,6 +53,7 @@ import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 // New optimized components
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
+import { CelebrationStrip } from "@/components/home/CelebrationStrip";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { PendingContractBanner } from "@/components/home/PendingContractBanner";
@@ -198,7 +199,7 @@ const Home = () => {
         .select("id, first_name, last_name, employment_start_date, cpr_number")
         .eq("is_active", true);
       
-      const results: { type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
+      const results: { employeeId: string; type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
       
       const parseCprBirthday = (cpr: string): Date | null => {
         if (!cpr || cpr.length < 6) return null;
@@ -221,6 +222,7 @@ const Home = () => {
             if ((isSameDay(birthdayThisYear, today) || isAfter(birthdayThisYear, today)) && 
                 isBefore(birthdayThisYear, addDays(today, 14))) {
               results.push({ 
+                employeeId: emp.id,
                 type: 'birthday', 
                 name: `${emp.first_name} ${emp.last_name}`,
                 years: age + (isAfter(birthdayThisYear, today) ? 1 : 0),
@@ -242,6 +244,7 @@ const Home = () => {
             if ((isSameDay(anniversaryThisYear, today) || isAfter(anniversaryThisYear, today)) && 
                 isBefore(anniversaryThisYear, addDays(today, 14))) {
               results.push({ 
+                employeeId: emp.id,
                 type: 'anniversary', 
                 name: `${emp.first_name} ${emp.last_name}`,
                 years: anniversaryYears,
@@ -552,34 +555,7 @@ const Home = () => {
 
         {/* Today's Celebrations - Only if there are any */}
         {todayCelebrations.length > 0 && (
-          <Card className="border border-border bg-card rounded-3xl animate-fade-in">
-            <CardContent className="py-4">
-              <div className="flex flex-wrap items-center gap-4">
-                {todayCelebrations.map((celebration, idx) => (
-                  <div 
-                    key={idx}
-                    className="flex items-center gap-3 px-4 py-2 rounded-xl bg-background/80 border border-primary/20"
-                  >
-                    {celebration.type === 'birthday' ? (
-                      <Cake className="w-5 h-5 text-foreground" />
-                    ) : (
-                      <Award className="w-5 h-5 text-warning" />
-                    )}
-                    <div>
-                      <p className="font-medium">{celebration.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {celebration.type === 'anniversary' 
-                          ? `${celebration.years} års jubilæum`
-                          : `Tillykke med fødselsdagen!`
-                        }
-                      </p>
-                    </div>
-                    <PartyPopper className="w-5 h-5 text-foreground" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <CelebrationStrip celebrations={todayCelebrations} />
         )}
 
         {/* ZONE 2: Liga + kommende begivenheder */}
