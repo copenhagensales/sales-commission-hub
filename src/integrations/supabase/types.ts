@@ -6770,6 +6770,7 @@ export type Database = {
           salary_hours_source: string | null
           salary_start_date: string | null
           salary_type: Database["public"]["Enums"]["salary_type"] | null
+          sales_history_from: string | null
           standard_start_time: string | null
           system_role_id: string | null
           team_id: string | null
@@ -6834,6 +6835,7 @@ export type Database = {
           salary_hours_source?: string | null
           salary_start_date?: string | null
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
+          sales_history_from?: string | null
           standard_start_time?: string | null
           system_role_id?: string | null
           team_id?: string | null
@@ -6898,6 +6900,7 @@ export type Database = {
           salary_hours_source?: string | null
           salary_start_date?: string | null
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
+          sales_history_from?: string | null
           standard_start_time?: string | null
           system_role_id?: string | null
           team_id?: string | null
