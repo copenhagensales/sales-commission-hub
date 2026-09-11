@@ -314,145 +314,17 @@ Deno.serve(async (req) => {
               }
             }
           } else if (policy.cleanup_mode === "anonymize_customer") {
-            const { data: salesToAnon, error: selErr } = await supabase
-              .from("sales")
-              .select(
-                "id, raw_payload, normalized_data, customer_phone, external_reference_number, external_sales_id"
-              )
-              .eq("client_campaign_id", policy.client_campaign_id)
-              .lt("sale_datetime", cutoffISO)
-              .or(
-                "customer_phone.not.is.null,raw_payload.not.is.null,external_reference_number.not.is.null,external_sales_id.not.is.null"
-              )
-              // Oldest first, batched. Anonymised sales drop out of this filter,
-              // so consecutive nightly runs work through the backlog safely.
-              .order("sale_datetime", { ascending: true })
-              .limit(500);
-
-            if (selErr) {
-              log("WARN", `Error selecting sales for anonymization (campaign ${policy.client_campaign_id}): ${selErr.message}`);
-              continue;
-            }
-
-            if (salesToAnon && salesToAnon.length > 0) {
-              let anonCount = 0;
-              let skippedUnmapped = 0;
-              let extRefsCleared = 0;
-              let extSalesIdsCleared = 0;
-              let commissionsThisCampaign = 0;
-              let normalizedThisCampaign = 0;
-
-              for (const sale of salesToAnon) {
-                const saleId = sale.id as string;
-                const payload = sale.raw_payload;
-
-                // --- 1) Safeguard: only touch fully mapped sales ---
-                const { data: items, error: itemsErr } = await supabase
-                  .from("sale_items")
-                  .select("id, needs_mapping, mapped_commission, adversus_external_id, adversus_product_title")
-                  .eq("sale_id", saleId);
-
-                if (itemsErr) {
-                  log("WARN", `Could not read sale_items for sale ${saleId}: ${itemsErr.message}`);
-                  skippedUnmapped++;
-                  continue;
-                }
-
-                // Commission present only in the payload lines (e.g. Relatel
-                // totalProvision)? Persist it to sale_items first.
-                const payloadCommissions = extractPayloadLineCommissions(payload);
-                for (const item of items ?? []) {
-                  if (item.mapped_commission !== null && item.mapped_commission !== undefined) continue;
-                  const match =
-                    payloadCommissions.find(
-                      (l) => l.lineId && item.adversus_external_id && l.lineId === String(item.adversus_external_id)
-                    ) ??
-                    payloadCommissions.find(
-                      (l) => l.title && item.adversus_product_title && l.title === item.adversus_product_title
-                    );
-                  if (!match) continue;
-
-                  const { error: ciErr } = await db
-                    .from("sale_items")
-                    .update({ mapped_commission: match.commission })
-                    .eq("id", item.id);
-
-                  if (ciErr) {
-                    log("WARN", `Could not backfill commission on sale_item ${item.id}: ${ciErr.message}`);
-                  } else {
-                    item.mapped_commission = match.commission;
-                    commissionsThisCampaign++;
-                  }
-                }
-
-                const unmapped = (items ?? []).some(
-                  (i) => i.needs_mapping === true || i.mapped_commission === null || i.mapped_commission === undefined
-                );
-                if (!items || items.length === 0 || unmapped) {
-                  skippedUnmapped++;
-                  log("INFO", `Skipping sale ${saleId} — sale_items not fully mapped`);
-                  continue;
-                }
-
-                // --- 2) Wipe external customer references at the deadline ---
-                // OPP number and Sales ID are on the personal-data positive list:
-                // the client can look them up in their own system. They are kept
-                // untouched inside the retention window (cancellation matching)
-                // and cleared here, together with customer_phone and raw_payload.
-                const patch: Record<string, unknown> = {
-                  customer_phone: null,
-                  customer_company: "Anonymiseret",
-                  raw_payload: null,
-                };
-
-                if (sale.external_reference_number) {
-                  patch.external_reference_number = null;
-                  extRefsCleared++;
-                }
-                if (sale.external_sales_id) {
-                  patch.external_sales_id = null;
-                  extSalesIdsCleared++;
-                }
-
-                // --- 3) Strip identity keys from normalized_data ---
-                const stripped = stripKeys(sale.normalized_data, NORMALIZED_IDENTITY_KEYS);
-                if (stripped.changed) {
-                  patch.normalized_data = stripped.result;
-                  normalizedThisCampaign += stripped.removed.length;
-                }
-
-                const { error: updErr } = await db.from("sales").update(patch).eq("id", saleId);
-
-                if (updErr) {
-                  log("WARN", `Failed to anonymize sale ${saleId}: ${updErr.message}`);
-                } else {
-                  anonCount++;
-                }
-              }
-
-              campaignSalesAnonymized += anonCount;
-              campaignSalesSkippedUnmapped += skippedUnmapped;
-              externalRefsCleared += extRefsCleared;
-              externalSalesIdsCleared += extSalesIdsCleared;
-              commissionsBackfilled += commissionsThisCampaign;
-              normalizedKeysStripped += normalizedThisCampaign;
-              campaignResults.push({
-                campaign_id: policy.client_campaign_id,
-                mode: "anonymize_customer",
-                count: anonCount,
-                skipped_unmapped: skippedUnmapped,
-                external_reference_number_cleared: extRefsCleared,
-                external_sales_id_cleared: extSalesIdsCleared,
-                commissions_backfilled: commissionsThisCampaign,
-                normalized_stripped: normalizedThisCampaign,
-              });
-              log(
-                "INFO",
-                `Campaign ${policy.client_campaign_id}: anonymized ${anonCount}, skipped_unmapped ${skippedUnmapped}`
-              );
-            }
+            // Owned by the daily pg_cron job `gdpr-campaign-sales-cleanup`, which
+            // calls public.gdpr_run_campaign_sales_cleanup() directly in Postgres.
+            // Doing it here as well would double-log and exceeded this function's
+            // CPU budget on the real sales volume, so it is skipped.
+            log(
+              "INFO",
+              `Campaign ${policy.client_campaign_id}: anonymize_customer handled by pg_cron job gdpr-campaign-sales-cleanup — skipping here`
+            );
           }
         }
+
 
       } else {
         log("INFO", "No active campaign retention policies found");
