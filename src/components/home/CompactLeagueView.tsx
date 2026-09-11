@@ -118,7 +118,7 @@ export function CompactLeagueView() {
                       />
                     )}
                     <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
-                      {formatPoints(standing.total_points || 0)}
+                      {formatProvision(Number(standing.total_provision) || 0)}
                     </span>
                   </div>
                 </div>
