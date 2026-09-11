@@ -95,7 +95,7 @@ export function PlayerProfileCard({
 
   const metaParts = [
     person.jobTitle || "Medarbejder",
-    person.teamName || "Intet team",
+    person.teamName,
     formatTenure(person.employmentStartDate),
   ].filter(Boolean) as string[];
 
