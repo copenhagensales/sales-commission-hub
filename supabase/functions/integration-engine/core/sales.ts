@@ -629,7 +629,7 @@ async function processSalesBatch(
     processed = 0
   }
 
-  return { processed, errors, identityFieldsStripped, identityStrippedSales }
+  return { processed, errors }
 }
 
 export async function processSales(
