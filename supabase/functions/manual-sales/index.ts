@@ -416,6 +416,9 @@ serve(async (req) => {
               channel_key: channel.key,
               subject_id: subjectId || null,
               campaign_name: r.kampagne ?? null,
+              // Mødetype gemmes under samme feltnavn som prissætningsreglerne bruger på
+              // øvrige produkter, så regelmotoren kan matche den uændret.
+              ...(meetingType ? { data: { "Hvilket type møde": meetingType } } : {}),
             },
           })
           .select("id")
@@ -443,7 +446,33 @@ serve(async (req) => {
         existingPhones.add(phone);
         seenPhones.add(phone);
         if (subjectId) existingSubjects.add(subjectId);
+        createdSaleIds.push(sale.id);
         created += 1;
+      }
+
+      // Lad den eksisterende prissætningsmotor sætte provision/omsætning på de nye salg,
+      // så regler (fx mødetype) gælder. Fejler kaldet, beholder salgene grundprisen.
+      if (!dryRun && createdSaleIds.length > 0) {
+        try {
+          const res = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/rematch-pricing-rules`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ sale_ids: createdSaleIds }),
+            },
+          );
+          if (!res.ok) {
+            console.error(
+              `[manual-sales] rematch-pricing-rules fejlede [${res.status}]: ${await res.text()}`,
+            );
+          }
+        } catch (e) {
+          console.error("[manual-sales] rematch-pricing-rules kunne ikke kaldes:", e);
+        }
       }
 
       return json(200, {
