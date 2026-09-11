@@ -15894,6 +15894,7 @@ export type Database = {
         }
         Returns: Json
       }
+      gdpr_run_dialer_calls_cleanup: { Args: never; Returns: Json }
       generate_access_code: { Args: never; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
