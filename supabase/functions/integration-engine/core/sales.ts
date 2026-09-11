@@ -3,13 +3,9 @@ import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
 import {
-  createFreetextStripper,
-  type FreetextStripper,
-} from "../../_shared/freetext-runtime.ts"
-import {
-  stripIdentityFromPiiFields,
-  stripNormalizedIdentity,
-} from "../../_shared/normalized-identity.ts"
+  createIngestionFilter,
+  type IngestionFilter,
+} from "../../_shared/ingestion-filter-runtime.ts"
 
 /**
  * Check if a condition value is a NumericCondition object
