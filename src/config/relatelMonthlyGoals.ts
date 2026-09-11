@@ -67,6 +67,7 @@ export const RELATEL_MONTHLY_GOALS: Record<string, RelatelMonthlyGoal> = {
       "Samuel Juul": 30,
       "Simon Sejer Linddal Sørensen": 40,
       "Thorbjørn Mindedal Weichert": 70,
+      "William Sean Maare Bai": 50,
     },
     excludeEmployeeIds: [],
   },
