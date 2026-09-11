@@ -207,10 +207,14 @@ export function useFeedReactions(targetKeys: string[]) {
   const getReactions = useCallback(
     (targetKey: string): FeedReactionSummary[] => {
       const rows = (reactionsQuery.data || []).filter((r) => r.target_key === targetKey);
-      return FEED_EMOJIS.map(({ key }) => {
-        const matching = rows.filter((r) => r.emoji === key);
+      const order: string[] = [];
+      rows.forEach((r) => {
+        if (!order.includes(r.emoji)) order.push(r.emoji);
+      });
+      return order.map((emoji) => {
+        const matching = rows.filter((r) => r.emoji === emoji);
         return {
-          emoji: key,
+          emoji,
           count: matching.length,
           names: matching.map((r) => lookupName(r.user_id)),
           mine: !!myUserId && matching.some((r) => r.user_id === myUserId),
