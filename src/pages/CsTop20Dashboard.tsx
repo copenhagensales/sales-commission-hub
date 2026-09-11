@@ -39,35 +39,38 @@ const getShortTeamName = (teamName?: string | null) => {
   return teamName.split(' ')[0];
 };
 
-// Get team badge styling based on team name - high contrast for all views
+// Get team badge styling based on team name.
+// Palette is chosen so hues are clearly distinct from each other and text
+// always has strong contrast against its own background (dark text on light hues).
 const getTeamBadgeStyle = (teamName: string | null | undefined): string => {
+  const base = 'uppercase tracking-wide ring-1 ring-inset ring-black/20';
   if (!teamName) return '';
   const lower = teamName.toLowerCase();
-  
+
   if (lower.includes('tdc')) {
-    return 'bg-red-500 text-white';
+    return `${base} bg-red-600 text-white`;
   }
   if (lower.includes('eesy')) {
-    return 'bg-violet-500 text-white';
+    return `${base} bg-violet-600 text-white`;
   }
   if (lower.includes('relatel')) {
-    return 'bg-amber-500 text-white';
+    return `${base} bg-amber-300 text-amber-950`;
   }
   if (lower.includes('united')) {
-    return 'bg-indigo-500 text-white';
+    return `${base} bg-sky-400 text-sky-950`;
   }
   if (lower.includes('field')) {
-    return 'bg-emerald-500 text-white';
+    return `${base} bg-lime-300 text-lime-950`;
   }
   if (lower.includes('tryg')) {
-    return 'bg-teal-500 text-white';
+    return `${base} bg-emerald-600 text-white`;
   }
   if (lower.includes('ase')) {
-    return 'bg-pink-500 text-white';
+    return `${base} bg-pink-500 text-white`;
   }
-  
-  // Default gray
-  return 'bg-slate-500 text-white';
+
+  // Default neutral
+  return `${base} bg-slate-200 text-slate-900`;
 };
 
 // Hook for fetching custom period leaderboard data through RPC (bypasses sales RLS for dashboard users)
