@@ -5,8 +5,8 @@
  * useEmployeeProfileStats. Hooken er delt via React Query-cachen, så hover
  * udløser ingen ekstra forespørgsler.
  *
- * På enheder uden mus (touch/mobil) findes hover ikke. Der bruges derfor en
- * Popover, som åbnes ved tryk, så kortet også kan læses på telefon og tablet.
+ * På enheder uden mus (touch/mobil) findes hover ikke. Der vises kortet derfor
+ * i en centreret dialog ved tryk, så hele kortet kan læses og scrolles.
  */
 import { ReactNode, useEffect, useState } from "react";
 import {
@@ -14,11 +14,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useEmployeeProfileStats } from "@/hooks/useEmployeeProfileStats";
 import { PlayerProfileCard } from "./PlayerProfileCard";
 
@@ -47,9 +43,6 @@ function useHasHover() {
   return hasHover;
 }
 
-const CONTENT_CLASS =
-  "w-auto max-w-[calc(100vw-24px)] max-h-[85vh] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none";
-
 export function PlayerProfileHoverCard({
   employeeId,
   children,
@@ -71,21 +64,15 @@ export function PlayerProfileHoverCard({
 
   if (!hasHover) {
     return (
-      <Popover>
-        <PopoverTrigger asChild>{children}</PopoverTrigger>
-        <PopoverContent
-          side="bottom"
-          align="center"
-          sideOffset={10}
-          collisionPadding={12}
-          avoidCollisions
+      <Dialog>
+        <DialogTrigger asChild>{children}</DialogTrigger>
+        <DialogContent
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className={CONTENT_CLASS}
+          className="w-auto max-w-[calc(100vw-24px)] max-h-[88vh] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:text-white"
         >
-
           {card}
-        </PopoverContent>
-      </Popover>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -98,7 +85,7 @@ export function PlayerProfileHoverCard({
         sideOffset={12}
         collisionPadding={16}
         avoidCollisions
-        className={CONTENT_CLASS}
+        className="w-auto max-w-[calc(100vw-24px)] max-h-[85vh] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none"
       >
         {card}
       </HoverCardContent>
