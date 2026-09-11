@@ -138,35 +138,38 @@ export function PlayerProfileCard({
       className={className}
       aria-label={`Spillerprofil for ${person.fullName}`}
       style={{
+        width: "min(420px, calc(100vw - 28px))",
+        maxWidth: "100%",
         borderRadius: 24,
         overflow: "hidden",
         background: ONYX,
         backgroundImage: `repeating-linear-gradient(to right, ${GRID_LINE} 0 1px, transparent 1px 48px), repeating-linear-gradient(to bottom, ${GRID_LINE} 0 1px, transparent 1px 48px)`,
         color: TEXT_PRIMARY,
         fontVariantNumeric: "tabular-nums",
+        boxShadow: "0 24px 60px -20px hsl(0 0% 0% / 0.55)",
       }}
     >
       {/* 1) Identitet */}
       <header
         style={{
-          padding: "22px 22px 20px",
+          padding: `${PAD_V} ${PAD_H} calc(${PAD_V} - 2px)`,
           background: `radial-gradient(120% 120% at 0% 0%, hsl(var(--cph-emerald) / 0.16), transparent 60%)`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div
             aria-hidden="true"
             style={{
-              width: 72,
-              height: 72,
-              flex: "0 0 72px",
+              width: AVATAR,
+              height: AVATAR,
+              flex: `0 0 ${AVATAR}`,
               borderRadius: "50%",
               background: EMERALD,
               color: ONYX,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 23,
+              fontSize: "clamp(18px, 5vw, 23px)",
               fontWeight: 800,
               boxShadow: `0 0 0 3px hsl(var(--cph-emerald) / 0.35)`,
               backgroundImage: person.avatarUrl
@@ -183,11 +186,12 @@ export function PlayerProfileCard({
           <div style={{ minWidth: 0 }}>
             <h3
               style={{
-                fontSize: 24,
+                fontSize: "clamp(19px, 5.2vw, 24px)",
                 fontWeight: 800,
                 lineHeight: 1.15,
                 margin: 0,
                 color: TEXT_PRIMARY,
+                overflowWrap: "anywhere",
               }}
             >
               {person.fullName || "Ukendt"}
@@ -198,12 +202,14 @@ export function PlayerProfileCard({
                 fontSize: 13,
                 fontWeight: 400,
                 color: TEXT_SECONDARY,
+                overflowWrap: "anywhere",
               }}
             >
               {metaParts.join(" · ")}
             </p>
           </div>
         </div>
+
 
         {(person.clients.length > 0 || leagueChip) && (
           <ul
