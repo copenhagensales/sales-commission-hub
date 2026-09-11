@@ -7055,6 +7055,8 @@ export type Database = {
           club_200_count: number
           club_50_count: number
           computed_at: string
+          current_streak_days: number
+          current_streak_start: string | null
           employee_id: string
           league_best_division: number | null
           league_round_wins: number
@@ -7080,6 +7082,8 @@ export type Database = {
           club_200_count?: number
           club_50_count?: number
           computed_at?: string
+          current_streak_days?: number
+          current_streak_start?: string | null
           employee_id: string
           league_best_division?: number | null
           league_round_wins?: number
@@ -7105,6 +7109,8 @@ export type Database = {
           club_200_count?: number
           club_50_count?: number
           computed_at?: string
+          current_streak_days?: number
+          current_streak_start?: string | null
           employee_id?: string
           league_best_division?: number | null
           league_round_wins?: number

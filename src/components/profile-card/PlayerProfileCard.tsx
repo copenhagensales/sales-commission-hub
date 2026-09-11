@@ -38,9 +38,11 @@ interface RecordRow {
   label: string;
   value: string;
   meta: string;
-  hint?: string;
   icon: JSX.Element;
   bars?: number;
+  /** Antal af de sidste felter der markeres som igangværende stribe. */
+  activeBars?: number;
+  activeLabel?: string;
 }
 
 /** Små inline-ikoner så kortet kan bruges uafhængigt af ikonbiblioteket. */
@@ -92,6 +94,7 @@ export function PlayerProfileCard({
   ].filter(Boolean) as string[];
 
   const streakDays = s?.longest_streak_days ?? 0;
+  const currentStreak = Math.min(s?.current_streak_days ?? 0, streakDays);
 
   const records: RecordRow[] = [
     {
@@ -107,9 +110,13 @@ export function PlayerProfileCard({
       meta:
         (streakDays > 0 ? formatDateSpan(s?.streak_start, s?.streak_end) : null) ??
         "ikke sat endnu",
-      hint: "Sammenhængende dage med mindst ét salg. Godkendt fravær og dage uden planlagt vagt springes over og bryder ikke striben.",
       icon: <Icon path={ICON_FLAME} />,
       bars: streakDays,
+      activeBars: currentStreak,
+      activeLabel:
+        currentStreak > 0
+          ? `Lige nu: ${count(currentStreak)} ${currentStreak === 1 ? "dag" : "dage"} i træk`
+          : undefined,
     },
   ];
 
@@ -401,17 +408,16 @@ export function PlayerProfileCard({
                     >
                       {r.meta}
                     </p>
-                    {r.hint && (
+                    {r.activeLabel && (
                       <p
                         style={{
                           margin: "4px 0 0",
                           fontSize: 13,
-                          fontWeight: 400,
-                          color: TEXT_SECONDARY,
-                          maxWidth: 300,
+                          fontWeight: 800,
+                          color: EMERALD,
                         }}
                       >
-                        {r.hint}
+                        {r.activeLabel}
                       </p>
                     )}
                   </div>
@@ -440,17 +446,29 @@ export function PlayerProfileCard({
                     height: 18,
                   }}
                 >
-                  {Array.from({ length: Math.min(r.bars, 30) }).map((_, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        flex: "1 1 0",
-                        height: 12,
-                        borderRadius: 4,
-                        background: "hsl(var(--cph-emerald) / 0.55)",
-                      }}
-                    />
-                  ))}
+                  {(() => {
+                    const shown = Math.min(r.bars ?? 0, 30);
+                    const active = Math.min(r.activeBars ?? 0, shown);
+                    return Array.from({ length: shown }).map((_, i) => {
+                      const isActive = i >= shown - active;
+                      return (
+                        <span
+                          key={i}
+                          style={{
+                            flex: "1 1 0",
+                            height: isActive ? 18 : 12,
+                            borderRadius: 4,
+                            background: isActive
+                              ? EMERALD
+                              : "hsl(var(--cph-emerald) / 0.22)",
+                            boxShadow: isActive
+                              ? `0 0 8px hsl(var(--cph-emerald) / 0.55)`
+                              : undefined,
+                          }}
+                        />
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>
@@ -485,17 +503,6 @@ export function PlayerProfileCard({
           />
           Klubber
         </h4>
-        <p
-          style={{
-            margin: "0 0 12px",
-            fontSize: 13,
-            fontWeight: 400,
-            color: TEXT_SECONDARY,
-          }}
-        >
-          Antal gange med mindst 50.000 / 100.000 / 200.000 kr i provision i én
-          lønperiode (15. til 14.).
-        </p>
 
         <ul
           style={{
@@ -564,20 +571,6 @@ export function PlayerProfileCard({
                     }}
                   >
                     ×{c.times}
-                  </span>
-                )}
-                {earned && c.threshold === 200 && (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 400,
-                      textAlign: "center",
-                      color: TEXT_SECONDARY,
-                    }}
-                  >
-                    {club200Members === 1
-                      ? "1 medlem i huset"
-                      : `${count(club200Members)} medlemmer i huset`}
                   </span>
                 )}
               </li>
