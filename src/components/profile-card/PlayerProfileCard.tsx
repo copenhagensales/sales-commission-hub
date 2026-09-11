@@ -573,20 +573,6 @@ export function PlayerProfileCard({
                     ×{c.times}
                   </span>
                 )}
-                {earned && c.threshold === 200 && (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 400,
-                      textAlign: "center",
-                      color: TEXT_SECONDARY,
-                    }}
-                  >
-                    {club200Members === 1
-                      ? "1 medlem i huset"
-                      : `${count(club200Members)} medlemmer i huset`}
-                  </span>
-                )}
               </li>
             );
           })}
