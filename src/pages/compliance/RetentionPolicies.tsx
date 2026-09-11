@@ -86,6 +86,21 @@ export default function RetentionPolicies() {
     },
   });
 
+  // Status for den natlige rensning af salg (aggregat, ingen persondata).
+  const { data: cleanupStatus } = useQuery({
+    queryKey: ["gdpr-campaign-sales-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("gdpr_campaign_sales_status");
+      if (error) throw error;
+      return (data ?? null) as {
+        overdue_sales: number;
+        last_run_at: string | null;
+        last_run_affected: number | null;
+      } | null;
+    },
+  });
+
+
   const dataUpsertMutation = useMutation({
     mutationFn: async (params: {
       data_type: string;
@@ -234,20 +249,31 @@ export default function RetentionPolicies() {
           </p>
         </div>
 
-        {/* Warning banner */}
+        {/* Status banner */}
         <Card className="border-yellow-500/30 bg-yellow-500/5">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 shrink-0" />
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">
-                Automatisk sletning er deaktiveret systemwide
+                Rensningen kører automatisk hver nat
               </p>
               <p className="text-sm text-muted-foreground">
-                Denne side forbereder politikker til fremtidig aktivering. Selv hvis du sætter en politik til "Aktiv" her, vil cleanup-jobbet ikke køre før det eksplicit aktiveres i koden. Ingen data slettes endnu.
+                Sætter du en politik til "Aktiv", bliver den anvendt på rigtige data ved næste natlige kørsel.
+                Kundeoplysninger på salg anonymiseres — salgstal, provision og rapporter berøres ikke.
+                Politikker sat til "Slet alt" fjerner hele salgsrækken permanent.
               </p>
+              {cleanupStatus && (
+                <p className="text-sm text-muted-foreground">
+                  Status nu: {cleanupStatus.overdue_sales.toLocaleString("da-DK")} salg afventer rensning
+                  {cleanupStatus.last_run_at
+                    ? ` · sidste kørsel ${new Date(cleanupStatus.last_run_at).toLocaleString("da-DK")} (${(cleanupStatus.last_run_affected ?? 0).toLocaleString("da-DK")} anonymiseret)`
+                    : " · rensningen har endnu ikke kørt"}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
+
 
         {/* Data preservation info */}
         <Card className="border-primary/20 bg-primary/5">
