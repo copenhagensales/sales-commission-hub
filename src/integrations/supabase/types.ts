@@ -4599,6 +4599,27 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_control_points: {
+        Row: {
+          check_key: string
+          effective_from: string
+          note: string | null
+          set_at: string
+        }
+        Insert: {
+          check_key: string
+          effective_from: string
+          note?: string | null
+          set_at?: string
+        }
+        Update: {
+          check_key?: string
+          effective_from?: string
+          note?: string | null
+          set_at?: string
+        }
+        Relationships: []
+      }
       compliance_notification_recipients: {
         Row: {
           created_at: string
@@ -16035,6 +16056,10 @@ export type Database = {
       }
       compliance_run_and_log: { Args: { p_by?: string }; Returns: Json }
       compliance_run_checks: { Args: never; Returns: Json }
+      compliance_since: {
+        Args: { p_fallback?: string; p_key: string }
+        Returns: string
+      }
       consume_password_reset_token: {
         Args: { _token_hash: string }
         Returns: boolean
@@ -16094,8 +16119,20 @@ export type Database = {
         }
         Returns: Json
       }
+      gdpr_freetext_field_hits: {
+        Args: { p_payload: Json }
+        Returns: {
+          container: string
+          field_label: string
+          rule: string
+        }[]
+      }
       gdpr_run_campaign_sales_cleanup: { Args: never; Returns: Json }
       gdpr_run_dialer_calls_cleanup: { Args: never; Returns: Json }
+      gdpr_strip_freetext_sales: {
+        Args: { p_days?: number; p_dry_run?: boolean }
+        Returns: Json
+      }
       generate_access_code: { Args: never; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {

@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sanitizePayload } from "../_shared/sanitize.ts";
-import { stripNoteFields } from "../_shared/strip-notes.ts";
+import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
+import { createFreetextStripper } from "../_shared/freetext-runtime.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
@@ -122,6 +123,14 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // GDPR: fritekst må aldrig persisteres — regel A (feltnavn) + regel B (værdi)
+  const freetext = await createFreetextStripper(supabase, {
+    integration: 'adversus',
+    container: 'raw_payload',
+    blockedLabels: BLOCKED_FIELD_LABELS,
+    triggeredBy: 'adversus-webhook',
+  });
+
   try {
     // Log raw request details before parsing
     const rawBody = await req.text();
@@ -214,7 +223,7 @@ serve(async (req) => {
       .insert({
         external_id: externalId,
         event_type: body.type || 'result',
-        payload: stripNoteFields(body),
+        payload: freetext.strip(body),
         processed: false,
         received_at: new Date().toISOString(),
       })
@@ -234,6 +243,7 @@ serve(async (req) => {
         event_id: eventData.id,
         external_id: externalId,
       });
+      await freetext.flush();
       return new Response(
         JSON.stringify({
           success: true,
@@ -446,6 +456,8 @@ serve(async (req) => {
     });
 
     console.log('Webhook processed successfully');
+
+    await freetext.flush();
 
     return new Response(
       JSON.stringify({
