@@ -56,20 +56,10 @@ export function PlayerProfileCard({
 
   const records: RecordRow[] = [
     {
-      label: "Bedste dag",
-      value: kr(s?.best_day_amount ?? null),
-      meta: formatDanishDate(s?.best_day_date) ?? "ikke sat endnu",
-    },
-    {
       label: "Bedste uge",
       value: kr(s?.best_week_amount ?? null),
       meta:
         formatIsoWeek(s?.best_week_iso, s?.best_week_year) ?? "ikke sat endnu",
-    },
-    {
-      label: "Bedste lønperiode",
-      value: kr(s?.best_period_amount ?? null),
-      meta: formatPayPeriod(s?.best_period_start) ?? "ikke sat endnu",
     },
     {
       label: "Længste stribe uden nuldag",
