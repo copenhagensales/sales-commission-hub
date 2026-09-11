@@ -7038,6 +7038,106 @@ export type Database = {
           },
         ]
       }
+      employee_profile_stats: {
+        Row: {
+          avg_per_pay_period: number
+          best_day_amount: number | null
+          best_day_date: string | null
+          best_period_amount: number | null
+          best_period_start: string | null
+          best_week_amount: number | null
+          best_week_iso: number | null
+          best_week_year: number | null
+          club_100_count: number
+          club_200_count: number
+          club_50_count: number
+          computed_at: string
+          employee_id: string
+          league_best_division: number | null
+          league_round_wins: number
+          league_seasons: number
+          longest_streak_days: number
+          pay_periods: number
+          streak_end: string | null
+          streak_start: string | null
+          total_commission: number
+          total_sales: number
+          uses_weekday_fallback: boolean
+        }
+        Insert: {
+          avg_per_pay_period?: number
+          best_day_amount?: number | null
+          best_day_date?: string | null
+          best_period_amount?: number | null
+          best_period_start?: string | null
+          best_week_amount?: number | null
+          best_week_iso?: number | null
+          best_week_year?: number | null
+          club_100_count?: number
+          club_200_count?: number
+          club_50_count?: number
+          computed_at?: string
+          employee_id: string
+          league_best_division?: number | null
+          league_round_wins?: number
+          league_seasons?: number
+          longest_streak_days?: number
+          pay_periods?: number
+          streak_end?: string | null
+          streak_start?: string | null
+          total_commission?: number
+          total_sales?: number
+          uses_weekday_fallback?: boolean
+        }
+        Update: {
+          avg_per_pay_period?: number
+          best_day_amount?: number | null
+          best_day_date?: string | null
+          best_period_amount?: number | null
+          best_period_start?: string | null
+          best_week_amount?: number | null
+          best_week_iso?: number | null
+          best_week_year?: number | null
+          club_100_count?: number
+          club_200_count?: number
+          club_50_count?: number
+          computed_at?: string
+          employee_id?: string
+          league_best_division?: number | null
+          league_round_wins?: number
+          league_seasons?: number
+          longest_streak_days?: number
+          pay_periods?: number
+          streak_end?: string | null
+          streak_start?: string | null
+          total_commission?: number
+          total_sales?: number
+          uses_weekday_fallback?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_profile_stats_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_profile_stats_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_profile_stats_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_referrals: {
         Row: {
           applied_position: string | null
@@ -16371,6 +16471,8 @@ export type Database = {
         Args: { _salary_type: string }
         Returns: string
       }
+      pay_period_start: { Args: { ts: string }; Returns: string }
+      recalc_employee_profile_stats: { Args: never; Returns: number }
       recalculate_coaching_due_dates_for_employee: {
         Args: { p_employee_id: string }
         Returns: number

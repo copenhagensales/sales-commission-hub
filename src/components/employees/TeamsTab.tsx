@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 import { TeamTimeClockTab } from "./TeamTimeClockTab";
 import { TeamAssignEmployeesSubTab } from "./TeamAssignEmployeesSubTab";
+import { PlayerProfileExplorer } from "@/components/profile-card/PlayerProfileExplorer";
 import { format, isToday, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { useTeamAssistantLeaders, getTeamAssistantIds, useUpdateTeamAssistants } from "@/hooks/useTeamAssistantLeaders";
@@ -62,7 +63,8 @@ export function TeamsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [clientSearch, setClientSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"teams" | "employees">("teams");
+  const [viewMode, setViewMode] = useState<"teams" | "employees" | "profiles">("teams");
+  const [profileTeamId, setProfileTeamId] = useState<string | null>(null);
   
   // Move team dialog state
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
@@ -650,6 +652,15 @@ export function TeamsTab() {
               <Users className="h-4 w-4 mr-2" />
               Medarbejdere
             </Button>
+            <Button
+              variant={viewMode === "profiles" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("profiles")}
+              className="h-8"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Profiler
+            </Button>
           </div>
           <Button variant="outline" onClick={() => openMoveDialog()}>
             <ArrowRightLeft className="h-4 w-4 mr-2" />
@@ -936,6 +947,43 @@ export function TeamsTab() {
             </div>
           )}
         </>
+      )}
+
+      {/* Profil-view: liste + spillerprofil-kort */}
+      {viewMode === "profiles" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {teams
+              .filter((team) => getTeamMembers(team.id).length > 0)
+              .map((team, index) => {
+                const isActive = (profileTeamId ?? null) === team.id || (!profileTeamId && index === 0);
+                return (
+                  <Button
+                    key={team.id}
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setProfileTeamId(team.id)}
+                  >
+                    {team.name}
+                  </Button>
+                );
+              })}
+          </div>
+          {(() => {
+            const teamsWithMembers = teams.filter((team) => getTeamMembers(team.id).length > 0);
+            const activeTeam =
+              teamsWithMembers.find((t) => t.id === profileTeamId) ?? teamsWithMembers[0];
+            if (!activeTeam) {
+              return <p className="text-sm text-muted-foreground">Ingen teams med medarbejdere.</p>;
+            }
+            const memberIds = getTeamMembers(activeTeam.id).filter((id) =>
+              employees.some((emp) => emp.id === id)
+            );
+            return (
+              <PlayerProfileExplorer employeeIds={memberIds} metricLabel="Provision i alt" />
+            );
+          })()}
+        </div>
       )}
 
       {/* Employee view - grouped by teams */}
