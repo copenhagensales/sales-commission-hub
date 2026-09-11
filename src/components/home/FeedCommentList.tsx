@@ -57,7 +57,13 @@ export function FeedCommentList({
   return (
     <div className="space-y-2">
       {visible.length > 0 && (
-        <ul className="space-y-1">
+        <ul
+          className={
+            expanded
+              ? "max-h-32 space-y-1 overflow-y-auto pr-1"
+              : "max-h-20 space-y-1 overflow-hidden"
+          }
+        >
           {visible.map((comment) => (
             <li key={comment.id} className="flex items-start gap-2 text-[13px] text-foreground">
               <span className="min-w-0 flex-1">
