@@ -87,7 +87,7 @@ export function CompactLeagueView() {
           <div className="divide-y divide-[hsl(var(--cph-onyx)/0.1)] border-t border-[hsl(var(--cph-onyx)/0.1)]">
             {visibleStandings.map((standing, index) => {
               const isMe = standing.employee_id === currentEmployeeId;
-              const rank = standing.overall_rank || index + 1;
+              const rank = index + 1;
               const name = formatPlayerName(standing.employee);
 
               return (
