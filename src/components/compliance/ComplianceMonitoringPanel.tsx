@@ -11,6 +11,7 @@ import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import {
   useAcknowledgeAlert,
   useComplianceAlerts,
+  useComplianceMailPayload,
   useLastComplianceRun,
   useRunComplianceChecks,
   type ComplianceAlert,
