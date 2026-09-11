@@ -52,14 +52,16 @@ export function CelebrationStrip({ celebrations }: CelebrationStripProps) {
                 ) : (
                   <Award className="mt-0.5 h-5 w-5 flex-none text-warning" aria-hidden="true" />
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{celebration.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {celebration.type === "anniversary"
-                      ? `${celebration.years} års jubilæum`
-                      : "Tillykke med fødselsdagen!"}
-                  </p>
-                </div>
+                <PlayerProfileHoverCard employeeId={celebration.employeeId}>
+                  <div className="min-w-0 flex-1 cursor-default">
+                    <p className="truncate font-medium text-foreground">{celebration.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {celebration.type === "anniversary"
+                        ? `${celebration.years} års jubilæum`
+                        : "Tillykke med fødselsdagen!"}
+                    </p>
+                  </div>
+                </PlayerProfileHoverCard>
               </div>
 
               <div className="mt-3 space-y-2">
