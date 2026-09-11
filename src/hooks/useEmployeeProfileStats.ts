@@ -23,6 +23,8 @@ export interface EmployeeProfileStats {
   longest_streak_days: number;
   streak_start: string | null;
   streak_end: string | null;
+  current_streak_days: number;
+  current_streak_start: string | null;
   club_50_count: number;
   club_100_count: number;
   club_200_count: number;
