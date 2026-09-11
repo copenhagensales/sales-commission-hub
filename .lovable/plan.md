@@ -25,6 +25,12 @@ I `supabase/functions/integration-engine/core/calls.ts`:
 
 Ingen ændring i hvor mange opkald der importeres, og ingen ændring i eksisterende beregninger.
 
+### Hvorfor vi ikke bare stopper import af opkald uden salg
+
+Det ville slå opkaldsstatistikken i stykker. Svarprocent, hitrate og "salg pr. opkald" regnes som salg divideret med alle opkald — uden opkaldene uden salg bliver nævneren væk, og hitrate ville altid vise 100 %. Aktivitetsopfølgning pr. sælger (hvor mange opkald og hvor lang samtaletid) forsvinder også, og både dashboards, TV-boards og head-to-head bygger på netop de tal. Vi kan heller ikke se, om et opkald førte til salg, før efter det er hentet.
+
+Løsningen er derfor ikke færre opkald, men færre oplysninger pr. opkald: vi henter samme antal opkald, men gemmer kun tidspunkt, varighed, status, retning, agent og kampagne. Så er der intet personhenførbart tilbage, og statistikken er intakt.
+
 ## Del 2 — Engangsoprydning af det der allerede ligger
 
 Tre kontrollerede opdateringer på `dialer_calls`, hver med optælling før og efter:
