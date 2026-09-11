@@ -2,15 +2,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { 
-  useActiveSeason, 
-   
-  useQualificationStandings,
-  useEnrollmentCount,
-  type QualificationStanding 
-} from "@/hooks/useLeagueData";
-import { useCurrentRound } from "@/hooks/useLeagueActiveData";
-import { useLeagueRoundLeaders } from "@/hooks/useLeagueRoundLeaders";
+import { useActiveSeason, useEnrollmentCount } from "@/hooks/useLeagueData";
+import { useSeasonStandings } from "@/hooks/useLeagueActiveData";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
@@ -21,45 +14,30 @@ import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileH
 export function CompactLeagueView() {
   const { data: season } = useActiveSeason();
   const { data: currentEmployeeId } = useCurrentEmployeeId();
-  const { data: allStandings = [] } = useQualificationStandings(season?.id);
+  const { data: seasonStandings = [] } = useSeasonStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
-  const { data: currentRound } = useCurrentRound(season?.id);
-  const { data: roundLeaders = {} } = useLeagueRoundLeaders(currentRound);
   const lookupAvatar = useAvatarLookup();
 
-  // Top 3 for den igangvaerende runde (denne uge), uanset om man selv er tilmeldt
-  const weeklyTop3: QualificationStanding[] = allStandings
-    .map((standing) => {
-      const weekly = roundLeaders[standing.employee_id];
-      return {
-        ...standing,
-        current_provision: weekly?.provision ?? 0,
-        deals_count: weekly?.deals ?? 0,
-      };
-    })
-    .sort((a, b) => (b.current_provision || 0) - (a.current_provision || 0))
+  // Samlet top 3 i sæsonen — samme pointstilling som ligasiden viser
+  const pointsTop3 = [...seasonStandings]
+    .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
     .slice(0, 3);
 
   const leagueTargetKey = (employeeId: string) =>
     buildTargetKey("league_round", [season?.id ?? "none", employeeId]);
 
-  const podiumKeys = weeklyTop3.map((standing) => leagueTargetKey(standing.employee_id));
+  const podiumKeys = pointsTop3.map((standing) => leagueTargetKey(standing.employee_id));
 
   const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
 
-  const formatProvision = (amount: number) => {
-    return new Intl.NumberFormat("da-DK", {
-      style: "decimal",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount) + " kr";
-  };
+  const formatPoints = (points: number) =>
+    `${new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(points)} pt`;
 
   const isPodium = (rank: number) => rank >= 1 && rank <= 3;
 
   if (!season) return null;
 
-  const visibleStandings = weeklyTop3;
+  const visibleStandings = pointsTop3;
 
 
   const getInitials = (name: string) =>
@@ -76,7 +54,7 @@ export function CompactLeagueView() {
         <div className="flex items-baseline justify-between gap-3">
           <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
             <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
-            Liga · denne uge
+            Liga · samlet top 3
           </CardTitle>
           <span className="text-[13px] text-foreground/70">{enrollmentCount} tilmeldt</span>
         </div>
@@ -124,7 +102,9 @@ export function CompactLeagueView() {
                       {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
                     </p>
                     <p className="text-[13px] text-foreground/70">
-                      {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
+                      {standing.rounds_played
+                        ? `${standing.rounds_played} runder spillet`
+                        : "Ingen runder endnu"}
                     </p>
                   </div>
                   <div className="flex flex-none items-center gap-3">
@@ -138,7 +118,7 @@ export function CompactLeagueView() {
                       />
                     )}
                     <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
-                      {formatProvision(standing.current_provision || 0)}
+                      {formatPoints(standing.total_points || 0)}
                     </span>
                   </div>
                 </div>
