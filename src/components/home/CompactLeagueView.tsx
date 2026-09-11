@@ -12,6 +12,8 @@ import {
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
+import { FeedReactionRow } from "@/components/home/FeedReactionRow";
+import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 
 function getNeighborStandings(
   allStandings: QualificationStanding[],
@@ -60,6 +62,15 @@ export function CompactLeagueView() {
   const { data: allStandings = [] } = useQualificationStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
   const lookupAvatar = useAvatarLookup();
+
+  const leagueTargetKey = (employeeId: string) =>
+    buildTargetKey("league_round", [season?.id ?? "none", employeeId]);
+
+  const podiumKeys = allStandings
+    .slice(0, 3)
+    .map((standing) => leagueTargetKey(standing.employee_id));
+
+  const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
 
   const formatProvision = (amount: number) => {
     return new Intl.NumberFormat("da-DK", {
