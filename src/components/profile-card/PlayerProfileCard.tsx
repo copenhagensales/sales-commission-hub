@@ -38,9 +38,11 @@ interface RecordRow {
   label: string;
   value: string;
   meta: string;
-  hint?: string;
   icon: JSX.Element;
   bars?: number;
+  /** Antal af de sidste felter der markeres som igangværende stribe. */
+  activeBars?: number;
+  activeLabel?: string;
 }
 
 /** Små inline-ikoner så kortet kan bruges uafhængigt af ikonbiblioteket. */
