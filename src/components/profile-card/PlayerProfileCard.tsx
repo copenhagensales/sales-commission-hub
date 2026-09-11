@@ -269,7 +269,7 @@ export function PlayerProfileCard({
       </header>
 
       {/* 2) Topgrafik: de to vigtigste rekorder */}
-      <div style={{ display: "flex", gap: 8, padding: "0 22px" }}>
+      <div style={{ display: "flex", gap: 8, padding: `0 ${PAD_H}` }}>
         {[
           {
             label: "Bedste dag",
@@ -289,7 +289,8 @@ export function PlayerProfileCard({
             style={{
               flex: "1 1 0",
               background: PANEL,
-              padding: "14px 16px 13px",
+              padding: "14px clamp(11px, 3.5vw, 16px) 13px",
+              minWidth: 0,
               borderRadius: 18,
               border: `1px solid ${DIVIDER}`,
               backgroundImage: `radial-gradient(100% 120% at 100% 0%, hsl(var(--cph-emerald) / 0.10), transparent 65%)`,
@@ -314,7 +315,7 @@ export function PlayerProfileCard({
             <p
               style={{
                 margin: "10px 0 0",
-                fontSize: 27,
+                fontSize: "clamp(21px, 6vw, 27px)",
                 fontWeight: 800,
                 lineHeight: 1.05,
                 color: TEXT_PRIMARY,
@@ -337,7 +338,7 @@ export function PlayerProfileCard({
       </div>
 
       {/* 3) Personlige rekorder */}
-      <section style={{ padding: "22px 22px 20px" }}>
+      <section style={{ padding: `${PAD_V} ${PAD_H} calc(${PAD_V} - 2px)` }}>
         <h4
           style={{
             display: "flex",
