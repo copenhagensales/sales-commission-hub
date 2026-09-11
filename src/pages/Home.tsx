@@ -554,34 +554,7 @@ const Home = () => {
 
         {/* Today's Celebrations - Only if there are any */}
         {todayCelebrations.length > 0 && (
-          <Card className="border border-border bg-card rounded-3xl animate-fade-in">
-            <CardContent className="py-4">
-              <div className="flex flex-wrap items-center gap-4">
-                {todayCelebrations.map((celebration, idx) => (
-                  <div 
-                    key={idx}
-                    className="flex items-center gap-3 px-4 py-2 rounded-xl bg-background/80 border border-primary/20"
-                  >
-                    {celebration.type === 'birthday' ? (
-                      <Cake className="w-5 h-5 text-foreground" />
-                    ) : (
-                      <Award className="w-5 h-5 text-warning" />
-                    )}
-                    <div>
-                      <p className="font-medium">{celebration.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {celebration.type === 'anniversary' 
-                          ? `${celebration.years} års jubilæum`
-                          : `Tillykke med fødselsdagen!`
-                        }
-                      </p>
-                    </div>
-                    <PartyPopper className="w-5 h-5 text-foreground" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <CelebrationStrip celebrations={todayCelebrations} />
         )}
 
         {/* ZONE 2: Liga + kommende begivenheder */}
