@@ -54,7 +54,7 @@ export function CompactLeagueView() {
         <div className="flex items-baseline justify-between gap-3">
           <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
             <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
-            Liga · denne uge
+            Liga · samlet top 3
           </CardTitle>
           <span className="text-[13px] text-foreground/70">{enrollmentCount} tilmeldt</span>
         </div>
