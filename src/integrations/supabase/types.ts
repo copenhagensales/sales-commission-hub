@@ -4470,6 +4470,81 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_alert_recipients: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      compliance_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          check_key: string
+          detail: Json
+          first_seen: string
+          id: string
+          last_seen: string
+          note: string | null
+          observed_value: number | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          threshold: number | null
+          title: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          check_key: string
+          detail?: Json
+          first_seen?: string
+          id?: string
+          last_seen?: string
+          note?: string | null
+          observed_value?: number | null
+          resolved_at?: string | null
+          severity: string
+          status?: string
+          threshold?: number | null
+          title: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          check_key?: string
+          detail?: Json
+          first_seen?: string
+          id?: string
+          last_seen?: string
+          note?: string | null
+          observed_value?: number | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold?: number | null
+          title?: string
+        }
+        Relationships: []
+      }
       compliance_area_reviews: {
         Row: {
           area_key: string
@@ -4497,6 +4572,30 @@ export type Database = {
           reviewed_at?: string
           reviewed_by?: string | null
           reviewed_by_name?: string | null
+        }
+        Relationships: []
+      }
+      compliance_check_runs: {
+        Row: {
+          critical_alerts: number
+          id: string
+          open_alerts: number
+          run_at: string
+          triggered_by: string | null
+        }
+        Insert: {
+          critical_alerts: number
+          id?: string
+          open_alerts: number
+          run_at?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          critical_alerts?: number
+          id?: string
+          open_alerts?: number
+          run_at?: string
+          triggered_by?: string | null
         }
         Relationships: []
       }
@@ -9067,6 +9166,48 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           times_used?: number
+        }
+        Relationships: []
+      }
+      ingestion_known_fields: {
+        Row: {
+          container: string
+          decided_at: string | null
+          decided_by: string | null
+          decision: string
+          field_label: string
+          first_seen: string
+          id: string
+          integration: string
+          last_seen: string
+          note: string | null
+          occurrences: number
+        }
+        Insert: {
+          container: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string
+          field_label: string
+          first_seen?: string
+          id?: string
+          integration: string
+          last_seen?: string
+          note?: string | null
+          occurrences?: number
+        }
+        Update: {
+          container?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string
+          field_label?: string
+          first_seen?: string
+          id?: string
+          integration?: string
+          last_seen?: string
+          note?: string | null
+          occurrences?: number
         }
         Relationships: []
       }
@@ -15588,10 +15729,37 @@ export type Database = {
     Views: {
       compliance_afvigelser: {
         Row: {
-          antal: number | null
-          kontrol: string | null
-          kriterium: string | null
-          nr: number | null
+          alarm: string | null
+          alvor: string | null
+          check_key: string | null
+          detaljer: Json | null
+          foerst_set: string | null
+          graense: number | null
+          maalt: number | null
+          sidst_set: string | null
+          status: string | null
+        }
+        Insert: {
+          alarm?: string | null
+          alvor?: string | null
+          check_key?: string | null
+          detaljer?: Json | null
+          foerst_set?: string | null
+          graense?: number | null
+          maalt?: number | null
+          sidst_set?: string | null
+          status?: string | null
+        }
+        Update: {
+          alarm?: string | null
+          alvor?: string | null
+          check_key?: string | null
+          detaljer?: Json | null
+          foerst_set?: string | null
+          graense?: number | null
+          maalt?: number | null
+          sidst_set?: string | null
+          status?: string | null
         }
         Relationships: []
       }
@@ -15853,6 +16021,19 @@ export type Database = {
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
+      compliance_raise: {
+        Args: {
+          p_detail: Json
+          p_key: string
+          p_sev: string
+          p_thr: number
+          p_title: string
+          p_val: number
+        }
+        Returns: undefined
+      }
+      compliance_run_and_log: { Args: { p_by?: string }; Returns: Json }
+      compliance_run_checks: { Args: never; Returns: Json }
       consume_password_reset_token: {
         Args: { _token_hash: string }
         Returns: boolean
@@ -16423,6 +16604,7 @@ export type Database = {
         Args: { p_sale_ids?: string[] }
         Returns: number
       }
+      ingestion_scan_fields: { Args: { p_days?: number }; Returns: number }
       is_active_employee: { Args: { _uid: string }; Returns: boolean }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }

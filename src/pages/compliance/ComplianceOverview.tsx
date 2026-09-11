@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { ComplianceReviewAlert } from "@/components/compliance/ComplianceReviewAlert";
 import { ComplianceReviewPanel } from "@/components/compliance/ComplianceReviewPanel";
+import { ComplianceMonitoringPanel } from "@/components/compliance/ComplianceMonitoringPanel";
 
 export default function ComplianceOverview() {
   const navigate = useNavigate();
@@ -203,6 +204,7 @@ export default function ComplianceOverview() {
           </CardContent>
         </Card>
         {p.canView("menu_compliance_admin") && <ComplianceReviewAlert />}
+        <ComplianceMonitoringPanel />
         {p.canView("menu_compliance_admin") && <ComplianceReviewPanel />}
 
         <div className="grid gap-6 md:grid-cols-3">
