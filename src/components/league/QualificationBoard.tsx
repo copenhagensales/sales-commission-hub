@@ -299,8 +299,12 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
+        {/* Avatar med profilkort ved hover */}
+        <LeaguePlayerAvatar employeeId={standing.employee_id} name={playerName} />
+
         {/* Name – fluid on mobile */}
         <div className="min-w-0 flex-1 sm:w-[220px] sm:flex-none sm:shrink-0">
+
           <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
             {todayProvision > 0 && (
               <span className="relative flex h-1.5 w-1.5 shrink-0">
