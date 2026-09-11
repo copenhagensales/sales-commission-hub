@@ -4,7 +4,7 @@ import {
   DIALER_CALL_METADATA_ALLOWLIST,
   hasDisallowedDialerCallMetadata,
   sanitizeDialerCallMetadata,
-} from "./dialer-call-privacy.ts";
+} from "../../../supabase/functions/_shared/dialer-call-privacy.ts";
 
 describe("sanitizeDialerCallMetadata", () => {
   it("keeps only technical keys and drops identity keys", () => {
