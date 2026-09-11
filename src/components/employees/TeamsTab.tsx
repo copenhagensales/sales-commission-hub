@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 import { TeamTimeClockTab } from "./TeamTimeClockTab";
 import { TeamAssignEmployeesSubTab } from "./TeamAssignEmployeesSubTab";
+import { PlayerProfileExplorer } from "@/components/profile-card/PlayerProfileExplorer";
 import { format, isToday, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { useTeamAssistantLeaders, getTeamAssistantIds, useUpdateTeamAssistants } from "@/hooks/useTeamAssistantLeaders";
