@@ -9,6 +9,8 @@ import {
   useEnrollmentCount,
   type QualificationStanding 
 } from "@/hooks/useLeagueData";
+import { useCurrentRound } from "@/hooks/useLeagueActiveData";
+import { useLeagueRoundLeaders } from "@/hooks/useLeagueRoundLeaders";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
