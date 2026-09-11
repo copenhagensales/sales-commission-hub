@@ -18,60 +18,32 @@ import { FeedReactionRow } from "@/components/home/FeedReactionRow";
 import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
-function getNeighborStandings(
-  allStandings: QualificationStanding[],
-  myEmployeeId: string | null
-): { visibleStandings: QualificationStanding[]; myIndex: number } {
-  if (!myEmployeeId || allStandings.length === 0) {
-    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
-  }
-
-  const myIndex = allStandings.findIndex(s => s.employee_id === myEmployeeId);
-  
-  if (myIndex === -1) {
-    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
-  }
-
-  const total = allStandings.length;
-  
-  if (total <= 5) {
-    return { visibleStandings: allStandings, myIndex };
-  }
-
-  let start = myIndex - 2;
-  let end = myIndex + 3;
-
-  if (start < 0) {
-    start = 0;
-    end = Math.min(5, total);
-  }
-  
-  if (end > total) {
-    end = total;
-    start = Math.max(0, total - 5);
-  }
-
-  return { 
-    visibleStandings: allStandings.slice(start, end), 
-    myIndex: myIndex - start
-  };
-}
-
 export function CompactLeagueView() {
   const { data: season } = useActiveSeason();
-  const { data: enrollment } = useMyEnrollment(season?.id);
-  const isEnrolled = !!enrollment;
   const { data: currentEmployeeId } = useCurrentEmployeeId();
   const { data: allStandings = [] } = useQualificationStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
+  const { data: currentRound } = useCurrentRound(season?.id);
+  const { data: roundLeaders = {} } = useLeagueRoundLeaders(currentRound);
   const lookupAvatar = useAvatarLookup();
+
+  // Top 3 for den igangvaerende runde (denne uge), uanset om man selv er tilmeldt
+  const weeklyTop3: QualificationStanding[] = allStandings
+    .map((standing) => {
+      const weekly = roundLeaders[standing.employee_id];
+      return {
+        ...standing,
+        current_provision: weekly?.provision ?? 0,
+        deals_count: weekly?.deals ?? 0,
+      };
+    })
+    .sort((a, b) => (b.current_provision || 0) - (a.current_provision || 0))
+    .slice(0, 3);
 
   const leagueTargetKey = (employeeId: string) =>
     buildTargetKey("league_round", [season?.id ?? "none", employeeId]);
 
-  const podiumKeys = allStandings
-    .slice(0, 3)
-    .map((standing) => leagueTargetKey(standing.employee_id));
+  const podiumKeys = weeklyTop3.map((standing) => leagueTargetKey(standing.employee_id));
 
   const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
 
@@ -87,9 +59,8 @@ export function CompactLeagueView() {
 
   if (!season) return null;
 
-  const { visibleStandings, myIndex } = isEnrolled
-    ? getNeighborStandings(allStandings, currentEmployeeId || null)
-    : { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+  const visibleStandings = weeklyTop3;
+
 
   const getInitials = (name: string) =>
     name
