@@ -14,7 +14,7 @@ import { CphBoardFrame, CphLeaderboard, type CphKpi } from "@/components/dashboa
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
 import { calculatePayrollPeriod } from "@/lib/calculations";
 import { getDisplayName } from "@/utils/formatting";
-import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
+import { useLiveDashboardAggregates } from "@/hooks/useLiveDashboardAggregates";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAggregatedClientKpis, useAggregatedClientLeaderboards } from "@/hooks/useAggregatedClientCache";
@@ -35,8 +35,9 @@ export interface ClientDashboardConfig {
     showMonth?: boolean;
     /** Show cross-sales in leaderboard + KPI suffixes (default: false) */
     crossSales?: boolean;
-    /** Enable live-mode fallback for custom periods (default: false) */
+    /** Live-mode for custom periods (default: true — set false to disable) */
     liveMode?: boolean;
+
     /**
      * If set, dashboard aggregates KPI + leaderboard cache across these client IDs
      * instead of querying a (non-existent) team-scoped cache.
@@ -75,7 +76,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const showMonth = config.features?.showMonth !== false;
   const showSalesPerHour = config.features?.salesPerHour === true;
   const showCrossSales = config.features?.crossSales === true;
-  const useLiveMode = config.features?.liveMode === true;
+  const useLiveMode = config.features?.liveMode !== false;
   const showFiber = config.features?.fiberBoard === true;
 
   // Determine scope
@@ -160,15 +161,24 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const leaderboardsLoading = primaryLoading || (hasSecondary && secondaryLeaderboards.isLoading);
 
 
-  // ========== LIVE DATA (optional, for custom periods) ==========
-  const { data: liveData, isLoading: liveLoading } = useSalesAggregatesExtended({
+  // ========== LIVE DATA (custom periods, where no cache exists) ==========
+  // Covers single-client boards, team-scoped boards and multi-client
+  // (aggregated) boards, plus secondary clients whose commission merges in.
+  const livePrimaryClientIds = isAggregated
+    ? aggregateClientIds
+    : scopeType === "client" && scopeId
+    ? [scopeId]
+    : [];
+
+  const { data: liveData, isLoading: liveLoading } = useLiveDashboardAggregates({
     periodStart: selectedPeriod.from,
     periodEnd: selectedPeriod.to,
-    clientId: scopeType === "client" ? (scopeId || undefined) : undefined,
-    teamId: scopeType === "team" && !isAggregated ? (scopeId || undefined) : undefined,
-    groupBy: ['employee'],
+    clientIds: livePrimaryClientIds,
+    secondaryClientIds: hasSecondary ? secondaryClientIds : undefined,
+    teamId: scopeType === "team" && !isAggregated ? scopeId : null,
     enabled: useLiveMode && !useCached,
   });
+
 
   // Employee data for live mode name resolution
   const { data: employeeData } = useQuery({
@@ -263,21 +273,21 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
 
   // Live sellers (only used in live mode)
   const liveSellers: LeaderboardSeller[] = useMemo(() => {
-    if (!liveData?.byEmployee) return [];
-    return Object.entries(liveData.byEmployee)
-      .map(([key, emp]) => {
-        const name = employeeData?.idToNameMap?.get(key) || emp.name;
-        return {
-          id: key,
-          name,
-          displayName: getDisplayName(name),
-          avatarUrl: employeeData?.idToAvatarMap?.get(key) ?? null,
-          salesCount: emp.sales,
-          commission: emp.commission,
-        };
-      })
-      .sort((a, b) => b.commission - a.commission);
+    if (!liveData?.sellers) return [];
+    return liveData.sellers.map((s) => {
+      const name = employeeData?.idToNameMap?.get(s.employeeId) || s.employeeName;
+      return {
+        id: s.employeeId,
+        name,
+        displayName: getDisplayName(name),
+        avatarUrl: employeeData?.idToAvatarMap?.get(s.employeeId) ?? null,
+        salesCount: s.salesCount,
+        commission: s.commission,
+        crossSales: s.crossSaleCount,
+      };
+    });
   }, [liveData, employeeData]);
+
 
   const isLoading = useCached ? (kpisLoading || leaderboardsLoading || aggKpisLoading) : liveLoading;
 
@@ -455,7 +465,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 isLoading={isLoading}
                 tvMode={false}
                 light
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
               />
+
             </div>
           )}
         </CphBoardFrame>
@@ -561,7 +574,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={liveSellers}
                 isLoading={isLoading}
                 tvMode={false}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
               />
+
             </div>
           </>
         )}
