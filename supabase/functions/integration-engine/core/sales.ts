@@ -417,12 +417,10 @@ async function processSalesBatch(
   pricingRulesMap: Map<string, PricingRule[]>,
   campaignMappingsMap: Map<string, string>,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  freetext: FreetextStripper
+  gdprFilter: IngestionFilter
 ) {
   let processed = 0
   let errors = 0
-  let identityFieldsStripped = 0
-  let identityStrippedSales = 0
 
   const externalIdsRaw = sales.map((s) => String(s.externalId || "").trim()).filter(Boolean)
   const externalIds = Array.from(new Set(externalIdsRaw))
