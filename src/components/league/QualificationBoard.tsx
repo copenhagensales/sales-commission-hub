@@ -12,6 +12,7 @@ import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { ZoneLegend } from "./ZoneLegend";
 import { ProvisionSparkline } from "./ProvisionSparkline";
 import { PlayerHoverCard } from "./PlayerHoverCard";
+import { LeaguePlayerAvatar } from "./LeaguePlayerAvatar";
 import { ZoneProgressBar } from "./ZoneProgressBar";
 import { motion, AnimatePresence } from "framer-motion";
 
