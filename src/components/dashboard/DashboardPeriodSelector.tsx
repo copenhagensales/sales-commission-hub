@@ -129,16 +129,28 @@ export function DashboardPeriodSelector({
     setOpen(false);
   };
 
-  const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (!range) return;
-    
+  const handleDateRangeSelect = (
+    range: { from?: Date; to?: Date } | undefined,
+    selectedDay?: Date,
+  ) => {
+    // Er der allerede valgt et helt interval, starter næste klik forfra på en ny fra-dato.
+    if (dateRange.from && dateRange.to && selectedDay) {
+      setDateRange({ from: selectedDay, to: undefined });
+      return;
+    }
+
+    if (!range?.from) {
+      setDateRange({ from: selectedDay, to: undefined });
+      return;
+    }
+
     setDateRange(range);
-    
-    // Only apply when both dates are selected
+
+    // Anvend først når både fra og til er valgt
     if (range.from && range.to) {
       const fromStr = format(range.from, "d. MMM", { locale: da });
       const toStr = format(range.to, "d. MMM", { locale: da });
-      
+
       onPeriodChange({
         type: "custom",
         from: startOfDay(range.from),
@@ -148,6 +160,7 @@ export function DashboardPeriodSelector({
       setOpen(false);
     }
   };
+
 
   if (disabled) {
     return null;
