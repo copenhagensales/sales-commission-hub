@@ -161,15 +161,24 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const leaderboardsLoading = primaryLoading || (hasSecondary && secondaryLeaderboards.isLoading);
 
 
-  // ========== LIVE DATA (optional, for custom periods) ==========
-  const { data: liveData, isLoading: liveLoading } = useSalesAggregatesExtended({
+  // ========== LIVE DATA (custom periods, where no cache exists) ==========
+  // Covers single-client boards, team-scoped boards and multi-client
+  // (aggregated) boards, plus secondary clients whose commission merges in.
+  const livePrimaryClientIds = isAggregated
+    ? aggregateClientIds
+    : scopeType === "client" && scopeId
+    ? [scopeId]
+    : [];
+
+  const { data: liveData, isLoading: liveLoading } = useLiveDashboardAggregates({
     periodStart: selectedPeriod.from,
     periodEnd: selectedPeriod.to,
-    clientId: scopeType === "client" ? (scopeId || undefined) : undefined,
-    teamId: scopeType === "team" && !isAggregated ? (scopeId || undefined) : undefined,
-    groupBy: ['employee'],
+    clientIds: livePrimaryClientIds,
+    secondaryClientIds: hasSecondary ? secondaryClientIds : undefined,
+    teamId: scopeType === "team" && !isAggregated ? scopeId : null,
     enabled: useLiveMode && !useCached,
   });
+
 
   // Employee data for live mode name resolution
   const { data: employeeData } = useQuery({
