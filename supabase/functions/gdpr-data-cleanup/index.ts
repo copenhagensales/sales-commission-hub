@@ -14,7 +14,6 @@ import {
   NORMALIZED_IDENTITY_KEYS,
   stripKeys,
 } from "../_shared/gdpr-sales-privacy.ts";
-import { DIALER_CALL_METADATA_ALLOWLIST } from "../_shared/dialer-call-privacy.ts";
 
 
 interface FieldDefinition {
@@ -688,9 +687,6 @@ Deno.serve(async (req) => {
     let loginEventsAnonymized = 0;
     let inactiveEmployeesDeleted = 0;
     let inactiveEmployeesAnonymized = 0;
-    let dialerCallsRecordingsCleared = 0;
-    let dialerCallsLeadKeysCleared = 0;
-    let dialerCallsMetadataCleaned = 0;
 
     const ANON_EMAIL = "anonymiseret@slettet.local";
 
@@ -1046,11 +1042,6 @@ Deno.serve(async (req) => {
     addLog("login_events_anonymized", loginEventsAnonymized);
     addLog("inactive_employees_deleted", inactiveEmployeesDeleted);
     addLog("inactive_employees_anonymized", inactiveEmployeesAnonymized);
-    addLog("dialer_calls_anonymized", dialerCallsRecordingsCleared + dialerCallsLeadKeysCleared + dialerCallsMetadataCleaned, {
-      recordings_cleared: dialerCallsRecordingsCleared,
-      lead_keys_cleared: dialerCallsLeadKeysCleared,
-      metadata_rows_cleaned: dialerCallsMetadataCleaned,
-    });
 
     const totalActions =
       totalFieldsCleaned +
@@ -1066,12 +1057,9 @@ Deno.serve(async (req) => {
       fmSalesAnonymized +
       eesyRowsAnonymized +
       cancellationRowsAnonymized +
-      dialerCallsRecordingsCleared +
-      dialerCallsLeadKeysCleared +
-      dialerCallsMetadataCleaned +
       adversusEventsDeleted;
 
-    log("INFO", `GDPR cleanup complete${dryRun ? " (DRY RUN)" : ""}. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Skipped unmapped: ${campaignSalesSkippedUnmapped}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}, FM phones: ${fmSalesAnonymized}, Eesy rows: ${eesyRowsAnonymized}, Cancellation rows: ${cancellationRowsAnonymized}, Dialer calls rec/lead/meta: ${dialerCallsRecordingsCleared}/${dialerCallsLeadKeysCleared}/${dialerCallsMetadataCleaned}, Adversus events: ${adversusEventsDeleted}`);
+    log("INFO", `GDPR cleanup complete${dryRun ? " (DRY RUN)" : ""}. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Skipped unmapped: ${campaignSalesSkippedUnmapped}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}, FM phones: ${fmSalesAnonymized}, Eesy rows: ${eesyRowsAnonymized}, Cancellation rows: ${cancellationRowsAnonymized}, Adversus events: ${adversusEventsDeleted}`);
 
     const summaryDetails = {
       dry_run: dryRun,
@@ -1098,9 +1086,6 @@ Deno.serve(async (req) => {
       login_events_anonymized: loginEventsAnonymized,
       inactive_employees_deleted: inactiveEmployeesDeleted,
       inactive_employees_anonymized: inactiveEmployeesAnonymized,
-      dialer_calls_recordings_cleared: dialerCallsRecordingsCleared,
-      dialer_calls_lead_keys_cleared: dialerCallsLeadKeysCleared,
-      dialer_calls_metadata_cleaned: dialerCallsMetadataCleaned,
       timestamp: new Date().toISOString(),
     };
 
