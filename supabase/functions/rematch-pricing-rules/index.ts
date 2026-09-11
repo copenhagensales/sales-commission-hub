@@ -212,6 +212,12 @@ function matchPricingRule(
   campaignMappingId?: string | null,
   saleDate?: string | null, // ISO date string for date-based filtering
   siblingProductIds?: Set<string> | null,
+  /**
+   * Manuelt indtastede salg (Tast selv salg) har ingen leaddata. Derfor må
+   * "tom leaddata"-fallbacken IKKE gælde for dem — mangler betingelsen, skal
+   * produktets basispris bruges.
+   */
+  isManualSale?: boolean,
 ): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean; immediatePaymentCommission: number | null; immediatePaymentRevenue: number | null; displayName: string | null } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
