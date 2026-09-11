@@ -948,6 +948,43 @@ export function TeamsTab() {
         </>
       )}
 
+      {/* Profil-view: liste + spillerprofil-kort */}
+      {viewMode === "profiles" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {teams
+              .filter((team) => getTeamMembers(team.id).length > 0)
+              .map((team, index) => {
+                const isActive = (profileTeamId ?? null) === team.id || (!profileTeamId && index === 0);
+                return (
+                  <Button
+                    key={team.id}
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setProfileTeamId(team.id)}
+                  >
+                    {team.name}
+                  </Button>
+                );
+              })}
+          </div>
+          {(() => {
+            const teamsWithMembers = teams.filter((team) => getTeamMembers(team.id).length > 0);
+            const activeTeam =
+              teamsWithMembers.find((t) => t.id === profileTeamId) ?? teamsWithMembers[0];
+            if (!activeTeam) {
+              return <p className="text-sm text-muted-foreground">Ingen teams med medarbejdere.</p>;
+            }
+            const memberIds = getTeamMembers(activeTeam.id).filter((id) =>
+              employees.some((emp) => emp.id === id)
+            );
+            return (
+              <PlayerProfileExplorer employeeIds={memberIds} metricLabel="Provision i alt" />
+            );
+          })()}
+        </div>
+      )}
+
       {/* Employee view - grouped by teams */}
       {viewMode === "employees" && (
         <div className="space-y-4">
