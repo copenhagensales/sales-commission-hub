@@ -48,21 +48,23 @@ export function CelebrationStrip({ celebrations }: CelebrationStripProps) {
               className="rounded-xl border border-primary/20 bg-background/80 px-4 py-3"
             >
               <div className="flex items-start gap-3">
-                {celebration.type === "birthday" ? (
-                  <Cake className="mt-0.5 h-5 w-5 flex-none text-foreground" aria-hidden="true" />
-                ) : (
-                  <Award className="mt-0.5 h-5 w-5 flex-none text-warning" aria-hidden="true" />
-                )}
                 <PlayerProfileHoverCard employeeId={celebration.employeeId}>
-                  <div className="min-w-0 flex-1 cursor-default">
-                    <p className="truncate font-medium text-foreground">{celebration.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {celebration.type === "anniversary"
-                        ? `${celebration.years} års jubilæum`
-                        : "Tillykke med fødselsdagen!"}
-                    </p>
-                  </div>
+                  <span className="mt-0.5 flex-none cursor-pointer">
+                    {celebration.type === "birthday" ? (
+                      <Cake className="h-5 w-5 text-foreground" aria-hidden="true" />
+                    ) : (
+                      <Award className="h-5 w-5 text-warning" aria-hidden="true" />
+                    )}
+                  </span>
                 </PlayerProfileHoverCard>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{celebration.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {celebration.type === "anniversary"
+                      ? `${celebration.years} års jubilæum`
+                      : "Tillykke med fødselsdagen!"}
+                  </p>
+                </div>
               </div>
 
               <div className="mt-3 space-y-2">
