@@ -92,6 +92,7 @@ export function PlayerProfileCard({
   ].filter(Boolean) as string[];
 
   const streakDays = s?.longest_streak_days ?? 0;
+  const currentStreak = Math.min(s?.current_streak_days ?? 0, streakDays);
 
   const records: RecordRow[] = [
     {
