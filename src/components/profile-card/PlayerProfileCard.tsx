@@ -503,17 +503,6 @@ export function PlayerProfileCard({
           />
           Klubber
         </h4>
-        <p
-          style={{
-            margin: "0 0 12px",
-            fontSize: 13,
-            fontWeight: 400,
-            color: TEXT_SECONDARY,
-          }}
-        >
-          Antal gange med mindst 50.000 / 100.000 / 200.000 kr i provision i én
-          lønperiode (15. til 14.).
-        </p>
 
         <ul
           style={{
