@@ -56,20 +56,10 @@ export function PlayerProfileCard({
 
   const records: RecordRow[] = [
     {
-      label: "Bedste dag",
-      value: kr(s?.best_day_amount ?? null),
-      meta: formatDanishDate(s?.best_day_date) ?? "ikke sat endnu",
-    },
-    {
       label: "Bedste uge",
       value: kr(s?.best_week_amount ?? null),
       meta:
         formatIsoWeek(s?.best_week_iso, s?.best_week_year) ?? "ikke sat endnu",
-    },
-    {
-      label: "Bedste lønperiode",
-      value: kr(s?.best_period_amount ?? null),
-      meta: formatPayPeriod(s?.best_period_start) ?? "ikke sat endnu",
     },
     {
       label: "Længste stribe uden nuldag",
@@ -193,14 +183,18 @@ export function PlayerProfileCard({
         )}
       </header>
 
-      {/* 2) Tre karrieretal */}
+      {/* 2) Topgrafik: de to vigtigste rekorder */}
       <div style={{ display: "flex", gap: 2, padding: "0 22px" }}>
         {[
-          { label: "Salg i alt", value: count(s?.total_sales ?? 0) },
-          { label: "Lønperioder", value: count(s?.pay_periods ?? 0) },
           {
-            label: "Snit pr. lønperiode",
-            value: s && s.pay_periods > 0 ? kr(s.avg_per_pay_period) : "—",
+            label: "Bedste dag",
+            value: kr(s?.best_day_amount ?? null),
+            meta: formatDanishDate(s?.best_day_date) ?? "ikke sat endnu",
+          },
+          {
+            label: "Bedste lønperiode",
+            value: kr(s?.best_period_amount ?? null),
+            meta: formatPayPeriod(s?.best_period_start) ?? "ikke sat endnu",
           },
         ].map((item, i, arr) => (
           <div
@@ -237,6 +231,16 @@ export function PlayerProfileCard({
               }}
             >
               {item.value}
+            </p>
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: 13,
+                fontWeight: 400,
+                color: TEXT_SECONDARY,
+              }}
+            >
+              {item.meta}
             </p>
           </div>
         ))}
