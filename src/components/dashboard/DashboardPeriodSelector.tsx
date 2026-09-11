@@ -196,7 +196,7 @@ export function DashboardPeriodSelector({
             <Calendar
               mode="range"
               defaultMonth={dateRange.from}
-              selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
+              selected={dateRange.from ? { from: dateRange.from, to: dateRange.to } : undefined}
               onSelect={handleDateRangeSelect}
               numberOfMonths={2}
               locale={da}
