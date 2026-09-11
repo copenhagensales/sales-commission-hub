@@ -574,7 +574,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={liveSellers}
                 isLoading={isLoading}
                 tvMode={false}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
               />
+
             </div>
           </>
         )}
