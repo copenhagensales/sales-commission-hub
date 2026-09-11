@@ -3,6 +3,10 @@ import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
 import { stripNoteFields } from "../../_shared/strip-notes.ts"
+import {
+  stripIdentityFromPiiFields,
+  stripNormalizedIdentity,
+} from "../../_shared/normalized-identity.ts"
 
 /**
  * Check if a condition value is a NumericCondition object
