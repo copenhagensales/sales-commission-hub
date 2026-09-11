@@ -140,9 +140,20 @@ export function CompactLeagueView() {
                       {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
                     </p>
                   </div>
-                  <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
-                    {formatProvision(standing.current_provision || 0)}
-                  </span>
+                  <div className="flex flex-none items-center gap-3">
+                    {isPodium(rank) && (
+                      <FeedReactionRow
+                        targetType="league_round"
+                        targetKey={leagueTargetKey(standing.employee_id)}
+                        reactions={getReactions(leagueTargetKey(standing.employee_id))}
+                        disabled={!canInteract}
+                        onToggle={(args) => toggleReaction.mutate(args)}
+                      />
+                    )}
+                    <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
+                      {formatProvision(standing.current_provision || 0)}
+                    </span>
+                  </div>
                 </div>
               );
             })}
