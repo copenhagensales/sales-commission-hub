@@ -1011,7 +1011,17 @@ Deno.serve(async (req) => {
               break;
             }
 
+            case "dialer_calls": {
+              // Owned by the daily pg_cron job `gdpr-dialer-calls-cleanup`, which
+              // calls public.gdpr_run_dialer_calls_cleanup() directly in Postgres.
+              // Doing it here as well would double-log and can exceed this
+              // function's CPU budget on large call volumes, so it is skipped.
+              log("INFO", `dialer_calls handled by pg_cron job gdpr-dialer-calls-cleanup — skipping here`);
+              break;
+            }
+
             default:
+
               log("INFO", `Unknown data_type "${policy.data_type}" — skipping`);
           }
         }

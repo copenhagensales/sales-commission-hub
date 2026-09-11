@@ -1,6 +1,8 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardCall } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
+import { sanitizeDialerCallMetadata } from "../../_shared/dialer-call-privacy.ts"
+
 
 /**
  * List of email domains that should be excluded from syncing.
@@ -62,8 +64,11 @@ async function processCallsBatch(
         campaign_external_id: call.campaignExternalId,
         lead_external_id: call.leadExternalId,
         agent_id: agentId,
-        recording_url: call.recordingUrl || null,
-        metadata: call.metadata || null,
+        // Privacy: recording links and non-technical metadata are never stored.
+        // See _shared/dialer-call-privacy.ts. The agent e-mail from the payload
+        // is still used above to resolve agent_id, it is just not persisted.
+        recording_url: null,
+        metadata: sanitizeDialerCallMetadata(call.metadata),
         integration_id: integrationId,
         updated_at: new Date().toISOString(),
       }

@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.gdpr_clean_dialer_calls(timestamptz, text[], boolean) FROM anon, authenticated;

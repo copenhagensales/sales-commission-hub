@@ -15886,6 +15886,15 @@ export type Database = {
           uid: string
         }[]
       }
+      gdpr_clean_dialer_calls: {
+        Args: {
+          p_allowed_metadata_keys: string[]
+          p_cutoff: string
+          p_dry_run?: boolean
+        }
+        Returns: Json
+      }
+      gdpr_run_dialer_calls_cleanup: { Args: never; Returns: Json }
       generate_access_code: { Args: never; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
