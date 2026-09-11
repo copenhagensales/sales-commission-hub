@@ -14,6 +14,7 @@ import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 import { FeedReactionRow } from "@/components/home/FeedReactionRow";
 import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
+import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
 function getNeighborStandings(
   allStandings: QualificationStanding[],
