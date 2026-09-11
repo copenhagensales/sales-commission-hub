@@ -421,6 +421,8 @@ async function processSalesBatch(
 ) {
   let processed = 0
   let errors = 0
+  let identityFieldsStripped = 0
+  let identityStrippedSales = 0
 
   const externalIdsRaw = sales.map((s) => String(s.externalId || "").trim()).filter(Boolean)
   const externalIds = Array.from(new Set(externalIdsRaw))
@@ -497,6 +499,16 @@ async function processSalesBatch(
         }
       }
       
+      // GDPR: kundeidentitet må aldrig persisteres i normalized_data
+      const normalizedIdentity = stripNormalizedIdentity(
+        sale.normalizedData as Record<string, unknown> | null | undefined
+      )
+      if (normalizedIdentity.removedKeys.length > 0) {
+        identityFieldsStripped += normalizedIdentity.removedKeys.length
+        identityStrippedSales++
+        sale.piiFields = stripIdentityFromPiiFields(sale.piiFields) ?? undefined
+      }
+
       const saleData: Record<string, unknown> = {
         adversus_external_id: sale.externalId,
         sale_datetime: sale.saleDate,
@@ -509,7 +521,7 @@ async function processSalesBatch(
         source: sale.dialerName,
         integration_type: sale.integrationType,
         raw_payload: sale.rawPayload ? stripNoteFields(sale.rawPayload) : null,
-        normalized_data: sale.normalizedData || null,
+        normalized_data: normalizedIdentity.data || null,
         updated_at: new Date().toISOString(),
         validation_status: 'pending',  // Eksplicit default for at undgå NULL
         enrichment_status: enrichmentStatus,
