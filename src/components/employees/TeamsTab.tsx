@@ -62,7 +62,8 @@ export function TeamsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [clientSearch, setClientSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"teams" | "employees">("teams");
+  const [viewMode, setViewMode] = useState<"teams" | "employees" | "profiles">("teams");
+  const [profileTeamId, setProfileTeamId] = useState<string | null>(null);
   
   // Move team dialog state
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
@@ -649,6 +650,15 @@ export function TeamsTab() {
             >
               <Users className="h-4 w-4 mr-2" />
               Medarbejdere
+            </Button>
+            <Button
+              variant={viewMode === "profiles" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("profiles")}
+              className="h-8"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Profiler
             </Button>
           </div>
           <Button variant="outline" onClick={() => openMoveDialog()}>
