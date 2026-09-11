@@ -242,6 +242,16 @@ export function PlayerProfileCard({
             >
               {item.value}
             </p>
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: 13,
+                fontWeight: 400,
+                color: TEXT_SECONDARY,
+              }}
+            >
+              {item.meta}
+            </p>
           </div>
         ))}
       </div>
