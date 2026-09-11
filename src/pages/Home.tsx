@@ -968,8 +968,8 @@ const Home = () => {
               {upcomingCelebrations.map((celebration, idx) => {
                 const isAnniversary = celebration.type === 'anniversary';
                 return (
+                  <PlayerProfileHoverCard key={idx} employeeId={celebration.employeeId} side="top">
                   <div
-                    key={idx}
                     className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${
                       isAnniversary
                         ? 'bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]'
