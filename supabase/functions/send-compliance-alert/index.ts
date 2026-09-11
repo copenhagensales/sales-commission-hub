@@ -67,22 +67,6 @@ const escapeHtml = (value: string) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string)
   );
 
-interface AlertRow {
-  id: string;
-  check_key: string;
-  severity: string;
-  title: string;
-  detail: Record<string, unknown> | null;
-  observed_value: number | null;
-  threshold: number | null;
-  status: string;
-  first_seen: string;
-  last_seen: string;
-  note: string | null;
-}
-
-const SEVERITY_ORDER: Record<string, number> = { KRITISK: 0, HOEJ: 1, MIDDEL: 2, INFO: 3 };
-
 const SEVERITY_COLOR: Record<string, string> = {
   KRITISK: "#dc2626",
   HOEJ: "#ea580c",
@@ -90,31 +74,30 @@ const SEVERITY_COLOR: Record<string, string> = {
   INFO: "#2563eb",
 };
 
-const daFormat = (iso: string | null | undefined) => {
-  if (!iso) return "ukendt";
-  return new Date(iso).toLocaleString("da-DK", {
-    timeZone: "Europe/Copenhagen",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+interface PayloadAlert {
+  alvor?: string;
+  titel?: string;
+  maalt?: number | string | null;
+  graense?: number | string | null;
+  aaben_i_dage?: number | null;
+  detaljer?: Record<string, unknown> | null;
+}
 
-const ageText = (firstSeen: string) => {
-  const ms = Date.now() - new Date(firstSeen).getTime();
-  const days = Math.floor(ms / 86_400_000);
-  if (days >= 1) return `${days} ${days === 1 ? "dag" : "dage"}`;
-  const hours = Math.max(0, Math.floor(ms / 3_600_000));
-  return `${hours} ${hours === 1 ? "time" : "timer"}`;
-};
+interface MailPayload {
+  send_mail?: boolean;
+  grund?: string;
+  kritiske?: number;
+  aabne_i_alt?: number;
+  timer_siden_kontrol?: number | null;
+  timer_siden_oprydning?: number | null;
+  alarmer?: PayloadAlert[];
+}
 
 /**
  * Detail-felter vises kun som navn + tal/kort tekst. Objekter og lange
  * strenge udelades, så ingen kundedata kan slippe med i mailen.
  */
-const detailLines = (detail: Record<string, unknown> | null): string[] => {
+const detailLines = (detail: Record<string, unknown> | null | undefined): string[] => {
   if (!detail || typeof detail !== "object") return [];
   const lines: string[] = [];
   for (const [key, value] of Object.entries(detail)) {
@@ -139,6 +122,12 @@ const detailLines = (detail: Record<string, unknown> | null): string[] => {
   return lines;
 };
 
+const hoursText = (hours: number | null | undefined) => {
+  if (hours === null || hours === undefined || Number.isNaN(Number(hours))) return "ukendt";
+  const h = Math.round(Number(hours) * 10) / 10;
+  return `${h} ${h === 1 ? "time" : "timer"} siden`;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -156,88 +145,61 @@ const handler = async (req: Request): Promise<Response> => {
       dryRun = body?.dry_run === true;
     }
 
-    const [{ data: recipientRows, error: recipientError }, alertsRes, runRes, gdprRes] =
-      await Promise.all([
-        supabase
-          .from("compliance_alert_recipients")
-          .select("email, is_active")
-          .eq("is_active", true),
-        supabase
-          .from("compliance_alerts")
-          .select(
-            "id, check_key, severity, title, detail, observed_value, threshold, status, first_seen, last_seen, note",
-          )
-          .in("status", ["open", "acknowledged"]),
-        supabase
-          .from("compliance_check_runs")
-          .select("run_at, open_alerts, critical_alerts, triggered_by")
-          .order("run_at", { ascending: false })
-          .limit(1),
-        supabase
-          .from("gdpr_cleanup_log")
-          .select("run_at, action, records_affected")
-          .order("run_at", { ascending: false })
-          .limit(1),
-      ]);
+    // Beslutningen om, HVORNÅR der sendes, ligger udelukkende i basen.
+    // Denne funktion adlyder send_mail og indeholder ingen egen betingelse.
+    const { data: payloadRaw, error: payloadError } = await supabase.rpc(
+      "compliance_mail_payload",
+    );
+    if (payloadError) throw payloadError;
 
+    const payload = (payloadRaw ?? {}) as MailPayload;
+    const grund = typeof payload.grund === "string" && payload.grund.trim()
+      ? payload.grund.trim()
+      : "ukendt årsag";
+
+    if (payload.send_mail !== true) {
+      console.log(`Ingen mail sendt (send_mail=false): ${grund}`);
+      return new Response(
+        JSON.stringify({ sent: false, send_mail: false, grund }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: recipientRows, error: recipientError } = await supabase
+      .from("compliance_alert_recipients")
+      .select("email, is_active")
+      .eq("is_active", true);
     if (recipientError) throw recipientError;
-    if (alertsRes.error) throw alertsRes.error;
 
     const recipients = (recipientRows ?? [])
       .map((r) => r.email)
       .filter((e): e is string => typeof e === "string" && e.includes("@"));
 
-    const alerts = ((alertsRes.data ?? []) as AlertRow[]).sort((a, b) => {
-      const sa = SEVERITY_ORDER[a.severity] ?? 9;
-      const sb = SEVERITY_ORDER[b.severity] ?? 9;
-      if (sa !== sb) return sa - sb;
-      return new Date(a.first_seen).getTime() - new Date(b.first_seen).getTime();
-    });
-
-    const openAlerts = alerts.filter((a) => a.status === "open");
-    const criticalCount = openAlerts.filter((a) => a.severity === "KRITISK").length;
-    const lastRun = runRes.data?.[0] ?? null;
-    const lastGdpr = gdprRes.data?.[0] ?? null;
-
-    const subject = openAlerts.length === 0
-      ? "Stork compliance: alt i orden"
-      : `Stork compliance: ${openAlerts.length} afvigelser (${criticalCount} kritiske)`;
-
-    const statusColor = openAlerts.length === 0
-      ? "#16a34a"
-      : criticalCount > 0
-        ? "#dc2626"
-        : "#ca8a04";
-
-    const statusText = openAlerts.length === 0
-      ? "Ingen åbne afvigelser. Alle kontroller er grønne."
-      : `${openAlerts.length} åbne afvigelser, heraf ${criticalCount} kritiske.`;
+    const alerts = Array.isArray(payload.alarmer) ? payload.alarmer : [];
+    const subject = `Stork compliance: ${grund}`;
 
     const alertHtml = alerts.length === 0
-      ? `<p style="margin:16px 0;color:#374151;">Der er ingen åbne eller kvitterede alarmer.</p>`
+      ? `<p style="margin:16px 0;color:#374151;">Ingen alarmer i udtrækket.</p>`
       : alerts
         .map((a) => {
-          const color = SEVERITY_COLOR[a.severity] ?? "#374151";
-          const maalt = a.observed_value === null
+          const severity = String(a.alvor ?? "INFO");
+          const color = SEVERITY_COLOR[severity] ?? "#374151";
+          const maalt = a.maalt === null || a.maalt === undefined
             ? "—"
-            : `${a.observed_value}${a.threshold === null ? "" : ` mod grænse ${a.threshold}`}`;
-          const lines = detailLines(a.detail);
-          const kvitteret = a.status === "acknowledged"
-            ? `<div style="font-size:12px;color:#6b7280;margin-top:6px;">Kvitteret${a.note ? `: ${escapeHtml(a.note)}` : ""}</div>`
-            : "";
-          return `<div style="border:1px solid #e5e7eb;border-left:4px solid ${color};border-radius:6px;padding:12px 14px;margin:10px 0;${a.status === "acknowledged" ? "opacity:0.65;" : ""}">
+            : `${a.maalt}${a.graense === null || a.graense === undefined ? "" : ` mod grænse ${a.graense}`}`;
+          const days = Number(a.aaben_i_dage ?? 0);
+          const lines = detailLines(a.detaljer);
+          return `<div style="border:1px solid #e5e7eb;border-left:4px solid ${color};border-radius:6px;padding:12px 14px;margin:10px 0;">
               <div style="font-weight:600;color:#111;">
-                <span style="color:${color};">${escapeHtml(a.severity)}</span> · ${escapeHtml(a.title)}
+                <span style="color:${color};">${escapeHtml(severity)}</span> · ${escapeHtml(String(a.titel ?? "Uden titel"))}
               </div>
               <div style="font-size:13px;color:#374151;margin-top:4px;">
-                Kontrol: ${escapeHtml(a.check_key)}<br>
                 Målt værdi: ${escapeHtml(maalt)}<br>
-                Åben i: ${escapeHtml(ageText(a.first_seen))} (første gang ${escapeHtml(daFormat(a.first_seen))})
+                Åben i: ${escapeHtml(`${days} ${days === 1 ? "dag" : "dage"}`)}
               </div>
               ${lines.length
                 ? `<div style="font-size:12px;color:#4b5563;margin-top:6px;">${lines.map((l) => escapeHtml(l)).join("<br>")}</div>`
                 : ""}
-              ${kvitteret}
             </div>`;
         })
         .join("");
@@ -245,21 +207,25 @@ const handler = async (req: Request): Promise<Response> => {
     const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
       <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;background:#f5f5f5;padding:20px;">
         <div style="max-width:720px;margin:0 auto;background:#fff;padding:24px;border:1px solid #e5e7eb;border-radius:8px;">
-          <h2 style="margin:0;">Stork compliance-overvågning</h2>
-          <p style="color:#6b7280;margin:6px 0 16px;">Daglig status. Denne mail sendes hver dag — udebliver den, er selve overvågningen nede.</p>
+          <h2 style="margin:0;">Stork compliance-alarm</h2>
+          <p style="color:#6b7280;margin:6px 0 16px;">Denne mail sendes kun, når kontrollen vurderer situationen som kritisk.</p>
 
-          <div style="border-radius:6px;padding:12px 14px;background:${statusColor}1a;border:1px solid ${statusColor};color:#111;font-weight:600;">
-            ${escapeHtml(statusText)}
+          <div style="border-radius:6px;padding:12px 14px;background:#dc26261a;border:1px solid #dc2626;color:#111;font-weight:600;">
+            ${escapeHtml(grund)}
           </div>
 
           <table style="width:100%;font-size:13px;color:#374151;margin:16px 0;border-collapse:collapse;">
             <tr>
+              <td style="padding:4px 0;">Åbne alarmer</td>
+              <td style="padding:4px 0;text-align:right;">${escapeHtml(String(payload.aabne_i_alt ?? 0))} (heraf ${escapeHtml(String(payload.kritiske ?? 0))} kritiske)</td>
+            </tr>
+            <tr>
               <td style="padding:4px 0;">Seneste compliance-kørsel</td>
-              <td style="padding:4px 0;text-align:right;">${escapeHtml(daFormat(lastRun?.run_at))}${lastRun?.triggered_by ? ` (${escapeHtml(String(lastRun.triggered_by))})` : ""}</td>
+              <td style="padding:4px 0;text-align:right;">${escapeHtml(hoursText(payload.timer_siden_kontrol))}</td>
             </tr>
             <tr>
               <td style="padding:4px 0;">Seneste GDPR-oprydning</td>
-              <td style="padding:4px 0;text-align:right;">${escapeHtml(daFormat(lastGdpr?.run_at))}${lastGdpr?.action ? ` (${escapeHtml(String(lastGdpr.action))})` : ""}</td>
+              <td style="padding:4px 0;text-align:right;">${escapeHtml(hoursText(payload.timer_siden_oprydning))}</td>
             </tr>
           </table>
 
@@ -277,10 +243,12 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           dry_run: true,
+          send_mail: true,
           subject,
+          grund,
           recipients,
-          open_alerts: openAlerts.length,
-          critical_alerts: criticalCount,
+          alarmer: alerts.length,
+          kritiske: payload.kritiske ?? 0,
           sent: false,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -303,9 +271,10 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({
         sent: true,
         subject,
+        grund,
         recipients: recipients.length,
-        open_alerts: openAlerts.length,
-        critical_alerts: criticalCount,
+        alarmer: alerts.length,
+        kritiske: payload.kritiske ?? 0,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

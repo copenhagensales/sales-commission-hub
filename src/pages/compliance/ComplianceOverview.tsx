@@ -190,6 +190,8 @@ export default function ComplianceOverview() {
           </p>
         </div>
 
+        <ComplianceMonitoringPanel />
+
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-start gap-3">
             <Shield className="h-5 w-5 text-primary mt-0.5 shrink-0" />
@@ -204,7 +206,6 @@ export default function ComplianceOverview() {
           </CardContent>
         </Card>
         {p.canView("menu_compliance_admin") && <ComplianceReviewAlert />}
-        <ComplianceMonitoringPanel />
         {p.canView("menu_compliance_admin") && <ComplianceReviewPanel />}
 
         <div className="grid gap-6 md:grid-cols-3">

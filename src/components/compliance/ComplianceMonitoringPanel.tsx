@@ -11,6 +11,7 @@ import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import {
   useAcknowledgeAlert,
   useComplianceAlerts,
+  useComplianceMailPayload,
   useLastComplianceRun,
   useRunComplianceChecks,
   type ComplianceAlert,
@@ -126,28 +127,54 @@ function AlertRow({ alert, canAcknowledge }: { alert: ComplianceAlert; canAcknow
   );
 }
 
+const STALE_HOURS = 26;
+
+/** Beregner tidspunkt ud fra "antal timer siden" — basen returnerer kun timer. */
+const isoFromHoursAgo = (hours: number | null | undefined) => {
+  if (hours === null || hours === undefined || Number.isNaN(Number(hours))) return null;
+  return new Date(Date.now() - Number(hours) * 3_600_000).toISOString();
+};
+
 export function ComplianceMonitoringPanel() {
   const { isSuperadmin } = useIsSuperadmin();
   const { data: alerts = [], isLoading } = useComplianceAlerts();
   const { data: lastRun } = useLastComplianceRun();
+  const { data: payload } = useComplianceMailPayload();
   const runChecks = useRunComplianceChecks();
 
   const openAlerts = alerts.filter((a) => a.status === "open");
   const criticalCount = openAlerts.filter((a) => a.severity === "KRITISK").length;
+  const highCount = openAlerts.filter((a) => a.severity === "HOEJ").length;
+  const mediumCount = openAlerts.filter((a) => a.severity === "MIDDEL").length;
+  const infoCount = openAlerts.filter((a) => a.severity === "INFO").length;
 
-  const statusTone =
-    openAlerts.length === 0
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800"
-      : criticalCount > 0
-        ? "border-red-500/40 bg-red-500/10 text-red-800"
-        : "border-yellow-500/40 bg-yellow-500/10 text-yellow-800";
+  const hoursSinceCheck = payload?.timer_siden_kontrol ?? null;
+  const hoursSinceCleanup = payload?.timer_siden_oprydning ?? null;
+  const checkStale = hoursSinceCheck === null || Number(hoursSinceCheck) > STALE_HOURS;
+  const cleanupStale = hoursSinceCleanup === null || Number(hoursSinceCleanup) > STALE_HOURS;
+  const heartbeatBroken = checkStale || cleanupStale;
 
-  const statusText =
-    openAlerts.length === 0
-      ? "Alt i orden — ingen åbne afvigelser."
-      : criticalCount > 0
-        ? `${openAlerts.length} åbne afvigelser, heraf ${criticalCount} kritiske.`
-        : `${openAlerts.length} åbne afvigelser. Ingen kritiske.`;
+  const lastCheckAt = lastRun?.run_at ?? isoFromHoursAgo(hoursSinceCheck);
+  const lastCleanupAt = isoFromHoursAgo(hoursSinceCleanup);
+
+  const tone =
+    heartbeatBroken || criticalCount > 0
+      ? "border-red-500/50 bg-red-500/10 text-red-800"
+      : highCount > 0
+        ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-800"
+        : openAlerts.length > 0
+          ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-800"
+          : "border-emerald-500/50 bg-emerald-500/10 text-emerald-800";
+
+  const statusText = heartbeatBroken
+    ? "Overvågningen er ikke kørt som forventet — det er den værste fejl."
+    : criticalCount > 0
+      ? `${openAlerts.length} åbne afvigelser, heraf ${criticalCount} kritiske.`
+      : openAlerts.length > 0
+        ? `${openAlerts.length} åbne afvigelser. Ingen kritiske.`
+        : "Alt i orden — ingen åbne afvigelser.";
+
+  const topAlerts = openAlerts.slice(0, 3);
 
   const handleRun = () => {
     runChecks.mutate(undefined, {
@@ -182,16 +209,56 @@ export function ComplianceMonitoringPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className={`flex items-start gap-3 rounded-md border p-3 ${statusTone}`}>
-          {openAlerts.length === 0 ? (
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-          ) : (
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-          )}
-          <div className="text-sm">
-            <p className="font-semibold">{statusText}</p>
-            <p className="opacity-80">Sidste kørsel: {formatDaDateTime(lastRun?.run_at)}</p>
+        <div className={`space-y-3 rounded-md border p-4 ${tone}`}>
+          <div className="flex items-start gap-3">
+            {!heartbeatBroken && openAlerts.length === 0 ? (
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+            ) : (
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            )}
+            <div className="text-sm">
+              <p className="font-semibold">{statusText}</p>
+              <p className="opacity-80">
+                Sidst kontrolleret: {formatDaDateTime(lastCheckAt)}
+                {checkStale && " — over 26 timer siden"}
+              </p>
+              <p className="opacity-80">
+                Sidste GDPR-oprydning: {formatDaDateTime(lastCleanupAt)}
+                {cleanupStale && " — over 26 timer siden"}
+              </p>
+            </div>
           </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className={SEVERITY_STYLE.KRITISK}>
+              {criticalCount} kritiske
+            </Badge>
+            <Badge variant="outline" className={SEVERITY_STYLE.HOEJ}>
+              {highCount} høje
+            </Badge>
+            <Badge variant="outline" className={SEVERITY_STYLE.MIDDEL}>
+              {mediumCount} middel
+            </Badge>
+            <Badge variant="outline" className={SEVERITY_STYLE.INFO}>
+              {infoCount} info
+            </Badge>
+          </div>
+
+          {topAlerts.length > 0 && (
+            <ul className="space-y-1 text-sm">
+              {topAlerts.map((a) => (
+                <li key={a.id} className="flex flex-wrap gap-x-2">
+                  <span className="font-medium">{a.severity}</span>
+                  <span>{a.title}</span>
+                  <span className="opacity-80">
+                    {a.observed_value === null
+                      ? "ingen målt værdi"
+                      : `målt ${a.observed_value}${a.threshold === null ? "" : ` mod grænse ${a.threshold}`}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <Tabs defaultValue="alarmer">

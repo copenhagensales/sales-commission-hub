@@ -62,6 +62,31 @@ export function useLastComplianceRun() {
   });
 }
 
+export interface ComplianceMailPayload {
+  send_mail: boolean;
+  grund: string;
+  kritiske: number;
+  aabne_i_alt: number;
+  timer_siden_kontrol: number | null;
+  timer_siden_oprydning: number | null;
+}
+
+/**
+ * Basens egen vurdering. Bruges kun til at vise, hvor længe siden kontrollen og
+ * GDPR-oprydningen sidst kørte — betingelsen for alarm ligger i databasen.
+ */
+export function useComplianceMailPayload() {
+  return useQuery({
+    queryKey: ["compliance-mail-payload"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("compliance_mail_payload");
+      if (error) throw error;
+      return (data ?? null) as unknown as ComplianceMailPayload | null;
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useAcknowledgeAlert() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
