@@ -198,7 +198,7 @@ const Home = () => {
         .select("id, first_name, last_name, employment_start_date, cpr_number")
         .eq("is_active", true);
       
-      const results: { type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
+      const results: { employeeId: string; type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
       
       const parseCprBirthday = (cpr: string): Date | null => {
         if (!cpr || cpr.length < 6) return null;
@@ -221,6 +221,7 @@ const Home = () => {
             if ((isSameDay(birthdayThisYear, today) || isAfter(birthdayThisYear, today)) && 
                 isBefore(birthdayThisYear, addDays(today, 14))) {
               results.push({ 
+                employeeId: emp.id,
                 type: 'birthday', 
                 name: `${emp.first_name} ${emp.last_name}`,
                 years: age + (isAfter(birthdayThisYear, today) ? 1 : 0),
@@ -242,6 +243,7 @@ const Home = () => {
             if ((isSameDay(anniversaryThisYear, today) || isAfter(anniversaryThisYear, today)) && 
                 isBefore(anniversaryThisYear, addDays(today, 14))) {
               results.push({ 
+                employeeId: emp.id,
                 type: 'anniversary', 
                 name: `${emp.first_name} ${emp.last_name}`,
                 years: anniversaryYears,
