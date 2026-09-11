@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sanitizePayload } from "../_shared/sanitize.ts";
 import { BLOCKED_FIELD_LABELS } from "../_shared/strip-notes.ts";
-import { createFreetextStripper } from "../_shared/freetext-strip-runtime.ts";
+import { createFreetextStripper } from "../_shared/freetext-runtime.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {

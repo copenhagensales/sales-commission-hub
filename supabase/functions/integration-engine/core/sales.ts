@@ -6,7 +6,7 @@ import { BLOCKED_FIELD_LABELS } from "../../_shared/strip-notes.ts"
 import {
   createFreetextStripper,
   type FreetextStripper,
-} from "../../_shared/freetext-strip-runtime.ts"
+} from "../../_shared/freetext-runtime.ts"
 import {
   stripIdentityFromPiiFields,
   stripNormalizedIdentity,
