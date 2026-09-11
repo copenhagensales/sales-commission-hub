@@ -27,6 +27,12 @@ const PANEL_STRONG = "hsl(var(--cph-light-blue) / 0.10)";
 const DIVIDER = "hsl(var(--cph-light-blue) / 0.12)";
 const GRID_LINE = "hsl(var(--cph-light-blue) / 0.035)";
 
+/** Responsive mål: kortet skal også kunne læses på en smal telefon. */
+const PAD_H = "clamp(14px, 4.5vw, 22px)";
+const PAD_V = "clamp(16px, 4.5vw, 22px)";
+const AVATAR = "clamp(56px, 16vw, 72px)";
+
+
 interface PlayerProfileCardProps {
   person: ProfilePerson;
   /** Antal personer i huset med Klub 200 — bruges til tekstforklaringen. */
@@ -138,35 +144,38 @@ export function PlayerProfileCard({
       className={className}
       aria-label={`Spillerprofil for ${person.fullName}`}
       style={{
+        width: "min(420px, calc(100vw - 28px))",
+        maxWidth: "100%",
         borderRadius: 24,
         overflow: "hidden",
         background: ONYX,
         backgroundImage: `repeating-linear-gradient(to right, ${GRID_LINE} 0 1px, transparent 1px 48px), repeating-linear-gradient(to bottom, ${GRID_LINE} 0 1px, transparent 1px 48px)`,
         color: TEXT_PRIMARY,
         fontVariantNumeric: "tabular-nums",
+        boxShadow: "0 24px 60px -20px hsl(0 0% 0% / 0.55)",
       }}
     >
       {/* 1) Identitet */}
       <header
         style={{
-          padding: "22px 22px 20px",
+          padding: `${PAD_V} ${PAD_H} calc(${PAD_V} - 2px)`,
           background: `radial-gradient(120% 120% at 0% 0%, hsl(var(--cph-emerald) / 0.16), transparent 60%)`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div
             aria-hidden="true"
             style={{
-              width: 72,
-              height: 72,
-              flex: "0 0 72px",
+              width: AVATAR,
+              height: AVATAR,
+              flex: `0 0 ${AVATAR}`,
               borderRadius: "50%",
               background: EMERALD,
               color: ONYX,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 23,
+              fontSize: "clamp(18px, 5vw, 23px)",
               fontWeight: 800,
               boxShadow: `0 0 0 3px hsl(var(--cph-emerald) / 0.35)`,
               backgroundImage: person.avatarUrl
@@ -183,11 +192,12 @@ export function PlayerProfileCard({
           <div style={{ minWidth: 0 }}>
             <h3
               style={{
-                fontSize: 24,
+                fontSize: "clamp(19px, 5.2vw, 24px)",
                 fontWeight: 800,
                 lineHeight: 1.15,
                 margin: 0,
                 color: TEXT_PRIMARY,
+                overflowWrap: "anywhere",
               }}
             >
               {person.fullName || "Ukendt"}
@@ -198,12 +208,14 @@ export function PlayerProfileCard({
                 fontSize: 13,
                 fontWeight: 400,
                 color: TEXT_SECONDARY,
+                overflowWrap: "anywhere",
               }}
             >
               {metaParts.join(" · ")}
             </p>
           </div>
         </div>
+
 
         {(person.clients.length > 0 || leagueChip) && (
           <ul
@@ -257,7 +269,7 @@ export function PlayerProfileCard({
       </header>
 
       {/* 2) Topgrafik: de to vigtigste rekorder */}
-      <div style={{ display: "flex", gap: 8, padding: "0 22px" }}>
+      <div style={{ display: "flex", gap: 8, padding: `0 ${PAD_H}` }}>
         {[
           {
             label: "Bedste dag",
@@ -277,7 +289,8 @@ export function PlayerProfileCard({
             style={{
               flex: "1 1 0",
               background: PANEL,
-              padding: "14px 16px 13px",
+              padding: "14px clamp(11px, 3.5vw, 16px) 13px",
+              minWidth: 0,
               borderRadius: 18,
               border: `1px solid ${DIVIDER}`,
               backgroundImage: `radial-gradient(100% 120% at 100% 0%, hsl(var(--cph-emerald) / 0.10), transparent 65%)`,
@@ -302,7 +315,7 @@ export function PlayerProfileCard({
             <p
               style={{
                 margin: "10px 0 0",
-                fontSize: 27,
+                fontSize: "clamp(21px, 6vw, 27px)",
                 fontWeight: 800,
                 lineHeight: 1.05,
                 color: TEXT_PRIMARY,
@@ -325,7 +338,7 @@ export function PlayerProfileCard({
       </div>
 
       {/* 3) Personlige rekorder */}
-      <section style={{ padding: "22px 22px 20px" }}>
+      <section style={{ padding: `${PAD_V} ${PAD_H} calc(${PAD_V} - 2px)` }}>
         <h4
           style={{
             display: "flex",
@@ -360,7 +373,7 @@ export function PlayerProfileCard({
                 background: PANEL,
                 border: `1px solid ${DIVIDER}`,
                 borderRadius: 18,
-                padding: "14px 16px",
+                padding: "14px clamp(11px, 3.5vw, 16px)",
               }}
             >
               <div
@@ -425,7 +438,7 @@ export function PlayerProfileCard({
                 <dd
                   style={{
                     margin: 0,
-                    fontSize: 21,
+                    fontSize: "clamp(17px, 5vw, 21px)",
                     fontWeight: 800,
                     whiteSpace: "nowrap",
                     color: r.bars ? EMERALD : TEXT_PRIMARY,
@@ -477,7 +490,7 @@ export function PlayerProfileCard({
       </section>
 
       {/* 4) Klubberne */}
-      <section style={{ padding: "0 22px 22px" }}>
+      <section style={{ padding: `0 ${PAD_H} ${PAD_V}` }}>
         <h4
           style={{
             display: "flex",
@@ -537,8 +550,9 @@ export function PlayerProfileCard({
                 <span
                   aria-hidden="true"
                   style={{
-                    width: 54,
-                    height: 54,
+                    width: "clamp(44px, 13vw, 54px)",
+                    height: "clamp(44px, 13vw, 54px)",
+                    flex: "0 0 auto",
                     borderRadius: "50%",
                     display: "flex",
                     alignItems: "center",
@@ -583,8 +597,8 @@ export function PlayerProfileCard({
       <footer
         style={{
           display: "flex",
-          gap: 2,
-          padding: "16px 22px 18px",
+          gap: 6,
+          padding: `16px ${PAD_H} 18px`,
           background: "hsl(var(--cph-light-blue) / 0.06)",
           borderTop: `1px solid ${DIVIDER}`,
         }}
