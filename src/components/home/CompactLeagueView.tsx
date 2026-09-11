@@ -126,34 +126,34 @@ export function CompactLeagueView() {
                   >
                     {rank}
                   </span>
-                  <span
-                    className={`flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full text-[13px] font-extrabold ${
-                      rank === 1
-                        ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-emerald))]"
-                        : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
-                    }`}
-                  >
-                    {lookupAvatar({ employeeId: standing.employee_id, name }) ? (
-                      <img
-                        src={lookupAvatar({ employeeId: standing.employee_id, name }) as string}
-                        alt={name}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : (
-                      getInitials(name)
-                    )}
-                  </span>
                   <PlayerProfileHoverCard employeeId={standing.employee_id}>
-                    <div className="min-w-0 flex-1 cursor-default">
-                      <p className="truncate text-[15px] font-extrabold text-foreground">
-                        {name}
-                        {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
-                      </p>
-                      <p className="text-[13px] text-foreground/70">
-                        {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
-                      </p>
-                    </div>
+                    <span
+                      className={`flex h-10 w-10 flex-none cursor-pointer items-center justify-center overflow-hidden rounded-full text-[13px] font-extrabold ${
+                        rank === 1
+                          ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-emerald))]"
+                          : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
+                      }`}
+                    >
+                      {lookupAvatar({ employeeId: standing.employee_id, name }) ? (
+                        <img
+                          src={lookupAvatar({ employeeId: standing.employee_id, name }) as string}
+                          alt={name}
+                          className="h-full w-full rounded-full object-cover"
+                        />
+                      ) : (
+                        getInitials(name)
+                      )}
+                    </span>
                   </PlayerProfileHoverCard>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-extrabold text-foreground">
+                      {name}
+                      {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
+                    </p>
+                    <p className="text-[13px] text-foreground/70">
+                      {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
+                    </p>
+                  </div>
                   <div className="flex flex-none items-center gap-3">
                     {isPodium(rank) && (
                       <FeedReactionRow
