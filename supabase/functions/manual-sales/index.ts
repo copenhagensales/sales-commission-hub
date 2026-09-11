@@ -343,6 +343,7 @@ serve(async (req) => {
         const r = rows[idx];
         const seller = String(r.saelger ?? "").trim();
         const subjectId = String(r.emne_id ?? "").trim();
+        const meetingType = String(r.moedetype ?? "").trim();
         const push = (reason: string) => errors.push({ reason, seller, subject_id: subjectId });
 
 
