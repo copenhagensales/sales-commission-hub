@@ -30,8 +30,8 @@ export function CompactLeagueView() {
 
   const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
 
-  const formatPoints = (points: number) =>
-    `${new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(points)} pt`;
+  const formatProvision = (amount: number) =>
+    `${new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(amount)} kr`;
 
   const isPodium = (rank: number) => rank >= 1 && rank <= 3;
 
