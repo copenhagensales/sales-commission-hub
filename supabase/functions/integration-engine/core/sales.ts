@@ -3,6 +3,10 @@ import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
 import { stripNoteFields } from "../../_shared/strip-notes.ts"
+import {
+  stripIdentityFromPiiFields,
+  stripNormalizedIdentity,
+} from "../../_shared/normalized-identity.ts"
 
 /**
  * Check if a condition value is a NumericCondition object
@@ -417,6 +421,8 @@ async function processSalesBatch(
 ) {
   let processed = 0
   let errors = 0
+  let identityFieldsStripped = 0
+  let identityStrippedSales = 0
 
   const externalIdsRaw = sales.map((s) => String(s.externalId || "").trim()).filter(Boolean)
   const externalIds = Array.from(new Set(externalIdsRaw))
@@ -493,6 +499,16 @@ async function processSalesBatch(
         }
       }
       
+      // GDPR: kundeidentitet må aldrig persisteres i normalized_data
+      const normalizedIdentity = stripNormalizedIdentity(
+        sale.normalizedData as Record<string, unknown> | null | undefined
+      )
+      if (normalizedIdentity.removedKeys.length > 0) {
+        identityFieldsStripped += normalizedIdentity.removedKeys.length
+        identityStrippedSales++
+        sale.piiFields = stripIdentityFromPiiFields(sale.piiFields) ?? undefined
+      }
+
       const saleData: Record<string, unknown> = {
         adversus_external_id: sale.externalId,
         sale_datetime: sale.saleDate,
@@ -505,7 +521,7 @@ async function processSalesBatch(
         source: sale.dialerName,
         integration_type: sale.integrationType,
         raw_payload: sale.rawPayload ? stripNoteFields(sale.rawPayload) : null,
-        normalized_data: sale.normalizedData || null,
+        normalized_data: normalizedIdentity.data || null,
         updated_at: new Date().toISOString(),
         validation_status: 'pending',  // Eksplicit default for at undgå NULL
         enrichment_status: enrichmentStatus,
@@ -615,7 +631,7 @@ async function processSalesBatch(
     processed = 0
   }
 
-  return { processed, errors }
+  return { processed, errors, identityFieldsStripped, identityStrippedSales }
 }
 
 export async function processSales(
@@ -755,12 +771,14 @@ export async function processSales(
 
   let totalProcessed = 0
   let totalErrors = 0
+  let totalIdentityFieldsStripped = 0
+  let totalIdentityStrippedSales = 0
   const batches = chunk(filteredSales, batchSize)
   const totalBatches = batches.length
   for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
     const batch = batches[batchNum]
     log("INFO", `Procesando lote ${batchNum + 1}/${totalBatches} (${batch.length} ventas)...`)
-    const { processed, errors } = await processSalesBatch(
+    const { processed, errors, identityFieldsStripped, identityStrippedSales } = await processSalesBatch(
       supabase,
       batch,
       productMapByName,
@@ -772,10 +790,35 @@ export async function processSales(
     )
     totalProcessed += processed
     totalErrors += errors
+    totalIdentityFieldsStripped += identityFieldsStripped || 0
+    totalIdentityStrippedSales += identityStrippedSales || 0
     log(
       "INFO",
       `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${filteredSales.length}`
     )
   }
+
+  // GDPR: log kun tællinger for fjernede identitetsfelter, aldrig værdierne
+  if (totalIdentityFieldsStripped > 0) {
+    log(
+      "INFO",
+      `GDPR: fjernede ${totalIdentityFieldsStripped} identitetsfelter fra normalized_data i ${totalIdentityStrippedSales} salg`
+    )
+    const { error: logError } = await supabase.from("gdpr_cleanup_log").insert({
+      action: "normalized_data_identity_stripped",
+      records_affected: totalIdentityStrippedSales,
+      triggered_by: "integration-engine",
+      details: {
+        fields_removed: totalIdentityFieldsStripped,
+        sales_affected: totalIdentityStrippedSales,
+        source: sampleSale.dialerName,
+        integration_type: sampleSale.integrationType,
+      },
+    })
+    if (logError) {
+      log("WARN", `Kunne ikke skrive gdpr_cleanup_log: ${logError.message}`)
+    }
+  }
+
   return { processed: totalProcessed, errors: totalErrors }
 }

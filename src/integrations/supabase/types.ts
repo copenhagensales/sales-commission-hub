@@ -15586,6 +15586,15 @@ export type Database = {
       }
     }
     Views: {
+      compliance_afvigelser: {
+        Row: {
+          antal: number | null
+          kontrol: string | null
+          kriterium: string | null
+          nr: number | null
+        }
+        Relationships: []
+      }
       dialer_session_daily_metrics: {
         Row: {
           agent_external_id: string | null
