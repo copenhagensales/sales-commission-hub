@@ -497,21 +497,15 @@ async function processSalesBatch(
         }
       }
       
-      // GDPR: kundeidentitet må aldrig persisteres i normalized_data
-      const normalizedIdentity = stripNormalizedIdentity(
-        sale.normalizedData as Record<string, unknown> | null | undefined
-      )
-      if (normalizedIdentity.removedKeys.length > 0) {
-        identityFieldsStripped += normalizedIdentity.removedKeys.length
-        identityStrippedSales++
-        sale.piiFields = stripIdentityFromPiiFields(sale.piiFields) ?? undefined
-      }
-
-      // GDPR: fritekst må ikke persisteres — hverken i raw_payload eller normalized_data
+      // GDPR: ét databasedrevet indtagsfilter for begge beholdere
       gdprFilter.countSale()
-      const cleanNormalized = normalizedIdentity.data
-        ? gdprFilter.filter(normalizedIdentity.data)
+      const cleanNormalized = sale.normalizedData
+        ? gdprFilter.filter(
+            sale.normalizedData as Record<string, unknown>,
+            "normalized_data"
+          )
         : null
+      sale.piiFields = gdprFilter.filterPii(sale.piiFields) ?? undefined
 
       const saleData: Record<string, unknown> = {
         adversus_external_id: sale.externalId,
