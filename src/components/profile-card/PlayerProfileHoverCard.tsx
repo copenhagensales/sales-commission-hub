@@ -25,7 +25,7 @@ export function PlayerProfileHoverCard({
   employeeId,
   children,
   side = "right",
-  align = "start",
+  align = "center",
 }: PlayerProfileHoverCardProps) {
   const { data } = useEmployeeProfileStats();
   const person = employeeId ? data?.byId.get(employeeId) : undefined;
@@ -38,13 +38,17 @@ export function PlayerProfileHoverCard({
       <HoverCardContent
         side={side}
         align={align}
-        className="w-auto border-0 bg-transparent p-0 shadow-none"
+        sideOffset={12}
+        collisionPadding={24}
+        avoidCollisions
+        className="w-auto max-h-[85vh] overflow-y-auto border-0 bg-transparent p-0 shadow-none"
       >
         <PlayerProfileCard
           person={person}
           club200Members={data?.club200Members ?? 0}
         />
       </HoverCardContent>
+
     </HoverCard>
   );
 }
