@@ -16021,6 +16021,7 @@ export type Database = {
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
+      compliance_mail_payload: { Args: never; Returns: Json }
       compliance_raise: {
         Args: {
           p_detail: Json
