@@ -170,9 +170,13 @@ export function DashboardPeriodSelector({
     <div className={cn("flex items-center gap-2", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2 min-w-[140px] justify-start">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 min-w-[140px] justify-start bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+          >
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            <span>{displayLabel}</span>
+            <span className="text-foreground">{displayLabel}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
