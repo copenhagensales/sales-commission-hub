@@ -76,7 +76,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const showMonth = config.features?.showMonth !== false;
   const showSalesPerHour = config.features?.salesPerHour === true;
   const showCrossSales = config.features?.crossSales === true;
-  const useLiveMode = config.features?.liveMode === true;
+  const useLiveMode = config.features?.liveMode !== false;
   const showFiber = config.features?.fiberBoard === true;
 
   // Determine scope
