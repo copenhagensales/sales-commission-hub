@@ -193,14 +193,18 @@ export function PlayerProfileCard({
         )}
       </header>
 
-      {/* 2) Tre karrieretal */}
+      {/* 2) Topgrafik: de to vigtigste rekorder */}
       <div style={{ display: "flex", gap: 2, padding: "0 22px" }}>
         {[
-          { label: "Salg i alt", value: count(s?.total_sales ?? 0) },
-          { label: "Lønperioder", value: count(s?.pay_periods ?? 0) },
           {
-            label: "Snit pr. lønperiode",
-            value: s && s.pay_periods > 0 ? kr(s.avg_per_pay_period) : "—",
+            label: "Bedste dag",
+            value: kr(s?.best_day_amount ?? null),
+            meta: formatDanishDate(s?.best_day_date) ?? "ikke sat endnu",
+          },
+          {
+            label: "Bedste lønperiode",
+            value: kr(s?.best_period_amount ?? null),
+            meta: formatPayPeriod(s?.best_period_start) ?? "ikke sat endnu",
           },
         ].map((item, i, arr) => (
           <div
