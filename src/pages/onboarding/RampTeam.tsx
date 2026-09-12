@@ -969,15 +969,22 @@ export default function RampTeam() {
                 extraColor: "#57635e",
               },
               {
-                strip: counts.missing > 0 ? AMBER : GREEN,
+                strip: !programActive ? "#c9d6d1" : counts.missing > 0 ? AMBER : GREEN,
                 label: `Mangler forløb i uge ${isoWeek ?? "-"}`,
                 value: counts.missing,
                 sub: `af ${counts.total} sælgere`,
-                extra:
-                  counts.missing > 0
+                extra: !programActive
+                  ? programStartLabel
+                    ? `Starter ${programStartLabel}`
+                    : "Ordningen er ikke trådt i kraft endnu"
+                  : counts.missing > 0
                     ? "Coaching eller lyt mangler stadig"
                     : "Alle forløb er afviklet",
-                extraColor: counts.missing > 0 ? AMBER_TEXT : "#0f5a38",
+                extraColor: !programActive
+                  ? "#57635e"
+                  : counts.missing > 0
+                    ? AMBER_TEXT
+                    : "#0f5a38",
               },
             ].map((kpi) => (
               <div
