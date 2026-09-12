@@ -395,8 +395,7 @@ export function buildLeaderMail(
       leaderName: input.leaderName,
       leaderRole: "Afholdt forløbet",
       cta: true,
-      remember:
-        "Du kan altid tage fat i os - også uden for de faste forløb. Ring, skriv på Teams eller kom forbi. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
+      remember: supportSentence(input, false),
     }),
   };
 }
