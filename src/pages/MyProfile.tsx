@@ -27,6 +27,8 @@ import { VACATION_PAY_RATES, getPayrollPeriod } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 import { HandbookTabContent } from "@/components/profile/HandbookTabContent";
+import { RampCurveCard } from "@/components/ramp/RampCurveCard";
+
 import { logSensitiveAccess } from "@/hooks/useLogSensitiveAccess";
 
 
