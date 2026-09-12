@@ -25,7 +25,7 @@ import { getInitials } from "@/utils/formatting";
  * og registreringen sker paa serveren efter mailen er lagt i koen.
  */
 
-type FilterMode = "danger" | "missing";
+type FilterMode = "all" | "danger" | "missing";
 type SessionKind = "coaching" | "listen";
 
 const KIND_LABEL: Record<SessionKind, string> = {
