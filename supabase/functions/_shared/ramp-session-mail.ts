@@ -351,7 +351,6 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
     quoteBlock(input.note, focusLine(input)),
     strengthBlock(input.strengthNote),
     chart(input),
-    rampBlock(input),
   ].join("");
 
   return {
@@ -359,7 +358,7 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
     html: shell({
       preheader,
       isoWeek: input.isoWeek,
-      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} I HUS`,
+      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()}`,
       heading,
       heroInitials: esc(initials(input.sellerName)).toUpperCase(),
       intro: `Vi holdt vores <strong style="color:#ffffff;">${esc(KIND_LABEL[input.kind])}</strong> i uge ${input.isoWeek}. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
@@ -367,8 +366,7 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       leaderName: input.leaderName,
       leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
-      remember:
-        "Du må fange mig når som helst - også uden for de faste forløb. Ring, skriv på Teams eller stik hovedet ind. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
+      remember: supportSentence(input, true),
     }),
   };
 }
