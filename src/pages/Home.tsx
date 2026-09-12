@@ -60,6 +60,7 @@ import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { PendingContractBanner } from "@/components/home/PendingContractBanner";
 import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBanner";
 import { EventGallery } from "@/components/home/EventGallery";
+import { RampCurveCard } from "@/components/ramp/RampCurveCard";
 
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
