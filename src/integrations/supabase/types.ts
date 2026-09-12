@@ -12621,7 +12621,8 @@ export type Database = {
           action_type: string
           coaching_feedback_id: string | null
           created_at: string
-          flag_id: string
+          employee_id: string
+          flag_id: string | null
           id: string
           performed_at: string
           performed_by: string
@@ -12630,7 +12631,8 @@ export type Database = {
           action_type: string
           coaching_feedback_id?: string | null
           created_at?: string
-          flag_id: string
+          employee_id: string
+          flag_id?: string | null
           id?: string
           performed_at?: string
           performed_by: string
@@ -12639,7 +12641,8 @@ export type Database = {
           action_type?: string
           coaching_feedback_id?: string | null
           created_at?: string
-          flag_id?: string
+          employee_id?: string
+          flag_id?: string | null
           id?: string
           performed_at?: string
           performed_by?: string
@@ -12650,6 +12653,27 @@ export type Database = {
             columns: ["coaching_feedback_id"]
             isOneToOne: false
             referencedRelation: "coaching_feedback"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_employee_fk"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_employee_fk"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_employee_fk"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
           {
@@ -12803,6 +12827,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ramp_risk_stats: {
+        Row: {
+          client_campaign_id: string
+          computed_at: string
+          curve_version: number
+          day_no: number
+          id: string
+          n_above: number
+          n_above_stopped: number
+          n_below: number
+          n_below_stopped: number
+          threshold_p25: number
+        }
+        Insert: {
+          client_campaign_id: string
+          computed_at?: string
+          curve_version: number
+          day_no: number
+          id?: string
+          n_above: number
+          n_above_stopped: number
+          n_below: number
+          n_below_stopped: number
+          threshold_p25: number
+        }
+        Update: {
+          client_campaign_id?: string
+          computed_at?: string
+          curve_version?: number
+          day_no?: number
+          id?: string
+          n_above?: number
+          n_above_stopped?: number
+          n_below?: number
+          n_below_stopped?: number
+          threshold_p25?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ramp_risk_stats_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ramp_settings: {
         Row: {
@@ -16360,6 +16431,7 @@ export type Database = {
         Returns: boolean
       }
       can_view_ramp_risk_flags: { Args: never; Returns: boolean }
+      can_view_ramp_team: { Args: never; Returns: boolean }
       can_view_sale_as_employee: {
         Args: { _sale_id: string; _user_id: string }
         Returns: boolean
@@ -16399,6 +16471,7 @@ export type Database = {
         Returns: string
       }
       compute_ramp_curve: { Args: { p_campaign: string }; Returns: number }
+      compute_ramp_risk_stats: { Args: { p_campaign: string }; Returns: number }
       consume_password_reset_token: {
         Args: { _token_hash: string }
         Returns: boolean
@@ -16768,6 +16841,7 @@ export type Database = {
       get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
       get_ramp_for_employee: { Args: { p_employee_id: string }; Returns: Json }
       get_ramp_risk_flags: { Args: never; Returns: Json }
+      get_ramp_team_overview: { Args: never; Returns: Json }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
