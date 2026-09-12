@@ -178,9 +178,20 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       </div>
 
       {/* 3) Kurvekort */}
-      <div className="rs-card rs-fade mt-4 p-4 sm:p-6" style={{ animationDelay: "140ms" }}>
+      <div
+        className="rs-card rs-fade mt-4 p-4 sm:p-6"
+        style={{ animationDelay: "140ms", borderLeft: "5px solid #2e3136" }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[16px] font-bold tracking-tight">Din kurve mod dag 40</h3>
+          <div>
+            <p
+              className="text-[10px] font-extrabold uppercase tracking-[0.14em]"
+              style={{ color: "var(--rs-muted)" }}
+            >
+              Forløb
+            </p>
+            <h3 className="text-[18px] font-extrabold tracking-tight">Din kurve mod dag 40</h3>
+          </div>
           <span
             className="rounded-full px-2.5 py-1 text-[11px] font-bold"
             style={{ background: "#e8faf0", color: "#13623c" }}
