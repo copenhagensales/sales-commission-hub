@@ -65,6 +65,10 @@ export interface RampTeamMember {
   has_coaching: boolean;
   has_listen: boolean;
   has_absence: boolean;
+  /** Startdato for ordningen med ugentlige forloeb (null = ikke sat). */
+  weekly_program_start_date: string | null;
+  /** True naar ugens mandag ligger paa eller efter startdatoen. */
+  weekly_program_active: boolean;
   week_required: boolean;
   week_complete: boolean;
   weeks: RampWeekPoint[];
