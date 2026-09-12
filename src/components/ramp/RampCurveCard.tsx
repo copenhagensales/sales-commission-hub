@@ -327,8 +327,17 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       </div>
 
       {/* 4) Din rejse */}
-      <div className="rs-card rs-fade mt-4 p-4 sm:p-6" style={{ animationDelay: "200ms" }}>
-        <h3 className="text-[16px] font-bold tracking-tight">Din rejse</h3>
+      <div
+        className="rs-card rs-fade mt-4 p-4 sm:p-6"
+        style={{ animationDelay: "200ms", borderLeft: "5px solid var(--rs-accent)" }}
+      >
+        <p
+          className="text-[10px] font-extrabold uppercase tracking-[0.14em]"
+          style={{ color: "var(--rs-muted)" }}
+        >
+          Milepæle
+        </p>
+        <h3 className="text-[18px] font-extrabold tracking-tight">Din rejse</h3>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {view.milestones.map((m) => (
             <div
