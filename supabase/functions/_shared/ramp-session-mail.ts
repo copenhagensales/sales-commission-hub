@@ -235,7 +235,6 @@ function shell(opts: {
   heroInitials: string;
   blocks: string;
   leaderName: string;
-  leaderRole: string;
   cta: boolean;
   remember: string;
 }): string {
@@ -307,7 +306,7 @@ function shell(opts: {
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #e2eaeb;"><tr><td style="padding-top:20px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
             <td width="46" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="38" height="38" align="center" bgcolor="${C.onyx}" style="border-radius:12px;font-family:${FONT};font-size:14px;font-weight:800;color:${C.emerald};">${esc(initials(opts.leaderName)).toUpperCase()}</td></tr></table></td>
-            <td valign="middle" style="${txt(14, 20, C.onyx, 800)}">${esc(opts.leaderName)}<span style="display:block;font-weight:400;font-size:13px;color:${C.muted};">${opts.leaderRole}</span></td>
+            <td valign="middle" style="${txt(14, 20, C.onyx, 800)}">${esc(opts.leaderName)}</td>
           </tr></table>
         </td></tr></table>
       </td></tr>
@@ -364,7 +363,6 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       intro: `Vi holdt vores <strong style="color:#ffffff;">${esc(KIND_LABEL[input.kind])}</strong> i uge ${input.isoWeek}. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
       blocks,
       leaderName: input.leaderName,
-      leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
       remember: supportSentence(input, true),
     }),
@@ -393,7 +391,6 @@ export function buildLeaderMail(
       intro: `<strong style="color:#ffffff;">${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
       blocks,
       leaderName: input.leaderName,
-      leaderRole: "Afholdt forløbet",
       cta: true,
       remember: supportSentence(input, false),
     }),
