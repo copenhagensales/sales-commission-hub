@@ -89,7 +89,7 @@ export function useRampRiskStats() {
       const { data, error } = await supabase
         .from("ramp_risk_stats")
         .select(
-          "day_no, threshold_p25, n_below, n_below_stopped, n_above, n_above_stopped, computed_at, client_campaigns(name)",
+          "day_no, threshold_p25, n_below, n_below_stopped, n_below_pending, n_above, n_above_stopped, n_above_pending, computed_at, client_campaigns(name)",
         )
         .order("day_no", { ascending: true });
       if (error) throw error;
@@ -98,12 +98,15 @@ export function useRampRiskStats() {
         threshold_p25: Number(row.threshold_p25),
         n_below: row.n_below,
         n_below_stopped: row.n_below_stopped,
+        n_below_pending: row.n_below_pending,
         n_above: row.n_above,
         n_above_stopped: row.n_above_stopped,
+        n_above_pending: row.n_above_pending,
         computed_at: row.computed_at,
         campaign_name:
           (row as { client_campaigns?: { name: string } | null }).client_campaigns?.name ?? null,
       }));
+
     },
     staleTime: 10 * 60 * 1000,
   });
