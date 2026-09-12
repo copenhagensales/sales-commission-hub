@@ -884,7 +884,8 @@ export default function RampTeam() {
             <div className="flex flex-wrap gap-2">
               {(
                 [
-                  { mode: "danger" as FilterMode, label: `Alle i farezonen · ${counts.danger}` },
+                  { mode: "all" as FilterMode, label: `Alle nye · ${counts.total}` },
+                  { mode: "danger" as FilterMode, label: `I farezonen · ${counts.danger}` },
                   {
                     mode: "missing" as FilterMode,
                     label: `Mangler forløb i uge ${isoWeek ?? "-"} · ${counts.missing}`,
