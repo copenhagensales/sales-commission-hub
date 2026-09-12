@@ -32,6 +32,10 @@ export interface RampAction {
   action_type: string;
   performed_at: string;
   performed_by_name: string | null;
+  /** Feedbacktekst der blev sendt ordret til modtagerne (null for gamle registreringer). */
+  note: string | null;
+  /** E-mailadresser feedbacken blev sendt til. */
+  recipients: string[];
 }
 
 export interface RampWeekPoint {
