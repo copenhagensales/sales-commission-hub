@@ -855,7 +855,7 @@ export default function RampTeam() {
     );
   }
 
-  const list = filter === "danger" ? dangerList : missingList;
+  const list = filter === "all" ? allList : filter === "danger" ? dangerList : missingList;
   const day10 = stats.find((s) => s.day_no === 10);
 
   return (
