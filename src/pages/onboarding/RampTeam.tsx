@@ -25,7 +25,7 @@ import { getInitials } from "@/utils/formatting";
  * og registreringen sker paa serveren efter mailen er lagt i koen.
  */
 
-type FilterMode = "danger" | "missing";
+type FilterMode = "all" | "danger" | "missing";
 type SessionKind = "coaching" | "listen";
 
 const KIND_LABEL: Record<SessionKind, string> = {
@@ -782,7 +782,7 @@ export default function RampTeam() {
   const { data: canView, isLoading: accessLoading } = useCanViewRampTeam();
   const { data: members = [], isLoading } = useRampTeamOverview();
   const { data: stats = [] } = useRampRiskStats();
-  const [filter, setFilter] = useState<FilterMode>("danger");
+  const [filter, setFilter] = useState<FilterMode>("all");
   const [showEvidence, setShowEvidence] = useState(false);
   const [dialog, setDialog] = useState<{
     employeeId: string;
@@ -801,10 +801,9 @@ export default function RampTeam() {
       })
     : null;
 
-  const dangerList = useMemo(
+  const allList = useMemo(
     () =>
       members
-        .filter((m) => m.status === "under")
         .map((m) => ({ member: m, urgency: derive(m).urgency }))
         .sort(
           (a, b) =>
@@ -815,9 +814,11 @@ export default function RampTeam() {
     [members],
   );
 
+  const dangerList = useMemo(() => allList.filter((m) => m.status === "under"), [allList]);
+
   const missingList = useMemo(
-    () => dangerList.filter((m) => !m.has_absence && (!m.has_coaching || !m.has_listen)),
-    [dangerList],
+    () => allList.filter((m) => !m.has_absence && (!m.has_coaching || !m.has_listen)),
+    [allList],
   );
 
   const counts = useMemo(() => {
@@ -854,7 +855,7 @@ export default function RampTeam() {
     );
   }
 
-  const list = filter === "danger" ? dangerList : missingList;
+  const list = filter === "all" ? allList : filter === "danger" ? dangerList : missingList;
   const day10 = stats.find((s) => s.day_no === 10);
 
   return (
@@ -883,7 +884,8 @@ export default function RampTeam() {
             <div className="flex flex-wrap gap-2">
               {(
                 [
-                  { mode: "danger" as FilterMode, label: `Alle i farezonen · ${counts.danger}` },
+                  { mode: "all" as FilterMode, label: `Alle nye · ${counts.total}` },
+                  { mode: "danger" as FilterMode, label: `I farezonen · ${counts.danger}` },
                   {
                     mode: "missing" as FilterMode,
                     label: `Mangler forløb i uge ${isoWeek ?? "-"} · ${counts.missing}`,
@@ -1040,10 +1042,13 @@ export default function RampTeam() {
                 >
                   {filter === "missing"
                     ? `Mangler forløb i uge ${isoWeek ?? "-"}`
-                    : "I farezonen nu"}
+                    : filter === "danger"
+                      ? "I farezonen nu"
+                      : "Alle nye i opstart"}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Under spændet = 1-1 coaching og 1-1 lyt hver uge, indtil de er inde i spændet.
+                  Alle nye får 1-1 coaching og 1-1 lyt hver uge i de første 40 arbejdsdage — også
+                  dem der ligger flot.
                 </p>
               </div>
               <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>
@@ -1059,16 +1064,18 @@ export default function RampTeam() {
                 <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
                   {filter === "missing"
                     ? `Alle forløb er afviklet i uge ${isoWeek ?? "-"}`
-                    : "Ingen sælgere ligger under spændet lige nu"}
+                    : filter === "danger"
+                      ? "Ingen sælgere ligger under spændet lige nu"
+                      : "Ingen sælgere er i opstart lige nu"}
                 </p>
-                {filter === "missing" && (
+                {filter !== "all" && (
                   <button
                     type="button"
-                    onClick={() => setFilter("danger")}
+                    onClick={() => setFilter("all")}
                     className="mt-2 text-[12px] font-bold underline"
                     style={{ color: "#0f5a38" }}
                   >
-                    Tilbage til alle i farezonen
+                    Vis alle nye
                   </button>
                 )}
               </div>
