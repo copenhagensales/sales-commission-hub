@@ -44,6 +44,19 @@ const AMBER = "#e0b64a";
 const AMBER_STRIP = "#e08a2e";
 const AMBER_TEXT = "#9a6216";
 const GREEN = "#177a4d";
+
+/** Fokusomraader lederen kan vaelge til ugens fokus. */
+const FOCUS_AREAS = [
+  "Åbningen",
+  "Behovsafdækning",
+  "Værdiargumentation",
+  "Indvendingshåndtering",
+  "Lukkefasen",
+  "Mersalg",
+  "Tonen i samtalen",
+  "Struktur og disciplin",
+  "Aktivitet og opkald",
+] as const;
 const NEUTRAL = "#b9c4bf";
 
 function isoWeekOf(date: Date): { year: number; week: number } {
