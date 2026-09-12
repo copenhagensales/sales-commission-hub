@@ -88,13 +88,19 @@ function derive(member: RampTeamMember): Derived {
   const doneThisWeek = (member.has_coaching ? 1 : 0) + (member.has_listen ? 1 : 0);
 
   // Sammenhaengende uger bagud uden et lyt (den aktuelle uge taelles med).
+  // Uger foer ordningens startdato taeller ikke som manglende.
   let missedListen = 0;
-  for (let i = member.weeks.length - 1; i >= 0; i--) {
-    const w = member.weeks[i];
-    const entry = weekActions.get(weekKey(w.iso_year, w.iso_week));
-    if (entry?.absence) break;
-    if (entry?.listen) break;
-    missedListen += 1;
+  if (member.weekly_program_active && member.weekly_program_start_date) {
+    const start = isoWeekOf(new Date(`${member.weekly_program_start_date}T00:00:00`));
+    const startRank = start.year * 100 + start.week;
+    for (let i = member.weeks.length - 1; i >= 0; i--) {
+      const w = member.weeks[i];
+      if (w.iso_year * 100 + w.iso_week < startRank) break;
+      const entry = weekActions.get(weekKey(w.iso_year, w.iso_week));
+      if (entry?.absence) break;
+      if (entry?.listen) break;
+      missedListen += 1;
+    }
   }
 
   const sales = member.weeks.map((w) => w.sales);
@@ -105,7 +111,10 @@ function derive(member: RampTeamMember): Derived {
   }
 
   const urgency =
-    (missedListen >= 2 ? 100 : 0) + (2 - doneThisWeek) * 20 + gap * 3 + (trend === "down" ? 10 : 0);
+    (missedListen >= 2 ? 100 : 0) +
+    (member.week_required ? (2 - doneThisWeek) * 20 : 0) +
+    gap * 3 +
+    (trend === "down" ? 10 : 0);
 
   return {
     gap,
@@ -137,7 +146,7 @@ function priorityBand(member: RampTeamMember, d: Derived) {
       sub: "Sæt et lyt i kalenderen i dag",
     };
   }
-  if (d.doneThisWeek === 0) {
+  if (member.week_required && d.doneThisWeek === 0) {
     return {
       tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
       mark: "!",
@@ -145,12 +154,20 @@ function priorityBand(member: RampTeamMember, d: Derived) {
       sub: "Coaching og lyt skal holdes denne uge",
     };
   }
-  if (d.doneThisWeek === 1) {
+  if (member.week_required && d.doneThisWeek === 1) {
     return {
       tone: { bg: "#fdf2e3", icon: AMBER_TEXT, text: "#7a4e11" },
       mark: "!",
       title: `${missingKind} mangler i uge ${member.iso_week}`,
       sub: "Ét forløb tilbage før ugen er lukket",
+    };
+  }
+  if (!member.week_required && !member.weekly_program_active) {
+    return {
+      tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
+      mark: "✓",
+      title: "Ordningen er ikke trådt i kraft endnu",
+      sub: "Ugen tælles ikke som manglende",
     };
   }
   if (d.trend === "down") {
@@ -823,7 +840,10 @@ export default function RampTeam() {
   const dangerList = useMemo(() => allList.filter((m) => m.status === "under"), [allList]);
 
   const missingList = useMemo(
-    () => allList.filter((m) => !m.has_absence && (!m.has_coaching || !m.has_listen)),
+    () =>
+      allList.filter(
+        (m) => m.week_required && !m.has_absence && (!m.has_coaching || !m.has_listen),
+      ),
     [allList],
   );
 
@@ -949,15 +969,22 @@ export default function RampTeam() {
                 extraColor: "#57635e",
               },
               {
-                strip: counts.missing > 0 ? AMBER : GREEN,
+                strip: !programActive ? "#c9d6d1" : counts.missing > 0 ? AMBER : GREEN,
                 label: `Mangler forløb i uge ${isoWeek ?? "-"}`,
                 value: counts.missing,
                 sub: `af ${counts.total} sælgere`,
-                extra:
-                  counts.missing > 0
+                extra: !programActive
+                  ? programStartLabel
+                    ? `Starter ${programStartLabel}`
+                    : "Ordningen er ikke trådt i kraft endnu"
+                  : counts.missing > 0
                     ? "Coaching eller lyt mangler stadig"
                     : "Alle forløb er afviklet",
-                extraColor: counts.missing > 0 ? AMBER_TEXT : "#0f5a38",
+                extraColor: !programActive
+                  ? "#57635e"
+                  : counts.missing > 0
+                    ? AMBER_TEXT
+                    : "#0f5a38",
               },
             ].map((kpi) => (
               <div
