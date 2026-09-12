@@ -1213,7 +1213,7 @@ export default function MyProfile() {
           <TabsContent value="stamdata" className="mt-6">
             <div className="space-y-6">
               {/* Din opstart – opstartskurve for nye sælgere */}
-              <RampCurveCard employeeId="bc9a0753-1028-498e-a699-183d1e7bc923" />
+              <RampCurveCard />
 
               {/* Personal Information - Combined Card */}
 
