@@ -782,7 +782,7 @@ export default function RampTeam() {
   const { data: canView, isLoading: accessLoading } = useCanViewRampTeam();
   const { data: members = [], isLoading } = useRampTeamOverview();
   const { data: stats = [] } = useRampRiskStats();
-  const [filter, setFilter] = useState<FilterMode>("danger");
+  const [filter, setFilter] = useState<FilterMode>("all");
   const [showEvidence, setShowEvidence] = useState(false);
   const [dialog, setDialog] = useState<{
     employeeId: string;
