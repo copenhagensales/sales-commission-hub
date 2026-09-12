@@ -238,11 +238,12 @@ function shell(opts: {
   pill: string;
   heading: string;
   intro: string;
+  heroInitials: string;
   blocks: string;
   leaderName: string;
   leaderRole: string;
   cta: boolean;
-  remember: boolean;
+  remember: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="da"><head>
