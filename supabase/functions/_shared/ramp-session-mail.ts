@@ -129,9 +129,7 @@ function chart(input: SessionMailInput): string {
       </tr>`
     : "";
 
-  const bandLabel = low !== null
-    ? `<td width="96" valign="bottom" align="right" style="font-family:${FONT};font-size:10px;font-weight:800;color:${C.emerald};padding-left:8px;white-space:nowrap;">${low} = SPÆNDET</td>`
-    : `<td width="96">&nbsp;</td>`;
+  const bandLabel = `<td width="96">&nbsp;</td>`;
 
   const footer = low !== null && input.bandMedian !== null
     ? `Typisk spænd for din anciennitet: ${low}&ndash;${input.bandHigh ?? input.bandMedian} salg &middot; median ${input.bandMedian}.`
