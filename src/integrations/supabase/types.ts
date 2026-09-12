@@ -3553,6 +3553,7 @@ export type Database = {
           external_adversus_id: string | null
           id: string
           name: string
+          ramp_enabled: boolean
           updated_at: string | null
         }
         Insert: {
@@ -3561,6 +3562,7 @@ export type Database = {
           external_adversus_id?: string | null
           id?: string
           name: string
+          ramp_enabled?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -3569,6 +3571,7 @@ export type Database = {
           external_adversus_id?: string | null
           id?: string
           name?: string
+          ramp_enabled?: boolean
           updated_at?: string | null
         }
         Relationships: [
@@ -12797,6 +12800,27 @@ export type Database = {
           created_at?: string
           id?: string
           risk_factor?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ramp_settings: {
+        Row: {
+          created_at: string
+          id: string
+          lookback_months: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lookback_months?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lookback_months?: number
           updated_at?: string
         }
         Relationships: []
