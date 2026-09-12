@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.ramp_day1(uuid, uuid) TO authenticated, service_role;
