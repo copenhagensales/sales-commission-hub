@@ -12952,18 +12952,21 @@ export type Database = {
           id: string
           lookback_months: number
           updated_at: string
+          weekly_program_start_date: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           lookback_months?: number
           updated_at?: string
+          weekly_program_start_date?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           lookback_months?: number
           updated_at?: string
+          weekly_program_start_date?: string | null
         }
         Relationships: []
       }
