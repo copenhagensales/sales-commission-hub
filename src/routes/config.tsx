@@ -85,6 +85,7 @@ import {
   Messages,
   OnboardingAdmin,
   OnboardingDashboard,
+  RampRiskFlags,
   OnboardingCourse,
   MyFeedback,
   ExcelFieldMatcher,
@@ -412,6 +413,8 @@ export const routes: RouteConfig[] = [
   { path: "/onboarding-program/kursus", component: OnboardingCourse, access: "protected" },
   { path: "/my-feedback", component: MyFeedback, access: "role", positionPermission: "menu_my_feedback" },
   { path: "/coaching-templates", component: CoachingTemplates, access: "role", positionPermission: "menu_onboarding_admin" },
+  // Fareflag: adgangen haandhaeves i databasen og i selve siden (kun ledere)
+  { path: "/opstart-risiko", component: RampRiskFlags, access: "protected" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 

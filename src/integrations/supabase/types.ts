@@ -12613,6 +12613,194 @@ export type Database = {
           },
         ]
       }
+      ramp_flag_action: {
+        Row: {
+          action_type: string
+          coaching_feedback_id: string | null
+          created_at: string
+          flag_id: string
+          id: string
+          performed_at: string
+          performed_by: string
+        }
+        Insert: {
+          action_type: string
+          coaching_feedback_id?: string | null
+          created_at?: string
+          flag_id: string
+          id?: string
+          performed_at?: string
+          performed_by: string
+        }
+        Update: {
+          action_type?: string
+          coaching_feedback_id?: string | null
+          created_at?: string
+          flag_id?: string
+          id?: string
+          performed_at?: string
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ramp_flag_action_coaching_feedback_id_fkey"
+            columns: ["coaching_feedback_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_feedback"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_flag_id_fkey"
+            columns: ["flag_id"]
+            isOneToOne: false
+            referencedRelation: "ramp_risk_flag"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_flag_action_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ramp_risk_flag: {
+        Row: {
+          client_campaign_id: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          cum_sales: number
+          curve_version: number
+          day_no: number
+          employee_id: string
+          id: string
+          status: string
+          threshold_value: number
+        }
+        Insert: {
+          client_campaign_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          cum_sales: number
+          curve_version: number
+          day_no: number
+          employee_id: string
+          id?: string
+          status?: string
+          threshold_value: number
+        }
+        Update: {
+          client_campaign_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          cum_sales?: number
+          curve_version?: number
+          day_no?: number
+          employee_id?: string
+          id?: string
+          status?: string
+          threshold_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ramp_risk_flag_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_risk_flag_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_risk_flag_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_risk_flag_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_risk_flag_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_risk_flag_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_risk_flag_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ramp_risk_settings: {
+        Row: {
+          basis_campaign_label: string
+          basis_leavers: number
+          basis_sellers: number
+          created_at: string
+          id: string
+          risk_factor: number
+          updated_at: string
+        }
+        Insert: {
+          basis_campaign_label?: string
+          basis_leavers?: number
+          basis_sellers?: number
+          created_at?: string
+          id?: string
+          risk_factor?: number
+          updated_at?: string
+        }
+        Update: {
+          basis_campaign_label?: string
+          basis_leavers?: number
+          basis_sellers?: number
+          created_at?: string
+          id?: string
+          risk_factor?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recruitment_notifications: {
         Row: {
           created_at: string
@@ -16147,6 +16335,7 @@ export type Database = {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_ramp_risk_flags: { Args: never; Returns: boolean }
       can_view_sale_as_employee: {
         Args: { _sale_id: string; _user_id: string }
         Returns: boolean
@@ -16554,6 +16743,7 @@ export type Database = {
       }
       get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
       get_ramp_for_employee: { Args: { p_employee_id: string }; Returns: Json }
+      get_ramp_risk_flags: { Args: never; Returns: Json }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
@@ -16868,7 +17058,9 @@ export type Database = {
         Returns: string
       }
       pay_period_start: { Args: { ts: string }; Returns: string }
+      ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
+      ramp_risk_mail_payload: { Args: never; Returns: Json }
       ramp_workday_no: {
         Args: { p_start: string; p_target: string }
         Returns: number
