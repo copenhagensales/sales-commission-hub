@@ -235,7 +235,6 @@ function shell(opts: {
   heroInitials: string;
   blocks: string;
   leaderName: string;
-  leaderRole: string;
   cta: boolean;
   remember: string;
 }): string {
@@ -364,7 +363,6 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       intro: `Vi holdt vores <strong style="color:#ffffff;">${esc(KIND_LABEL[input.kind])}</strong> i uge ${input.isoWeek}. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
       blocks,
       leaderName: input.leaderName,
-      leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
       remember: supportSentence(input, true),
     }),
@@ -393,7 +391,6 @@ export function buildLeaderMail(
       intro: `<strong style="color:#ffffff;">${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
       blocks,
       leaderName: input.leaderName,
-      leaderRole: "Afholdt forløbet",
       cta: true,
       remember: supportSentence(input, false),
     }),
