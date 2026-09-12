@@ -180,11 +180,22 @@ function Pill({
 }) {
   return (
     <span
-      className="rounded-full px-3 py-1 text-[12px] font-bold"
+      className="rounded-full px-[13px] py-[7px] text-[13px] font-extrabold"
       style={{ background: bg, color }}
     >
       {children}
     </span>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="text-[12px] font-extrabold uppercase"
+      style={{ color: "#57635e", letterSpacing: ".1em" }}
+    >
+      {children}
+    </p>
   );
 }
 
@@ -193,56 +204,62 @@ function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor:
   const bandLow = last ? last.p25 : 0;
   const bandHigh = last ? last.p75 : 0;
   const max = Math.max(1, bandHigh, ...weeks.map((w) => w.sales)) * 1.12;
+  const H = 84;
+  const px = (v: number) => Math.round((v / max) * H);
 
   return (
     <div>
-      <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
-        Salg pr. uge mod typisk spænd
-      </p>
-      <div className="relative mt-3" style={{ height: 84 }}>
+      <SectionLabel>Salg pr. uge mod typisk spænd</SectionLabel>
+      <div className="relative mt-3.5 flex items-end gap-2" style={{ height: H }}>
         {bandHigh > 0 && (
           <div
-            className="absolute inset-x-0 border-y border-dashed"
+            className="pointer-events-none absolute inset-x-0 border-y-2 border-dashed"
             style={{
-              bottom: `${(bandLow / max) * 100}%`,
-              height: `${Math.max(2, ((bandHigh - bandLow) / max) * 100)}%`,
+              top: H - px(bandHigh),
+              height: Math.max(2, px(bandHigh) - px(bandLow)),
               borderColor: "#bcd6c8",
               background: "rgba(23,122,77,.07)",
             }}
           />
         )}
-        <div className="relative flex h-full items-end gap-2">
-          {weeks.map((w) => {
-            const color =
-              w.sales >= w.p25 ? GREEN : w.sales >= w.p25 - 3 ? AMBER : stripColor;
-            return (
-              <div key={weekKey(w.iso_year, w.iso_week)} className="flex flex-1 justify-center">
-                <span
-                  className="w-4 rounded-t-[4px]"
-                  style={{
-                    height: `${Math.max(3, (w.sales / max) * 100)}%`,
-                    background: color,
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
+        {weeks.map((w) => {
+          const color = w.sales >= w.p25 ? GREEN : w.sales >= w.p25 - 3 ? AMBER : stripColor;
+          return (
+            <div
+              key={weekKey(w.iso_year, w.iso_week)}
+              className="relative z-[1] flex flex-1 flex-col items-center gap-[5px]"
+            >
+              <span
+                className="text-[12px] font-extrabold tabular-nums"
+                style={{ color: w.sales >= w.p25 ? GREEN : "#57635e" }}
+              >
+                {w.sales}
+              </span>
+              <span
+                className="w-full"
+                style={{
+                  height: Math.max(2, px(w.sales)),
+                  background: color,
+                  borderRadius: "5px 5px 0 0",
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
-      <div className="mt-1 flex gap-2">
+      <div className="mt-2 flex gap-2">
         {weeks.map((w) => (
-          <div key={`lbl-${weekKey(w.iso_year, w.iso_week)}`} className="flex-1 text-center">
-            <p className="text-[11px] tabular-nums" style={{ color: "#57635e" }}>
-              u{w.iso_week}
-            </p>
-            <p className="text-[11px] font-bold tabular-nums" style={{ color: "#1b1f1d" }}>
-              {w.sales}
-            </p>
-          </div>
+          <span
+            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
+            className="flex-1 text-center text-[11px] font-bold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            u{w.iso_week}
+          </span>
         ))}
       </div>
       {last && (
-        <p className="mt-2 text-[12px]" style={{ color: "#57635e" }}>
+        <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
           Stiplet felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · median{" "}
           {Math.round(last.p50)}
         </p>
@@ -274,26 +291,26 @@ function ProgramRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-colors"
+      className="flex w-full items-center gap-3 rounded-[13px] border px-[15px] py-[13px] text-left transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,.07)]"
       style={{
         background: done ? "#e7f4ed" : "#ffffff",
-        borderColor: done ? "#a9dcc3" : "#e7eeeb",
+        borderColor: done ? "#a9dcc3" : "#e0e7e4",
       }}
     >
       <span
-        className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-[8px] border"
+        className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-[8px] border-2"
         style={{
           background: done ? GREEN : "#ffffff",
-          borderColor: done ? GREEN : "#c9d5d0",
+          borderColor: done ? GREEN : "#c3ccc8",
         }}
       >
         {done && <Check className="h-3.5 w-3.5" style={{ color: "#fff" }} />}
       </span>
-      <span>
-        <span className="block text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
           {KIND_LABEL[kind]}
         </span>
-        <span className="block text-[12px]" style={{ color: "#57635e" }}>
+        <span className="mt-px block text-[12px] font-semibold" style={{ color: "#57635e" }}>
           {status}
         </span>
       </span>
@@ -303,30 +320,38 @@ function ProgramRow({
 
 function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
   return (
-    <div className="mt-3 flex gap-1">
-      {member.weeks.map((w) => {
-        const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
-        const count = (entry?.coaching ? 1 : 0) + (entry?.listen ? 1 : 0);
-        const color = entry?.absence
-          ? "#e7eeeb"
-          : count === 2
-            ? GREEN
-            : count === 1
-              ? AMBER
-              : "#e3908b";
-        const label = entry?.absence
-          ? `Uge ${w.iso_week}: fravær hele ugen`
-          : `Uge ${w.iso_week}: ${count} af 2 forløb holdt`;
-        return (
-          <span
-            key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
-            title={label}
-            aria-label={label}
-            className="h-2 flex-1 rounded-full"
-            style={{ background: color }}
-          />
-        );
-      })}
+    <div className="mt-3 flex items-center gap-2.5">
+      <span
+        className="whitespace-nowrap text-[11px] font-extrabold"
+        style={{ color: "#57635e" }}
+      >
+        6 uger
+      </span>
+      <div className="flex flex-1 gap-1">
+        {member.weeks.map((w) => {
+          const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
+          const count = (entry?.coaching ? 1 : 0) + (entry?.listen ? 1 : 0);
+          const color = entry?.absence
+            ? "#e7eeeb"
+            : count === 2
+              ? GREEN
+              : count === 1
+                ? AMBER
+                : "#e3908b";
+          const label = entry?.absence
+            ? `Uge ${w.iso_week}: fravær hele ugen`
+            : `Uge ${w.iso_week}: ${count} af 2 forløb holdt`;
+          return (
+            <span
+              key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
+              title={label}
+              aria-label={label}
+              className="h-[9px] flex-1 rounded-[3px]"
+              style={{ background: color }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -369,182 +394,205 @@ function MemberCard({
 
   return (
     <article
-      className="overflow-hidden rounded-[20px] bg-white"
+      className="relative overflow-hidden rounded-[20px] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
     >
-      <div className="flex">
-        <span className="w-[5px] shrink-0" style={{ background: d.stripColor }} />
-        <div className="flex-1 p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span
-                className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[14px] font-extrabold"
-                style={{ background: "#f1f4f3", color: "#1b1f1d" }}
+      <span
+        className="absolute bottom-0 left-0 top-0 w-[5px]"
+        style={{ background: d.stripColor }}
+      />
+
+      <div className="px-5 pt-5 sm:px-[26px]">
+        <div className="flex flex-wrap items-center justify-between gap-3.5">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[15px] font-extrabold"
+              style={{ background: "#f1f4f3", color: "#4a5651" }}
+            >
+              {getInitials(member.employee_name)}
+            </span>
+            <div className="min-w-0">
+              <p
+                className="text-[18px] font-extrabold leading-tight"
+                style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
               >
-                {getInitials(member.employee_name)}
-              </span>
-              <div>
-                <p className="text-[18px] font-extrabold leading-tight" style={{ color: "#1b1f1d" }}>
-                  {member.employee_name}
-                </p>
-                <p className="text-[12px]" style={{ color: "#57635e" }}>
-                  {[member.campaign_name, `arbejdsdag ${member.day_no}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Pill bg={trendPill.bg} color={trendPill.color}>
-                {trendPill.text}
-              </Pill>
-              {d.gap > 0 && (
-                <Pill
-                  bg={d.stripColor === RED ? "#fbe9e8" : "#fdf2e3"}
-                  color={d.stripColor === RED ? "#8f2a23" : "#7a4e11"}
-                >
-                  {d.gap} under spændet
-                </Pill>
-              )}
+                {member.employee_name}
+              </p>
+              <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                {[member.campaign_name, `arbejdsdag ${member.day_no}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill bg={trendPill.bg} color={trendPill.color}>
+              {trendPill.text}
+            </Pill>
+            {d.gap > 0 && (
+              <Pill
+                bg={d.stripColor === RED ? "#fbe9e8" : "#fdf2e3"}
+                color={d.stripColor === RED ? RED_TEXT : AMBER_TEXT}
+              >
+                {d.gap} under spændet
+              </Pill>
+            )}
+          </div>
+        </div>
 
-          <div
-            className="mt-3 flex items-start gap-3 rounded-2xl p-3"
-            style={{ background: band.tone.bg }}
+        <div
+          className="mt-[18px] flex items-center gap-3.5 rounded-[14px] px-[18px] py-3.5"
+          style={{ background: band.tone.bg }}
+        >
+          <span
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] text-[16px] font-extrabold text-white"
+            style={{ background: band.tone.icon }}
+          >
+            {band.mark}
+          </span>
+          <div className="min-w-0">
+            <p
+              className="text-[16px] font-extrabold"
+              style={{ color: band.tone.text, letterSpacing: "-.01em" }}
+            >
+              {band.title}
+            </p>
+            <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+              {band.sub}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <span
+            className="whitespace-nowrap text-[12px] font-extrabold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            Dag {member.day_no} af 40
+          </span>
+          <span
+            className="h-2 flex-1 overflow-hidden rounded-[4px]"
+            style={{ background: "#f1f4f3" }}
           >
             <span
-              className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] bg-white text-[15px] font-extrabold"
-              style={{ color: band.tone.icon }}
+              className="block h-full rounded-[4px]"
+              style={{
+                width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
+                background: d.stripColor,
+              }}
+            />
+          </span>
+          <span
+            className="whitespace-nowrap text-[12px] font-bold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            {member.days_left} dage tilbage
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
+        style={{ borderColor: "#eef2f0" }}
+      >
+        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} />
+
+        <div
+          className="rounded-[16px] border px-5 py-[18px]"
+          style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionLabel>Ugens faste forløb</SectionLabel>
+            <span
+              className="text-[12px] font-extrabold"
+              style={{ color: d.doneThisWeek === 2 ? "#0f5a38" : AMBER_TEXT }}
             >
-              {band.mark}
+              {d.doneThisWeek === 2 ? "Ugen er klaret" : `${d.doneThisWeek} af 2 holdt`}
             </span>
-            <div>
-              <p className="text-[14px] font-extrabold" style={{ color: band.tone.text }}>
-                {band.title}
-              </p>
-              <p className="text-[12px]" style={{ color: band.tone.text }}>
-                {band.sub}
-              </p>
-            </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3">
-            <span className="text-[12px] font-extrabold tabular-nums" style={{ color: "#1b1f1d" }}>
-              Dag {member.day_no} af 40
-            </span>
-            <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "#f1f4f3" }}>
-              <span
-                className="block h-full rounded-full"
-                style={{
-                  width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
-                  background: d.stripColor,
-                }}
+          {member.has_absence ? (
+            <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+              Der er registreret fravær hele ugen — forløbet er ikke krævet.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <ProgramRow
+                kind="coaching"
+                done={member.has_coaching}
+                member={member}
+                missedListen={d.missedListen}
+                onOpen={() => onOpen(member, "coaching", member.has_coaching)}
               />
-            </span>
-            <span className="text-[12px] tabular-nums" style={{ color: "#57635e" }}>
-              {member.days_left} dage tilbage
-            </span>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} />
-
-            <div
-              className="rounded-2xl border p-3"
-              style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
-                  Ugens faste forløb
+              <ProgramRow
+                kind="listen"
+                done={member.has_listen}
+                member={member}
+                missedListen={d.missedListen}
+                onOpen={() => onOpen(member, "listen", member.has_listen)}
+              />
+              {!member.week_required && (
+                <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
+                  {member.weekly_program_active
+                    ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
+                    : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
                 </p>
-                <Pill
-                  bg={d.doneThisWeek === 2 ? "#e7f4ed" : "#fdf2e3"}
-                  color={d.doneThisWeek === 2 ? "#0f5a38" : "#7a4e11"}
-                >
-                  {d.doneThisWeek === 2 ? "Ugen er klaret" : `${d.doneThisWeek} af 2 holdt`}
-                </Pill>
-              </div>
-
-              {member.has_absence ? (
-                <p className="mt-3 text-[12px]" style={{ color: "#57635e" }}>
-                  Der er registreret fravær hele ugen — forløbet er ikke krævet.
-                </p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  <ProgramRow
-                    kind="coaching"
-                    done={member.has_coaching}
-                    member={member}
-                    missedListen={d.missedListen}
-                    onOpen={() => onOpen(member, "coaching", member.has_coaching)}
-                  />
-                  <ProgramRow
-                    kind="listen"
-                    done={member.has_listen}
-                    member={member}
-                    missedListen={d.missedListen}
-                    onOpen={() => onOpen(member, "listen", member.has_listen)}
-                  />
-                  {!member.week_required && (
-                    <p className="text-[12px]" style={{ color: "#57635e" }}>
-                      {member.weekly_program_active
-                        ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
-                        : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={logAction.isPending}
-                    onClick={() =>
-                      logAction.mutate({
-                        employeeId: member.employee_id,
-                        actionType: RAMP_WEEKLY_ABSENCE,
-                        flagId: member.flag_id,
-                      })
-                    }
-                    className="text-[12px] underline disabled:opacity-50"
-                    style={{ color: "#57635e" }}
-                  >
-                    Registrér fravær hele ugen
-                  </button>
-                </div>
               )}
-
-              <HistoryBars member={member} d={d} />
-              <p className="mt-2 text-[12px] font-semibold" style={{ color: effect.color }}>
-                {effect.text}
-              </p>
-
-              {d.feedbackLog.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                    Sendt feedback
-                  </p>
-                  {d.feedbackLog.slice(0, 4).map((a, index) => {
-                    const { week } = isoWeekOf(new Date(a.performed_at));
-                    return (
-                      <div
-                        key={`${a.performed_at}-${index}`}
-                        className="rounded-2xl border bg-white p-3"
-                        style={{ borderColor: "#e7eeeb" }}
-                      >
-                        <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                          {a.action_type}
-                        </p>
-                        <p className="text-[11px]" style={{ color: "#57635e" }}>
-                          Sendt til {a.recipients.length} · uge {week}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
-                          {a.note}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <button
+                type="button"
+                disabled={logAction.isPending}
+                onClick={() =>
+                  logAction.mutate({
+                    employeeId: member.employee_id,
+                    actionType: RAMP_WEEKLY_ABSENCE,
+                    flagId: member.flag_id,
+                  })
+                }
+                className="text-[12px] font-semibold underline disabled:opacity-50"
+                style={{ color: "#57635e" }}
+              >
+                Registrér fravær hele ugen
+              </button>
             </div>
-          </div>
+          )}
+
+          <HistoryBars member={member} d={d} />
+
+          <p
+            className="mt-3 border-t pt-3 text-[13px] font-bold"
+            style={{ borderColor: "#e7eeeb", color: effect.color, textWrap: "pretty" }}
+          >
+            {effect.text}
+          </p>
+
+          {d.feedbackLog.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <SectionLabel>Sendt feedback</SectionLabel>
+              {d.feedbackLog.slice(0, 4).map((a, index) => {
+                const { week } = isoWeekOf(new Date(a.performed_at));
+                return (
+                  <div
+                    key={`${a.performed_at}-${index}`}
+                    className="rounded-[13px] border bg-white p-3"
+                    style={{ borderColor: "#e7eeeb" }}
+                  >
+                    <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
+                      {a.action_type}
+                    </p>
+                    <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                      Sendt til {a.recipients.length} · uge {week}
+                    </p>
+                    <p
+                      className="mt-1 whitespace-pre-wrap text-[12px]"
+                      style={{ color: "#1b1f1d" }}
+                    >
+                      {a.note}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </article>
@@ -813,16 +861,19 @@ export default function RampTeam() {
     <MainLayout>
       <div className="ramp-page" style={{ background: "#e6efec" }}>
         <div className="mx-auto max-w-[1080px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
-          <header className="flex flex-wrap items-end justify-between gap-3">
+          <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-[28px] font-extrabold leading-tight" style={{ color: "#1b1f1d" }}>
+              <h1
+                className="text-[30px] font-extrabold leading-tight sm:text-[34px]"
+                style={{ color: "#1b1f1d", letterSpacing: "-.03em" }}
+              >
                 Opstartshold
               </h1>
-              <p className="text-[13px]" style={{ color: "#57635e" }}>
+              <p className="mt-1.5 text-[15px] font-semibold" style={{ color: "#57635e" }}>
                 Uge {isoWeek ?? "-"} · første 40 arbejdsdage
               </p>
               {programStartLabel && (
-                <p className="mt-1 text-[12px]" style={{ color: "#57635e" }}>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
                   {programActive
                     ? `Ugentlige forløb registreres fra ${programStartLabel}.`
                     : `Ugentlige forløb registreres først fra ${programStartLabel} — indtil da tælles ingen uger som manglende.`}
@@ -845,10 +896,11 @@ export default function RampTeam() {
                     key={tab.mode}
                     type="button"
                     onClick={() => setFilter(tab.mode)}
-                    className="rounded-full px-4 py-2 text-[13px] font-bold"
+                    className="rounded-full px-4 py-2.5 text-[14px] font-bold"
                     style={{
                       background: active ? "#1b1f1d" : "#ffffff",
                       color: active ? "#ffffff" : "#1b1f1d",
+                      boxShadow: "0 1px 2px rgba(0,0,0,.06)",
                     }}
                   >
                     {tab.label}
@@ -858,86 +910,97 @@ export default function RampTeam() {
             </div>
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3.5 sm:grid-cols-3">
             {[
               {
                 strip: RED,
-                label: "I FAREZONEN",
+                label: "I farezonen",
                 value: counts.danger,
-                valueColor: RED_TEXT,
                 sub: `af ${counts.total} sælgere`,
                 extra: `${counts.missing} mangler ugens forløb`,
                 extraColor: RED_TEXT,
               },
               {
                 strip: GREEN,
-                label: "SER GODT UD",
+                label: "Ser godt ud",
                 value: counts.good,
-                valueColor: "#0f5a38",
-                sub: "på eller over spændet",
+                sub: "på eller over typisk",
                 extra: "Ingen handling nødvendig",
                 extraColor: "#57635e",
               },
               {
                 strip: NEUTRAL,
-                label: "STADIG UNDERVEJS",
+                label: "Stadig undervejs",
                 value: counts.pending,
-                valueColor: "#57635e",
-                sub: "uden grundlag endnu",
+                sub: "mod dag 40",
                 extra: "Tælles ikke med endnu",
                 extraColor: "#57635e",
               },
             ].map((kpi) => (
               <div
                 key={kpi.label}
-                className="flex overflow-hidden rounded-[20px] bg-white"
+                className="relative overflow-hidden rounded-[20px] bg-white px-[22px] py-5"
                 style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
               >
-                <span className="w-[5px] shrink-0" style={{ background: kpi.strip }} />
-                <div className="p-4">
-                  <p
-                    className="text-[12px] font-extrabold uppercase"
-                    style={{ color: "#57635e", letterSpacing: ".12em" }}
-                  >
-                    {kpi.label}
-                  </p>
-                  <p
+                <span
+                  className="absolute bottom-0 left-0 top-0 w-[5px]"
+                  style={{ background: kpi.strip }}
+                />
+                <p
+                  className="text-[12px] font-extrabold uppercase"
+                  style={{ color: "#57635e", letterSpacing: ".12em" }}
+                >
+                  {kpi.label}
+                </p>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span
                     className="tabular-nums"
                     style={{
                       fontSize: 40,
                       fontWeight: 800,
                       letterSpacing: "-.04em",
-                      color: kpi.valueColor,
-                      lineHeight: 1.1,
+                      lineHeight: 1,
+                      color: "#1b1f1d",
                     }}
                   >
                     {kpi.value}
-                  </p>
-                  <p className="text-[12px]" style={{ color: "#57635e" }}>
+                  </span>
+                  <span className="text-[14px] font-semibold" style={{ color: "#57635e" }}>
                     {kpi.sub}
-                  </p>
-                  <p className="mt-1 text-[12px] font-semibold" style={{ color: kpi.extraColor }}>
-                    {kpi.extra}
-                  </p>
+                  </span>
                 </div>
+                <p className="mt-[7px] text-[13px] font-bold" style={{ color: kpi.extraColor }}>
+                  {kpi.extra}
+                </p>
               </div>
             ))}
           </div>
 
           {stats.length > 0 && (
             <section
-              className="rounded-[20px] bg-white p-4"
+              className="rounded-[16px] bg-white px-[22px] py-4"
               style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[13px]" style={{ color: "#1b1f1d" }}>
-                  <span style={{ color: GREEN }}>●</span>{" "}
+              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
+                <span
+                  className="h-[9px] w-[9px] shrink-0 rounded-full"
+                  style={{ background: RED }}
+                />
+                <p
+                  className="min-w-[200px] flex-1 text-[14px] font-bold"
+                  style={{ color: "#1b1f1d" }}
+                >
                   {day10 && day10.n_below > 0 && day10.n_above > 0 ? (
                     <>
                       Under typisk på dag 10 →{" "}
-                      <strong>{Math.round((day10.n_below_stopped / day10.n_below) * 100)} %</strong>{" "}
+                      <strong style={{ color: RED_TEXT }}>
+                        {Math.round((day10.n_below_stopped / day10.n_below) * 100)} %
+                      </strong>{" "}
                       stopper inden dag 40. På eller over →{" "}
-                      <strong>{Math.round((day10.n_above_stopped / day10.n_above) * 100)} %</strong>.
+                      <strong style={{ color: GREEN }}>
+                        {Math.round((day10.n_above_stopped / day10.n_above) * 100)} %
+                      </strong>
+                      .
                     </>
                   ) : (
                     "Grundlaget er endnu for tyndt til en sammenligning på dag 10."
@@ -946,32 +1009,45 @@ export default function RampTeam() {
                 <button
                   type="button"
                   onClick={() => setShowEvidence((v) => !v)}
-                  className="rounded-full border px-3 py-1.5 text-[12px] font-bold"
-                  style={{ borderColor: "#e7eeeb", color: "#1b1f1d" }}
+                  className="rounded-full px-3.5 py-[7px] text-[13px] font-bold"
+                  style={{ background: "#f1f4f3", color: "#1b1f1d" }}
                 >
                   {showEvidence ? "Skjul grundlag" : "Se grundlag"}
                 </button>
               </div>
               {showEvidence && (
-                <ul className="mt-3 space-y-1 text-[12px]" style={{ color: "#57635e" }}>
+                <div
+                  className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2 border-t pt-3.5 text-[13px] font-semibold"
+                  style={{ borderColor: "#eaefed", color: "#57635e" }}
+                >
                   {stats.map((s) => {
                     const line = formatRiskStatShort(s);
-                    return line ? <li key={s.day_no}>{line}</li> : null;
+                    return line ? <span key={s.day_no}>{line}</span> : null;
                   })}
-                  <li>Lille grundlag — tallene kan flytte sig</li>
-                  <li>Gælder grupper, ikke enkeltpersoner</li>
-                </ul>
+                  <span>Lille grundlag — tallene kan flytte sig</span>
+                  <span>Gælder grupper, ikke enkeltpersoner</span>
+                </div>
               )}
             </section>
           )}
 
-          <section style={{ display: "grid", gap: 18 }}>
-            <div>
-              <p className="text-[14px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                Under spændet = 1-1 coaching og 1-1 lyt hver uge, indtil de er inde i spændet.
-              </p>
-              <p className="text-[12px]" style={{ color: "#57635e" }}>
-                Sorteret med mest hastende først
+          <section style={{ display: "grid", gap: 12 }}>
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p
+                  className="text-[19px] font-extrabold"
+                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
+                >
+                  {filter === "missing"
+                    ? `Mangler forløb i uge ${isoWeek ?? "-"}`
+                    : "I farezonen nu"}
+                </p>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                  Under spændet = 1-1 coaching og 1-1 lyt hver uge, indtil de er inde i spændet.
+                </p>
+              </div>
+              <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>
+                Sorteret efter hastende først
               </p>
             </div>
 
