@@ -99,15 +99,17 @@ function chart(input: SessionMailInput): string {
         : w.sales >= low - 3
           ? C.emeraldSoft
           : C.neutral;
-    return `<td width="${width}%" valign="bottom" style="${last ? "" : "padding-right:5px;"}">
+    return `<td width="${width}%" valign="bottom" style="${last ? "" : "padding-right:6px;"}">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-        <tr><td align="center" style="${txt(11, 15, C.onyx, 800)}padding-bottom:4px;">${w.sales}</td></tr>
-        <tr><td height="${h}" bgcolor="${color}" style="border-radius:4px 4px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td height="${h}" bgcolor="${color}" style="border-radius:6px 6px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
       </table></td>`;
   };
 
+  const valueCell = (w: WeekPoint, i: number) =>
+    `<td width="${width}%" align="center" style="${txt(13, 18, i === weeks.length - 1 ? C.emerald : C.white, 800)}padding-top:8px;">${w.sales}</td>`;
+
   const weekCell = (w: WeekPoint, i: number) =>
-    `<td width="${width}%" align="center" style="${txt(10, 14, i === weeks.length - 1 ? C.green : C.muted, 800)}padding-top:7px;">u${w.iso_week}</td>`;
+    `<td width="${width}%" align="center" style="${txt(10, 14, i === weeks.length - 1 ? C.emerald : "#9aa5aa", 800)}padding-top:3px;">u${w.iso_week}</td>`;
 
   const first = weeks[0].sales;
   const last = weeks[weeks.length - 1].sales;
@@ -126,7 +128,7 @@ function chart(input: SessionMailInput): string {
     : "";
 
   const bandLabel = low !== null
-    ? `<td width="96" valign="bottom" align="right" style="font-family:${FONT};font-size:10px;font-weight:800;color:${C.green};padding-left:8px;white-space:nowrap;">${low} = SPÆNDET</td>`
+    ? `<td width="96" valign="bottom" align="right" style="font-family:${FONT};font-size:10px;font-weight:800;color:${C.emerald};padding-left:8px;white-space:nowrap;">${low} = SPÆNDET</td>`
     : `<td width="96">&nbsp;</td>`;
 
   const footer = low !== null && input.bandMedian !== null
@@ -134,18 +136,18 @@ function chart(input: SessionMailInput): string {
     : "";
 
   return `<tr><td style="padding:22px 30px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.soft};border:1px solid ${C.softBorder};border-radius:18px;">
-      <tr><td style="padding:20px 22px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.onyx};border-radius:20px;">
+      <tr><td style="padding:22px 24px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr>
-            <td style="${label()}padding-bottom:8px;">SALG PR. UGE</td>
-            <td align="right" style="${label()}padding-bottom:8px;">SIDEN UGE ${weeks[0].iso_week}</td>
+            <td style="${label(C.emerald)}padding-bottom:8px;">SALG PR. UGE</td>
+            <td align="right" style="${label("#9aa5aa")}padding-bottom:8px;">SIDEN UGE ${weeks[0].iso_week}</td>
           </tr>
           <tr>
-            <td style="${txt(27, 32, C.onyx, 800)}">${first} &rarr; ${last}</td>
-            <td align="right" style="${txt(15, 20, C.green, 800)}">${trend}</td>
+            <td style="${txt(30, 36, C.white, 800)}">${first} &rarr; ${last}</td>
+            <td align="right" style="${txt(15, 20, C.emerald, 800)}">${trend}</td>
           </tr>
-          <tr><td colspan="2" style="padding-top:14px;">
+          <tr><td colspan="2" style="padding-top:18px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
               <tr>
                 <td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${weeks.map((w, i) => barCell(w, i === weeks.length - 1)).join("")}</tr></table></td>
@@ -153,12 +155,16 @@ function chart(input: SessionMailInput): string {
               </tr>
               ${bandLine}
               <tr>
+                <td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${weeks.map(valueCell).join("")}</tr></table></td>
+                <td width="96">&nbsp;</td>
+              </tr>
+              <tr>
                 <td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${weeks.map(weekCell).join("")}</tr></table></td>
                 <td width="96">&nbsp;</td>
               </tr>
             </table>
           </td></tr>
-          ${footer ? `<tr><td colspan="2" style="${txt(12, 19, C.muted)}padding-top:14px;">${footer}</td></tr>` : ""}
+          ${footer ? `<tr><td colspan="2" style="${txt(12, 19, "#9aa5aa")}padding-top:16px;">${footer}</td></tr>` : ""}
         </table>
       </td></tr>
     </table>
@@ -168,22 +174,22 @@ function chart(input: SessionMailInput): string {
 function quoteBlock(note: string, focus: string | null): string {
   const body = esc(note).replace(/\n/g, "<br>");
   const focusBox = focus
-    ? `<tr><td height="12" style="font-size:0;line-height:0;">&nbsp;</td></tr>
-       <tr><td style="background:${C.emerald};border-radius:18px;padding:18px 22px;">
+    ? `<tr><td height="16" style="font-size:0;line-height:0;">&nbsp;</td></tr>
+       <tr><td style="background:${C.emerald};border-radius:20px;padding:20px 24px;">
          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-           <td width="34" valign="top" style="font-family:${FONT};font-size:18px;line-height:24px;">🎯</td>
-           <td style="${txt(16, 24, C.onEmerald, 800)}">
-             <span style="display:block;${label(C.onEmerald)}padding-bottom:5px;">UGENS FOKUS</span>
+           <td width="38" valign="top" style="font-family:${FONT};font-size:20px;line-height:26px;">🎯</td>
+           <td style="${txt(17, 26, C.onEmerald, 800)}">
+             <span style="display:block;${label(C.onEmerald)}padding-bottom:6px;">UGENS FOKUS</span>
              ${focus}
            </td>
          </tr></table>
        </td></tr>`
     : "";
 
-  return `<tr><td style="padding:24px 30px 0;">
+  return `<tr><td style="padding:26px 30px 0;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      <tr><td style="${label()}padding-bottom:10px;">NOTER FRA SAMTALEN</td></tr>
-      <tr><td style="background:${C.soft};border:1px solid ${C.softBorder};border-left:5px solid ${C.emerald};border-radius:0 18px 18px 0;padding:20px 22px;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:26px;mso-line-height-rule:exactly;color:${C.onyx};">${body}</td></tr>
+      <tr><td style="${label()}padding-bottom:12px;">NOTER FRA SAMTALEN</td></tr>
+      <tr><td style="border-left:4px solid ${C.emerald};padding:2px 0 2px 20px;${txt(16, 28, C.onyx)}">${body}</td></tr>
       ${focusBox}
     </table>
   </td></tr>`;
@@ -191,18 +197,14 @@ function quoteBlock(note: string, focus: string | null): string {
 
 function strengthBlock(strength: string | null): string {
   if (!strength) return "";
-  return `<tr><td style="padding:14px 30px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#d6f7e6;border:1px solid #a9dcc3;border-radius:18px;">
-      <tr><td style="padding:18px 22px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="34" valign="top" style="font-family:${FONT};font-size:18px;line-height:24px;">💪</td>
-          <td style="${txt(15, 24, C.onyx)}">
-            <span style="display:block;${label(C.green)}padding-bottom:5px;">HER ER DU STÆRK</span>
-            ${esc(strength).replace(/\n/g, "<br>")}
-          </td>
-        </tr></table>
-      </td></tr>
-    </table>
+  return `<tr><td style="padding:22px 30px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+      <td width="42" valign="top" style="font-family:${FONT};font-size:22px;line-height:26px;">💪</td>
+      <td style="${txt(16, 26, C.onyx)}">
+        <span style="display:block;${label()}padding-bottom:6px;">HER ER DU STÆRK</span>
+        ${esc(strength).replace(/\n/g, "<br>")}
+      </td>
+    </tr></table>
   </td></tr>`;
 }
 
@@ -236,11 +238,12 @@ function shell(opts: {
   pill: string;
   heading: string;
   intro: string;
+  heroInitials: string;
   blocks: string;
   leaderName: string;
   leaderRole: string;
   cta: boolean;
-  remember: boolean;
+  remember: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="da"><head>
@@ -265,27 +268,40 @@ function shell(opts: {
   <tr><td style="background:${C.white};border-radius:22px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
 
-      <tr><td style="padding:28px 30px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td bgcolor="${C.emerald}" style="border-radius:999px;padding:9px 18px;font-family:${FONT};font-size:13px;font-weight:800;color:${C.onEmerald};">${opts.pill}</td>
-        </tr></table>
+      <tr><td style="background:${C.onyx};border-radius:22px 22px 0 0;padding:30px 30px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr><td>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td bgcolor="${C.emerald}" style="border-radius:999px;padding:9px 18px;font-family:${FONT};font-size:13px;font-weight:800;color:${C.onEmerald};">${opts.pill}</td>
+            </tr></table>
+          </td></tr>
+          <tr><td style="padding-top:18px;${txt(34, 42, C.white, 800)}letter-spacing:-0.8px;">${opts.heading}</td></tr>
+          <tr><td style="padding-top:14px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="56" valign="top">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td width="44" height="44" align="center" bgcolor="${C.emerald}" style="border-radius:999px;font-family:${FONT};font-size:15px;font-weight:800;color:${C.onEmerald};">${opts.heroInitials}</td>
+                </tr></table>
+              </td>
+              <td valign="top" style="${txt(15, 24, "#c7d0d4")}">${opts.intro}</td>
+            </tr></table>
+          </td></tr>
+        </table>
       </td></tr>
-
-      <tr><td style="padding:18px 30px 0;${txt(30, 36, C.onyx, 800)}letter-spacing:-0.6px;">${opts.heading}</td></tr>
-      <tr><td style="padding:10px 30px 0;${txt(15, 24, C.muted)}">${opts.intro}</td></tr>
 
       ${opts.blocks}
 
-      ${opts.remember ? `<tr><td style="padding:22px 30px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.onyx};border-radius:18px;">
-          <tr><td style="padding:22px 24px;${txt(15, 24, C.light)}">
-            <span style="display:block;${label(C.emerald)}padding-bottom:8px;">HUSK</span>
-            Du skal aldrig sidde og tygge på noget alene. Har du en svær samtale, en indvending der driller, eller bare brug for at sparre, så fang mig. Vi er her for dig, og vi vil gerne have at du lykkes. 🤝
+      <tr><td style="padding:26px 30px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.soft};border:1px solid ${C.softBorder};border-radius:20px;">
+          <tr><td style="padding:22px 24px;${txt(15, 25, C.onyx)}">
+            <span style="display:block;${label(C.green)}padding-bottom:8px;">DU KAN ALTID TAGE FAT I OS</span>
+            ${opts.remember}
           </td></tr>
         </table>
-      </td></tr>` : ""}
+      </td></tr>
 
       ${opts.cta ? `<tr><td align="center" style="padding:24px 30px 0;">
+
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
           <td align="center" bgcolor="${C.emerald}" style="border-radius:999px;">
             <a href="${APP_URL}/opstartshold" style="display:block;padding:16px 34px;font-family:${FONT};font-size:16px;font-weight:800;color:${C.onEmerald};text-decoration:none;white-space:nowrap;">🐦 &nbsp;Åbn Stork</a>
@@ -351,12 +367,14 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       isoWeek: input.isoWeek,
       pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} I HUS`,
       heading,
-      intro: `Vi holdt vores ${esc(KIND_LABEL[input.kind])} i dag. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
+      heroInitials: esc(initials(input.sellerName)).toUpperCase(),
+      intro: `Vi holdt vores <strong style="color:#ffffff;">${esc(KIND_LABEL[input.kind])}</strong> i uge ${input.isoWeek}. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
       blocks,
       leaderName: input.leaderName,
       leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
-      remember: true,
+      remember:
+        "Du må fange mig når som helst - også uden for de faste forløb. Ring, skriv på Teams eller stik hovedet ind. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
     }),
   };
 }
@@ -380,12 +398,14 @@ export function buildLeaderMail(
       isoWeek: input.isoWeek,
       pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} DOKUMENTERET`,
       heading: `Hej ${esc(firstName(recipientName))}`,
-      intro: `<strong>${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
+      heroInitials: esc(initials(input.sellerName)).toUpperCase(),
+      intro: `<strong style="color:#ffffff;">${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
       blocks,
       leaderName: input.leaderName,
       leaderRole: "Afholdt forløbet",
       cta: true,
-      remember: false,
+      remember:
+        "Du kan altid tage fat i os - også uden for de faste forløb. Ring, skriv på Teams eller kom forbi. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
     }),
   };
 }
