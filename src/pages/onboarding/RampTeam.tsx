@@ -111,7 +111,10 @@ function derive(member: RampTeamMember): Derived {
   }
 
   const urgency =
-    (missedListen >= 2 ? 100 : 0) + (2 - doneThisWeek) * 20 + gap * 3 + (trend === "down" ? 10 : 0);
+    (missedListen >= 2 ? 100 : 0) +
+    (member.week_required ? (2 - doneThisWeek) * 20 : 0) +
+    gap * 3 +
+    (trend === "down" ? 10 : 0);
 
   return {
     gap,
