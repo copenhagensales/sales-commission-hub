@@ -268,27 +268,40 @@ function shell(opts: {
   <tr><td style="background:${C.white};border-radius:22px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
 
-      <tr><td style="padding:28px 30px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td bgcolor="${C.emerald}" style="border-radius:999px;padding:9px 18px;font-family:${FONT};font-size:13px;font-weight:800;color:${C.onEmerald};">${opts.pill}</td>
-        </tr></table>
+      <tr><td style="background:${C.onyx};border-radius:22px 22px 0 0;padding:30px 30px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr><td>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td bgcolor="${C.emerald}" style="border-radius:999px;padding:9px 18px;font-family:${FONT};font-size:13px;font-weight:800;color:${C.onEmerald};">${opts.pill}</td>
+            </tr></table>
+          </td></tr>
+          <tr><td style="padding-top:18px;${txt(34, 42, C.white, 800)}letter-spacing:-0.8px;">${opts.heading}</td></tr>
+          <tr><td style="padding-top:14px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="56" valign="top">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td width="44" height="44" align="center" bgcolor="${C.emerald}" style="border-radius:999px;font-family:${FONT};font-size:15px;font-weight:800;color:${C.onEmerald};">${opts.heroInitials}</td>
+                </tr></table>
+              </td>
+              <td valign="top" style="${txt(15, 24, "#c7d0d4")}">${opts.intro}</td>
+            </tr></table>
+          </td></tr>
+        </table>
       </td></tr>
-
-      <tr><td style="padding:18px 30px 0;${txt(30, 36, C.onyx, 800)}letter-spacing:-0.6px;">${opts.heading}</td></tr>
-      <tr><td style="padding:10px 30px 0;${txt(15, 24, C.muted)}">${opts.intro}</td></tr>
 
       ${opts.blocks}
 
-      ${opts.remember ? `<tr><td style="padding:22px 30px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.onyx};border-radius:18px;">
-          <tr><td style="padding:22px 24px;${txt(15, 24, C.light)}">
-            <span style="display:block;${label(C.emerald)}padding-bottom:8px;">HUSK</span>
-            Du skal aldrig sidde og tygge på noget alene. Har du en svær samtale, en indvending der driller, eller bare brug for at sparre, så fang mig. Vi er her for dig, og vi vil gerne have at du lykkes. 🤝
+      <tr><td style="padding:26px 30px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.soft};border:1px solid ${C.softBorder};border-radius:20px;">
+          <tr><td style="padding:22px 24px;${txt(15, 25, C.onyx)}">
+            <span style="display:block;${label(C.green)}padding-bottom:8px;">DU KAN ALTID TAGE FAT I OS</span>
+            ${opts.remember}
           </td></tr>
         </table>
-      </td></tr>` : ""}
+      </td></tr>
 
       ${opts.cta ? `<tr><td align="center" style="padding:24px 30px 0;">
+
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
           <td align="center" bgcolor="${C.emerald}" style="border-radius:999px;">
             <a href="${APP_URL}/opstartshold" style="display:block;padding:16px 34px;font-family:${FONT};font-size:16px;font-weight:800;color:${C.onEmerald};text-decoration:none;white-space:nowrap;">🐦 &nbsp;Åbn Stork</a>
