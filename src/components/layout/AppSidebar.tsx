@@ -1480,6 +1480,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <FileText className="h-4 w-4" />
                   Coaching Skabeloner
                 </NavLink>
+                </>)}
               </CollapsibleContent>
             </Collapsible>
           )}
