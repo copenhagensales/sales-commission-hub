@@ -791,6 +791,12 @@ export default function RampTeam() {
   } | null>(null);
 
   const isoWeek = members[0]?.iso_week ?? null;
+  const campaignLabel = useMemo(() => {
+    const names = Array.from(
+      new Set(members.map((m) => m.campaign_name).filter((n): n is string => Boolean(n))),
+    );
+    return names.length > 0 ? names.join(" · ") : "Eesy TM Products";
+  }, [members]);
   const programStart = members[0]?.weekly_program_start_date ?? null;
   const programActive = members[0]?.weekly_program_active ?? false;
   const programStartLabel = programStart
