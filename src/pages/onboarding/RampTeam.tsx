@@ -88,13 +88,19 @@ function derive(member: RampTeamMember): Derived {
   const doneThisWeek = (member.has_coaching ? 1 : 0) + (member.has_listen ? 1 : 0);
 
   // Sammenhaengende uger bagud uden et lyt (den aktuelle uge taelles med).
+  // Uger foer ordningens startdato taeller ikke som manglende.
   let missedListen = 0;
-  for (let i = member.weeks.length - 1; i >= 0; i--) {
-    const w = member.weeks[i];
-    const entry = weekActions.get(weekKey(w.iso_year, w.iso_week));
-    if (entry?.absence) break;
-    if (entry?.listen) break;
-    missedListen += 1;
+  if (member.weekly_program_active && member.weekly_program_start_date) {
+    const start = isoWeekOf(new Date(`${member.weekly_program_start_date}T00:00:00`));
+    const startRank = start.year * 100 + start.week;
+    for (let i = member.weeks.length - 1; i >= 0; i--) {
+      const w = member.weeks[i];
+      if (w.iso_year * 100 + w.iso_week < startRank) break;
+      const entry = weekActions.get(weekKey(w.iso_year, w.iso_week));
+      if (entry?.absence) break;
+      if (entry?.listen) break;
+      missedListen += 1;
+    }
   }
 
   const sales = member.weeks.map((w) => w.sales);
