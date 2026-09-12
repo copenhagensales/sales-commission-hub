@@ -71,7 +71,10 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       </div>
 
       {/* 2) Hero */}
-      <div className="rs-dark rs-fade p-5 sm:p-7" style={{ animationDelay: "60ms" }}>
+      <div
+        className="rs-dark rs-fade p-5 sm:p-7"
+        style={{ animationDelay: "60ms", borderLeft: "5px solid var(--rs-accent)" }}
+      >
         <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 lg:gap-10">
           <div className="min-w-0">
             <div className="flex items-end gap-3">
