@@ -12719,8 +12719,10 @@ export type Database = {
           employee_id: string
           flag_id: string | null
           id: string
+          note: string | null
           performed_at: string
           performed_by: string
+          recipients: string[] | null
         }
         Insert: {
           action_type: string
@@ -12729,8 +12731,10 @@ export type Database = {
           employee_id: string
           flag_id?: string | null
           id?: string
+          note?: string | null
           performed_at?: string
           performed_by: string
+          recipients?: string[] | null
         }
         Update: {
           action_type?: string
@@ -12739,8 +12743,10 @@ export type Database = {
           employee_id?: string
           flag_id?: string | null
           id?: string
+          note?: string | null
           performed_at?: string
           performed_by?: string
+          recipients?: string[] | null
         }
         Relationships: [
           {
@@ -17241,6 +17247,10 @@ export type Database = {
       ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
+      ramp_session_recipients: {
+        Args: { p_employee_id: string }
+        Returns: Json
+      }
       ramp_week_workdays: {
         Args: { p_end?: string; p_monday: string; p_start: string }
         Returns: number
