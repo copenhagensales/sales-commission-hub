@@ -128,7 +128,7 @@ function chart(input: SessionMailInput): string {
     : "";
 
   const bandLabel = low !== null
-    ? `<td width="96" valign="bottom" align="right" style="font-family:${FONT};font-size:10px;font-weight:800;color:${C.green};padding-left:8px;white-space:nowrap;">${low} = SPÆNDET</td>`
+    ? `<td width="96" valign="bottom" align="right" style="font-family:${FONT};font-size:10px;font-weight:800;color:${C.emerald};padding-left:8px;white-space:nowrap;">${low} = SPÆNDET</td>`
     : `<td width="96">&nbsp;</td>`;
 
   const footer = low !== null && input.bandMedian !== null
@@ -136,18 +136,18 @@ function chart(input: SessionMailInput): string {
     : "";
 
   return `<tr><td style="padding:22px 30px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.soft};border:1px solid ${C.softBorder};border-radius:18px;">
-      <tr><td style="padding:20px 22px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.onyx};border-radius:20px;">
+      <tr><td style="padding:22px 24px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr>
-            <td style="${label()}padding-bottom:8px;">SALG PR. UGE</td>
-            <td align="right" style="${label()}padding-bottom:8px;">SIDEN UGE ${weeks[0].iso_week}</td>
+            <td style="${label(C.emerald)}padding-bottom:8px;">SALG PR. UGE</td>
+            <td align="right" style="${label("#9aa5aa")}padding-bottom:8px;">SIDEN UGE ${weeks[0].iso_week}</td>
           </tr>
           <tr>
-            <td style="${txt(27, 32, C.onyx, 800)}">${first} &rarr; ${last}</td>
-            <td align="right" style="${txt(15, 20, C.green, 800)}">${trend}</td>
+            <td style="${txt(30, 36, C.white, 800)}">${first} &rarr; ${last}</td>
+            <td align="right" style="${txt(15, 20, C.emerald, 800)}">${trend}</td>
           </tr>
-          <tr><td colspan="2" style="padding-top:14px;">
+          <tr><td colspan="2" style="padding-top:18px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
               <tr>
                 <td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${weeks.map((w, i) => barCell(w, i === weeks.length - 1)).join("")}</tr></table></td>
@@ -155,12 +155,16 @@ function chart(input: SessionMailInput): string {
               </tr>
               ${bandLine}
               <tr>
+                <td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${weeks.map(valueCell).join("")}</tr></table></td>
+                <td width="96">&nbsp;</td>
+              </tr>
+              <tr>
                 <td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${weeks.map(weekCell).join("")}</tr></table></td>
                 <td width="96">&nbsp;</td>
               </tr>
             </table>
           </td></tr>
-          ${footer ? `<tr><td colspan="2" style="${txt(12, 19, C.muted)}padding-top:14px;">${footer}</td></tr>` : ""}
+          ${footer ? `<tr><td colspan="2" style="${txt(12, 19, "#9aa5aa")}padding-top:16px;">${footer}</td></tr>` : ""}
         </table>
       </td></tr>
     </table>
