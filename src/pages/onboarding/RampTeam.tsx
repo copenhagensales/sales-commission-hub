@@ -840,7 +840,10 @@ export default function RampTeam() {
   const dangerList = useMemo(() => allList.filter((m) => m.status === "under"), [allList]);
 
   const missingList = useMemo(
-    () => allList.filter((m) => !m.has_absence && (!m.has_coaching || !m.has_listen)),
+    () =>
+      allList.filter(
+        (m) => m.week_required && !m.has_absence && (!m.has_coaching || !m.has_listen),
+      ),
     [allList],
   );
 
