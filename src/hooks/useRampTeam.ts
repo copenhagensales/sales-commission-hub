@@ -13,12 +13,18 @@ import { toast } from "sonner";
 export const RAMP_ACTION_TYPES = [
   "1-1 samtale",
   "medlyt med feedback",
+  "fravær hele ugen",
   "ny leadbatch",
   "samtale med salgschef",
   "ingen handling",
 ] as const;
 
 export type RampActionType = (typeof RAMP_ACTION_TYPES)[number];
+
+/** Ugens faste forloeb: begge skal registreres hver uge for alle nye saelgere. */
+export const RAMP_WEEKLY_COACHING: RampActionType = "1-1 samtale";
+export const RAMP_WEEKLY_LISTEN: RampActionType = "medlyt med feedback";
+export const RAMP_WEEKLY_ABSENCE: RampActionType = "fravær hele ugen";
 
 export type RampStatus = "over" | "midt" | "under" | "ukendt";
 
@@ -28,11 +34,23 @@ export interface RampAction {
   performed_by_name: string | null;
 }
 
+export interface RampWeekPoint {
+  week_no: number;
+  iso_year: number;
+  iso_week: number;
+  sales: number;
+  p25: number;
+  p50: number;
+  p75: number;
+}
+
 export interface RampTeamMember {
   employee_id: string;
   employee_name: string;
   campaign_name: string | null;
+  team_name: string | null;
   day_no: number;
+  days_left: number;
   cum_sales: number;
   p25: number | null;
   p50: number | null;
@@ -41,6 +59,15 @@ export interface RampTeamMember {
   flag_id: string | null;
   flag_created_at: string | null;
   flag_days_open: number | null;
+  iso_year: number;
+  iso_week: number;
+  workdays_this_week: number;
+  has_coaching: boolean;
+  has_listen: boolean;
+  has_absence: boolean;
+  week_required: boolean;
+  week_complete: boolean;
+  weeks: RampWeekPoint[];
   actions: RampAction[];
 }
 
@@ -205,3 +232,14 @@ export function formatRiskStatSentence(stat: RampRiskStat): string {
   return parts.join(" ");
 }
 
+/** Kort linje pr. maalepunkt: procent altid med de raa antal. */
+export function formatRiskStatShort(stat: RampRiskStat): string | null {
+  if (stat.n_below === 0 && stat.n_above === 0) return null;
+  const belowPct = stat.n_below === 0 ? null : Math.round((stat.n_below_stopped / stat.n_below) * 100);
+  const abovePct = stat.n_above === 0 ? null : Math.round((stat.n_above_stopped / stat.n_above) * 100);
+  const below =
+    belowPct === null ? "ingen vurderbare" : `${belowPct} % (${stat.n_below_stopped} af ${stat.n_below})`;
+  const above =
+    abovePct === null ? "ingen vurderbare" : `${abovePct} % (${stat.n_above_stopped} af ${stat.n_above})`;
+  return `Dag ${stat.day_no}: ${below} mod ${above}`;
+}

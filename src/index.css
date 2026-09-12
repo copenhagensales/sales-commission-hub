@@ -932,3 +932,32 @@
 .cph-board .rounded-3xl {
   border-radius: 20px !important;
 }
+
+/* ==========================================================================
+   Opstartshold ("ramp") — sidespecifik palet efter Kaspers design.
+   Kun aktiv inde i .ramp-page, saa resten af Stork er uberoert.
+   ========================================================================== */
+
+.ramp-page {
+  --ramp-ink: #1b1f1d;
+  --ramp-muted: #57635e;
+  --ramp-green: #177a4d;
+  --ramp-green-strong: #0f5a38;
+  --ramp-green-flat: #e7f4ed;
+  --ramp-green-flat-2: #e6efec;
+  --ramp-green-line: #bcd6c8;
+  --ramp-red: #c13b32;
+  --ramp-red-strong: #d4453c;
+  --ramp-red-flat: #fbe9e8;
+  --ramp-yellow: #9a6216;
+  --ramp-surface: #f1f4f3;
+  --ramp-surface-2: #e7eeeb;
+  --ramp-surface-3: #eef2f0;
+
+  font-family: "Plus Jakarta Sans", "Figtree", ui-sans-serif, system-ui, sans-serif;
+  color: var(--ramp-ink);
+}
+
+.ramp-page * {
+  box-shadow: none !important;
+}

@@ -12665,6 +12665,52 @@ export type Database = {
           },
         ]
       }
+      ramp_escalation_recipients: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ramp_escalation_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_escalation_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_escalation_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ramp_flag_action: {
         Row: {
           action_type: string
@@ -17192,6 +17238,11 @@ export type Database = {
       ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
+      ramp_week_workdays: {
+        Args: { p_end?: string; p_monday: string; p_start: string }
+        Returns: number
+      }
+      ramp_weekly_missing_payload: { Args: never; Returns: Json }
       ramp_workday_no: {
         Args: { p_start: string; p_target: string }
         Returns: number
