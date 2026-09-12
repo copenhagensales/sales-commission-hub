@@ -196,6 +196,9 @@ export function useSendRampSessionFeedback() {
       employeeId: string;
       kind: "coaching" | "listen";
       note: string;
+      focusArea: string;
+      focusNote?: string | null;
+      strengthNote?: string | null;
       flagId?: string | null;
     }) => {
       const { data, error } = await supabase.functions.invoke("send-ramp-session-feedback", {
@@ -203,6 +206,9 @@ export function useSendRampSessionFeedback() {
           employeeId: params.employeeId,
           kind: params.kind,
           note: params.note,
+          focusArea: params.focusArea,
+          focusNote: params.focusNote ?? null,
+          strengthNote: params.strengthNote ?? null,
           flagId: params.flagId ?? null,
         },
       });
