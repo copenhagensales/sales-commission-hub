@@ -145,6 +145,7 @@ Deno.serve(async (req) => {
       bandLow: num(info.band_low),
       bandMedian: num(info.band_median),
       bandHigh: num(info.band_high),
+      supportNames: (info.leaders ?? []).map((l) => l.name).filter(Boolean),
     };
 
     const svc = createClient(
