@@ -1210,7 +1210,11 @@ export default function MyProfile() {
 
           <TabsContent value="stamdata" className="mt-6">
             <div className="space-y-6">
+              {/* Din opstart – opstartskurve for nye sælgere */}
+              <RampCurveCard />
+
               {/* Personal Information - Combined Card */}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Personlige oplysninger</CardTitle>

@@ -554,10 +554,14 @@ const Home = () => {
           />
         </div>
 
+        {/* Din opstart – kun inden for de første 40 arbejdsdage */}
+        <RampCurveCard hideWhenCompleted />
+
         {/* Today's Celebrations - Only if there are any */}
         {todayCelebrations.length > 0 && (
           <CelebrationStrip celebrations={todayCelebrations} />
         )}
+
 
         {/* ZONE 2: Liga + kommende begivenheder */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
