@@ -628,9 +628,12 @@ function FeedbackDialog({
   onClose: () => void;
 }) {
   const [note, setNote] = useState("");
+  const [focusArea, setFocusArea] = useState("");
+  const [focusNote, setFocusNote] = useState("");
+  const [strengthNote, setStrengthNote] = useState("");
   const send = useSendRampSessionFeedback();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const ready = note.trim().length >= 10;
+  const ready = note.trim().length >= 10 && focusArea.trim().length > 0;
   const d = derive(member);
   const previous = d.feedbackLog.filter((a) => a.action_type === KIND_ACTION[kind]);
 
@@ -650,6 +653,9 @@ function FeedbackDialog({
         employeeId: member.employee_id,
         kind,
         note: note.trim(),
+        focusArea: focusArea.trim(),
+        focusNote: focusNote.trim() || null,
+        strengthNote: strengthNote.trim() || null,
         flagId: member.flag_id,
       },
       { onSuccess: () => onClose() },
