@@ -861,16 +861,19 @@ export default function RampTeam() {
     <MainLayout>
       <div className="ramp-page" style={{ background: "#e6efec" }}>
         <div className="mx-auto max-w-[1080px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
-          <header className="flex flex-wrap items-end justify-between gap-3">
+          <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-[28px] font-extrabold leading-tight" style={{ color: "#1b1f1d" }}>
+              <h1
+                className="text-[30px] font-extrabold leading-tight sm:text-[34px]"
+                style={{ color: "#1b1f1d", letterSpacing: "-.03em" }}
+              >
                 Opstartshold
               </h1>
-              <p className="text-[13px]" style={{ color: "#57635e" }}>
+              <p className="mt-1.5 text-[15px] font-semibold" style={{ color: "#57635e" }}>
                 Uge {isoWeek ?? "-"} · første 40 arbejdsdage
               </p>
               {programStartLabel && (
-                <p className="mt-1 text-[12px]" style={{ color: "#57635e" }}>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
                   {programActive
                     ? `Ugentlige forløb registreres fra ${programStartLabel}.`
                     : `Ugentlige forløb registreres først fra ${programStartLabel} — indtil da tælles ingen uger som manglende.`}
@@ -893,10 +896,11 @@ export default function RampTeam() {
                     key={tab.mode}
                     type="button"
                     onClick={() => setFilter(tab.mode)}
-                    className="rounded-full px-4 py-2 text-[13px] font-bold"
+                    className="rounded-full px-4 py-2.5 text-[14px] font-bold"
                     style={{
                       background: active ? "#1b1f1d" : "#ffffff",
                       color: active ? "#ffffff" : "#1b1f1d",
+                      boxShadow: "0 1px 2px rgba(0,0,0,.06)",
                     }}
                   >
                     {tab.label}
@@ -906,86 +910,97 @@ export default function RampTeam() {
             </div>
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3.5 sm:grid-cols-3">
             {[
               {
                 strip: RED,
-                label: "I FAREZONEN",
+                label: "I farezonen",
                 value: counts.danger,
-                valueColor: RED_TEXT,
                 sub: `af ${counts.total} sælgere`,
                 extra: `${counts.missing} mangler ugens forløb`,
                 extraColor: RED_TEXT,
               },
               {
                 strip: GREEN,
-                label: "SER GODT UD",
+                label: "Ser godt ud",
                 value: counts.good,
-                valueColor: "#0f5a38",
-                sub: "på eller over spændet",
+                sub: "på eller over typisk",
                 extra: "Ingen handling nødvendig",
                 extraColor: "#57635e",
               },
               {
                 strip: NEUTRAL,
-                label: "STADIG UNDERVEJS",
+                label: "Stadig undervejs",
                 value: counts.pending,
-                valueColor: "#57635e",
-                sub: "uden grundlag endnu",
+                sub: "mod dag 40",
                 extra: "Tælles ikke med endnu",
                 extraColor: "#57635e",
               },
             ].map((kpi) => (
               <div
                 key={kpi.label}
-                className="flex overflow-hidden rounded-[20px] bg-white"
+                className="relative overflow-hidden rounded-[20px] bg-white px-[22px] py-5"
                 style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
               >
-                <span className="w-[5px] shrink-0" style={{ background: kpi.strip }} />
-                <div className="p-4">
-                  <p
-                    className="text-[12px] font-extrabold uppercase"
-                    style={{ color: "#57635e", letterSpacing: ".12em" }}
-                  >
-                    {kpi.label}
-                  </p>
-                  <p
+                <span
+                  className="absolute bottom-0 left-0 top-0 w-[5px]"
+                  style={{ background: kpi.strip }}
+                />
+                <p
+                  className="text-[12px] font-extrabold uppercase"
+                  style={{ color: "#57635e", letterSpacing: ".12em" }}
+                >
+                  {kpi.label}
+                </p>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span
                     className="tabular-nums"
                     style={{
                       fontSize: 40,
                       fontWeight: 800,
                       letterSpacing: "-.04em",
-                      color: kpi.valueColor,
-                      lineHeight: 1.1,
+                      lineHeight: 1,
+                      color: "#1b1f1d",
                     }}
                   >
                     {kpi.value}
-                  </p>
-                  <p className="text-[12px]" style={{ color: "#57635e" }}>
+                  </span>
+                  <span className="text-[14px] font-semibold" style={{ color: "#57635e" }}>
                     {kpi.sub}
-                  </p>
-                  <p className="mt-1 text-[12px] font-semibold" style={{ color: kpi.extraColor }}>
-                    {kpi.extra}
-                  </p>
+                  </span>
                 </div>
+                <p className="mt-[7px] text-[13px] font-bold" style={{ color: kpi.extraColor }}>
+                  {kpi.extra}
+                </p>
               </div>
             ))}
           </div>
 
           {stats.length > 0 && (
             <section
-              className="rounded-[20px] bg-white p-4"
+              className="rounded-[16px] bg-white px-[22px] py-4"
               style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[13px]" style={{ color: "#1b1f1d" }}>
-                  <span style={{ color: GREEN }}>●</span>{" "}
+              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
+                <span
+                  className="h-[9px] w-[9px] shrink-0 rounded-full"
+                  style={{ background: RED }}
+                />
+                <p
+                  className="min-w-[200px] flex-1 text-[14px] font-bold"
+                  style={{ color: "#1b1f1d" }}
+                >
                   {day10 && day10.n_below > 0 && day10.n_above > 0 ? (
                     <>
                       Under typisk på dag 10 →{" "}
-                      <strong>{Math.round((day10.n_below_stopped / day10.n_below) * 100)} %</strong>{" "}
+                      <strong style={{ color: RED_TEXT }}>
+                        {Math.round((day10.n_below_stopped / day10.n_below) * 100)} %
+                      </strong>{" "}
                       stopper inden dag 40. På eller over →{" "}
-                      <strong>{Math.round((day10.n_above_stopped / day10.n_above) * 100)} %</strong>.
+                      <strong style={{ color: GREEN }}>
+                        {Math.round((day10.n_above_stopped / day10.n_above) * 100)} %
+                      </strong>
+                      .
                     </>
                   ) : (
                     "Grundlaget er endnu for tyndt til en sammenligning på dag 10."
@@ -994,8 +1009,8 @@ export default function RampTeam() {
                 <button
                   type="button"
                   onClick={() => setShowEvidence((v) => !v)}
-                  className="rounded-full border px-3 py-1.5 text-[12px] font-bold"
-                  style={{ borderColor: "#e7eeeb", color: "#1b1f1d" }}
+                  className="rounded-full px-3.5 py-[7px] text-[13px] font-bold"
+                  style={{ background: "#f1f4f3", color: "#1b1f1d" }}
                 >
                   {showEvidence ? "Skjul grundlag" : "Se grundlag"}
                 </button>
