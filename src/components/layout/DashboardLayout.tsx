@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { LockOverlays } from "./LockOverlays";
 import { RolePreviewBanner } from "./RolePreviewBanner";
+import { ViewAsBanner } from "./ViewAsBanner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useNavigate } from "react-router-dom";
 import { Menu, PanelLeft } from "lucide-react";
@@ -38,6 +39,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <LockOverlays>
       <div className="min-h-screen bg-background">
         {/* Preview banner at very top */}
+        <ViewAsBanner />
         <RolePreviewBanner />
         
         {/* Desktop sidebar */}

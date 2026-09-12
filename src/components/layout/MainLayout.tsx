@@ -3,6 +3,7 @@ import { AppSidebar } from "./AppSidebar";
 import { PreviewSidebar } from "./PreviewSidebar";
 import { LockOverlays } from "./LockOverlays";
 import { RolePreviewBanner } from "./RolePreviewBanner";
+import { ViewAsBanner } from "./ViewAsBanner";
 import { CompleteProfileBanner } from "./CompleteProfileBanner";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
@@ -55,6 +56,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <LockOverlays>
         <div className="min-h-screen bg-background">
           {/* Preview banner at very top */}
+          <ViewAsBanner />
           <RolePreviewBanner />
           
           {/* Complete profile banner for new employees */}
