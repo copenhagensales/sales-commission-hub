@@ -93,10 +93,14 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing email ${email.id} to ${email.recipient_email}`);
 
-        // Determine if rejection email (simple format)
-        const isRejection = email.template_key === 'afslag';
-        
-        const emailContent = isRejection
+        // Mails der selv indeholder et komplet design sendes uden wrapper
+        const rawContent = (email.content ?? '').trimStart();
+        const isFullDocument = rawContent.startsWith('<!DOCTYPE') || rawContent.startsWith('<html');
+        const isRejection = email.template_key === 'afslag' || isFullDocument;
+
+        const emailContent = isFullDocument
+          ? email.content
+          : isRejection
           ? `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6; color: #333;">
               ${email.content}
             </div>`

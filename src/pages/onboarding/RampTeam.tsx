@@ -44,6 +44,19 @@ const AMBER = "#e0b64a";
 const AMBER_STRIP = "#e08a2e";
 const AMBER_TEXT = "#9a6216";
 const GREEN = "#177a4d";
+
+/** Fokusomraader lederen kan vaelge til ugens fokus. */
+const FOCUS_AREAS = [
+  "Åbningen",
+  "Behovsafdækning",
+  "Værdiargumentation",
+  "Indvendingshåndtering",
+  "Lukkefasen",
+  "Mersalg",
+  "Tonen i samtalen",
+  "Struktur og disciplin",
+  "Aktivitet og opkald",
+] as const;
 const NEUTRAL = "#b9c4bf";
 
 function isoWeekOf(date: Date): { year: number; week: number } {
@@ -628,9 +641,12 @@ function FeedbackDialog({
   onClose: () => void;
 }) {
   const [note, setNote] = useState("");
+  const [focusArea, setFocusArea] = useState("");
+  const [focusNote, setFocusNote] = useState("");
+  const [strengthNote, setStrengthNote] = useState("");
   const send = useSendRampSessionFeedback();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const ready = note.trim().length >= 10;
+  const ready = note.trim().length >= 10 && focusArea.trim().length > 0;
   const d = derive(member);
   const previous = d.feedbackLog.filter((a) => a.action_type === KIND_ACTION[kind]);
 
@@ -650,6 +666,9 @@ function FeedbackDialog({
         employeeId: member.employee_id,
         kind,
         note: note.trim(),
+        focusArea: focusArea.trim(),
+        focusNote: focusNote.trim() || null,
+        strengthNote: strengthNote.trim() || null,
         flagId: member.flag_id,
       },
       { onSuccess: () => onClose() },
@@ -717,6 +736,60 @@ function FeedbackDialog({
             />
           </div>
 
+          <div>
+            <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
+              Ugens fokus
+            </p>
+            <p className="text-[12px]" style={{ color: "#57635e" }}>
+              Én ting sælgeren skal arbejde med i næste uge.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {FOCUS_AREAS.map((area) => {
+                const active = focusArea === area;
+                return (
+                  <button
+                    key={area}
+                    type="button"
+                    onClick={() => setFocusArea(active ? "" : area)}
+                    className="rounded-full border px-3 py-1.5 text-[12px] font-bold"
+                    style={{
+                      background: active ? GREEN : "#f6f9f8",
+                      borderColor: active ? GREEN : "#e7eeeb",
+                      color: active ? "#14352a" : "#57635e",
+                    }}
+                  >
+                    {area}
+                  </button>
+                );
+              })}
+            </div>
+            <input
+              value={focusNote}
+              onChange={(e) => setFocusNote(e.target.value.slice(0, 200))}
+              placeholder="Skriv fokus helt konkret, fx: husk at behovsafdække før du nævner prisen"
+              className="mt-2 w-full rounded-2xl border p-3 text-[13px] outline-none"
+              style={{ background: "#f9fbfa", borderColor: "#e7eeeb", color: "#1b1f1d" }}
+            />
+          </div>
+
+          <div>
+            <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
+              Her er du stærk
+            </p>
+            <p className="text-[12px]" style={{ color: "#57635e" }}>
+              Fremhæv noget der virker. Det står i en grøn boks i sælgerens mail.
+            </p>
+            <textarea
+              value={strengthNote}
+              onChange={(e) => setStrengthNote(e.target.value.slice(0, 400))}
+              placeholder="Fx: din åbning er blevet skarp, og du holder tempoet hele vejen igennem samtalen"
+              className="mt-2 w-full rounded-2xl border p-3 text-[13px] outline-none"
+              style={{ minHeight: 84, background: "#f9fbfa", borderColor: "#e7eeeb", color: "#1b1f1d" }}
+            />
+          </div>
+
+
+
           <div className="space-y-2">
             <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
               Modtagere
@@ -767,7 +840,11 @@ function FeedbackDialog({
           style={{ background: "#f6f9f8" }}
         >
           <p className="text-[12px] font-semibold" style={{ color: ready ? "#0f5a38" : AMBER_TEXT }}>
-            {ready ? "Sendes til sælgeren og teamets ledere" : "Skriv feedback før du sender"}
+            {ready
+              ? "Sendes til sælgeren og teamets ledere"
+              : note.trim().length < 10
+                ? "Skriv feedback før du sender"
+                : "Vælg ugens fokus før du sender"}
           </p>
           <div className="flex items-center gap-2">
             <button

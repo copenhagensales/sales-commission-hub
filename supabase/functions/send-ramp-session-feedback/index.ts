@@ -1,29 +1,29 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticated, sharedCorsHeaders } from "../_shared/auth.ts";
+import {
+  buildLeaderMail,
+  buildSellerMail,
+  KIND_LABEL,
+  type SessionKind,
+  type SessionMailInput,
+  type WeekPoint,
+} from "../_shared/ramp-session-mail.ts";
 
 /**
  * Feedback fra ugens faste forloeb (1-1 coaching / 1-1 lyt).
  *
  * Serveren indeholder INGEN forretningsregler om hvem der er i farezonen.
- * Modtagerne hentes udelukkende via `ramp_session_recipients()` med kalderens
- * eget JWT, saa en leder kun kan sende for de saelgere han i forvejen kan se.
- * Rekkefolge: modtagere -> mails i koen -> registrering af handlingen.
+ * Modtagere og tal hentes udelukkende via `ramp_session_recipients()` med
+ * kalderens eget JWT, saa en leder kun kan sende for de saelgere han i
+ * forvejen kan se. Rekkefolge: modtagere -> mails i koen -> registrering.
  * Fejler mailen, oprettes registreringen ikke.
  */
 
-const APP_URL = "https://stork.copenhagensales.dk";
 const TEMPLATE_KEY = "ramp_session_feedback";
 
-type Kind = "coaching" | "listen";
-
-const ACTION_TYPE: Record<Kind, string> = {
+const ACTION_TYPE: Record<SessionKind, string> = {
   coaching: "1-1 samtale",
   listen: "medlyt med feedback",
-};
-
-const KIND_LABEL: Record<Kind, string> = {
-  coaching: "1-1 coaching",
-  listen: "1-1 lyt",
 };
 
 interface Person {
@@ -37,54 +37,11 @@ interface RecipientInfo {
   performed_by_name: string | null;
   seller: Person & { campaign_name: string | null; day_no: number | null };
   leaders: Person[];
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function noteHtml(note: string): string {
-  return `<div style="background:#f6f9f8;border:1px solid #e7eeeb;border-radius:12px;padding:16px;
-      white-space:pre-wrap;font-size:14px;color:#1b1f1d;">${escapeHtml(note)}</div>`;
-}
-
-function sellerContent(info: RecipientInfo, kind: Kind, note: string, week: number): string {
-  return `
-    <p>Hej ${escapeHtml(info.seller.name)},</p>
-    <p>Her er noterne fra vores ${escapeHtml(KIND_LABEL[kind])} i uge ${week}.</p>
-    ${noteHtml(note)}`;
-}
-
-
-function leaderContent(
-  info: RecipientInfo,
-  leader: Person,
-  kind: Kind,
-  note: string,
-  week: number,
-): string {
-  return `
-    <p>Hej ${escapeHtml(leader.name)},</p>
-    <p><strong>${escapeHtml(info.seller.name)}</strong> har haft
-    ${escapeHtml(KIND_LABEL[kind])} i uge ${week} med
-    ${escapeHtml(info.performed_by_name ?? "en leder")}.</p>
-    <table style="border-collapse:collapse;font-size:14px;color:#1b1f1d;margin-bottom:16px;">
-      <tr><td style="padding:4px 12px 4px 0;color:#57635e;">Kampagne</td>
-          <td style="padding:4px 0;">${escapeHtml(info.seller.campaign_name ?? "-")}</td></tr>
-      <tr><td style="padding:4px 12px 4px 0;color:#57635e;">Opstart</td>
-          <td style="padding:4px 0;">Arbejdsdag ${info.seller.day_no ?? "-"} af 40</td></tr>
-    </table>
-    ${noteHtml(note)}
-    <p style="margin-top:24px;">
-      <a href="${APP_URL}/opstartshold"
-         style="background:#177a4d;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;">
-        Åbn Opstartshold i Stork
-      </a>
-    </p>`;
+  iso_week: number | null;
+  weeks: WeekPoint[] | null;
+  band_low: number | null;
+  band_median: number | null;
+  band_high: number | null;
 }
 
 function isoWeekNumber(date: Date): number {
@@ -93,6 +50,12 @@ function isoWeekNumber(date: Date): number {
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function num(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
 }
 
 Deno.serve(async (req) => {
@@ -112,18 +75,34 @@ Deno.serve(async (req) => {
   try {
     const body = (await req.json()) as {
       employeeId?: string;
-      kind?: Kind;
+      kind?: SessionKind;
       note?: string;
       flagId?: string | null;
+      focusArea?: string | null;
+      focusNote?: string | null;
+      strengthNote?: string | null;
     };
 
     const kind = body.kind;
     const note = (body.note ?? "").trim();
+    const focusArea = (body.focusArea ?? "").trim() || null;
+    const focusNote = (body.focusNote ?? "").trim() || null;
+    const strengthNote = (body.strengthNote ?? "").trim() || null;
+
     if (!body.employeeId || (kind !== "coaching" && kind !== "listen")) {
       return json(400, { error: "Ugyldig forespørgsel" });
     }
     if (note.length < 10) {
       return json(400, { error: "Skriv feedback før du sender (mindst 10 tegn)" });
+    }
+    if (!focusArea) {
+      return json(400, { error: "Vælg ugens fokus før du sender" });
+    }
+    if (focusArea.length > 60 || (focusNote?.length ?? 0) > 200) {
+      return json(400, { error: "Ugens fokus er for lang" });
+    }
+    if ((strengthNote?.length ?? 0) > 400) {
+      return json(400, { error: "Teksten om styrke er for lang" });
     }
 
     // Kalderens eget JWT: adgangen afgoeres i databasen.
@@ -143,7 +122,30 @@ Deno.serve(async (req) => {
     if (!infoRaw) return json(403, { error: "Du har ikke adgang til denne sælger" });
 
     const info = infoRaw as RecipientInfo;
-    const week = isoWeekNumber(new Date());
+    const week = info.iso_week ?? isoWeekNumber(new Date());
+
+    const mailInput: SessionMailInput = {
+      kind,
+      sellerName: info.seller.name,
+      leaderName: info.performed_by_name ?? "Din leder",
+      campaignName: info.seller.campaign_name,
+      dayNo: info.seller.day_no,
+      isoWeek: week,
+      note,
+      focusArea,
+      focusNote,
+      strengthNote,
+      weeks: (info.weeks ?? []).map((w) => ({
+        iso_week: Number(w.iso_week),
+        sales: Number(w.sales) || 0,
+        p25: num(w.p25),
+        p50: num(w.p50),
+        p75: num(w.p75),
+      })),
+      bandLow: num(info.band_low),
+      bandMedian: num(info.band_median),
+      bandHigh: num(info.band_high),
+    };
 
     const svc = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -151,27 +153,35 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const mails: { employeeId: string; email: string; name: string; subject: string; content: string }[] = [];
+    const mails: {
+      employeeId: string;
+      email: string;
+      name: string;
+      subject: string;
+      content: string;
+    }[] = [];
 
     if (info.seller.email) {
+      const mail = buildSellerMail(mailInput);
       mails.push({
         employeeId: info.seller.employee_id,
         email: info.seller.email,
         name: info.seller.name,
-        subject: `${KIND_LABEL[kind]} med ${info.performed_by_name ?? "din leder"} · uge ${week}`,
-        content: sellerContent(info, kind, note, week),
+        subject: mail.subject,
+        content: mail.html,
       });
     }
 
     for (const leader of info.leaders ?? []) {
       if (!leader.email) continue;
       if (leader.employee_id === info.performed_by) continue;
+      const mail = buildLeaderMail(mailInput, leader.name);
       mails.push({
         employeeId: leader.employee_id,
         email: leader.email,
         name: leader.name,
-        subject: `${info.seller.name} · ${KIND_LABEL[kind]} afholdt i uge ${week}`,
-        content: leaderContent(info, leader, kind, note, week),
+        subject: mail.subject,
+        content: mail.html,
       });
     }
 
@@ -199,11 +209,14 @@ Deno.serve(async (req) => {
       action_type: ACTION_TYPE[kind],
       performed_by: info.performed_by,
       note,
+      focus_area: focusArea,
+      focus_note: focusNote,
+      strength_note: strengthNote,
       recipients: mails.map((m) => m.email),
     });
     if (actionError) throw actionError;
 
-    return json(200, { ok: true, recipients: mails.map((m) => m.email) });
+    return json(200, { ok: true, kind: KIND_LABEL[kind], recipients: mails.map((m) => m.email) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Ukendt fejl";
     return json(500, { error: message });
