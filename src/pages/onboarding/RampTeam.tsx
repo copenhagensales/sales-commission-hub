@@ -291,26 +291,26 @@ function ProgramRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-colors"
+      className="flex w-full items-center gap-3 rounded-[13px] border px-[15px] py-[13px] text-left transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,.07)]"
       style={{
         background: done ? "#e7f4ed" : "#ffffff",
-        borderColor: done ? "#a9dcc3" : "#e7eeeb",
+        borderColor: done ? "#a9dcc3" : "#e0e7e4",
       }}
     >
       <span
-        className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-[8px] border"
+        className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-[8px] border-2"
         style={{
           background: done ? GREEN : "#ffffff",
-          borderColor: done ? GREEN : "#c9d5d0",
+          borderColor: done ? GREEN : "#c3ccc8",
         }}
       >
         {done && <Check className="h-3.5 w-3.5" style={{ color: "#fff" }} />}
       </span>
-      <span>
-        <span className="block text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
           {KIND_LABEL[kind]}
         </span>
-        <span className="block text-[12px]" style={{ color: "#57635e" }}>
+        <span className="mt-px block text-[12px] font-semibold" style={{ color: "#57635e" }}>
           {status}
         </span>
       </span>
@@ -320,30 +320,38 @@ function ProgramRow({
 
 function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
   return (
-    <div className="mt-3 flex gap-1">
-      {member.weeks.map((w) => {
-        const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
-        const count = (entry?.coaching ? 1 : 0) + (entry?.listen ? 1 : 0);
-        const color = entry?.absence
-          ? "#e7eeeb"
-          : count === 2
-            ? GREEN
-            : count === 1
-              ? AMBER
-              : "#e3908b";
-        const label = entry?.absence
-          ? `Uge ${w.iso_week}: fravær hele ugen`
-          : `Uge ${w.iso_week}: ${count} af 2 forløb holdt`;
-        return (
-          <span
-            key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
-            title={label}
-            aria-label={label}
-            className="h-2 flex-1 rounded-full"
-            style={{ background: color }}
-          />
-        );
-      })}
+    <div className="mt-3 flex items-center gap-2.5">
+      <span
+        className="whitespace-nowrap text-[11px] font-extrabold"
+        style={{ color: "#57635e" }}
+      >
+        6 uger
+      </span>
+      <div className="flex flex-1 gap-1">
+        {member.weeks.map((w) => {
+          const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
+          const count = (entry?.coaching ? 1 : 0) + (entry?.listen ? 1 : 0);
+          const color = entry?.absence
+            ? "#e7eeeb"
+            : count === 2
+              ? GREEN
+              : count === 1
+                ? AMBER
+                : "#e3908b";
+          const label = entry?.absence
+            ? `Uge ${w.iso_week}: fravær hele ugen`
+            : `Uge ${w.iso_week}: ${count} af 2 forløb holdt`;
+          return (
+            <span
+              key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
+              title={label}
+              aria-label={label}
+              className="h-[9px] flex-1 rounded-[3px]"
+              style={{ background: color }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
