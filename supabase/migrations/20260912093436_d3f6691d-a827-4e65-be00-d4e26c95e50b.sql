@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.ramp_weekly_missing_payload() FROM anon, authenticated;
