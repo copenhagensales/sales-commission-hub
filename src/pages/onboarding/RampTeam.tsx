@@ -346,6 +346,15 @@ export default function RampTeam() {
   const [filter, setFilter] = useState<FilterMode>("danger");
 
   const isoWeek = members[0]?.iso_week ?? null;
+  const programStart = members[0]?.weekly_program_start_date ?? null;
+  const programActive = members[0]?.weekly_program_active ?? false;
+  const programStartLabel = programStart
+    ? new Date(`${programStart}T00:00:00`).toLocaleDateString("da-DK", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   const dangerList = useMemo(
     () =>
@@ -407,6 +416,13 @@ export default function RampTeam() {
             <p className="text-[13px]" style={{ color: "var(--ramp-muted)" }}>
               Uge {isoWeek ?? "-"} · første 40 arbejdsdage
             </p>
+            {programStartLabel && (
+              <p className="mt-1 text-[12px]" style={{ color: "var(--ramp-muted)" }}>
+                {programActive
+                  ? `Ugentlige forløb registreres fra ${programStartLabel}.`
+                  : `Ugentlige forløb registreres først fra ${programStartLabel} — indtil da tælles ingen uger som manglende.`}
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 variant="ghost"
