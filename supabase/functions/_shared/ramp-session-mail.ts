@@ -174,22 +174,22 @@ function chart(input: SessionMailInput): string {
 function quoteBlock(note: string, focus: string | null): string {
   const body = esc(note).replace(/\n/g, "<br>");
   const focusBox = focus
-    ? `<tr><td height="12" style="font-size:0;line-height:0;">&nbsp;</td></tr>
-       <tr><td style="background:${C.emerald};border-radius:18px;padding:18px 22px;">
+    ? `<tr><td height="16" style="font-size:0;line-height:0;">&nbsp;</td></tr>
+       <tr><td style="background:${C.emerald};border-radius:20px;padding:20px 24px;">
          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-           <td width="34" valign="top" style="font-family:${FONT};font-size:18px;line-height:24px;">🎯</td>
-           <td style="${txt(16, 24, C.onEmerald, 800)}">
-             <span style="display:block;${label(C.onEmerald)}padding-bottom:5px;">UGENS FOKUS</span>
+           <td width="38" valign="top" style="font-family:${FONT};font-size:20px;line-height:26px;">🎯</td>
+           <td style="${txt(17, 26, C.onEmerald, 800)}">
+             <span style="display:block;${label(C.onEmerald)}padding-bottom:6px;">UGENS FOKUS</span>
              ${focus}
            </td>
          </tr></table>
        </td></tr>`
     : "";
 
-  return `<tr><td style="padding:24px 30px 0;">
+  return `<tr><td style="padding:26px 30px 0;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      <tr><td style="${label()}padding-bottom:10px;">NOTER FRA SAMTALEN</td></tr>
-      <tr><td style="background:${C.soft};border:1px solid ${C.softBorder};border-left:5px solid ${C.emerald};border-radius:0 18px 18px 0;padding:20px 22px;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:26px;mso-line-height-rule:exactly;color:${C.onyx};">${body}</td></tr>
+      <tr><td style="${label()}padding-bottom:12px;">NOTER FRA SAMTALEN</td></tr>
+      <tr><td style="border-left:4px solid ${C.emerald};padding:2px 0 2px 20px;${txt(16, 28, C.onyx)}">${body}</td></tr>
       ${focusBox}
     </table>
   </td></tr>`;
@@ -197,18 +197,14 @@ function quoteBlock(note: string, focus: string | null): string {
 
 function strengthBlock(strength: string | null): string {
   if (!strength) return "";
-  return `<tr><td style="padding:14px 30px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#d6f7e6;border:1px solid #a9dcc3;border-radius:18px;">
-      <tr><td style="padding:18px 22px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-          <td width="34" valign="top" style="font-family:${FONT};font-size:18px;line-height:24px;">💪</td>
-          <td style="${txt(15, 24, C.onyx)}">
-            <span style="display:block;${label(C.green)}padding-bottom:5px;">HER ER DU STÆRK</span>
-            ${esc(strength).replace(/\n/g, "<br>")}
-          </td>
-        </tr></table>
-      </td></tr>
-    </table>
+  return `<tr><td style="padding:22px 30px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+      <td width="42" valign="top" style="font-family:${FONT};font-size:22px;line-height:26px;">💪</td>
+      <td style="${txt(16, 26, C.onyx)}">
+        <span style="display:block;${label()}padding-bottom:6px;">HER ER DU STÆRK</span>
+        ${esc(strength).replace(/\n/g, "<br>")}
+      </td>
+    </tr></table>
   </td></tr>`;
 }
 
