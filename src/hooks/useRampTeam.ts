@@ -182,6 +182,48 @@ export function useLogRampAction() {
   });
 }
 
+/**
+ * Ugens faste forloeb med dokumenteret feedback.
+ *
+ * Modtagerne bestemmes udelukkende paa serveren, og registreringen sker
+ * foerst naar mailen er lagt i koen. Klienten sender aldrig en modtagerliste.
+ */
+export function useSendRampSessionFeedback() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      employeeId: string;
+      kind: "coaching" | "listen";
+      note: string;
+      flagId?: string | null;
+    }) => {
+      const { data, error } = await supabase.functions.invoke("send-ramp-session-feedback", {
+        body: {
+          employeeId: params.employeeId,
+          kind: params.kind,
+          note: params.note,
+          flagId: params.flagId ?? null,
+        },
+      });
+      if (error) {
+        const message = (data as { error?: string } | null)?.error;
+        throw new Error(message || error.message || "Kunne ikke sende feedbacken");
+      }
+      const payload = data as { error?: string; recipients?: string[] } | null;
+      if (payload?.error) throw new Error(payload.error);
+      return payload?.recipients ?? [];
+    },
+    onSuccess: (recipients) => {
+      queryClient.invalidateQueries({ queryKey: ["ramp-team-overview"] });
+      toast.success(`Feedback sendt til ${recipients.length} modtagere`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Kunne ikke sende feedbacken");
+    },
+  });
+}
+
 export function useCloseRampFlag() {
   const queryClient = useQueryClient();
 
