@@ -99,15 +99,17 @@ function chart(input: SessionMailInput): string {
         : w.sales >= low - 3
           ? C.emeraldSoft
           : C.neutral;
-    return `<td width="${width}%" valign="bottom" style="${last ? "" : "padding-right:5px;"}">
+    return `<td width="${width}%" valign="bottom" style="${last ? "" : "padding-right:6px;"}">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-        <tr><td align="center" style="${txt(11, 15, C.onyx, 800)}padding-bottom:4px;">${w.sales}</td></tr>
-        <tr><td height="${h}" bgcolor="${color}" style="border-radius:4px 4px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td height="${h}" bgcolor="${color}" style="border-radius:6px 6px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
       </table></td>`;
   };
 
+  const valueCell = (w: WeekPoint, i: number) =>
+    `<td width="${width}%" align="center" style="${txt(13, 18, i === weeks.length - 1 ? C.emerald : C.white, 800)}padding-top:8px;">${w.sales}</td>`;
+
   const weekCell = (w: WeekPoint, i: number) =>
-    `<td width="${width}%" align="center" style="${txt(10, 14, i === weeks.length - 1 ? C.green : C.muted, 800)}padding-top:7px;">u${w.iso_week}</td>`;
+    `<td width="${width}%" align="center" style="${txt(10, 14, i === weeks.length - 1 ? C.emerald : "#9aa5aa", 800)}padding-top:3px;">u${w.iso_week}</td>`;
 
   const first = weeks[0].sales;
   const last = weeks[weeks.length - 1].sales;
