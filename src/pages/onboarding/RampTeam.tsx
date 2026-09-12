@@ -180,7 +180,7 @@ function Pill({
 }) {
   return (
     <span
-      className="rounded-full px-3 py-1 text-[12px] font-bold"
+      className="rounded-full px-[13px] py-[7px] text-[13px] font-extrabold"
       style={{ background: bg, color }}
     >
       {children}
