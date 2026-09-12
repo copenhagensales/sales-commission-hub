@@ -55,12 +55,10 @@ function noteHtml(note: string): string {
 function sellerContent(info: RecipientInfo, kind: Kind, note: string, week: number): string {
   return `
     <p>Hej ${escapeHtml(info.seller.name)},</p>
-    <p>Her er feedbacken fra vores ${escapeHtml(KIND_LABEL[kind])} i uge ${week}.</p>
-    ${noteHtml(note)}
-    <p style="color:#57635e;margin-top:16px;">Vi holder både en 1-1 coaching og en 1-1 lyt hver
-    uge, så længe salget ligger under det typiske spænd for din opstart. Næste forløb ligger i
-    næste uge.</p>`;
+    <p>Her er noterne fra vores ${escapeHtml(KIND_LABEL[kind])} i uge ${week}.</p>
+    ${noteHtml(note)}`;
 }
+
 
 function leaderContent(
   info: RecipientInfo,
