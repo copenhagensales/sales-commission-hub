@@ -1016,25 +1016,38 @@ export default function RampTeam() {
                 </button>
               </div>
               {showEvidence && (
-                <ul className="mt-3 space-y-1 text-[12px]" style={{ color: "#57635e" }}>
+                <div
+                  className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2 border-t pt-3.5 text-[13px] font-semibold"
+                  style={{ borderColor: "#eaefed", color: "#57635e" }}
+                >
                   {stats.map((s) => {
                     const line = formatRiskStatShort(s);
-                    return line ? <li key={s.day_no}>{line}</li> : null;
+                    return line ? <span key={s.day_no}>{line}</span> : null;
                   })}
-                  <li>Lille grundlag — tallene kan flytte sig</li>
-                  <li>Gælder grupper, ikke enkeltpersoner</li>
-                </ul>
+                  <span>Lille grundlag — tallene kan flytte sig</span>
+                  <span>Gælder grupper, ikke enkeltpersoner</span>
+                </div>
               )}
             </section>
           )}
 
-          <section style={{ display: "grid", gap: 18 }}>
-            <div>
-              <p className="text-[14px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                Under spændet = 1-1 coaching og 1-1 lyt hver uge, indtil de er inde i spændet.
-              </p>
-              <p className="text-[12px]" style={{ color: "#57635e" }}>
-                Sorteret med mest hastende først
+          <section style={{ display: "grid", gap: 12 }}>
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p
+                  className="text-[19px] font-extrabold"
+                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
+                >
+                  {filter === "missing"
+                    ? `Mangler forløb i uge ${isoWeek ?? "-"}`
+                    : "I farezonen nu"}
+                </p>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                  Under spændet = 1-1 coaching og 1-1 lyt hver uge, indtil de er inde i spændet.
+                </p>
+              </div>
+              <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>
+                Sorteret efter hastende først
               </p>
             </div>
 
