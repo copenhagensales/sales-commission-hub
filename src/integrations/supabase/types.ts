@@ -17254,10 +17254,6 @@ export type Database = {
       }
       pay_period_start: { Args: { ts: string }; Returns: string }
       ramp_create_risk_flags: { Args: never; Returns: number }
-      ramp_day1: {
-        Args: { p_campaign: string; p_employee_id: string }
-        Returns: string
-      }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
       ramp_session_recipients: {
