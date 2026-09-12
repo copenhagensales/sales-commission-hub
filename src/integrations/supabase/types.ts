@@ -12798,36 +12798,6 @@ export type Database = {
           },
         ]
       }
-      ramp_risk_settings: {
-        Row: {
-          basis_campaign_label: string
-          basis_leavers: number
-          basis_sellers: number
-          created_at: string
-          id: string
-          risk_factor: number
-          updated_at: string
-        }
-        Insert: {
-          basis_campaign_label?: string
-          basis_leavers?: number
-          basis_sellers?: number
-          created_at?: string
-          id?: string
-          risk_factor?: number
-          updated_at?: string
-        }
-        Update: {
-          basis_campaign_label?: string
-          basis_leavers?: number
-          basis_sellers?: number
-          created_at?: string
-          id?: string
-          risk_factor?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       ramp_risk_stats: {
         Row: {
           client_campaign_id: string
