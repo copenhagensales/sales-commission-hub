@@ -188,13 +188,20 @@ export function formatRiskStatSentence(stat: RampRiskStat): string {
   const parts: string[] = [];
   if (belowPct !== null) {
     parts.push(
-      `Blandt nye sælgere på ${campaign} stoppede ${belowPct} % af dem, der lå under det typiske på dag ${stat.day_no}, inden dag 40 (${stat.n_below_stopped} af ${stat.n_below}).`,
+      `Blandt nye sælgere på ${campaign} stoppede ${belowPct} % af dem, der lå under det typiske på dag ${stat.day_no}, inden dag 40 (${stat.n_below_stopped} af ${stat.n_below} vurderbare).`,
     );
   }
   if (abovePct !== null) {
     parts.push(
-      `Blandt dem på eller over lå tallet på ${abovePct} % (${stat.n_above_stopped} af ${stat.n_above}).`,
+      `Blandt dem på eller over lå tallet på ${abovePct} % (${stat.n_above_stopped} af ${stat.n_above} vurderbare).`,
+    );
+  }
+  const pending = stat.n_below_pending + stat.n_above_pending;
+  if (pending > 0) {
+    parts.push(
+      `${pending} sælgere er stadig undervejs mod dag 40 og tælles ikke med (${stat.n_below_pending} under, ${stat.n_above_pending} på eller over).`,
     );
   }
   return parts.join(" ");
 }
+
