@@ -346,6 +346,15 @@ export default function RampTeam() {
   const [filter, setFilter] = useState<FilterMode>("danger");
 
   const isoWeek = members[0]?.iso_week ?? null;
+  const programStart = members[0]?.weekly_program_start_date ?? null;
+  const programActive = members[0]?.weekly_program_active ?? false;
+  const programStartLabel = programStart
+    ? new Date(`${programStart}T00:00:00`).toLocaleDateString("da-DK", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   const dangerList = useMemo(
     () =>
