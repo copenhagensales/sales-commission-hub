@@ -35,6 +35,7 @@ import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMen
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import { useCanViewRampTeam } from "@/hooks/useRampTeam";
+import { ViewAsSelector } from "./ViewAsSelector";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
 
@@ -2026,6 +2027,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               )}
             </NavLink>
           )}
+          {/* "Se som" ved siden af kontoknappen — kun synlig for superadmins */}
+          <ViewAsSelector />
           <button onClick={() => { handleLogout(); handleNavClick(); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
             {t("sidebar.logout")}
