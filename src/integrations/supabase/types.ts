@@ -16743,6 +16743,7 @@ export type Database = {
       }
       get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
       get_ramp_for_employee: { Args: { p_employee_id: string }; Returns: Json }
+      get_ramp_risk_flags: { Args: never; Returns: Json }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
@@ -17057,7 +17058,9 @@ export type Database = {
         Returns: string
       }
       pay_period_start: { Args: { ts: string }; Returns: string }
+      ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
+      ramp_risk_mail_payload: { Args: never; Returns: Json }
       ramp_workday_no: {
         Args: { p_start: string; p_target: string }
         Returns: number
