@@ -394,182 +394,205 @@ function MemberCard({
 
   return (
     <article
-      className="overflow-hidden rounded-[20px] bg-white"
+      className="relative overflow-hidden rounded-[20px] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
     >
-      <div className="flex">
-        <span className="w-[5px] shrink-0" style={{ background: d.stripColor }} />
-        <div className="flex-1 p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span
-                className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[14px] font-extrabold"
-                style={{ background: "#f1f4f3", color: "#1b1f1d" }}
+      <span
+        className="absolute bottom-0 left-0 top-0 w-[5px]"
+        style={{ background: d.stripColor }}
+      />
+
+      <div className="px-5 pt-5 sm:px-[26px]">
+        <div className="flex flex-wrap items-center justify-between gap-3.5">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[15px] font-extrabold"
+              style={{ background: "#f1f4f3", color: "#4a5651" }}
+            >
+              {getInitials(member.employee_name)}
+            </span>
+            <div className="min-w-0">
+              <p
+                className="text-[18px] font-extrabold leading-tight"
+                style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
               >
-                {getInitials(member.employee_name)}
-              </span>
-              <div>
-                <p className="text-[18px] font-extrabold leading-tight" style={{ color: "#1b1f1d" }}>
-                  {member.employee_name}
-                </p>
-                <p className="text-[12px]" style={{ color: "#57635e" }}>
-                  {[member.campaign_name, `arbejdsdag ${member.day_no}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Pill bg={trendPill.bg} color={trendPill.color}>
-                {trendPill.text}
-              </Pill>
-              {d.gap > 0 && (
-                <Pill
-                  bg={d.stripColor === RED ? "#fbe9e8" : "#fdf2e3"}
-                  color={d.stripColor === RED ? "#8f2a23" : "#7a4e11"}
-                >
-                  {d.gap} under spændet
-                </Pill>
-              )}
+                {member.employee_name}
+              </p>
+              <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                {[member.campaign_name, `arbejdsdag ${member.day_no}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill bg={trendPill.bg} color={trendPill.color}>
+              {trendPill.text}
+            </Pill>
+            {d.gap > 0 && (
+              <Pill
+                bg={d.stripColor === RED ? "#fbe9e8" : "#fdf2e3"}
+                color={d.stripColor === RED ? RED_TEXT : AMBER_TEXT}
+              >
+                {d.gap} under spændet
+              </Pill>
+            )}
+          </div>
+        </div>
 
-          <div
-            className="mt-3 flex items-start gap-3 rounded-2xl p-3"
-            style={{ background: band.tone.bg }}
+        <div
+          className="mt-[18px] flex items-center gap-3.5 rounded-[14px] px-[18px] py-3.5"
+          style={{ background: band.tone.bg }}
+        >
+          <span
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] text-[16px] font-extrabold text-white"
+            style={{ background: band.tone.icon }}
+          >
+            {band.mark}
+          </span>
+          <div className="min-w-0">
+            <p
+              className="text-[16px] font-extrabold"
+              style={{ color: band.tone.text, letterSpacing: "-.01em" }}
+            >
+              {band.title}
+            </p>
+            <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+              {band.sub}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <span
+            className="whitespace-nowrap text-[12px] font-extrabold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            Dag {member.day_no} af 40
+          </span>
+          <span
+            className="h-2 flex-1 overflow-hidden rounded-[4px]"
+            style={{ background: "#f1f4f3" }}
           >
             <span
-              className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] bg-white text-[15px] font-extrabold"
-              style={{ color: band.tone.icon }}
+              className="block h-full rounded-[4px]"
+              style={{
+                width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
+                background: d.stripColor,
+              }}
+            />
+          </span>
+          <span
+            className="whitespace-nowrap text-[12px] font-bold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            {member.days_left} dage tilbage
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
+        style={{ borderColor: "#eef2f0" }}
+      >
+        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} />
+
+        <div
+          className="rounded-[16px] border px-5 py-[18px]"
+          style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionLabel>Ugens faste forløb</SectionLabel>
+            <span
+              className="text-[12px] font-extrabold"
+              style={{ color: d.doneThisWeek === 2 ? "#0f5a38" : AMBER_TEXT }}
             >
-              {band.mark}
+              {d.doneThisWeek === 2 ? "Ugen er klaret" : `${d.doneThisWeek} af 2 holdt`}
             </span>
-            <div>
-              <p className="text-[14px] font-extrabold" style={{ color: band.tone.text }}>
-                {band.title}
-              </p>
-              <p className="text-[12px]" style={{ color: band.tone.text }}>
-                {band.sub}
-              </p>
-            </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3">
-            <span className="text-[12px] font-extrabold tabular-nums" style={{ color: "#1b1f1d" }}>
-              Dag {member.day_no} af 40
-            </span>
-            <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "#f1f4f3" }}>
-              <span
-                className="block h-full rounded-full"
-                style={{
-                  width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
-                  background: d.stripColor,
-                }}
+          {member.has_absence ? (
+            <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+              Der er registreret fravær hele ugen — forløbet er ikke krævet.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <ProgramRow
+                kind="coaching"
+                done={member.has_coaching}
+                member={member}
+                missedListen={d.missedListen}
+                onOpen={() => onOpen(member, "coaching", member.has_coaching)}
               />
-            </span>
-            <span className="text-[12px] tabular-nums" style={{ color: "#57635e" }}>
-              {member.days_left} dage tilbage
-            </span>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} />
-
-            <div
-              className="rounded-2xl border p-3"
-              style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
-                  Ugens faste forløb
+              <ProgramRow
+                kind="listen"
+                done={member.has_listen}
+                member={member}
+                missedListen={d.missedListen}
+                onOpen={() => onOpen(member, "listen", member.has_listen)}
+              />
+              {!member.week_required && (
+                <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
+                  {member.weekly_program_active
+                    ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
+                    : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
                 </p>
-                <Pill
-                  bg={d.doneThisWeek === 2 ? "#e7f4ed" : "#fdf2e3"}
-                  color={d.doneThisWeek === 2 ? "#0f5a38" : "#7a4e11"}
-                >
-                  {d.doneThisWeek === 2 ? "Ugen er klaret" : `${d.doneThisWeek} af 2 holdt`}
-                </Pill>
-              </div>
-
-              {member.has_absence ? (
-                <p className="mt-3 text-[12px]" style={{ color: "#57635e" }}>
-                  Der er registreret fravær hele ugen — forløbet er ikke krævet.
-                </p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  <ProgramRow
-                    kind="coaching"
-                    done={member.has_coaching}
-                    member={member}
-                    missedListen={d.missedListen}
-                    onOpen={() => onOpen(member, "coaching", member.has_coaching)}
-                  />
-                  <ProgramRow
-                    kind="listen"
-                    done={member.has_listen}
-                    member={member}
-                    missedListen={d.missedListen}
-                    onOpen={() => onOpen(member, "listen", member.has_listen)}
-                  />
-                  {!member.week_required && (
-                    <p className="text-[12px]" style={{ color: "#57635e" }}>
-                      {member.weekly_program_active
-                        ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
-                        : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={logAction.isPending}
-                    onClick={() =>
-                      logAction.mutate({
-                        employeeId: member.employee_id,
-                        actionType: RAMP_WEEKLY_ABSENCE,
-                        flagId: member.flag_id,
-                      })
-                    }
-                    className="text-[12px] underline disabled:opacity-50"
-                    style={{ color: "#57635e" }}
-                  >
-                    Registrér fravær hele ugen
-                  </button>
-                </div>
               )}
-
-              <HistoryBars member={member} d={d} />
-              <p className="mt-2 text-[12px] font-semibold" style={{ color: effect.color }}>
-                {effect.text}
-              </p>
-
-              {d.feedbackLog.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                    Sendt feedback
-                  </p>
-                  {d.feedbackLog.slice(0, 4).map((a, index) => {
-                    const { week } = isoWeekOf(new Date(a.performed_at));
-                    return (
-                      <div
-                        key={`${a.performed_at}-${index}`}
-                        className="rounded-2xl border bg-white p-3"
-                        style={{ borderColor: "#e7eeeb" }}
-                      >
-                        <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                          {a.action_type}
-                        </p>
-                        <p className="text-[11px]" style={{ color: "#57635e" }}>
-                          Sendt til {a.recipients.length} · uge {week}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
-                          {a.note}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <button
+                type="button"
+                disabled={logAction.isPending}
+                onClick={() =>
+                  logAction.mutate({
+                    employeeId: member.employee_id,
+                    actionType: RAMP_WEEKLY_ABSENCE,
+                    flagId: member.flag_id,
+                  })
+                }
+                className="text-[12px] font-semibold underline disabled:opacity-50"
+                style={{ color: "#57635e" }}
+              >
+                Registrér fravær hele ugen
+              </button>
             </div>
-          </div>
+          )}
+
+          <HistoryBars member={member} d={d} />
+
+          <p
+            className="mt-3 border-t pt-3 text-[13px] font-bold"
+            style={{ borderColor: "#e7eeeb", color: effect.color, textWrap: "pretty" }}
+          >
+            {effect.text}
+          </p>
+
+          {d.feedbackLog.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <SectionLabel>Sendt feedback</SectionLabel>
+              {d.feedbackLog.slice(0, 4).map((a, index) => {
+                const { week } = isoWeekOf(new Date(a.performed_at));
+                return (
+                  <div
+                    key={`${a.performed_at}-${index}`}
+                    className="rounded-[13px] border bg-white p-3"
+                    style={{ borderColor: "#e7eeeb" }}
+                  >
+                    <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
+                      {a.action_type}
+                    </p>
+                    <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                      Sendt til {a.recipients.length} · uge {week}
+                    </p>
+                    <p
+                      className="mt-1 whitespace-pre-wrap text-[12px]"
+                      style={{ color: "#1b1f1d" }}
+                    >
+                      {a.note}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </article>
