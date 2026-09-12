@@ -416,6 +416,13 @@ export default function RampTeam() {
             <p className="text-[13px]" style={{ color: "var(--ramp-muted)" }}>
               Uge {isoWeek ?? "-"} · første 40 arbejdsdage
             </p>
+            {programStartLabel && (
+              <p className="mt-1 text-[12px]" style={{ color: "var(--ramp-muted)" }}>
+                {programActive
+                  ? `Ugentlige forløb registreres fra ${programStartLabel}.`
+                  : `Ugentlige forløb registreres først fra ${programStartLabel} — indtil da tælles ingen uger som manglende.`}
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 variant="ghost"
