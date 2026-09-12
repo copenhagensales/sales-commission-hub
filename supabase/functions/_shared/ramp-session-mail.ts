@@ -380,7 +380,7 @@ export function buildLeaderMail(
     quoteBlock(input.note, focusLine(input)),
     strengthBlock(input.strengthNote),
     chart(input),
-    rampBlock(input),
+    ].join("");
   ].join("");
 
   return {
