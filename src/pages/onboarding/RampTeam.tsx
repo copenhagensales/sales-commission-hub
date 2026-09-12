@@ -146,7 +146,7 @@ function priorityBand(member: RampTeamMember, d: Derived) {
       sub: "Sæt et lyt i kalenderen i dag",
     };
   }
-  if (d.doneThisWeek === 0) {
+  if (member.week_required && d.doneThisWeek === 0) {
     return {
       tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
       mark: "!",
@@ -154,12 +154,20 @@ function priorityBand(member: RampTeamMember, d: Derived) {
       sub: "Coaching og lyt skal holdes denne uge",
     };
   }
-  if (d.doneThisWeek === 1) {
+  if (member.week_required && d.doneThisWeek === 1) {
     return {
       tone: { bg: "#fdf2e3", icon: AMBER_TEXT, text: "#7a4e11" },
       mark: "!",
       title: `${missingKind} mangler i uge ${member.iso_week}`,
       sub: "Ét forløb tilbage før ugen er lukket",
+    };
+  }
+  if (!member.week_required && !member.weekly_program_active) {
+    return {
+      tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
+      mark: "✓",
+      title: "Ordningen er ikke trådt i kraft endnu",
+      sub: "Ugen tælles ikke som manglende",
     };
   }
   if (d.trend === "down") {
