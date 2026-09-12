@@ -54,6 +54,8 @@ export interface SessionMailInput {
   bandLow: number | null;
   bandMedian: number | null;
   bandHigh: number | null;
+  /** Fornavne paa de oevrige ledere paa holdet, brugt i afslutningen. */
+  supportNames?: string[];
 }
 
 function esc(value: string): string {
