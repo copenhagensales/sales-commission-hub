@@ -919,7 +919,7 @@ export default function RampTeam() {
                 label: "I farezonen",
                 value: counts.danger,
                 sub: `af ${counts.total} sælgere`,
-                extra: `${counts.missing} mangler ugens forløb`,
+                extra: "Under det typiske niveau",
                 extraColor: RED_TEXT,
               },
               {
@@ -927,16 +927,19 @@ export default function RampTeam() {
                 label: "Ser godt ud",
                 value: counts.good,
                 sub: "på eller over typisk",
-                extra: "Ingen handling nødvendig",
+                extra: "Skal stadig have ugens forløb",
                 extraColor: "#57635e",
               },
               {
-                strip: NEUTRAL,
-                label: "Stadig undervejs",
-                value: counts.pending,
-                sub: "mod dag 40",
-                extra: "Tælles ikke med endnu",
-                extraColor: "#57635e",
+                strip: counts.missing > 0 ? AMBER : GREEN,
+                label: `Mangler forløb i uge ${isoWeek ?? "-"}`,
+                value: counts.missing,
+                sub: `af ${counts.total} sælgere`,
+                extra:
+                  counts.missing > 0
+                    ? "Coaching eller lyt mangler stadig"
+                    : "Alle forløb er afviklet",
+                extraColor: counts.missing > 0 ? AMBER_TEXT : "#0f5a38",
               },
             ].map((kpi) => (
               <div
