@@ -840,7 +840,11 @@ function FeedbackDialog({
           style={{ background: "#f6f9f8" }}
         >
           <p className="text-[12px] font-semibold" style={{ color: ready ? "#0f5a38" : AMBER_TEXT }}>
-            {ready ? "Sendes til sælgeren og teamets ledere" : "Skriv feedback før du sender"}
+            {ready
+              ? "Sendes til sælgeren og teamets ledere"
+              : note.trim().length < 10
+                ? "Skriv feedback før du sender"
+                : "Vælg ugens fokus før du sender"}
           </p>
           <div className="flex items-center gap-2">
             <button
