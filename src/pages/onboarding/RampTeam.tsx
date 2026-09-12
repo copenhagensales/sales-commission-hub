@@ -791,6 +791,12 @@ export default function RampTeam() {
   } | null>(null);
 
   const isoWeek = members[0]?.iso_week ?? null;
+  const campaignLabel = useMemo(() => {
+    const names = Array.from(
+      new Set(members.map((m) => m.campaign_name).filter((n): n is string => Boolean(n))),
+    );
+    return names.length > 0 ? names.join(" · ") : "Eesy TM Products";
+  }, [members]);
   const programStart = members[0]?.weekly_program_start_date ?? null;
   const programActive = members[0]?.weekly_program_active ?? false;
   const programStartLabel = programStart
@@ -864,14 +870,26 @@ export default function RampTeam() {
         <div className="mx-auto max-w-[1080px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1
-                className="text-[30px] font-extrabold leading-tight sm:text-[34px]"
-                style={{ color: "#1b1f1d", letterSpacing: "-.03em" }}
-              >
-                Opstartshold
-              </h1>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1
+                  className="text-[30px] font-extrabold leading-tight sm:text-[34px]"
+                  style={{ color: "#1b1f1d", letterSpacing: "-.03em" }}
+                >
+                  Opstartshold
+                </h1>
+                <span
+                  className="rounded-full px-[11px] py-[5px] text-[12px] font-extrabold uppercase"
+                  style={{ background: "#1b1f1d", color: "#ffffff", letterSpacing: ".06em" }}
+                >
+                  {campaignLabel}
+                </span>
+              </div>
               <p className="mt-1.5 text-[15px] font-semibold" style={{ color: "#57635e" }}>
                 Uge {isoWeek ?? "-"} · første 40 arbejdsdage
+              </p>
+              <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                Forsøgsordning: gælder kun {campaignLabel}. Virker det, ruller vi det ud på de
+                øvrige teams.
               </p>
               {programStartLabel && (
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
