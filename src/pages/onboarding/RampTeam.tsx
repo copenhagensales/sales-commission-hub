@@ -188,61 +188,78 @@ function Pill({
   );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="text-[12px] font-extrabold uppercase"
+      style={{ color: "#57635e", letterSpacing: ".1em" }}
+    >
+      {children}
+    </p>
+  );
+}
+
 function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor: string }) {
   const last = weeks[weeks.length - 1];
   const bandLow = last ? last.p25 : 0;
   const bandHigh = last ? last.p75 : 0;
   const max = Math.max(1, bandHigh, ...weeks.map((w) => w.sales)) * 1.12;
+  const H = 84;
+  const px = (v: number) => Math.round((v / max) * H);
 
   return (
     <div>
-      <p className="text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
-        Salg pr. uge mod typisk spænd
-      </p>
-      <div className="relative mt-3" style={{ height: 84 }}>
+      <SectionLabel>Salg pr. uge mod typisk spænd</SectionLabel>
+      <div className="relative mt-3.5 flex items-end gap-2" style={{ height: H }}>
         {bandHigh > 0 && (
           <div
-            className="absolute inset-x-0 border-y border-dashed"
+            className="pointer-events-none absolute inset-x-0 border-y-2 border-dashed"
             style={{
-              bottom: `${(bandLow / max) * 100}%`,
-              height: `${Math.max(2, ((bandHigh - bandLow) / max) * 100)}%`,
+              top: H - px(bandHigh),
+              height: Math.max(2, px(bandHigh) - px(bandLow)),
               borderColor: "#bcd6c8",
               background: "rgba(23,122,77,.07)",
             }}
           />
         )}
-        <div className="relative flex h-full items-end gap-2">
-          {weeks.map((w) => {
-            const color =
-              w.sales >= w.p25 ? GREEN : w.sales >= w.p25 - 3 ? AMBER : stripColor;
-            return (
-              <div key={weekKey(w.iso_year, w.iso_week)} className="flex flex-1 justify-center">
-                <span
-                  className="w-4 rounded-t-[4px]"
-                  style={{
-                    height: `${Math.max(3, (w.sales / max) * 100)}%`,
-                    background: color,
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
+        {weeks.map((w) => {
+          const color = w.sales >= w.p25 ? GREEN : w.sales >= w.p25 - 3 ? AMBER : stripColor;
+          return (
+            <div
+              key={weekKey(w.iso_year, w.iso_week)}
+              className="relative z-[1] flex flex-1 flex-col items-center gap-[5px]"
+            >
+              <span
+                className="text-[12px] font-extrabold tabular-nums"
+                style={{ color: w.sales >= w.p25 ? GREEN : "#57635e" }}
+              >
+                {w.sales}
+              </span>
+              <span
+                className="w-full"
+                style={{
+                  height: Math.max(2, px(w.sales)),
+                  background: color,
+                  borderRadius: "5px 5px 0 0",
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
-      <div className="mt-1 flex gap-2">
+      <div className="mt-2 flex gap-2">
         {weeks.map((w) => (
-          <div key={`lbl-${weekKey(w.iso_year, w.iso_week)}`} className="flex-1 text-center">
-            <p className="text-[11px] tabular-nums" style={{ color: "#57635e" }}>
-              u{w.iso_week}
-            </p>
-            <p className="text-[11px] font-bold tabular-nums" style={{ color: "#1b1f1d" }}>
-              {w.sales}
-            </p>
-          </div>
+          <span
+            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
+            className="flex-1 text-center text-[11px] font-bold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            u{w.iso_week}
+          </span>
         ))}
       </div>
       {last && (
-        <p className="mt-2 text-[12px]" style={{ color: "#57635e" }}>
+        <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
           Stiplet felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · median{" "}
           {Math.round(last.p50)}
         </p>
