@@ -85,6 +85,7 @@ import {
   Messages,
   OnboardingAdmin,
   OnboardingDashboard,
+  RampRiskFlags,
   OnboardingCourse,
   MyFeedback,
   ExcelFieldMatcher,
