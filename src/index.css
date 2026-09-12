@@ -937,7 +937,6 @@
    Opstartshold ("ramp") — sidespecifik palet efter Kaspers design.
    Kun aktiv inde i .ramp-page, saa resten af Stork er uberoert.
    ========================================================================== */
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 .ramp-page {
   --ramp-ink: #1b1f1d;
