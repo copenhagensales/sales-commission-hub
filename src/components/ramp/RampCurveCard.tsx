@@ -71,7 +71,10 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       </div>
 
       {/* 2) Hero */}
-      <div className="rs-dark rs-fade p-5 sm:p-7" style={{ animationDelay: "60ms" }}>
+      <div
+        className="rs-dark rs-fade p-5 sm:p-7"
+        style={{ animationDelay: "60ms", borderLeft: "5px solid var(--rs-accent)" }}
+      >
         <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 lg:gap-10">
           <div className="min-w-0">
             <div className="flex items-end gap-3">
@@ -145,9 +148,19 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
                   salg
                 </span>
               </div>
-              <div className="mt-3 flex h-12 items-end gap-1.5">
+              <div className="mt-3 flex h-16 items-end gap-1.5">
                 {view.last7Bars.map((bar, i) => (
-                  <div key={i} className="flex-1 flex items-end" style={{ height: "100%" }}>
+                  <div
+                    key={i}
+                    className="flex flex-1 flex-col items-center justify-end"
+                    style={{ height: "100%" }}
+                  >
+                    <span
+                      className="rs-num mb-1 text-[11px] font-bold leading-none"
+                      style={{ color: bar.value > 0 ? "var(--rs-accent)" : "var(--rs-on-dark-muted)" }}
+                    >
+                      {bar.value}
+                    </span>
                     <div
                       className="rs-bar w-full rounded-[4px]"
                       style={{
@@ -165,9 +178,20 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       </div>
 
       {/* 3) Kurvekort */}
-      <div className="rs-card rs-fade mt-4 p-4 sm:p-6" style={{ animationDelay: "140ms" }}>
+      <div
+        className="rs-card rs-fade mt-4 p-4 sm:p-6"
+        style={{ animationDelay: "140ms", borderLeft: "5px solid #2e3136" }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[16px] font-bold tracking-tight">Din kurve mod dag 40</h3>
+          <div>
+            <p
+              className="text-[10px] font-extrabold uppercase tracking-[0.14em]"
+              style={{ color: "var(--rs-muted)" }}
+            >
+              Forløb
+            </p>
+            <h3 className="text-[18px] font-extrabold tracking-tight">Din kurve mod dag 40</h3>
+          </div>
           <span
             className="rounded-full px-2.5 py-1 text-[11px] font-bold"
             style={{ background: "#e8faf0", color: "#13623c" }}
@@ -303,8 +327,17 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       </div>
 
       {/* 4) Din rejse */}
-      <div className="rs-card rs-fade mt-4 p-4 sm:p-6" style={{ animationDelay: "200ms" }}>
-        <h3 className="text-[16px] font-bold tracking-tight">Din rejse</h3>
+      <div
+        className="rs-card rs-fade mt-4 p-4 sm:p-6"
+        style={{ animationDelay: "200ms", borderLeft: "5px solid var(--rs-accent)" }}
+      >
+        <p
+          className="text-[10px] font-extrabold uppercase tracking-[0.14em]"
+          style={{ color: "var(--rs-muted)" }}
+        >
+          Milepæle
+        </p>
+        <h3 className="text-[18px] font-extrabold tracking-tight">Din rejse</h3>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {view.milestones.map((m) => (
             <div
