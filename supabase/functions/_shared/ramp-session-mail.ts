@@ -54,6 +54,8 @@ export interface SessionMailInput {
   bandLow: number | null;
   bandMedian: number | null;
   bandHigh: number | null;
+  /** Fornavne paa de oevrige ledere paa holdet, brugt i afslutningen. */
+  supportNames?: string[];
 }
 
 function esc(value: string): string {
@@ -208,29 +210,21 @@ function strengthBlock(strength: string | null): string {
   </td></tr>`;
 }
 
-function rampBlock(input: SessionMailInput): string {
-  const day = input.dayNo ?? 0;
-  const pct = Math.max(4, Math.min(100, Math.round((day / 40) * 100)));
-  return `<tr><td style="padding:14px 30px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.soft};border:1px solid ${C.softBorder};border-radius:18px;">
-      <tr><td style="padding:18px 22px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr>
-            <td style="${label()}">DIN OPSTART</td>
-            <td align="right" style="${txt(12, 18, C.onyx, 800)}">Dag ${day} af 40</td>
-          </tr>
-          <tr><td colspan="2" style="padding-top:11px;">
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-radius:4px;overflow:hidden;"><tr>
-              <td width="${pct}%" height="9" bgcolor="${C.emerald}" style="font-size:0;line-height:0;">&nbsp;</td>
-              <td width="${100 - pct}%" height="9" bgcolor="#d6e1e3" style="font-size:0;line-height:0;">&nbsp;</td>
-            </tr></table>
-          </td></tr>
-          ${input.campaignName ? `<tr><td colspan="2" style="${txt(12, 18, C.muted)}padding-top:11px;">${esc(input.campaignName)}</td></tr>` : ""}
-        </table>
-      </td></tr>
-    </table>
-  </td></tr>`;
+/** Navneliste til afslutningen: "mig eller Kasper og Lone". */
+function supportSentence(input: SessionMailInput, forSeller: boolean): string {
+  const names = (input.supportNames ?? [])
+    .map((n) => firstName(n))
+    .filter((n) => n && n !== firstName(input.leaderName));
+  const unique = [...new Set(names)].slice(0, 3).map(esc);
+  const others = unique.length === 0
+    ? ""
+    : unique.length === 1
+    ? ` eller ${unique[0]}`
+    : ` eller en af de andre (${unique.slice(0, -1).join(", ")} og ${unique[unique.length - 1]})`;
+  const who = forSeller ? "mig" : esc(firstName(input.leaderName));
+  return `Du kan altid tage fat i ${who}${others}. Du behøver ikke vente på næste forløb - vi står lige ved siden af dig, og vi hjælper meget gerne. 🤝`;
 }
+
 
 function shell(opts: {
   preheader: string;
@@ -357,7 +351,6 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
     quoteBlock(input.note, focusLine(input)),
     strengthBlock(input.strengthNote),
     chart(input),
-    rampBlock(input),
   ].join("");
 
   return {
@@ -365,7 +358,7 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
     html: shell({
       preheader,
       isoWeek: input.isoWeek,
-      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} I HUS`,
+      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()}`,
       heading,
       heroInitials: esc(initials(input.sellerName)).toUpperCase(),
       intro: `Vi holdt vores <strong style="color:#ffffff;">${esc(KIND_LABEL[input.kind])}</strong> i uge ${input.isoWeek}. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
@@ -373,8 +366,7 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       leaderName: input.leaderName,
       leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
-      remember:
-        "Du må fange mig når som helst - også uden for de faste forløb. Ring, skriv på Teams eller stik hovedet ind. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
+      remember: supportSentence(input, true),
     }),
   };
 }
@@ -388,7 +380,6 @@ export function buildLeaderMail(
     quoteBlock(input.note, focusLine(input)),
     strengthBlock(input.strengthNote),
     chart(input),
-    rampBlock(input),
   ].join("");
 
   return {
@@ -396,7 +387,7 @@ export function buildLeaderMail(
     html: shell({
       preheader: `${input.sellerName} har haft ${KIND_LABEL[input.kind]} i uge ${input.isoWeek}.`,
       isoWeek: input.isoWeek,
-      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} DOKUMENTERET`,
+      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()}`,
       heading: `Hej ${esc(firstName(recipientName))}`,
       heroInitials: esc(initials(input.sellerName)).toUpperCase(),
       intro: `<strong style="color:#ffffff;">${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
@@ -404,8 +395,7 @@ export function buildLeaderMail(
       leaderName: input.leaderName,
       leaderRole: "Afholdt forløbet",
       cta: true,
-      remember:
-        "Du kan altid tage fat i os - også uden for de faste forløb. Ring, skriv på Teams eller kom forbi. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
+      remember: supportSentence(input, false),
     }),
   };
 }
