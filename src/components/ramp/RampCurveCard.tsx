@@ -145,9 +145,19 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
                   salg
                 </span>
               </div>
-              <div className="mt-3 flex h-12 items-end gap-1.5">
+              <div className="mt-3 flex h-16 items-end gap-1.5">
                 {view.last7Bars.map((bar, i) => (
-                  <div key={i} className="flex-1 flex items-end" style={{ height: "100%" }}>
+                  <div
+                    key={i}
+                    className="flex flex-1 flex-col items-center justify-end"
+                    style={{ height: "100%" }}
+                  >
+                    <span
+                      className="rs-num mb-1 text-[11px] font-bold leading-none"
+                      style={{ color: bar.value > 0 ? "var(--rs-accent)" : "var(--rs-on-dark-muted)" }}
+                    >
+                      {bar.value}
+                    </span>
                     <div
                       className="rs-bar w-full rounded-[4px]"
                       style={{
