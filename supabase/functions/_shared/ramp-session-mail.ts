@@ -240,6 +240,7 @@ function shell(opts: {
   leaderName: string;
   leaderRole: string;
   cta: boolean;
+  remember: boolean;
 }): string {
   return `<!DOCTYPE html>
 <html lang="da"><head>
@@ -275,14 +276,14 @@ function shell(opts: {
 
       ${opts.blocks}
 
-      <tr><td style="padding:22px 30px 0;">
+      ${opts.remember ? `<tr><td style="padding:22px 30px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.onyx};border-radius:18px;">
           <tr><td style="padding:22px 24px;${txt(15, 24, C.light)}">
             <span style="display:block;${label(C.emerald)}padding-bottom:8px;">HUSK</span>
             Du skal aldrig sidde og tygge på noget alene. Har du en svær samtale, en indvending der driller, eller bare brug for at sparre, så fang mig. Vi er her for dig, og vi vil gerne have at du lykkes. 🤝
           </td></tr>
         </table>
-      </td></tr>
+      </td></tr>` : ""}
 
       ${opts.cta ? `<tr><td align="center" style="padding:24px 30px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -355,6 +356,7 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       leaderName: input.leaderName,
       leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
+      remember: true,
     }),
   };
 }
@@ -383,6 +385,7 @@ export function buildLeaderMail(
       leaderName: input.leaderName,
       leaderRole: "Afholdt forløbet",
       cta: true,
+      remember: false,
     }),
   };
 }
