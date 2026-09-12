@@ -387,7 +387,7 @@ export function buildLeaderMail(
     html: shell({
       preheader: `${input.sellerName} har haft ${KIND_LABEL[input.kind]} i uge ${input.isoWeek}.`,
       isoWeek: input.isoWeek,
-      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} DOKUMENTERET`,
+      pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()}`,
       heading: `Hej ${esc(firstName(recipientName))}`,
       heroInitials: esc(initials(input.sellerName)).toUpperCase(),
       intro: `<strong style="color:#ffffff;">${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
