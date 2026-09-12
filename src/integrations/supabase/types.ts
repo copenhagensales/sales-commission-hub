@@ -7267,6 +7267,62 @@ export type Database = {
           },
         ]
       }
+      employee_ramp_enrollment: {
+        Row: {
+          client_campaign_id: string
+          created_at: string
+          curve_version: number
+          employee_id: string
+          id: string
+          start_date: string
+        }
+        Insert: {
+          client_campaign_id: string
+          created_at?: string
+          curve_version: number
+          employee_id: string
+          id?: string
+          start_date: string
+        }
+        Update: {
+          client_campaign_id?: string
+          created_at?: string
+          curve_version?: number
+          employee_id?: string
+          id?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_ramp_enrollment_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_ramp_enrollment_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_ramp_enrollment_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_ramp_enrollment_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_referrals: {
         Row: {
           applied_position: string | null
@@ -12513,6 +12569,50 @@ export type Database = {
         }
         Relationships: []
       }
+      ramp_curve: {
+        Row: {
+          client_campaign_id: string
+          computed_at: string
+          curve_version: number
+          day_no: number
+          id: string
+          n_sellers: number
+          p25: number
+          p50: number
+          p75: number
+        }
+        Insert: {
+          client_campaign_id: string
+          computed_at?: string
+          curve_version?: number
+          day_no: number
+          id?: string
+          n_sellers: number
+          p25: number
+          p50: number
+          p75: number
+        }
+        Update: {
+          client_campaign_id?: string
+          computed_at?: string
+          curve_version?: number
+          day_no?: number
+          id?: string
+          n_sellers?: number
+          p25?: number
+          p50?: number
+          p75?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ramp_curve_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruitment_notifications: {
         Row: {
           created_at: string
@@ -16085,6 +16185,7 @@ export type Database = {
         Args: { p_fallback?: string; p_key: string }
         Returns: string
       }
+      compute_ramp_curve: { Args: { p_campaign: string }; Returns: number }
       consume_password_reset_token: {
         Args: { _token_hash: string }
         Returns: boolean
@@ -16435,6 +16536,7 @@ export type Database = {
           revenue: number
         }[]
       }
+      get_my_ramp: { Args: never; Returns: Json }
       get_personal_daily_commission: {
         Args: {
           p_employee_id: string
@@ -16451,6 +16553,7 @@ export type Database = {
         Returns: Json
       }
       get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
+      get_ramp_for_employee: { Args: { p_employee_id: string }; Returns: Json }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
@@ -16765,6 +16868,11 @@ export type Database = {
         Returns: string
       }
       pay_period_start: { Args: { ts: string }; Returns: string }
+      ramp_nightly_maintenance: { Args: never; Returns: Json }
+      ramp_workday_no: {
+        Args: { p_start: string; p_target: string }
+        Returns: number
+      }
       recalc_employee_profile_stats: { Args: never; Returns: number }
       recalculate_coaching_due_dates_for_employee: {
         Args: { p_employee_id: string }
