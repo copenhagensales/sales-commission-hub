@@ -12718,11 +12718,14 @@ export type Database = {
           created_at: string
           employee_id: string
           flag_id: string | null
+          focus_area: string | null
+          focus_note: string | null
           id: string
           note: string | null
           performed_at: string
           performed_by: string
           recipients: string[] | null
+          strength_note: string | null
         }
         Insert: {
           action_type: string
@@ -12730,11 +12733,14 @@ export type Database = {
           created_at?: string
           employee_id: string
           flag_id?: string | null
+          focus_area?: string | null
+          focus_note?: string | null
           id?: string
           note?: string | null
           performed_at?: string
           performed_by: string
           recipients?: string[] | null
+          strength_note?: string | null
         }
         Update: {
           action_type?: string
@@ -12742,11 +12748,14 @@ export type Database = {
           created_at?: string
           employee_id?: string
           flag_id?: string | null
+          focus_area?: string | null
+          focus_note?: string | null
           id?: string
           note?: string | null
           performed_at?: string
           performed_by?: string
           recipients?: string[] | null
+          strength_note?: string | null
         }
         Relationships: [
           {
