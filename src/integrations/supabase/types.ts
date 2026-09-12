@@ -114,6 +114,55 @@ export type Database = {
           },
         ]
       }
+      admin_view_as: {
+        Row: {
+          admin_user_id: string
+          ended_at: string | null
+          expires_at: string
+          id: string
+          started_at: string
+          target_employee_id: string
+        }
+        Insert: {
+          admin_user_id: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          started_at?: string
+          target_employee_id: string
+        }
+        Update: {
+          admin_user_id?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          started_at?: string
+          target_employee_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_view_as_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_view_as_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_view_as_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       adversus_campaign_mappings: {
         Row: {
           adversus_campaign_id: string
@@ -16475,6 +16524,13 @@ export type Database = {
         Args: { p_employee_id: string; p_start_date?: string }
         Returns: number
       }
+      effective_auth_user_id: { Args: never; Returns: string }
+      effective_employee_id: { Args: never; Returns: string }
+      effective_has_app_role: { Args: { _role: string }; Returns: boolean }
+      effective_is_owner: { Args: never; Returns: boolean }
+      effective_is_superadmin: { Args: never; Returns: boolean }
+      effective_is_teamleder_or_above: { Args: never; Returns: boolean }
+      effective_roles: { Args: never; Returns: string[] }
       find_auth_uuid_references: {
         Args: { _uids: string[] }
         Returns: {
@@ -17075,6 +17131,7 @@ export type Database = {
       is_superadmin: { Args: { _user_id?: string }; Returns: boolean }
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
+      is_view_as_active: { Args: never; Returns: boolean }
       jsonb_object_keys_array: { Args: { p_json: Json }; Returns: Json }
       league_auto_advance_seasons: { Args: never; Returns: Json }
       league_current_open_season: {
@@ -17256,6 +17313,9 @@ export type Database = {
           start_fullscreen: boolean
         }[]
       }
+      view_as_candidates: { Args: never; Returns: Json }
+      view_as_status: { Args: never; Returns: Json }
+      view_as_target: { Args: never; Returns: string }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
