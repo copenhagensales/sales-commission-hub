@@ -367,12 +367,14 @@ export function buildSellerMail(input: SessionMailInput): { subject: string; htm
       isoWeek: input.isoWeek,
       pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} I HUS`,
       heading,
-      intro: `Vi holdt vores ${esc(KIND_LABEL[input.kind])} i dag. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
+      heroInitials: esc(initials(input.sellerName)).toUpperCase(),
+      intro: `Vi holdt vores <strong style="color:#ffffff;">${esc(KIND_LABEL[input.kind])}</strong> i uge ${input.isoWeek}. Her er mine noter, plus dine tal, så du kan se hvor langt du er kommet.`,
       blocks,
       leaderName: input.leaderName,
       leaderRole: "Teamleder · altid til at fange på Teams",
       cta: true,
-      remember: true,
+      remember:
+        "Du må fange mig når som helst - også uden for de faste forløb. Ring, skriv på Teams eller stik hovedet ind. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
     }),
   };
 }
