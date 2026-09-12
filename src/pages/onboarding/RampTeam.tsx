@@ -1042,10 +1042,13 @@ export default function RampTeam() {
                 >
                   {filter === "missing"
                     ? `Mangler forløb i uge ${isoWeek ?? "-"}`
-                    : "I farezonen nu"}
+                    : filter === "danger"
+                      ? "I farezonen nu"
+                      : "Alle nye i opstart"}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Under spændet = 1-1 coaching og 1-1 lyt hver uge, indtil de er inde i spændet.
+                  Alle nye får 1-1 coaching og 1-1 lyt hver uge i de første 40 arbejdsdage — også
+                  dem der ligger flot.
                 </p>
               </div>
               <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>
@@ -1061,16 +1064,18 @@ export default function RampTeam() {
                 <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
                   {filter === "missing"
                     ? `Alle forløb er afviklet i uge ${isoWeek ?? "-"}`
-                    : "Ingen sælgere ligger under spændet lige nu"}
+                    : filter === "danger"
+                      ? "Ingen sælgere ligger under spændet lige nu"
+                      : "Ingen sælgere er i opstart lige nu"}
                 </p>
-                {filter === "missing" && (
+                {filter !== "all" && (
                   <button
                     type="button"
-                    onClick={() => setFilter("danger")}
+                    onClick={() => setFilter("all")}
                     className="mt-2 text-[12px] font-bold underline"
                     style={{ color: "#0f5a38" }}
                   >
-                    Tilbage til alle i farezonen
+                    Vis alle nye
                   </button>
                 )}
               </div>
