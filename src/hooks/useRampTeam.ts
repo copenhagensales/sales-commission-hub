@@ -49,11 +49,14 @@ export interface RampRiskStat {
   threshold_p25: number;
   n_below: number;
   n_below_stopped: number;
+  n_below_pending: number;
   n_above: number;
   n_above_stopped: number;
+  n_above_pending: number;
   computed_at: string;
   campaign_name: string | null;
 }
+
 
 export function useCanViewRampTeam() {
   return useQuery({
