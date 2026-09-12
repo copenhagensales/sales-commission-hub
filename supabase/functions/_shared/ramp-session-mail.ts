@@ -398,12 +398,14 @@ export function buildLeaderMail(
       isoWeek: input.isoWeek,
       pill: `&#10003;&nbsp; ${KIND_LABEL[input.kind].toUpperCase()} DOKUMENTERET`,
       heading: `Hej ${esc(firstName(recipientName))}`,
-      intro: `<strong>${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
+      heroInitials: esc(initials(input.sellerName)).toUpperCase(),
+      intro: `<strong style="color:#ffffff;">${esc(input.sellerName)}</strong> har haft ${esc(KIND_LABEL[input.kind])} i uge ${input.isoWeek} med ${esc(input.leaderName)}. Her er noterne fra samtalen.`,
       blocks,
       leaderName: input.leaderName,
       leaderRole: "Afholdt forløbet",
       cta: true,
-      remember: false,
+      remember:
+        "Du kan altid tage fat i os - også uden for de faste forløb. Ring, skriv på Teams eller kom forbi. Vi hjælper meget gerne, ligesom vi altid har gjort. 🤝",
     }),
   };
 }
