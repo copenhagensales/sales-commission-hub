@@ -12855,8 +12855,10 @@ export type Database = {
           day_no: number
           id: string
           n_above: number
+          n_above_pending: number
           n_above_stopped: number
           n_below: number
+          n_below_pending: number
           n_below_stopped: number
           threshold_p25: number
         }
@@ -12867,8 +12869,10 @@ export type Database = {
           day_no: number
           id?: string
           n_above: number
+          n_above_pending?: number
           n_above_stopped: number
           n_below: number
+          n_below_pending?: number
           n_below_stopped: number
           threshold_p25: number
         }
@@ -12879,8 +12883,10 @@ export type Database = {
           day_no?: number
           id?: string
           n_above?: number
+          n_above_pending?: number
           n_above_stopped?: number
           n_below?: number
+          n_below_pending?: number
           n_below_stopped?: number
           threshold_p25?: number
         }
