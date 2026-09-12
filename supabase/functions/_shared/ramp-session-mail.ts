@@ -307,7 +307,7 @@ function shell(opts: {
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #e2eaeb;"><tr><td style="padding-top:20px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
             <td width="46" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="38" height="38" align="center" bgcolor="${C.onyx}" style="border-radius:12px;font-family:${FONT};font-size:14px;font-weight:800;color:${C.emerald};">${esc(initials(opts.leaderName)).toUpperCase()}</td></tr></table></td>
-            <td valign="middle" style="${txt(14, 20, C.onyx, 800)}">${esc(opts.leaderName)}<span style="display:block;font-weight:400;font-size:13px;color:${C.muted};">${opts.leaderRole}</span></td>
+            <td valign="middle" style="${txt(14, 20, C.onyx, 800)}">${esc(opts.leaderName)}</td>
           </tr></table>
         </td></tr></table>
       </td></tr>
