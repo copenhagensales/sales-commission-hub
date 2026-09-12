@@ -49,11 +49,14 @@ export interface RampRiskStat {
   threshold_p25: number;
   n_below: number;
   n_below_stopped: number;
+  n_below_pending: number;
   n_above: number;
   n_above_stopped: number;
+  n_above_pending: number;
   computed_at: string;
   campaign_name: string | null;
 }
+
 
 export function useCanViewRampTeam() {
   return useQuery({
@@ -86,7 +89,7 @@ export function useRampRiskStats() {
       const { data, error } = await supabase
         .from("ramp_risk_stats")
         .select(
-          "day_no, threshold_p25, n_below, n_below_stopped, n_above, n_above_stopped, computed_at, client_campaigns(name)",
+          "day_no, threshold_p25, n_below, n_below_stopped, n_below_pending, n_above, n_above_stopped, n_above_pending, computed_at, client_campaigns(name)",
         )
         .order("day_no", { ascending: true });
       if (error) throw error;
@@ -95,12 +98,15 @@ export function useRampRiskStats() {
         threshold_p25: Number(row.threshold_p25),
         n_below: row.n_below,
         n_below_stopped: row.n_below_stopped,
+        n_below_pending: row.n_below_pending,
         n_above: row.n_above,
         n_above_stopped: row.n_above_stopped,
+        n_above_pending: row.n_above_pending,
         computed_at: row.computed_at,
         campaign_name:
           (row as { client_campaigns?: { name: string } | null }).client_campaigns?.name ?? null,
       }));
+
     },
     staleTime: 10 * 60 * 1000,
   });
@@ -182,13 +188,20 @@ export function formatRiskStatSentence(stat: RampRiskStat): string {
   const parts: string[] = [];
   if (belowPct !== null) {
     parts.push(
-      `Blandt nye sælgere på ${campaign} stoppede ${belowPct} % af dem, der lå under det typiske på dag ${stat.day_no}, inden dag 40 (${stat.n_below_stopped} af ${stat.n_below}).`,
+      `Blandt nye sælgere på ${campaign} stoppede ${belowPct} % af dem, der lå under det typiske på dag ${stat.day_no}, inden dag 40 (${stat.n_below_stopped} af ${stat.n_below} vurderbare).`,
     );
   }
   if (abovePct !== null) {
     parts.push(
-      `Blandt dem på eller over lå tallet på ${abovePct} % (${stat.n_above_stopped} af ${stat.n_above}).`,
+      `Blandt dem på eller over lå tallet på ${abovePct} % (${stat.n_above_stopped} af ${stat.n_above} vurderbare).`,
+    );
+  }
+  const pending = stat.n_below_pending + stat.n_above_pending;
+  if (pending > 0) {
+    parts.push(
+      `${pending} sælgere er stadig undervejs mod dag 40 og tælles ikke med (${stat.n_below_pending} under, ${stat.n_above_pending} på eller over).`,
     );
   }
   return parts.join(" ");
 }
+
