@@ -13,14 +13,20 @@ interface Seller {
   created_at: string;
 }
 
+interface RiskStat {
+  day_no: number;
+  campaign_name: string | null;
+  n_below: number;
+  n_below_stopped: number;
+  n_above: number;
+  n_above_stopped: number;
+}
+
 interface LeaderPayload {
   leader_id: string;
   leader_name: string;
   leader_email: string;
-  risk_factor: number;
-  basis_sellers: number;
-  basis_leavers: number;
-  basis_campaign_label: string;
+  stats: RiskStat[];
   sellers: Seller[];
 }
 
@@ -30,6 +36,29 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/**
+ * Observeret gruppefrekvens med de raa antal altid synlige.
+ * Procent uden de raa tal er forbudt, og der maa aldrig staa en personlig
+ * sandsynlighed for en navngiven saelger.
+ */
+function buildStatSentence(stat: RiskStat): string {
+  const campaign = escapeHtml(stat.campaign_name ?? "kampagnen");
+  const parts: string[] = [];
+  if (stat.n_below > 0) {
+    const pct = Math.round((stat.n_below_stopped / stat.n_below) * 100);
+    parts.push(
+      `Blandt nye sælgere på ${campaign} stoppede ${pct} % af dem, der lå under det typiske på dag ${stat.day_no}, inden dag 40 (${stat.n_below_stopped} af ${stat.n_below}).`,
+    );
+  }
+  if (stat.n_above > 0) {
+    const pct = Math.round((stat.n_above_stopped / stat.n_above) * 100);
+    parts.push(
+      `Blandt dem på eller over lå tallet på ${pct} % (${stat.n_above_stopped} af ${stat.n_above}).`,
+    );
+  }
+  return parts.join(" ");
 }
 
 function buildContent(payload: LeaderPayload): string {
@@ -47,11 +76,14 @@ function buildContent(payload: LeaderPayload): string {
     )
     .join("");
 
+  const stats = (payload.stats ?? [])
+    .map((stat) => `<p><strong>${buildStatSentence(stat)}</strong></p>`)
+    .join("");
+
   return `
     <p>Hej ${escapeHtml(payload.leader_name)},</p>
-    <p><strong>Sælgere i denne liste har ca. ${payload.risk_factor} gange større risiko for at stoppe
-    inden dag 40 end de øvrige nye. Baseret på ${payload.basis_sellers} sælgere og
-    ${payload.basis_leavers} afgange på ${escapeHtml(payload.basis_campaign_label)}.</strong></p>
+    ${stats}
+    <p>Grundlaget er lille, så tallene kan flytte sig. Tallene gælder grupper, ikke enkeltpersoner.</p>
     <p>Det er en samtale, der mangler — ikke en vurdering af sælgeren. Tag fat i dem, mens der stadig
     kan gøres noget, og registrér hvad du gjorde.</p>
     <table style="border-collapse:collapse;width:100%;font-size:14px;">
@@ -67,9 +99,9 @@ function buildContent(payload: LeaderPayload): string {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin-top:24px;">
-      <a href="${APP_URL}/opstart-risiko"
+      <a href="${APP_URL}/opstartshold"
          style="background:#111;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;">
-        Åbn listen i Stork
+        Åbn Opstartshold i Stork
       </a>
     </p>`;
 }

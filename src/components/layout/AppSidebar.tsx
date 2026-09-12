@@ -34,6 +34,7 @@ import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
+import { useCanViewRampTeam } from "@/hooks/useRampTeam";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
 
@@ -57,6 +58,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isPreviewMode } = useRolePreview();
   const { isSuperadmin } = useIsSuperadmin();
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
+  const { data: canViewRampTeam } = useCanViewRampTeam();
   const { count: complianceReviewCount } = useComplianceReviewStatus();
   const { data: pendingDispatchCount = 0 } = usePendingSupplierDispatchCount(
     p.canViewFmBilling,
@@ -471,7 +473,10 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
      p.canViewUpcomingInterviews || p.canViewUpcomingHires || p.canViewBookingFlow);
   
   // Check if any Onboarding items are visible (requires section permission) - only show for admin users
-  const showOnboardingMenu = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
+  const showOnboardingAdminItems = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
+  // "Opstartshold" foelger sin egen regel i databasen (can_view_ramp_team)
+  const showRampTeam = canViewRampTeam === true;
+  const showOnboardingMenu = showOnboardingAdminItems || showRampTeam;
 
   // "Tryg - Ret salg": kun ejere samt allowlisten (Filip, Annika)
   const showTrygEditSales = trygEditAccess;
@@ -1416,6 +1421,16 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {onboardingOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {showRampTeam && (
+                  <NavLink to="/opstartshold" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/opstartshold" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Users className="h-4 w-4" />
+                    Opstartshold
+                  </NavLink>
+                )}
+                {showOnboardingAdminItems && (<>
                 <NavLink to="/onboarding-program" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/onboarding-program" && !location.search ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1465,6 +1480,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <FileText className="h-4 w-4" />
                   Coaching Skabeloner
                 </NavLink>
+                </>)}
               </CollapsibleContent>
             </Collapsible>
           )}
