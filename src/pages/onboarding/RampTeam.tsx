@@ -801,10 +801,9 @@ export default function RampTeam() {
       })
     : null;
 
-  const dangerList = useMemo(
+  const allList = useMemo(
     () =>
       members
-        .filter((m) => m.status === "under")
         .map((m) => ({ member: m, urgency: derive(m).urgency }))
         .sort(
           (a, b) =>
@@ -815,9 +814,11 @@ export default function RampTeam() {
     [members],
   );
 
+  const dangerList = useMemo(() => allList.filter((m) => m.status === "under"), [allList]);
+
   const missingList = useMemo(
-    () => dangerList.filter((m) => !m.has_absence && (!m.has_coaching || !m.has_listen)),
-    [dangerList],
+    () => allList.filter((m) => !m.has_absence && (!m.has_coaching || !m.has_listen)),
+    [allList],
   );
 
   const counts = useMemo(() => {
