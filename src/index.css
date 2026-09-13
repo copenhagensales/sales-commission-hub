@@ -965,7 +965,7 @@
 /* ── "Din opstart" (sælgerens eget kort) ─────────────────────────────── */
 .ramp-start {
   --rs-bg: #e6f0f1;
-  --rs-dark: #2e3136;
+  --rs-dark: hsl(var(--cph-onyx));
   --rs-on-dark: #e6f0f1;
   --rs-on-dark-muted: #a8b0b6;
   --rs-accent: #3be086;
