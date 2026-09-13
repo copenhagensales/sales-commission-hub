@@ -75,9 +75,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
         className="rs-fade relative mb-3 overflow-hidden rounded-2xl p-5 sm:p-7"
         style={{
           animationDelay: "30ms",
-          background: "var(--rs-accent)",
-          borderLeft: "6px solid #12321f",
-          color: "#12321f",
+          background: "var(--rs-accent)"          color: "#12321f",
         }}
       >
         <div className="mb-3 flex items-center gap-2">
@@ -108,7 +106,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       {/* 2) Hero */}
       <div
         className="rs-dark rs-fade p-5 sm:p-7"
-        style={{ animationDelay: "60ms", borderLeft: "5px solid var(--rs-accent)" }}
+        style={{ animationDelay: "60ms" }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 lg:gap-10">
           <div className="min-w-0">
@@ -215,7 +213,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       {/* 3) Kurvekort */}
       <div
         className="rs-card rs-fade mt-4 p-4 sm:p-6"
-        style={{ animationDelay: "140ms", borderLeft: "5px solid #2e3136" }}
+        style={{ animationDelay: "140ms" }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -364,7 +362,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
       {/* 4) Din rejse */}
       <div
         className="rs-card rs-fade mt-4 p-4 sm:p-6"
-        style={{ animationDelay: "200ms", borderLeft: "5px solid var(--rs-accent)" }}
+        style={{ animationDelay: "200ms" }}
       >
         <p
           className="text-[10px] font-extrabold uppercase tracking-[0.14em]"
