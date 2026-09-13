@@ -101,6 +101,9 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
         <p className="text-[14px] sm:text-[15px] font-semibold" style={{ color: "rgba(18,50,31,0.85)" }}>
           Fokusér på mest mulig taletid med kunderne, brug din træning og dine salgsteknikker aktivt, og spørg om hjælp. Så kommer resten.
         </p>
+        <p className="mt-2 text-[14px] sm:text-[15px] font-semibold" style={{ color: "rgba(18,50,31,0.85)" }}>
+          Nogle laver mange salg fra begyndelsen, for andre tager det tid. Men vil du det nok, så skal det nok komme.
+        </p>
       </div>
 
 
