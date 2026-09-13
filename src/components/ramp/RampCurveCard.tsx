@@ -70,6 +70,20 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
         )}
       </div>
 
+      {/* 1b) Godt råd til nye sælgere */}
+      <div
+        className="rs-fade mb-3 flex items-start gap-3 rounded-2xl bg-white/70 p-4 sm:p-5"
+        style={{ animationDelay: "30ms", borderLeft: "5px solid var(--rs-accent)" }}
+      >
+        <span className="text-[18px] leading-none pt-0.5">🌱</span>
+        <p className="text-[13px] sm:text-[14px] leading-relaxed">
+          <span className="font-bold">Det tager tid at blive god.</span>{" "}
+          <span style={{ color: "var(--rs-muted)" }}>
+            Vores bedste råd: Tag den næste samtale, brug din træning, og spørg om hjælp. Så kommer resten.
+          </span>
+        </p>
+      </div>
+
       {/* 2) Hero */}
       <div
         className="rs-dark rs-fade p-5 sm:p-7"
