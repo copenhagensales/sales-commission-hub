@@ -215,11 +215,11 @@ export default function Auth() {
             </div>
 
             <h2 className="mt-4 text-[clamp(32px,3.2vw,46px)] font-extrabold leading-[1.06] tracking-[-0.02em] text-[hsl(var(--cph-onyx))]">
-              {greeting} til dig
+              {greeting.title}
             </h2>
 
             <p className="mt-4 text-[17px] leading-relaxed text-[hsl(var(--cph-onyx))]/70">
-              Log ind med din arbejdsmail for at fortsætte.
+              {greeting.line}
             </p>
 
             {ssoError && (
