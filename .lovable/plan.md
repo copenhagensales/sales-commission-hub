@@ -1,21 +1,16 @@
-# Seneste event: gør billedrækken swipe-bar på mobil
+# Feedback-boksen på Opstartshold kan ikke rulles på mobil
 
-## Hvad jeg har bekræftet
+## Årsag (bekræftet i koden)
 
-- Sektionen ligger i `src/components/home/EventGallery.tsx` og bruger en vandret rulleliste (`overflow-x-auto`, `snap-x snap-mandatory`) med kort på 50 % bredde på mobil.
-- Der ligger 5 billeder i galleriet lige nu, så på en telefon er der reelt indhold uden for skærmen - rækken burde altså kunne rulles.
-- Selve årsagen til at swipe ikke reagerer på din telefon er **ikke bekræftet endnu**. Første skridt er derfor at reproducere det i mobilvisning.
+Boksen ved "1-1 coaching" / "1-1 lyt" ligger i `src/pages/onboarding/RampTeam.tsx` (linje 678-689). Den er centreret i et fast lag over siden, men selve boksen har `overflow-hidden` og ingen maksimal højde. På en telefon er indholdet (noter, ugens fokus, styrke, knapper) højere end skærmen, så alt under kanten bliver klippet væk - og fordi boksen ikke må rulle, kan man ikke nå ned til feltet og knappen.
 
 ## Plan
 
-1. Reproducér i mobilbredde og find ud af, om rullebeholderen faktisk har indhold uden for skærmen, eller om berøringen bliver fanget af noget udenom.
-2. Ret derefter rækken, så den er robust på touch:
-   - tilføj eksplicit touch-rulning på beholderen (vandret panorering, blødere iOS-rulning, ingen "kæde" til siden bagved)
-   - gør snap mindre stramt på små skærme, så en kort swipe ikke hopper tilbage
-   - vis pilene også når der kun er få billeder mere end der er plads til, så man altid har en knap-vej frem
-   - lad hele billedet være rulbart ved at flytte "like"- og redigeringsknapperne, hvis de spiser berøringen
-3. Verificér i mobilvisning: swipe til side virker, pilene virker, og de fem billeder kan alle nås.
+1. Giv boksen en maksimal højde i forhold til skærmen og lad indholdet rulle indeni, så bunden altid kan nås.
+2. Behold overskrift/luk øverst synligt og lad kun midterdelen rulle, så knappen "Send og markér" ikke forsvinder.
+3. Lad laget bagved rulle til toppen på små skærme, så boksen ikke sidder fast under mobilheaderen, og undgå at siden bagved ruller med.
+4. Verificér i mobilbredde: alle felter kan nås, der kan rulles, og knappen kan trykkes. Tjek også at desktopvisningen er uændret.
 
 ## Afgrænsning
 
-Kun udseende og berøring i `src/components/home/EventGallery.tsx` (og evt. lidt styling). Ingen ændringer i data, upload, likes eller adgangsregler.
+Kun udseende/rulning i `src/pages/onboarding/RampTeam.tsx`. Ingen ændringer i data, mails, rettigheder eller beregninger.
