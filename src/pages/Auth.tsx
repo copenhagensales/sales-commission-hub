@@ -90,13 +90,13 @@ export default function Auth() {
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
-    if (h < 5) return "God nat";
-    if (h < 10) return "Godmorgen";
-    if (h < 12) return "God formiddag";
-    if (h < 14) return "God middag";
-    if (h < 18) return "God eftermiddag";
-    if (h < 22) return "Godaften";
-    return "God nat";
+    if (h < 5) return { title: "Du er tidligt op", line: "Storken sover stadig, men dine tal er klar." };
+    if (h < 10) return { title: "Godmorgen", line: "Kaffen først, salget lige efter." };
+    if (h < 12) return { title: "Godmorgen", line: "Dagen er ung, og tallene venter." };
+    if (h < 14) return { title: "Goddag", line: "Frokosten er fortjent. Log ind og se dagen." };
+    if (h < 18) return { title: "Goddag", line: "Sidste træk på dagen. Log ind og se, hvor du står." };
+    if (h < 22) return { title: "Godaften", line: "Fyraften for de fleste, men aldrig for tallene." };
+    return { title: "Du er sent på den", line: "Storken er gået i seng. Dine tal er ikke." };
   }, []);
 
   const handleMicrosoftSignIn = async () => {
