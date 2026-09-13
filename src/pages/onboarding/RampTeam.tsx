@@ -677,17 +677,17 @@ function FeedbackDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-3 sm:items-center sm:p-4"
       style={{ background: "rgba(20,28,25,.45)" }}
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-[560px] overflow-hidden rounded-[20px] bg-white"
+        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[560px] flex-col overflow-hidden rounded-[20px] bg-white sm:max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 p-5">
+        <div className="flex shrink-0 items-start justify-between gap-3 p-5">
           <div>
             <p
               className="text-[11px] font-extrabold uppercase"
@@ -709,7 +709,7 @@ function FeedbackDialog({
           </button>
         </div>
 
-        <div className="space-y-4 px-5 pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 pb-4">
           {alreadyDone && (
             <p
               className="rounded-2xl border p-3 text-[12px]"
@@ -836,7 +836,7 @@ function FeedbackDialog({
         </div>
 
         <div
-          className="flex flex-wrap items-center justify-between gap-3 p-4"
+          className="flex shrink-0 flex-wrap items-center justify-between gap-3 p-4"
           style={{ background: "#f6f9f8" }}
         >
           <p className="text-[12px] font-semibold" style={{ color: ready ? "#0f5a38" : AMBER_TEXT }}>
