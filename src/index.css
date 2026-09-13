@@ -983,9 +983,14 @@
 }
 
 .ramp-start .rs-dark {
-  background: var(--rs-dark);
+  background-color: var(--rs-dark);
+  background-image:
+    linear-gradient(hsl(var(--cph-light-blue) / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--cph-light-blue) / 0.03) 1px, transparent 1px);
+  background-size: 56px 56px;
   color: var(--rs-on-dark);
   border-radius: 24px;
+  overflow: hidden;
   box-shadow: 0 22px 48px -30px rgba(46, 49, 54, 0.6);
 }
 
