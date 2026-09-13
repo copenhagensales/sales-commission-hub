@@ -99,7 +99,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
           style={{ background: "#12321f" }}
         />
         <p className="text-[14px] sm:text-[15px] font-semibold" style={{ color: "rgba(18,50,31,0.85)" }}>
-          Tag den næste samtale, brug din træning, og spørg om hjælp. Så kommer resten.
+          Fokusér på mest mulig taletid med kunderne, brug din træning og dine salgsteknikker aktivt, og spørg om hjælp. Så kommer resten.
         </p>
       </div>
 
