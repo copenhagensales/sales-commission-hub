@@ -75,7 +75,8 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
         className="rs-fade relative mb-3 overflow-hidden rounded-2xl p-5 sm:p-7"
         style={{
           animationDelay: "30ms",
-          background: "var(--rs-accent)"          color: "#12321f",
+          background: "var(--rs-accent)",
+          color: "#12321f",
         }}
       >
         <div className="mb-3 flex items-center gap-2">
