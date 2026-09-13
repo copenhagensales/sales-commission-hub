@@ -72,17 +72,38 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
 
       {/* 1b) Godt råd til nye sælgere */}
       <div
-        className="rs-fade mb-3 flex items-start gap-3 rounded-2xl bg-white/70 p-4 sm:p-5"
-        style={{ animationDelay: "30ms", borderLeft: "5px solid var(--rs-accent)" }}
+        className="rs-fade relative mb-3 overflow-hidden rounded-2xl p-5 sm:p-7"
+        style={{
+          animationDelay: "30ms",
+          background: "var(--rs-accent)",
+          borderLeft: "6px solid #12321f",
+          color: "#12321f",
+        }}
       >
-        <span className="text-[18px] leading-none pt-0.5">🌱</span>
-        <p className="text-[13px] sm:text-[14px] leading-relaxed">
-          <span className="font-bold">Det tager tid at blive god.</span>{" "}
-          <span style={{ color: "var(--rs-muted)" }}>
-            Vores bedste råd: Tag den næste samtale, brug din træning, og spørg om hjælp. Så kommer resten.
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-[16px] leading-none">🌱</span>
+          <span
+            className="text-[11px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "rgba(18,50,31,0.6)" }}
+          >
+            Vores bedste råd
           </span>
+        </div>
+        <p
+          className="font-extrabold leading-[0.95] text-[28px] sm:text-[38px]"
+          style={{ letterSpacing: "-0.03em" }}
+        >
+          Det tager tid at blive god.
+        </p>
+        <span
+          className="mt-4 mb-3 block h-[3px] w-14 rounded-full"
+          style={{ background: "#12321f" }}
+        />
+        <p className="text-[14px] sm:text-[15px] font-semibold" style={{ color: "rgba(18,50,31,0.85)" }}>
+          Tag den næste samtale, brug din træning, og spørg om hjælp. Så kommer resten.
         </p>
       </div>
+
 
       {/* 2) Hero */}
       <div
