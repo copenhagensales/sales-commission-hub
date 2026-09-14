@@ -24,6 +24,7 @@ interface BookingRow {
 interface AssignmentRow {
   booking_id: string;
   employee_id: string;
+  date: string;
 }
 
 interface WeekPlanSubscriptionRow {
