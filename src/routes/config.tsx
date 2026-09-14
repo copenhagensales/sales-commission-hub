@@ -418,6 +418,10 @@ export const routes: RouteConfig[] = [
   // Fareflag: adgangen haandhaeves i databasen og i selve siden (kun ledere)
   { path: "/opstartshold", component: RampTeam, access: "protected" },
 
+  // Kvalitetskontrol: adgangen haandhaeves i databasen (RLS + RPC) og i siden
+  { path: "/kvalitetskontrol", component: QualityControl, access: "protected" },
+  { path: "/kvalitetskontrol/administration", component: QualityAdmin, access: "protected" },
+
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 
   // TV Board routes
