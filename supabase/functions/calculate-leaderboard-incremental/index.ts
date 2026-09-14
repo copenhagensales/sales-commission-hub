@@ -189,6 +189,8 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    await loadDisplayNameOverrides(supabase);
+
     const now = new Date();
     const calculatedAt = now.toISOString();
     const currentMinute = now.getMinutes();
