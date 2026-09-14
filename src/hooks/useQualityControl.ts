@@ -269,81 +269,47 @@ export interface SaveQualityReviewInput {
   startedAt: string;
 }
 
-/** Gemmer en kontrol. Ved Afvist sendes straks-mail til teamleder. */
+/**
+ * Gemmer en kontrol i én arbejdsgang via save_quality_review, så kontrol,
+ * tjeklistepunkter og fejlkoder ikke kan ende halvt gemt. Resultatet udledes i
+ * databasen ud fra tjeklisten. Ved Afvist sendes straks-mail til teamleder.
+ */
 export function useSaveQualityReview() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: SaveQualityReviewInput) => {
-      const result = deriveQualityResult(input.items);
-
-      const { data: me } = await supabase.rpc("get_current_employee_id");
-      const { data: team } = input.sale.team_id
-        ? await supabase
-            .from("teams")
-            .select("id, name, team_leader_id, assistant_team_leader_id")
-            .eq("id", input.sale.team_id)
-            .maybeSingle()
-        : { data: null };
-
-      const { data: review, error } = await supabase
-        .from("quality_reviews")
-        .insert({
-          sale_id: input.sale.sale_id,
-          sale_datetime: input.sale.sale_datetime,
-          sale_date: input.sale.sale_date,
-          client_campaign_id: input.sale.client_campaign_id,
-          employee_id: input.sale.employee_id,
-          seller_name: input.sale.seller_name,
-          team_id: input.sale.team_id,
-          team_name: input.sale.team_name ?? team?.name ?? null,
-          team_leader_id: team?.team_leader_id ?? null,
-          assistant_team_leader_id: team?.assistant_team_leader_id ?? null,
-          reviewer_employee_id: me as string,
-          checklist_id: input.checklistId,
-          checklist_version: input.checklistVersion,
-          result,
-          comment: input.comment.trim() ? input.comment.trim().slice(0, 500) : null,
-          search_key: input.sale.search_key,
-          started_at: input.startedAt,
-        })
-        .select("id")
-        .single();
+      const { data, error } = await supabase.rpc("save_quality_review", {
+        p_sale_id: input.sale.sale_id,
+        p_sale_datetime: input.sale.sale_datetime,
+        p_sale_date: input.sale.sale_date,
+        p_client_campaign_id: input.sale.client_campaign_id,
+        p_employee_id: input.sale.employee_id,
+        p_seller_name: input.sale.seller_name,
+        p_team_id: input.sale.team_id,
+        p_team_name: input.sale.team_name,
+        p_search_key: input.sale.search_key,
+        p_checklist_id: input.checklistId,
+        p_checklist_version: input.checklistVersion,
+        p_items: input.items.map((i) => ({
+          checklist_item_id: i.checklist_item_id,
+          state: i.state,
+        })),
+        p_error_code_ids: input.errorCodeIds,
+        p_comment: input.comment,
+        p_started_at: input.startedAt,
+      });
       if (error) throw error;
 
-      if (input.items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from("quality_review_items")
-          .insert(
-            input.items.map((i) => ({
-              review_id: review.id,
-              checklist_item_id: i.checklist_item_id,
-              item_type: i.item_type,
-              state: i.state,
-            })),
-          );
-        if (itemsError) throw itemsError;
-      }
+      const saved = data as unknown as { review_id: string; result: QualityResult };
 
-      if (input.errorCodeIds.length > 0) {
-        const { error: codesError } = await supabase
-          .from("quality_review_error_codes")
-          .insert(
-            input.errorCodeIds.map((id) => ({
-              review_id: review.id,
-              error_code_id: id,
-            })),
-          );
-        if (codesError) throw codesError;
-      }
-
-      if (result === "afvist") {
+      if (saved.result === "afvist") {
         await supabase.functions.invoke("quality-mails", {
-          body: { action: "rejected_review", review_id: review.id },
+          body: { action: "rejected_review", review_id: saved.review_id },
         });
       }
 
-      return { reviewId: review.id, result };
+      return { reviewId: saved.review_id, result: saved.result };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quality-queue"] });
@@ -587,5 +553,23 @@ export function useCreateChecklistVersion() {
       queryClient.invalidateQueries({ queryKey: ["quality-checklists-admin"] });
       queryClient.invalidateQueries({ queryKey: ["quality-checklist"] });
     },
+  });
+}
+
+/** Aktive medarbejdere til valg af kvalitetskontrollanter (kun superadmin). */
+export function useQualityAdminEmployees(enabled: boolean) {
+  return useQuery({
+    queryKey: ["quality-admin-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, is_active")
+        .eq("is_active", true)
+        .order("first_name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
