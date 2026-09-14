@@ -623,6 +623,75 @@ const DAY_NAMES_LONG = [
   "Søndag",
 ];
 
+/**
+ * Uge-gitter: én række pr. lokation, én kolonne pr. ugedag. Kun tabeller og
+ * inline styles. Tallet i cellen er antal sælgere den dag; tom dag viser en
+ * streg, så en tom fredag er tydelig ved siden af en fyldt mandag.
+ */
+function weekGrid(
+  dates: string[],
+  rows: WeekPlanLocation[],
+  dayFmt: Intl.DateTimeFormat,
+): string {
+  const nameWidth = 152;
+  const cellWidth = 54;
+
+  const head = `<tr>
+    <td width="${nameWidth}" align="left" valign="bottom" style="width:${nameWidth}px;padding:0 8px 8px 0;font-family:${FONT};font-size:10px;line-height:14px;${LH}font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:${SECONDARY};">Lokation</td>
+    ${
+    dates
+      .map((iso, i) =>
+        `<td width="${cellWidth}" align="center" valign="bottom" style="width:${cellWidth}px;padding:0 2px 8px;font-family:${FONT};font-size:11px;line-height:15px;${LH}font-weight:bold;color:${
+          i >= 5 ? SECONDARY : ONYX
+        };">${esc(DAY_NAMES[i])}<br><span style="font-weight:normal;font-size:10px;line-height:14px;color:${SECONDARY};">${
+          esc(dayFmt.format(new Date(`${iso}T00:00:00Z`)))
+        }</span></td>`
+      )
+      .join("")
+  }
+  </tr>`;
+
+  const body = rows
+    .map((loc, ri) => {
+      const border = ri === 0 ? "" : `border-top:1px solid ${DIVIDER};`;
+      const flags = loc.dayFlags ?? [];
+      const sellers = loc.daySellers ?? [];
+      const tag = loc.tentative
+        ? `<div style="padding-top:3px;font-family:${FONT};font-size:10px;line-height:14px;${LH}font-weight:bold;letter-spacing:1.1px;text-transform:uppercase;color:${SECONDARY};">Kladde</div>`
+        : "";
+      const cells = dates
+        .map((_, i) => {
+          const booked = flags[i] === true;
+          const count = sellers[i] ?? 0;
+          const inner = booked
+            ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${ONYX};border-radius:6px;"><tr><td align="center" style="padding:8px 0;font-family:${FONT};font-size:14px;line-height:18px;${LH}font-weight:bold;color:${WHITE};">${
+              count > 0 ? fmtInt(count) : "\u2713"
+            }</td></tr></table>`
+            : `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${LIGHT};border-radius:6px;"><tr><td align="center" style="padding:8px 0;font-family:${FONT};font-size:14px;line-height:18px;${LH}color:${SECONDARY};">&#8211;</td></tr></table>`;
+          return `<td width="${cellWidth}" align="center" valign="middle" style="width:${cellWidth}px;padding:6px 2px;${border}">${inner}</td>`;
+        })
+        .join("");
+      return `<tr>
+        <td width="${nameWidth}" align="left" valign="middle" style="width:${nameWidth}px;padding:6px 8px 6px 0;${border}">
+          <div style="font-family:${FONT};font-size:14px;line-height:19px;${LH}font-weight:bold;color:${ONYX};">${
+        esc(loc.locationName)
+      }</div>
+          <div style="padding-top:2px;font-family:${FONT};font-size:11px;line-height:15px;${LH}color:${SECONDARY};">${
+        esc(`${fmtInt(loc.days)} ${loc.days === 1 ? "dag" : "dage"} \u00b7 ${fmtInt(loc.sellers)} ${
+          loc.sellers === 1 ? "sælger" : "sælgere"
+        }`)
+      }</div>
+          ${tag}
+        </td>
+        ${cells}
+      </tr>`;
+    })
+    .join("");
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="536" style="width:536px;">${head}${body}</table>`;
+}
+
+
 export function buildClientWeekPlanEmail(params: {
   clientName: string;
   isoWeek: number;
