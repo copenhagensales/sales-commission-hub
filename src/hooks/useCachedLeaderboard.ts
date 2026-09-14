@@ -101,24 +101,6 @@ export function useCachedLeaderboards(
 }
 
 /**
- * Format display name as "Firstname L."
+ * Format display name as "Firstname L." (eller medarbejderens manuelle korte navn).
  */
-export function formatDisplayName(fullName: string): string {
-  const parts = fullName.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return fullName;
-}
-
-/**
- * Get initials from name
- */
-export function getInitials(name: string): string {
-  if (!name) return "??";
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  }
-  return name.substring(0, 2).toUpperCase();
-}
+export { getDisplayName as formatDisplayName, getInitials } from "@/utils/formatting";
