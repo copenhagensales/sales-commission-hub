@@ -555,3 +555,21 @@ export function useCreateChecklistVersion() {
     },
   });
 }
+
+/** Aktive medarbejdere til valg af kvalitetskontrollanter (kun superadmin). */
+export function useQualityAdminEmployees(enabled: boolean) {
+  return useQuery({
+    queryKey: ["quality-admin-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, is_active")
+        .eq("is_active", true)
+        .order("first_name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
