@@ -135,6 +135,7 @@ function normalizeEdgeSellers(sellers: any[]): LeaderboardEntry[] {
 export default function CsTop20Dashboard() {
   const tvMode = isTvMode();
   
+  useDisplayNameOverrides();
   // Runtime access check - redirects if user doesn't have team-based permission (skipped in TV mode)
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20", { skip: tvMode });
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
