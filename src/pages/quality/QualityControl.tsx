@@ -486,6 +486,16 @@ export default function QualityControl() {
                                 >
                                   OA ikke godkendt
                                 </Button>
+                                {row.status !== "ikke_kontrolleret" && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-muted-foreground"
+                                    onClick={() => void runUndoReview(row)}
+                                  >
+                                    Fortryd
+                                  </Button>
+                                )}
                               </>
                             )}
                           </div>
