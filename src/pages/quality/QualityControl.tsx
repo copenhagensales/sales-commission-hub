@@ -52,6 +52,7 @@ export default function QualityControl() {
   const [selectedSale, setSelectedSale] = useState<QualityQueueRow | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [quickSavingId, setQuickSavingId] = useState<string | null>(null);
 
   const dates = useMemo(() => datesForQualityDay(date), [date]);
   const queue = useQualityQueue(dates, hasAccess);
