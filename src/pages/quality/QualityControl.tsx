@@ -36,6 +36,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
   Copy,
