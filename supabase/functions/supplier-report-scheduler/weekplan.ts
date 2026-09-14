@@ -14,6 +14,7 @@ type Svc = SupabaseClient;
 
 interface BookingRow {
   id: string;
+  status: string | null;
   start_date: string;
   end_date: string;
   booked_days: number[] | null;
@@ -86,13 +87,15 @@ export async function computeWeekPlan(
   weekStart: string,
   weekEnd: string,
 ): Promise<{ locations: WeekPlanLocation[]; days: WeekPlanDay[] }> {
+  // Alle bookinger i ugen, også kladder (fx markeder der endnu ikke er
+  // bekræftet). Kladder markeres i mailen, så modtageren kan se forskellen.
   const { data: bookings, error } = await svc
     .from("booking")
     .select(
-      "id, start_date, end_date, booked_days, location_id, location:location(name, type)",
+      "id, status, start_date, end_date, booked_days, location_id, location:location(name, type)",
     )
     .eq("client_id", clientId)
-    .eq("status", "confirmed")
+    .in("status", ["confirmed", "draft"])
     .lte("start_date", weekEnd)
     .gte("end_date", weekStart);
   if (error) throw new Error(error.message);
@@ -117,6 +120,7 @@ export async function computeWeekPlan(
 
   const employeesByBooking = new Map<string, Set<string>>();
   const employeesByDate = new Map<string, Set<string>>();
+  const employeesByBookingDate = new Map<string, Set<string>>();
   for (const a of (assignments ?? []) as unknown as AssignmentRow[]) {
     const set = employeesByBooking.get(a.booking_id) ?? new Set<string>();
     set.add(a.employee_id);
@@ -126,6 +130,11 @@ export async function computeWeekPlan(
     const dateSet = employeesByDate.get(dateKey) ?? new Set<string>();
     dateSet.add(a.employee_id);
     employeesByDate.set(dateKey, dateSet);
+
+    const bdKey = `${a.booking_id}|${dateKey}`;
+    const bdSet = employeesByBookingDate.get(bdKey) ?? new Set<string>();
+    bdSet.add(a.employee_id);
+    employeesByBookingDate.set(bdKey, bdSet);
   }
 
   // Antal bemandede lokationer pr. ugedag (0 = mandag).
@@ -133,25 +142,34 @@ export async function computeWeekPlan(
 
   const byLocation = new Map<
     string,
-    { name: string; type: string; days: number; employees: Set<string> }
+    {
+      name: string;
+      type: string;
+      days: number;
+      employees: Set<string>;
+      /** Pr. ugedag: sælgere på netop denne lokation. */
+      dayEmployees: Set<string>[];
+      dayFlags: boolean[];
+      tentative: boolean;
+    }
   >();
 
   for (const b of rows) {
     const bookedDays = b.booked_days ?? null;
     const start = b.start_date > weekStart ? b.start_date : weekStart;
     const end = b.end_date < weekEnd ? b.end_date : weekEnd;
-    let days = 0;
+    const hitDays: { index: number; iso: string }[] = [];
     for (let iso = start; iso <= end; iso = addDays(iso, 1)) {
       const d = new Date(`${iso}T00:00:00Z`);
       const index = (d.getUTCDay() === 0 ? 7 : d.getUTCDay()) - 1; // 0 = mandag
       if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(index)) {
-        days++;
+        hitDays.push({ index, iso });
         const set = locationsPerDay.get(index) ?? new Set<string>();
         set.add(b.location_id);
         locationsPerDay.set(index, set);
       }
     }
-    if (days === 0) continue;
+    if (hitDays.length === 0) continue;
 
     const key = b.location_id;
     const entry = byLocation.get(key) ?? {
@@ -159,9 +177,19 @@ export async function computeWeekPlan(
       type: b.location?.type ?? "Ukendt type",
       days: 0,
       employees: new Set<string>(),
+      dayEmployees: Array.from({ length: 7 }, () => new Set<string>()),
+      dayFlags: Array.from({ length: 7 }, () => false),
+      tentative: false,
     };
-    entry.days += days;
+    entry.days += hitDays.length;
     for (const e of employeesByBooking.get(b.id) ?? []) entry.employees.add(e);
+    for (const hit of hitDays) {
+      entry.dayFlags[hit.index] = true;
+      for (const e of employeesByBookingDate.get(`${b.id}|${hit.iso}`) ?? []) {
+        entry.dayEmployees[hit.index].add(e);
+      }
+    }
+    if ((b.status ?? "") !== "confirmed") entry.tentative = true;
     byLocation.set(key, entry);
   }
 
@@ -171,6 +199,9 @@ export async function computeWeekPlan(
       locationType: v.type,
       days: v.days,
       sellers: v.employees.size,
+      dayFlags: v.dayFlags,
+      daySellers: v.dayEmployees.map((s) => s.size),
+      tentative: v.tentative,
     }))
     .sort(
       (a, b) =>
