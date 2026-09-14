@@ -22,11 +22,15 @@ import {
   QUALITY_RESULT_LABEL,
   useFinishQualityDay,
   useQualityAccess,
+  useQualityChecklistResolver,
   useQualityDailyCompletion,
+  useQualityErrorCodes,
   useQualityOverview,
   useQualityQueue,
   useQualityReviewerStats,
   useQualitySettings,
+  useSaveQualityReview,
+  type QualityItemState,
   type QualityQueueRow,
 } from "@/hooks/useQualityControl";
 import {
@@ -48,6 +52,7 @@ export default function QualityControl() {
   const [selectedSale, setSelectedSale] = useState<QualityQueueRow | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [quickSavingId, setQuickSavingId] = useState<string | null>(null);
 
   const dates = useMemo(() => datesForQualityDay(date), [date]);
   const queue = useQualityQueue(dates, hasAccess);
@@ -56,6 +61,9 @@ export default function QualityControl() {
   const { data: settings } = useQualitySettings();
   const { data: completion } = useQualityDailyCompletion(date);
   const finishDay = useFinishQualityDay();
+  const saveReview = useSaveQualityReview();
+  const { resolve: resolveChecklist } = useQualityChecklistResolver();
+  const { data: errorCodes = [] } = useQualityErrorCodes();
 
   const rows = queue.data ?? [];
 
@@ -89,6 +97,79 @@ export default function QualityControl() {
     }
     void queue.refetch();
   };
+
+  /**
+   * Hurtigknapper: gemmer en kontrol med ét klik ud fra den samme tjekliste og
+   * det samme gemme-flow som sidepanelet. Resultatet udledes i databasen.
+   */
+  const runQuickReview = async (
+    row: QualityQueueRow,
+    action: "godkendt" | "oa_mangler" | "oa_ikke_godkendt",
+  ) => {
+    const resolved = resolveChecklist(row.client_campaign_id);
+    if (!resolved || resolved.items.length === 0) {
+      toast({ title: "Ingen tjekliste fundet for kampagnen", variant: "destructive" });
+      return;
+    }
+
+    const requiredItem =
+      resolved.items.find((i) => i.item_type === "obligatorisk" && i.label.startsWith("OA")) ??
+      resolved.items.find((i) => i.item_type === "obligatorisk");
+
+    if (action !== "godkendt" && !requiredItem) {
+      toast({ title: "Tjeklisten har ingen obligatoriske punkter", variant: "destructive" });
+      return;
+    }
+
+    const errorCode =
+      action === "oa_mangler"
+        ? errorCodes.find((c) => c.code === "OA_MANGLER")
+        : action === "oa_ikke_godkendt"
+        ? errorCodes.find((c) => c.code === "OA_IKKE_GODKENDT")
+        : undefined;
+
+    if (action !== "godkendt" && !errorCode) {
+      toast({ title: "Fejlkoden mangler i administrationen", variant: "destructive" });
+      return;
+    }
+
+    const items = resolved.items.map((item) => {
+      let state: QualityItemState = "ok";
+      if (action !== "godkendt") {
+        state = item.id === requiredItem!.id ? "mangler" : "ikke_relevant";
+      }
+      return { checklist_item_id: item.id, item_type: item.item_type, state };
+    });
+
+    setQuickSavingId(row.sale_id);
+    try {
+      const saved = await saveReview.mutateAsync({
+        sale: row,
+        checklistId: resolved.checklist.id,
+        checklistVersion: resolved.checklist.version,
+        items,
+        errorCodeIds: errorCode ? [errorCode.id] : [],
+        comment: "",
+        startedAt: new Date().toISOString(),
+      });
+      toast({
+        title:
+          saved.result === "afvist"
+            ? "Afvist og teamlederen er underrettet"
+            : "Kontrol gemt som godkendt",
+      });
+      void queue.refetch();
+    } catch (error) {
+      toast({
+        title: "Kunne ikke gemme kontrollen",
+        description: error instanceof Error ? error.message : "Ukendt fejl",
+        variant: "destructive",
+      });
+    } finally {
+      setQuickSavingId(null);
+    }
+  };
+
 
   const copyKey = async (value: string) => {
     await navigator.clipboard.writeText(value);
@@ -282,13 +363,22 @@ export default function QualityControl() {
                       <TableHead>Tidspunkt</TableHead>
                       <TableHead>Søgenøgle</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Hurtig</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRows.map((row) => (
                       <TableRow
                         key={row.sale_id}
-                        className="cursor-pointer"
+                        className={
+                          row.status === "afvist"
+                            ? "cursor-pointer bg-destructive/10 hover:bg-destructive/15"
+                            : row.status === "godkendt"
+                            ? "cursor-pointer bg-success/10 hover:bg-success/15"
+                            : row.status === "godkendt_med_bemaerkning"
+                            ? "cursor-pointer bg-warning/10 hover:bg-warning/15"
+                            : "cursor-pointer"
+                        }
                         onClick={() => openSale(row)}
                       >
                         <TableCell>
@@ -354,6 +444,40 @@ export default function QualityControl() {
                           >
                             {QUALITY_RESULT_LABEL[row.status]}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {quickSavingId === row.sale_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-success/40 px-2 text-xs text-success hover:bg-success/10"
+                                  onClick={() => void runQuickReview(row, "godkendt")}
+                                >
+                                  Godkendt
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                  onClick={() => void runQuickReview(row, "oa_mangler")}
+                                >
+                                  OA mangler
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                  onClick={() => void runQuickReview(row, "oa_ikke_godkendt")}
+                                >
+                                  OA ikke godkendt
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
