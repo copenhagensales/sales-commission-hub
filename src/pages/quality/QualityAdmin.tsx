@@ -62,20 +62,7 @@ export default function QualityAdmin() {
   const [selectedChecklistId, setSelectedChecklistId] = useState<string>("");
   const [draftItems, setDraftItems] = useState<DraftItem[] | null>(null);
 
-  const { data: employees } = useQuery({
-    queryKey: ["quality-admin-employees"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, is_active")
-        .eq("is_active", true)
-        .order("first_name", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: isSuperadmin,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: employees } = useQualityAdminEmployees(isSuperadmin);
 
   const activeChecklists = useMemo(
     () => (checklistData?.lists ?? []).filter((l) => l.is_active),
