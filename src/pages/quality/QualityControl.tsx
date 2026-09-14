@@ -416,7 +416,18 @@ export default function QualityControl() {
                         <TableCell>{formatDanishTime(row.sale_datetime)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs">{row.search_key ?? "–"}</span>
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs">{row.search_key ?? "–"}</p>
+                              {row.search_key_type && row.search_key_type !== "telefon" && (
+                                <p className="text-xs text-muted-foreground">
+                                  {row.search_key_type === "lead-id"
+                                    ? "Lead-id (intet tlf.)"
+                                    : row.search_key_type === "salgsnr."
+                                    ? "Salgsnr. (intet tlf.)"
+                                    : row.search_key_type}
+                                </p>
+                              )}
+                            </div>
                             {row.search_key && (
                               <Button
                                 size="icon"
