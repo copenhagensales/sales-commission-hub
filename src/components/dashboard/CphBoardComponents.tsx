@@ -24,11 +24,7 @@ export interface CphKpi {
   suffix?: React.ReactNode;
 }
 
-const getInitials = (name: string) => {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-};
+const getInitials = (name: string) => getSharedInitials(name);
 
 function CphKpiCard({ kpi, emphasis, tvMode }: { kpi: CphKpi; emphasis?: boolean; tvMode: boolean }) {
   const bigSize = tvMode ? (emphasis ? 84 : 56) : emphasis ? 64 : 44;
