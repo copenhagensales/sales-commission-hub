@@ -459,6 +459,7 @@ serve(async (req) => {
       mapped_revenue,
       needs_mapping,
       is_immediate_payment,
+      manual_pricing_lock,
       adversus_product_title,
       sales!inner (
         id,
