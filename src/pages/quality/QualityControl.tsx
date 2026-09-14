@@ -40,6 +40,7 @@ import {
   CheckCircle2,
   Copy,
   Loader2,
+  MessageSquare,
   Settings2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +66,6 @@ import {
   formatDanishDate,
   formatDanishTime,
 } from "@/lib/qualityDates";
-import { QualityReviewSheet } from "@/components/quality/QualityReviewSheet";
 import { QualityScorePanel } from "@/components/quality/QualityScorePanel";
 
 type QualitySortKey =
