@@ -15,6 +15,7 @@ import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs"
 import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { DateRange } from "react-day-picker";
 import { countWorkDaysInPeriod } from "@/lib/calculations";
@@ -85,6 +86,7 @@ const isTvMode = () => {
 export default function CphSalesDashboard() {
   // Runtime access check - redirects if user doesn't have team-based permission
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cph-sales");
+  useDisplayNameOverrides();
   
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");

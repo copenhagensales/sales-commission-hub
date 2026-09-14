@@ -14,6 +14,7 @@ import { CphBoardFrame, CphLeaderboard, type CphKpi } from "@/components/dashboa
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
 import { calculatePayrollPeriod } from "@/lib/calculations";
 import { getDisplayName } from "@/utils/formatting";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { useLiveDashboardAggregates } from "@/hooks/useLiveDashboardAggregates";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +66,7 @@ export interface ClientDashboardConfig {
 
 export default function ClientDashboard({ config }: { config: ClientDashboardConfig }) {
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess(config.slug);
+  useDisplayNameOverrides();
 
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
@@ -204,7 +206,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const mapToSeller = (entry: LeaderboardEntry): LeaderboardSeller => ({
     id: entry.employeeId,
     name: entry.employeeName,
-    displayName: getDisplayName(entry.displayName || entry.employeeName),
+    displayName: getDisplayName(entry.employeeName || entry.displayName),
     avatarUrl: entry.avatarUrl,
     salesCount: entry.salesCount,
     commission: entry.commission,

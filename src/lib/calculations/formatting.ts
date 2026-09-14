@@ -5,6 +5,8 @@
  * Uses Danish locale (da-DK) as the default.
  */
 
+import { getDisplayNameOverride } from '@/lib/displayNameOverrides';
+
 const DEFAULT_LOCALE = 'da-DK';
 
 /**
@@ -137,6 +139,9 @@ export function formatValue(value: number, category: string): string {
  */
 export function formatDisplayName(fullName: string): string {
   if (!fullName) return "";
+  
+  const override = getDisplayNameOverride(fullName);
+  if (override) return override;
   
   const parts = fullName.trim().split(" ").filter(p => p.length > 0);
   

@@ -2,16 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatNumber } from "@/lib/calculations";
+import { getInitials as getSharedInitials } from "@/utils/formatting";
 
 const formatCurrency = formatNumber;
 
-const getInitials = (name: string) => {
-  const parts = name.split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  }
-  return name.substring(0, 2).toUpperCase();
-};
+const getInitials = (name: string) => getSharedInitials(name);
 
 const formatFiberPoints = (value: number) => {
   if (Number.isInteger(value)) return String(value);

@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -65,6 +66,7 @@ function formatCountdown(ms: number): string {
 export default function PowerdagBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
+  useDisplayNameOverrides();
   const { canView } = useUnifiedPermissions();
   const hasEditAccess = canView("menu_powerdag_input");
   const now = useNowClock();

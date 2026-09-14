@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { isTvMode, useAutoReload, REFRESH_PROFILES } from "@/utils/tvMode";
 import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
+import { getDisplayName as getSharedDisplayName } from "@/utils/formatting";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 
 // formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
 const formatCurrency = formatNumber;
@@ -111,11 +113,7 @@ function useCustomPeriodLeaderboard(
 
 function formatDisplayName(fullName: string | null | undefined): string {
   if (!fullName) return "Ukendt";
-  const parts = fullName.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return fullName;
+  return getSharedDisplayName(fullName);
 }
 
 /** Normalize edge function seller data to LeaderboardEntry shape */
@@ -137,6 +135,7 @@ function normalizeEdgeSellers(sellers: any[]): LeaderboardEntry[] {
 export default function CsTop20Dashboard() {
   const tvMode = isTvMode();
   
+  useDisplayNameOverrides();
   // Runtime access check - redirects if user doesn't have team-based permission (skipped in TV mode)
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20", { skip: tvMode });
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));

@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getPayrollPeriod, getStartOfDay, getStartOfMonth, getStartOfWeek } from "../_shared/date-helpers.ts";
 import { resolveRoundEndTime, roundEndForStart, roundStartFromDateString } from "../_shared/league-round-time.ts";
+import { fetchDisplayNameOverrides, formatDisplayNameWithOverrides } from "../_shared/format-helpers.ts";
 
 
 const corsHeaders = {
@@ -237,12 +238,15 @@ function formatValue(value: number, category: string): string {
   return new Intl.NumberFormat("da-DK").format(value);
 }
 
+// Manuelle korte visningsnavne (employee_master_data.display_name_short), hentes pr. kørsel
+let displayNameOverrides = new Map<string, string>();
+
+async function loadDisplayNameOverrides(supabase: SupabaseClient): Promise<void> {
+  displayNameOverrides = await fetchDisplayNameOverrides(supabase as unknown as { rpc: (fn: string) => Promise<{ data: unknown; error: unknown }> });
+}
+
 function formatDisplayName(fullName: string): string {
-  const parts = fullName.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return fullName;
+  return formatDisplayNameWithOverrides(fullName, displayNameOverrides);
 }
 
 // Helper to upsert a batch of cached values immediately
@@ -503,6 +507,8 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    await loadDisplayNameOverrides(supabase);
 
     // Parse chunk parameter for split execution
     let chunk: string | null = null;

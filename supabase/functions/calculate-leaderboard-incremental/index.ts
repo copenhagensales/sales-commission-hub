@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getPayrollPeriod, getStartOfDay, getStartOfWeek } from "../_shared/date-helpers.ts";
+import { fetchDisplayNameOverrides, formatDisplayNameWithOverrides } from "../_shared/format-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,12 +38,15 @@ type SaleWithItems = {
   sale_items: { sale_id: string; quantity: number; mapped_commission: number; product_id: string | null }[];
 };
 
+// Manuelle korte visningsnavne (employee_master_data.display_name_short), hentes pr. kørsel
+let displayNameOverrides = new Map<string, string>();
+
+async function loadDisplayNameOverrides(supabase: SupabaseClient): Promise<void> {
+  displayNameOverrides = await fetchDisplayNameOverrides(supabase as unknown as { rpc: (fn: string) => Promise<{ data: unknown; error: unknown }> });
+}
+
 function formatDisplayName(fullName: string): string {
-  const parts = fullName.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return fullName;
+  return formatDisplayNameWithOverrides(fullName, displayNameOverrides);
 }
 
 // ============= UNIFIED DATA FETCH =============
@@ -184,6 +188,8 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    await loadDisplayNameOverrides(supabase);
 
     const now = new Date();
     const calculatedAt = now.toISOString();
