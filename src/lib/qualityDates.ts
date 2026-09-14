@@ -1,8 +1,9 @@
 /**
  * Datologik for kvalitetsmodulet.
  *
- * Standardvisning er gårsdagens salg. Mandag dækker fredag, lørdag og søndag,
- * så weekendens salg ikke falder mellem to stole.
+ * Standardvisning er dagens salg, og koen nulstiller derfor hver dag.
+ * Vaelges en soendag manuelt, vises fredag, loerdag og soendag samlet,
+ * saa weekendens salg ikke falder mellem to stole.
  */
 
 /** Dagens dato i dansk tid som YYYY-MM-DD. */
@@ -26,9 +27,9 @@ export function weekdayOf(isoDate: string): number {
   return new Date(`${isoDate}T12:00:00Z`).getUTCDay();
 }
 
-/** Standarddatoen for kontrolkøen: i går. */
+/** Standarddatoen for kontrolkøen: i dag (dansk tid). */
 export function defaultQualityDate(): string {
-  return addDays(todayInCopenhagen(), -1);
+  return todayInCopenhagen();
 }
 
 /**
