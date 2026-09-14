@@ -841,14 +841,6 @@ ${
       .join("\n")
   }
     </table>
-    ${
-    wpNote(
-      `Tallet er antal lokationer, der er bemandet den dag. Sælgere pr. dag: ${
-        days.map((d) => `${DAY_NAMES[d.index]} ${fmtInt(d.sellers)}`).join(", ")
-      }.`,
-      14,
-    )
-  }
   </td></tr>`;
 
   const detailHtml = locations.length === 0
@@ -860,12 +852,7 @@ ${
       groupKeys
         .map((key, i) => wpGroupTable(key, groups.get(key)!, gridDates, dayFmt, i === 0))
         .join("")
-    }</table>${
-      wpNote(
-        "Tallet i en dagskasse er antal sælgere på lokationen den dag. En streg betyder ingen bemanding.",
-        18,
-      )
-    }`;
+    }</table>`;
 
   const preheader =
     `uge ${isoWeek}, ${startLabel} til ${endLabel} — ${fmtInt(totalDays)} dage i alt \u00b7 ${
