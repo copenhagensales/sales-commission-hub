@@ -111,11 +111,7 @@ function useCustomPeriodLeaderboard(
 
 function formatDisplayName(fullName: string | null | undefined): string {
   if (!fullName) return "Ukendt";
-  const parts = fullName.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return fullName;
+  return getSharedDisplayName(fullName);
 }
 
 /** Normalize edge function seller data to LeaderboardEntry shape */
