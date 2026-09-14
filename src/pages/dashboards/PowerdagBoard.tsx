@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
