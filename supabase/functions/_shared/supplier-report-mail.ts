@@ -843,8 +843,15 @@ export function buildClientWeekPlanEmail(params: {
   for (const key of groupKeys) {
     textLines.push(key);
     for (const l of groups.get(key)!) {
+      const perDay = DAY_NAMES.map((n, i) => {
+        const booked = (l.dayFlags ?? [])[i] === true;
+        const count = (l.daySellers ?? [])[i] ?? 0;
+        return `${n} ${booked ? (count > 0 ? String(count) : "x") : "-"}`;
+      }).join(", ");
       textLines.push(
-        `  ${l.locationName}: ${l.days} dage, ${l.sellers} ${l.sellers === 1 ? "sælger" : "sælgere"}`,
+        `  ${l.locationName}${l.tentative ? " (kladde)" : ""}: ${l.days} dage, ${l.sellers} ${
+          l.sellers === 1 ? "sælger" : "sælgere"
+        } | ${perDay}`,
       );
     }
     textLines.push("");
