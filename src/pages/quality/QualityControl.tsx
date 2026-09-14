@@ -105,8 +105,9 @@ export default function QualityControl() {
 
   const [date, setDate] = useState(defaultQualityDate());
   const [activeTeam, setActiveTeam] = useState<string>("all");
-  const [selectedSale, setSelectedSale] = useState<QualityQueueRow | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [commentRow, setCommentRow] = useState<QualityQueueRow | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [commentCodeId, setCommentCodeId] = useState("");
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [quickSavingId, setQuickSavingId] = useState<string | null>(null);
 
