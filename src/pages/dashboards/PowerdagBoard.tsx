@@ -66,6 +66,7 @@ function formatCountdown(ms: number): string {
 export default function PowerdagBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
+  useDisplayNameOverrides();
   const { canView } = useUnifiedPermissions();
   const hasEditAccess = canView("menu_powerdag_input");
   const now = useNowClock();
