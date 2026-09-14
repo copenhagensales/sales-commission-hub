@@ -6,6 +6,7 @@ import { sendM365Mail } from "../_shared/m365-mail.ts";
 import {
   buildClientWeekPlanEmail,
   buildWeekPlanEmptyWarningEmail,
+  type WeekPlanDay,
   type WeekPlanLocation,
 } from "../_shared/supplier-report-mail.ts";
 
