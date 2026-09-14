@@ -133,92 +133,120 @@ export function QualityScorePanel({ overview, teamId, minReviewsForPercentage }:
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Fordeling pr. fejlkode</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {codes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ingen fejlkoder registreret endnu.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fejlkode</TableHead>
-                    <TableHead className="text-right">I dag</TableHead>
-                    <TableHead className="text-right">30 dage</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {codes.map((c) => (
-                    <TableRow key={c.code}>
-                      <TableCell>{c.label}</TableCell>
-                      <TableCell className="text-right">
-                        {formatPct(pct(c.dayCount, day.reviewed))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatPct(pct(c.d30Count, d30.reviewed))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pr. sælger, 30 dage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {sellers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ingen kontroller i perioden.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sælger</TableHead>
-                    <TableHead className="text-right">Kontrollerede</TableHead>
-                    <TableHead className="text-right">Afvist</TableHead>
-                    <TableHead className="text-right">Bemærkning</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sellers
-                    .sort(
-                      (a, b) =>
-                        (b.stats.d30?.reviewed ?? 0) - (a.stats.d30?.reviewed ?? 0),
-                    )
-                    .map((s) => {
-                      const stats = s.stats.d30 ?? EMPTY;
-                      const showPct = stats.reviewed >= minReviewsForPercentage;
-                      return (
-                        <TableRow key={s.employee_id}>
-                          <TableCell>{s.seller_name ?? "Ukendt"}</TableCell>
-                          <TableCell className="text-right">{stats.reviewed}</TableCell>
-                          <TableCell className="text-right">
-                            {showPct
-                              ? formatPct(pct(stats.rejected, stats.reviewed))
-                              : stats.rejected}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {showPct
-                              ? formatPct(pct(stats.remarked, stats.reviewed))
-                              : stats.remarked}
-                          </TableCell>
+        <Collapsible open={codesOpen} onOpenChange={setCodesOpen}>
+          <Card>
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-6 text-left">
+              <div>
+                <p className="text-base font-semibold leading-none">Fordeling pr. fejlkode</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {codes.length === 0 ? "Ingen fejlkoder endnu" : `${codes.length} fejlkoder`}
+                </p>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${codesOpen ? "rotate-180" : ""}`}
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                {codes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ingen fejlkoder registreret endnu.</p>
+                ) : (
+                  <div className="max-h-[420px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fejlkode</TableHead>
+                          <TableHead className="text-right">I dag</TableHead>
+                          <TableHead className="text-right">30 dage</TableHead>
                         </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
-            )}
-            <p className="mt-3 text-xs text-muted-foreground">
-              Procent vises først ved mindst {minReviewsForPercentage} kontrollerede salg i
-              perioden. Ellers vises kun antal.
-            </p>
-          </CardContent>
-        </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {codes.map((c) => (
+                          <TableRow key={c.code}>
+                            <TableCell>{c.label}</TableCell>
+                            <TableCell className="text-right">
+                              {formatPct(pct(c.dayCount, day.reviewed))}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPct(pct(c.d30Count, d30.reviewed))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        <Collapsible open={sellersOpen} onOpenChange={setSellersOpen}>
+          <Card>
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-6 text-left">
+              <div>
+                <p className="text-base font-semibold leading-none">Pr. sælger, 30 dage</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {sellers.length === 0 ? "Ingen kontroller i perioden" : `${sellers.length} sælgere`}
+                </p>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${sellersOpen ? "rotate-180" : ""}`}
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                {sellers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ingen kontroller i perioden.</p>
+                ) : (
+                  <div className="max-h-[420px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Sælger</TableHead>
+                          <TableHead className="text-right">Kontrollerede</TableHead>
+                          <TableHead className="text-right">Afvist</TableHead>
+                          <TableHead className="text-right">Bemærkning</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...sellers]
+                          .sort(
+                            (a, b) =>
+                              (b.stats.d30?.reviewed ?? 0) - (a.stats.d30?.reviewed ?? 0),
+                          )
+                          .map((s) => {
+                            const stats = s.stats.d30 ?? EMPTY;
+                            const showPct = stats.reviewed >= minReviewsForPercentage;
+                            return (
+                              <TableRow key={s.employee_id}>
+                                <TableCell>{s.seller_name ?? "Ukendt"}</TableCell>
+                                <TableCell className="text-right">{stats.reviewed}</TableCell>
+                                <TableCell className="text-right">
+                                  {showPct
+                                    ? formatPct(pct(stats.rejected, stats.reviewed))
+                                    : stats.rejected}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {showPct
+                                    ? formatPct(pct(stats.remarked, stats.reviewed))
+                                    : stats.remarked}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Procent vises først ved mindst {minReviewsForPercentage} kontrollerede salg i
+                  perioden. Ellers vises kun antal.
+                </p>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       </div>
     </div>
   );
