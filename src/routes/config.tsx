@@ -86,6 +86,8 @@ import {
   OnboardingAdmin,
   OnboardingDashboard,
   RampTeam,
+  QualityControl,
+  QualityAdmin,
   OnboardingCourse,
   MyFeedback,
   ExcelFieldMatcher,
