@@ -393,10 +393,10 @@ export default function QualityControl() {
   }
 
   const goal = reviewerStats.data?.daily_goal ?? 40;
-  const myToday = reviewerStats.data?.me?.today_count ?? 0;
-  const avgToday = reviewerStats.data?.me?.avg_secs_today ?? null;
-  const avg30 = reviewerStats.data?.me?.avg_secs_30d ?? null;
-  const myDaily = reviewerStats.data?.my_daily ?? [];
+  const myToday = reviewerStats.data?.all?.today_count ?? 0;
+  const avgToday = reviewerStats.data?.all?.avg_secs_today ?? null;
+  const avg30 = reviewerStats.data?.all?.avg_secs_30d ?? null;
+  const myDaily = reviewerStats.data?.all_daily ?? [];
   const maxDaily = Math.max(1, ...myDaily.map((d) => d.count));
 
   const formatSecs = (secs: number | null) =>
