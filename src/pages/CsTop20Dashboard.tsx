@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { isTvMode, useAutoReload, REFRESH_PROFILES } from "@/utils/tvMode";
 import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
+import { getDisplayName as getSharedDisplayName } from "@/utils/formatting";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 
 // formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
 const formatCurrency = formatNumber;
