@@ -75,16 +75,17 @@ export function isoWeekNumber(iso: string): number {
 }
 
 /**
- * Beregner ugeplanen pr. lokation for én kunde.
+ * Beregner ugeplanen pr. lokation for én kunde, samt dagsfordelingen.
  * Dage: booked_days er ugedagsindeks med 0 = mandag; tom/null = alle dage i intervallet.
  * Sælgere: antal DISTINCT employee_id i booking_assignment inden for ugen.
+ * days: pr. ugedag antal bemandede lokationer og antal DISTINCT sælgere den dag.
  */
 export async function computeWeekPlan(
   svc: Svc,
   clientId: string,
   weekStart: string,
   weekEnd: string,
-): Promise<WeekPlanLocation[]> {
+): Promise<{ locations: WeekPlanLocation[]; days: WeekPlanDay[] }> {
   const { data: bookings, error } = await svc
     .from("booking")
     .select(
