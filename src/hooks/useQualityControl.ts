@@ -367,6 +367,31 @@ export function useSaveQualityReview() {
   });
 }
 
+/**
+ * Fortryder kontrollen på et salg. Kontrollen slettes ikke — den markeres som
+ * trukket tilbage i quality_review_voids, så historikken bevares, mens salget
+ * igen vises som ikke kontrolleret.
+ */
+export function useVoidQualityReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleId: string) => {
+      const { data, error } = await supabase.rpc("void_quality_review", {
+        p_sale_id: saleId,
+        p_reason: null,
+      });
+      if (error) throw error;
+      return data as unknown as { voided: number };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quality-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["quality-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["quality-reviewer-stats"] });
+    },
+  });
+}
+
 /** "Færdig for i dag" — kan kun bruges én gang pr. dag. */
 export function useQualityDailyCompletion(date: string) {
   return useQuery({
