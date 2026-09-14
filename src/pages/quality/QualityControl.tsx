@@ -363,13 +363,22 @@ export default function QualityControl() {
                       <TableHead>Tidspunkt</TableHead>
                       <TableHead>Søgenøgle</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Hurtig</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRows.map((row) => (
                       <TableRow
                         key={row.sale_id}
-                        className="cursor-pointer"
+                        className={
+                          row.status === "afvist"
+                            ? "cursor-pointer bg-destructive/10 hover:bg-destructive/15"
+                            : row.status === "godkendt"
+                            ? "cursor-pointer bg-success/10 hover:bg-success/15"
+                            : row.status === "godkendt_med_bemaerkning"
+                            ? "cursor-pointer bg-warning/10 hover:bg-warning/15"
+                            : "cursor-pointer"
+                        }
                         onClick={() => openSale(row)}
                       >
                         <TableCell>
