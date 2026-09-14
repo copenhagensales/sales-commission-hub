@@ -36,6 +36,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
   Copy,
@@ -659,7 +660,7 @@ export default function QualityControl() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-1">
+                          <div className="min-w-0 max-w-[260px] space-y-1.5">
                             <Badge
                               variant={
                                 row.status === "afvist"
@@ -671,31 +672,51 @@ export default function QualityControl() {
                             >
                               {QUALITY_RESULT_LABEL[row.status]}
                             </Badge>
+
                             {row.status !== "ikke_kontrolleret" &&
                               (row.reason_labels?.length ?? 0) > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {row.reason_labels!.map((label) => (
-                                    <Badge
-                                      key={label}
-                                      variant="outline"
-                                      className={
-                                        row.status === "afvist"
-                                          ? "border-destructive/40 text-destructive text-[11px] font-normal"
-                                          : "border-warning/40 text-warning text-[11px] font-normal"
-                                      }
+                                <div
+                                  className={`flex items-start gap-1.5 rounded-md border-l-2 px-2 py-1 ${
+                                    row.status === "afvist"
+                                      ? "border-l-destructive bg-destructive/5"
+                                      : "border-l-warning bg-warning/5"
+                                  }`}
+                                >
+                                  <AlertTriangle
+                                    className={`mt-[3px] h-3 w-3 shrink-0 ${
+                                      row.status === "afvist" ? "text-destructive" : "text-warning"
+                                    }`}
+                                  />
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                      Årsag
+                                    </p>
+                                    <p
+                                      className={`text-[11px] leading-snug ${
+                                        row.status === "afvist" ? "text-destructive" : "text-warning"
+                                      }`}
                                     >
-                                      {label}
-                                    </Badge>
-                                  ))}
+                                      {row.reason_labels!.join(" · ")}
+                                    </p>
+                                  </div>
                                 </div>
                               )}
+
                             {row.review_comment && (
-                              <p
-                                className="max-w-[220px] truncate text-[11px] text-muted-foreground"
-                                title={row.review_comment}
-                              >
-                                {row.review_comment}
-                              </p>
+                              <div className="flex items-start gap-1.5 rounded-md bg-muted/50 px-2 py-1">
+                                <MessageSquare className="mt-[3px] h-3 w-3 shrink-0 text-muted-foreground" />
+                                <div className="min-w-0">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Kommentar
+                                  </p>
+                                  <p
+                                    className="line-clamp-2 text-[11px] leading-snug text-foreground/80"
+                                    title={row.review_comment}
+                                  >
+                                    {row.review_comment}
+                                  </p>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </TableCell>
