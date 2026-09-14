@@ -104,6 +104,14 @@ export interface QualityReviewerStats {
     count_30d?: number;
   };
   my_daily: Array<{ date: string; count: number }>;
+  /** Samlede tal for alle kontrollanter i perioden. */
+  all?: {
+    today_count?: number;
+    avg_secs_today?: number | null;
+    avg_secs_30d?: number | null;
+    count_30d?: number;
+  };
+  all_daily?: Array<{ date: string; count: number }>;
   reviewers: Array<{
     employee_id: string;
     name: string | null;
