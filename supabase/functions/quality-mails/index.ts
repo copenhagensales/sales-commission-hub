@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sharedCorsHeaders } from "../_shared/auth.ts";
 import {
   renderRejectionMail,
+  renderFeedbackMail,
   renderTeamSummaryMail,
   renderManagementMail,
   RESULT_LABEL,
