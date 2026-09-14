@@ -16,7 +16,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Copy, Loader2, Settings2, CheckCircle2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  Settings2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   QUALITY_RESULT_LABEL,
