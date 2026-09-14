@@ -1,37 +1,51 @@
-# Hiper Lukning / Hiper Viderestilling — de to "altid matcher"-regler
+# Rettelse af Relatel-salg: 50% tilskud → 0% tilskud
 
-## Kort svar
+## Hvad jeg har fundet (bekræftet i data)
 
-Din mistanke holder — men de to regler er ikke ens i risiko, og de bør **deaktiveres**, ikke slettes.
+Salget er identificeret entydigt:
 
-- **Hiper Viderestilling – default**: provision 400 kr, omsætning 0 kr = fuldstændig identisk med produktets basissats (400/0). Reglen er ren støj uden effekt.
-- **Hiper Lukning – default**: provision 200 kr (= basis), men omsætning **0 kr mod basis 1.300 kr**. Det ligner en fejloprettelse og er en sovende bombe: hvis reglen nogensinde bliver aktiv i beregningen, forsvinder 1.300 kr omsætning pr. salg.
+- Sælger: Thorbjørn Larsen (`thor@cph-relatel.dk`), Relatel, kampagne 85913
+- Dato: 25. august 2026, kl. 14:26 dansk tid
+- Sales ID 25808754 står i dialer-data på salget (feltet "Sales ID")
+- Feltet "Tilskud" er registreret som **50%**
 
-## Evidens (read-only, ingen data ændret)
+Salget har tre linjer, og de er i dag prissat efter produkternes basissatser, fordi der ikke findes en pricing-regel for "50% tilskud":
 
-- `product_pricing_rules` for Hiper:
-  - `3674036f…` "Hiper Lukning - default": priority 100, `conditions = {}`, ingen kampagnebinding, 200,00 / **0,00**, effective_from 2026-07-08.
-  - `e05f7680…` "Hiper Viderestilling - default": priority 100, `conditions = {}`, ingen kampagnebinding, 400,00 / 0,00, samme dato.
-- Basissatser i `products`: Hiper Lukning 200 / **1.300**, Hiper Viderestilling 400 / 0. Rabattrin-produkterne har ingen regler.
-- Faktiske linjer i `sale_items`: 305 Hiper Lukning-linjer (gns. omsætning 1.300) og 303 Viderestilling-linjer (gns. 0) — **alle med `matched_pricing_rule_id = NULL`**. Ingen linje har nogensinde brugt de to regler.
-- Årsagen: alle 608 salg har `sales.source = 'manual_entry'`, og `supabase/functions/manual-sales/index.ts:437-438, 556-557` skriver basissatserne direkte (`products.commission_dkk` / `revenue_dkk`) uden regelopslag.
-- Men `rematch-pricing-rules` bruger `matchPricingRule` (index.ts:208-275), hvor en regel uden kampagnebinding og uden betingelser matcher **universelt**. Kører en rematch over disse produkter/linjer, bliver Hiper Lukning sat til omsætning 0. Så reglen er inaktiv i praksis i dag, men aktiv i logikken.
-- `pricing_rule_history` har **0 rækker** for begge regler, og FK'en er `ON DELETE CASCADE` — en `DELETE` fjerner også al fremtidig/eksisterende historik og sætter `sale_items.matched_pricing_rule_id` til NULL.
+| Linje | Provision i dag | Omsætning i dag |
+| --- | --- | --- |
+| Fri Tale - 1000 GB ATL | 1.210 kr | 2.600,00 kr |
+| Mobilfeatures ATL | 176 kr | 351,00 kr |
+| Datadeling ATL | 176 kr | 351,00 kr |
+| **I alt** | **1.562 kr** | **3.302,00 kr** |
 
-## Anbefaling
+De gældende 0%-tilskudsregler (aktive fra 15. juni 2026, altså gældende 25. august) giver:
 
-Deaktiver i stedet for at slette (princip: historik bevares, mindst risikable ændring):
+| Linje | Ny provision | Ny omsætning |
+| --- | --- | --- |
+| Fri Tale - 1000 GB ATL | 1.615 kr | 3.325,85 kr |
+| Mobilfeatures ATL | 335 kr | 639,45 kr |
+| Datadeling ATL | 335 kr | 639,45 kr |
+| **I alt** | **2.285 kr** | **4.604,75 kr** |
 
-1. Sæt `is_active = false` på begge regler og skriv en historik-række (`change_type = 'deactivate'`) i `pricing_rule_history`, så beslutningen kan spores.
-2. Rør **ikke** eksisterende `sale_items` — ingen genberegning, ingen løn- eller provisionsændring. Nuværende beløb er allerede basissats-korrekte.
-3. Efter deaktivering vil både nye manuelle salg og en eventuel rematch give samme resultat: 200/1.300 for Lukning og 400/0 for Viderestilling.
+Det betyder +723 kr i provision og +1.302,75 kr i omsætning på salget.
 
-## Åbent spørgsmål inden udførelse
+## Hvad jeg vil gøre
 
-Hvis "Hiper Lukning" i virkeligheden **skal** have 0 kr omsætning (fx fordi Hiper afregnes anderledes), er fejlen omvendt: så er det basissatsen 1.300 der er forkert, og de 305 eksisterende linjer er bogført med for høj omsætning. Det skal bekræftes af jer, før noget ændres.
+1. Rette de tre linjer på salget til 0%-tilskudssatserne ovenfor, i én samlet handling.
+2. Låse linjerne som manuelt rettede, så det natlige gennemløb af prisregler ikke overskriver rettelsen igen.
+3. Logge rettelsen i den historiske log over manuelle prisrettelser, med før- og efterbeløb, feltet "Tilskud" (50% → 0%) og en begrundelse der nævner Sales ID 25808754.
 
-## Teknisk gennemførelse (når retningen er bekræftet)
+## Hvad jeg ikke gør
 
-- Én migration: `UPDATE product_pricing_rules SET is_active = false WHERE id IN ('3674036f-530a-4438-be3e-37bbd192596f','e05f7680-925b-4f71-804b-ee0020051990')` plus indsættelse i `pricing_rule_history` med de gamle værdier.
-- Ingen ændringer i `sale_items`, `commission_transactions`, pricing-kode eller edge functions.
-- Verifikation efter migration: begge regler inaktive, antal Hiper-linjer og deres `mapped_commission`/`mapped_revenue` uændret (305 × 1.300 og 303 × 0), samt et dry-run af `rematch-pricing-rules` på Hiper-produkterne der viser `BASE_PRODUCT_PRICE` uden beløbsændring.
+- Jeg ændrer ikke de rå data fra ringesystemet — de bevares som de kom ind, så historikken er intakt.
+- Jeg ændrer ingen andre salg, ingen prisregler og ingen produkter.
+- Jeg ændrer ikke lønberegninger direkte; provisionen på dette salg indgår i lønnen efter systemets normale regler, som ethvert andet salg.
+
+## Teknisk (til reference)
+
+- Salg: `sales.id = a8ff9227-5a26-48d5-8edc-d3195ab2c83d` (`adversus_external_id = 1500146`, lead 1020501911)
+- Linjer i `sale_items`: `7e3eeb68…` (produkt `25c13052…`), `e8621451…` (`3f172eb3…`), `a299caf5…` (`b0c7c77f…`)
+- Kildesatser: `product_pricing_rules` med `conditions = {"Tilskud":"0%"}`, `effective_from = 2026-06-15`: `cc00bf87…` (1615/3325.85), `8dddd5cd…` (335/639.45), `1c5b722a…` (335/639.45)
+- Sætter `manual_pricing_lock = true` på de tre linjer (respekteres af `rematch-pricing-rules`)
+- Indsætter tre rækker i `sales_manual_pricing_corrections` (immutable log), samme mønster som rettelsen af Sales ID 45785734
+- Ren dataopdatering via SQL i én transaktion — ingen kodeændringer, ingen migration, ingen ændring af RLS
