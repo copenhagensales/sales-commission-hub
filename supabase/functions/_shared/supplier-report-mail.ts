@@ -597,6 +597,26 @@ export interface WeekPlanLocation {
   sellers: number;
 }
 
+/** Én dag i ugen: antal lokationer åbne og antal sælgere på dagen. */
+export interface WeekPlanDay {
+  /** 0 = mandag ... 6 = søndag */
+  index: number;
+  date: string; // yyyy-mm-dd
+  locations: number;
+  sellers: number;
+}
+
+const DAY_NAMES = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+const DAY_NAMES_LONG = [
+  "Mandag",
+  "Tirsdag",
+  "Onsdag",
+  "Torsdag",
+  "Fredag",
+  "Lørdag",
+  "Søndag",
+];
+
 export function buildClientWeekPlanEmail(params: {
   clientName: string;
   isoWeek: number;
@@ -604,9 +624,17 @@ export function buildClientWeekPlanEmail(params: {
   weekEnd: string; // yyyy-mm-dd (søndag)
   locations: WeekPlanLocation[];
   previousWeek?: { isoWeek: number; days: number } | null;
+  days?: WeekPlanDay[];
 }): { subject: string; html: string; text: string } {
-  const { clientName, isoWeek, weekStart, weekEnd, locations, previousWeek = null } =
-    params;
+  const {
+    clientName,
+    isoWeek,
+    weekStart,
+    weekEnd,
+    locations,
+    previousWeek = null,
+    days = [],
+  } = params;
 
   const dateFmt = new Intl.DateTimeFormat("da-DK", {
     day: "numeric",
