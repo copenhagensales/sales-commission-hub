@@ -138,6 +138,9 @@ export function formatValue(value: number, category: string): string {
 export function formatDisplayName(fullName: string): string {
   if (!fullName) return "";
   
+  const override = getDisplayNameOverride(fullName);
+  if (override) return override;
+  
   const parts = fullName.trim().split(" ").filter(p => p.length > 0);
   
   if (parts.length >= 2) {
