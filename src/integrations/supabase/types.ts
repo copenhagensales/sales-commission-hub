@@ -17800,6 +17800,26 @@ export type Database = {
         }
         Returns: string
       }
+      save_quality_review: {
+        Args: {
+          p_checklist_id: string
+          p_checklist_version: number
+          p_client_campaign_id: string
+          p_comment: string
+          p_employee_id: string
+          p_error_code_ids: string[]
+          p_items: Json
+          p_sale_date: string
+          p_sale_datetime: string
+          p_sale_id: string
+          p_search_key: string
+          p_seller_name: string
+          p_started_at: string
+          p_team_id: string
+          p_team_name: string
+        }
+        Returns: Json
+      }
       schedule_integration_sync: {
         Args: {
           p_anon_key: string
