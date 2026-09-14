@@ -4,6 +4,7 @@ import { da } from "date-fns/locale";
 import cphLogo from "@/assets/cph-sales-logo.png";
 import { formatNumber } from "@/lib/calculations";
 import type { LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
+import { getInitials as getSharedInitials } from "@/utils/formatting";
 
 /**
  * Copenhagen Sales visuel stil til klient-boards.
