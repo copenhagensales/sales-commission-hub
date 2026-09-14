@@ -443,17 +443,42 @@ export default function QualityControl() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Sælger</TableHead>
-                      <TableHead>Team</TableHead>
-                      <TableHead>Kampagne</TableHead>
-                      <TableHead>Tidspunkt</TableHead>
-                      <TableHead>Søgenøgle</TableHead>
-                      <TableHead>Status</TableHead>
+                      {(
+                        [
+                          ["saelger", "Sælger"],
+                          ["team", "Team"],
+                          ["kampagne", "Kampagne"],
+                          ["tidspunkt", "Tidspunkt"],
+                          ["soegenoegle", "Søgenøgle"],
+                          ["status", "Status"],
+                        ] as Array<[QualitySortKey, string]>
+                      ).map(([key, label]) => (
+                        <TableHead key={key}>
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(key)}
+                            className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+                            title={`Sortér efter ${label.toLowerCase()}`}
+                          >
+                            {label}
+                            {sortKey === key ? (
+                              sortDir === "asc" ? (
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                            )}
+                          </button>
+                        </TableHead>
+                      ))}
                       <TableHead className="text-right">Hurtig</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRows.map((row) => (
+                    {sortedRows.map((row) => (
+
                       <TableRow
                         key={row.sale_id}
                         className={
