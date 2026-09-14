@@ -204,7 +204,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const mapToSeller = (entry: LeaderboardEntry): LeaderboardSeller => ({
     id: entry.employeeId,
     name: entry.employeeName,
-    displayName: getDisplayName(entry.displayName || entry.employeeName),
+    displayName: getDisplayName(entry.employeeName || entry.displayName),
     avatarUrl: entry.avatarUrl,
     salesCount: entry.salesCount,
     commission: entry.commission,
