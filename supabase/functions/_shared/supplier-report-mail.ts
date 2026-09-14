@@ -812,7 +812,7 @@ export function buildClientWeekPlanEmail(params: {
     sections: [
       ...(daySection ? [daySection] : []),
       {
-        label: `Lokationer \u00b7 dage og antal sælgere`,
+        label: `Lokationer \u00b7 dag for dag`,
         html: detailHtml,
       },
     ],
