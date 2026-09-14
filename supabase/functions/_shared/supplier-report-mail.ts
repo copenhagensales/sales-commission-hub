@@ -623,74 +623,134 @@ const DAY_NAMES_LONG = [
   "Søndag",
 ];
 
-/**
- * Uge-gitter: én række pr. lokation, én kolonne pr. ugedag. Kun tabeller og
- * inline styles. Tallet i cellen er antal sælgere den dag; tom dag viser en
- * streg, så en tom fredag er tydelig ved siden af en fyldt mandag.
- */
-function weekGrid(
-  dates: string[],
-  rows: WeekPlanLocation[],
-  dayFmt: Intl.DateTimeFormat,
-): string {
-  const nameWidth = 152;
-  const cellWidth = 54;
+// ---------------------------------------------------------------------------
+// Ugeplan-mailen har sit eget visuelle udtryk (mørkt kort på hvid flade).
+// Farverne nedenfor bruges KUN her, så øvrige rapportmails er uændrede.
+// ---------------------------------------------------------------------------
+const WP_CARD = "#2E3136";
+const WP_CARD_2 = "#353A40";
+const WP_LINE = "#3A3F45";
+const WP_ROW_LINE = "#34383D";
+const WP_INK = "#E6F0F1";
+const WP_PALE = "#B9CBCE";
+const WP_MUTED = "#7F878E";
+const WP_ACCENT = "#3BE086";
+const WP_FOOTER = "#26292D";
+const WP_DARK = "#1C1F22";
+const WP_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-  const head = `<tr>
-    <td width="${nameWidth}" align="left" valign="bottom" style="width:${nameWidth}px;padding:0 8px 8px 0;font-family:${FONT};font-size:10px;line-height:14px;${LH}font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:${SECONDARY};">Lokation</td>
-    ${
-    dates
-      .map((iso, i) =>
-        `<td width="${cellWidth}" align="center" valign="bottom" style="width:${cellWidth}px;padding:0 2px 8px;font-family:${FONT};font-size:11px;line-height:15px;${LH}font-weight:bold;color:${
-          i >= 5 ? SECONDARY : ONYX
-        };">${esc(DAY_NAMES[i])}<br><span style="font-weight:normal;font-size:10px;line-height:14px;color:${SECONDARY};">${
-          esc(dayFmt.format(new Date(`${iso}T00:00:00Z`)))
-        }</span></td>`
-      )
-      .join("")
-  }
-  </tr>`;
+/** Ét dagsafsnit i "Dage i ugen": label, 7-punkts graf og tal til højre. */
+function wpDayRow(label: string, filled: number): string {
+  const dots = Array.from({ length: 7 }, (_, i) =>
+    `<td style="padding:0 3px"><div style="height:10px;border-radius:3px;background:${
+      i < filled ? WP_ACCENT : WP_LINE
+    };font-size:0;line-height:0">&nbsp;</div></td>`
+  ).join("");
+  return `<tr>
+  <td style="padding:10px 0;border-bottom:1px solid ${WP_ROW_LINE};font-size:14px;font-weight:600;color:${WP_INK};font-family:${WP_FONT};white-space:nowrap;width:92px">${
+    esc(label)
+  }</td>
+  <td style="padding:10px 16px;border-bottom:1px solid ${WP_ROW_LINE}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${dots}</tr></table></td>
+  <td style="padding:10px 0;border-bottom:1px solid ${WP_ROW_LINE};font-size:15px;font-weight:700;color:${WP_INK};font-family:${WP_FONT};text-align:right;width:24px">${
+    fmtInt(filled)
+  }</td>
+</tr>`;
+}
+
+/** Ét tabelkort pr. lokationstype: lokation som række, Man-Søn som kolonner. */
+function wpGroupTable(
+  title: string,
+  rows: WeekPlanLocation[],
+  dates: string[],
+  dayFmt: Intl.DateTimeFormat,
+  first: boolean,
+): string {
+  const head = dates
+    .map((iso, i) =>
+      `<td style="padding:12px 0 10px;text-align:center;width:42px"><div style="font-size:11px;font-weight:700;color:${WP_INK};font-family:${WP_FONT}">${
+        esc(DAY_NAMES[i])
+      }</div><div style="font-size:10px;color:${WP_MUTED};font-family:${WP_FONT}">${
+        esc(dayFmt.format(new Date(`${iso}T00:00:00Z`)))
+      }</div></td>`
+    )
+    .join("");
 
   const body = rows
-    .map((loc, ri) => {
-      const border = ri === 0 ? "" : `border-top:1px solid ${DIVIDER};`;
+    .map((loc) => {
       const flags = loc.dayFlags ?? [];
       const sellers = loc.daySellers ?? [];
-      const tag = loc.tentative
-        ? `<div style="padding-top:3px;font-family:${FONT};font-size:10px;line-height:14px;${LH}font-weight:bold;letter-spacing:1.1px;text-transform:uppercase;color:${SECONDARY};">Kladde</div>`
-        : "";
       const cells = dates
         .map((_, i) => {
           const booked = flags[i] === true;
           const count = sellers[i] ?? 0;
           const inner = booked
-            ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${ONYX};border-radius:6px;"><tr><td align="center" style="padding:8px 0;font-family:${FONT};font-size:14px;line-height:18px;${LH}font-weight:bold;color:${WHITE};">${
-              count > 0 ? fmtInt(count) : "\u2713"
-            }</td></tr></table>`
-            : `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${LIGHT};border-radius:6px;"><tr><td align="center" style="padding:8px 0;font-family:${FONT};font-size:14px;line-height:18px;${LH}color:${SECONDARY};">&#8211;</td></tr></table>`;
-          return `<td width="${cellWidth}" align="center" valign="middle" style="width:${cellWidth}px;padding:6px 2px;${border}">${inner}</td>`;
+            ? (count > 0
+              ? `<span style="display:inline-block;min-width:26px;font-size:13px;font-weight:700;color:${WP_DARK};background:${WP_PALE};border-radius:6px;padding:4px 0;font-family:${WP_FONT}">${
+                fmtInt(count)
+              }</span>`
+              : `<span style="display:inline-block;min-width:26px;font-size:13px;font-weight:700;color:${WP_ACCENT};font-family:${WP_FONT}">&#10003;</span>`)
+            : `<span style="display:inline-block;min-width:26px;font-size:13px;color:${WP_MUTED};font-family:${WP_FONT}">&#8211;</span>`;
+          return `<td style="padding:12px 0;border-top:1px solid ${WP_LINE};text-align:center">${inner}</td>`;
         })
         .join("");
+      const tag = loc.tentative
+        ? `<div style="margin-top:6px"><span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${WP_MUTED};border:1px solid ${WP_LINE};border-radius:4px;padding:3px 6px;font-family:${WP_FONT}">Kladde</span></div>`
+        : "";
       return `<tr>
-        <td width="${nameWidth}" align="left" valign="middle" style="width:${nameWidth}px;padding:6px 8px 6px 0;${border}">
-          <div style="font-family:${FONT};font-size:14px;line-height:19px;${LH}font-weight:bold;color:${ONYX};">${
+      <td style="padding:12px 12px 12px 14px;border-top:1px solid ${WP_LINE}">
+        <div style="font-size:14px;font-weight:600;color:${WP_INK};line-height:1.3;font-family:${WP_FONT}">${
         esc(loc.locationName)
       }</div>
-          <div style="padding-top:2px;font-family:${FONT};font-size:11px;line-height:15px;${LH}color:${SECONDARY};">${
-        esc(`${fmtInt(loc.days)} ${loc.days === 1 ? "dag" : "dage"} \u00b7 ${fmtInt(loc.sellers)} ${
-          loc.sellers === 1 ? "sælger" : "sælgere"
-        }`)
+        <div style="margin-top:5px;font-size:12px;color:${WP_MUTED};font-family:${WP_FONT}">${
+        esc(
+          `${fmtInt(loc.days)} ${loc.days === 1 ? "dag" : "dage"} \u00b7 ${fmtInt(loc.sellers)} ${
+            loc.sellers === 1 ? "sælger" : "sælgere"
+          }`,
+        )
       }</div>
-          ${tag}
-        </td>
-        ${cells}
-      </tr>`;
+        ${tag}
+      </td>
+      ${cells}
+      <td style="border-top:1px solid ${WP_LINE}"></td>
+    </tr>`;
     })
     .join("");
 
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="536" style="width:536px;">${head}${body}</table>`;
+  return `<tr><td style="padding:${first ? "18px" : "26px"} 0 12px">
+  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${WP_ACCENT};vertical-align:middle"></span>
+  <span style="font-size:12px;font-weight:700;letter-spacing:.16em;color:${WP_INK};text-transform:uppercase;font-family:${WP_FONT};padding-left:10px;vertical-align:middle">${
+    esc(title)
+  }</span>
+</td></tr>
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${WP_CARD_2};border-radius:14px">
+    <tr style="background:${WP_LINE}">
+      <td style="padding:12px 0 10px 14px;font-size:10px;font-weight:700;letter-spacing:.14em;color:${WP_MUTED};text-transform:uppercase;font-family:${WP_FONT}">Lokation</td>
+      ${head}
+      <td style="width:14px"></td>
+    </tr>
+    ${body}
+  </table>
+</td></tr>`;
 }
 
+function wpKpi(value: string, label: string, accent = false): string {
+  return `<td width="33.33%" style="padding:0 6px" valign="top"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${WP_CARD_2};border-radius:12px"><tr><td style="padding:16px 16px 14px"><div style="font-size:30px;line-height:1;font-weight:700;color:${
+    accent ? WP_ACCENT : WP_INK
+  };font-family:${WP_FONT}">${value}</div><div style="margin-top:8px;font-size:12px;line-height:1.35;color:${WP_MUTED};font-family:${WP_FONT}">${label}</div></td></tr></table></td>`;
+}
+
+function wpSectionLabel(text: string): string {
+  return `<div style="padding-bottom:6px;border-bottom:1px solid ${WP_LINE};font-size:11px;font-weight:700;letter-spacing:.18em;color:${WP_MUTED};text-transform:uppercase;font-family:${WP_FONT}">${
+    esc(text)
+  }</div>`;
+}
+
+function wpNote(text: string, top: number): string {
+  return `<div style="padding-top:${top}px;font-size:12px;line-height:1.6;color:${WP_MUTED};font-family:${WP_FONT}">${
+    esc(text)
+  }</div>`;
+}
 
 export function buildClientWeekPlanEmail(params: {
   clientName: string;
@@ -755,71 +815,115 @@ export function buildClientWeekPlanEmail(params: {
       return d.toISOString().slice(0, 10);
     });
 
-  const detailHtml = locations.length === 0
-    ? bodyText(
-      "Der er ingen bookinger i ugen, så planen indeholder ingen lokationer.",
-    )
-    : `${
-      groupKeys
-        .map((key, i) =>
-          `${groupHeading(key, i === 0)}${weekGrid(gridDates, groups.get(key)!, dayFmt)}`
-        )
-        .join("")
-    }<div style="padding-top:16px;">${
-      bodyText(
-        "Tallet i en dagskasse er antal sælgere på lokationen den dag. En streg betyder ingen bemanding.",
-      )
-    }</div>`;
-  const daySection = days.length === 0
-    ? null
-    : {
-      label: "Dage i ugen \u00b7 lokationer pr. dag",
-      html: `${
-        barChart(
-          days.map((d) => ({
-            label: DAY_NAMES[d.index] ?? "",
-            sublabel: dayFmt.format(new Date(`${d.date}T00:00:00Z`)),
-            value: d.locations,
-            weekend: d.index >= 5,
-            latest: false,
-          })),
-        )
-      }<div style="padding-top:14px;">${
-        bodyText(
-          `Tallet er antal lokationer, der er bemandet den dag. Sælgere pr. dag: ${
-            days
-              .map((d) => `${DAY_NAMES[d.index]} ${fmtInt(d.sellers)}`)
-              .join(", ")
-          }.`,
-        )
-      }</div>`,
-    };
+  const diff = previousWeek ? totalDays - previousWeek.days : null;
+  const diffValue = diff === null
+    ? "Ingen data"
+    : diff > 0
+    ? `+${fmtInt(diff)}`
+    : diff < 0
+    ? `\u2212${fmtInt(Math.abs(diff))}`
+    : fmtInt(0);
+  const diffLabel = previousWeek
+    ? `mod ugen før <span style="color:${WP_PALE}">\u00b7 uge ${previousWeek.isoWeek}</span>`
+    : "Der er ikke et sammenligneligt tal";
 
-  const html = renderMail({
-    title: subject,
-    preheader: `Uge ${isoWeek}: ${fmtInt(totalDays)} dage på ${fmtInt(locations.length)} lokationer for ${clientName}.`,
-    mailType: "Ugeplan",
-    heroValue: fmtInt(totalDays),
-    heroUnit: `dage i alt \u00b7 ${fmtInt(locations.length)} lokationer`,
-    heroContext: subtitle,
-    panel: diffPanel({
-      label: "Mod ugen før",
-      current: totalDays,
-      previous: previousWeek ? previousWeek.days : null,
-      reference: previousWeek ? `uge ${previousWeek.isoWeek}` : "",
-      unit: "count",
-    }),
-    sections: [
-      ...(daySection ? [daySection] : []),
-      {
-        label: `Lokationer \u00b7 dag for dag`,
-        html: detailHtml,
-      },
-    ],
-    disclaimer:
-      "Planen viser dagsfordelingen samt antal dage og antal sælgere pr. lokation. Ændringer kan forekomme i løbet af ugen.",
-    description: "Ugeplan",
-  });
+  const daysHtml = days.length === 0 ? "" : `<tr><td style="background:${WP_CARD};padding:0 34px 30px">
+    ${wpSectionLabel("Dage i ugen \u00b7 Lokationer pr. dag")}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">
+${
+    days
+      .map((d) =>
+        wpDayRow(
+          `${DAY_NAMES[d.index] ?? ""} ${dayFmt.format(new Date(`${d.date}T00:00:00Z`))}`,
+          d.locations,
+        )
+      )
+      .join("\n")
+  }
+    </table>
+    ${
+    wpNote(
+      `Tallet er antal lokationer, der er bemandet den dag. Sælgere pr. dag: ${
+        days.map((d) => `${DAY_NAMES[d.index]} ${fmtInt(d.sellers)}`).join(", ")
+      }.`,
+      14,
+    )
+  }
+  </td></tr>`;
+
+  const detailHtml = locations.length === 0
+    ? wpNote(
+      "Der er ingen bookinger i ugen, så planen indeholder ingen lokationer.",
+      8,
+    )
+    : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${
+      groupKeys
+        .map((key, i) => wpGroupTable(key, groups.get(key)!, gridDates, dayFmt, i === 0))
+        .join("")
+    }</table>${
+      wpNote(
+        "Tallet i en dagskasse er antal sælgere på lokationen den dag. En streg betyder ingen bemanding.",
+        18,
+      )
+    }`;
+
+  const preheader =
+    `uge ${isoWeek}, ${startLabel} til ${endLabel} — ${fmtInt(totalDays)} dage i alt \u00b7 ${
+      fmtInt(locations.length)
+    } lokationer`;
+
+  const html = `<!doctype html>
+<html lang="da"><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>${esc(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#FFFFFF">
+<div style="display:none;font-size:0;line-height:0;max-height:0;overflow:hidden">${
+    esc(preheader)
+  }</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFFFFF">
+<tr><td align="center" style="padding:32px 16px 48px">
+<table role="presentation" width="660" cellpadding="0" cellspacing="0" border="0" style="width:660px;max-width:660px">
+
+  <tr><td style="background:${WP_CARD};border-radius:20px 20px 0 0;padding:34px 34px 30px;border-bottom:1px solid ${WP_LINE}">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td valign="top"><img src="${LOGO_URL}" alt="Copenhagen Sales" height="38" style="height:38px;width:auto;display:block;border:0" /></td>
+      <td valign="top" align="right" style="padding-top:6px;font-size:11px;font-weight:700;letter-spacing:.18em;color:${WP_MUTED};text-transform:uppercase;font-family:${WP_FONT}">uge ${isoWeek}</td>
+    </tr></table>
+    <div style="margin-top:30px;font-size:40px;line-height:1;font-weight:700;letter-spacing:.22em;color:${WP_INK};font-family:${WP_FONT}">UGEPLAN</div>
+    <div style="margin-top:14px;font-size:15px;line-height:1.5;color:${WP_PALE};font-family:${WP_FONT}">${
+    esc(subtitle)
+  }</div>
+  </td></tr>
+
+  <tr><td style="background:${WP_CARD};padding:24px 28px 26px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      ${wpKpi(fmtInt(totalDays), "dage i alt")}
+      ${wpKpi(fmtInt(locations.length), "lokationer")}
+      ${wpKpi(diffValue, diffLabel, diff !== null && diff > 0)}
+    </tr></table>
+  </td></tr>
+
+  ${daysHtml}
+
+  <tr><td style="background:${WP_CARD};padding:0 34px 34px">
+    ${wpSectionLabel("Lokationer \u00b7 Dag for dag")}
+    ${detailHtml}
+  </td></tr>
+
+  <tr><td style="background:${WP_FOOTER};padding:24px 34px;border-top:1px solid ${WP_LINE};font-size:12px;line-height:1.65;color:${WP_MUTED};font-family:${WP_FONT}">Planen viser dagsfordelingen samt antal dage og antal sælgere pr. lokation. Ændringer kan forekomme i løbet af ugen.</td></tr>
+
+  <tr><td style="background:${WP_FOOTER};border-radius:0 0 20px 20px;padding:22px 34px 26px;border-top:1px solid ${WP_LINE}">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font-size:11px;font-weight:700;letter-spacing:.2em;color:${WP_INK};text-transform:uppercase;font-family:${WP_FONT}">COPENHAGEN SALES</td>
+      <td align="right" style="font-size:11px;letter-spacing:.14em;color:${WP_MUTED};text-transform:uppercase;font-family:${WP_FONT}">Ugeplan</td>
+    </tr></table>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
 
   const textLines = [
     `Ugeplan - ${clientName}`,
