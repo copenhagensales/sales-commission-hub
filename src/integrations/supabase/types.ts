@@ -12591,6 +12591,457 @@ export type Database = {
         }
         Relationships: []
       }
+      quality_checklist_items: {
+        Row: {
+          checklist_id: string
+          created_at: string
+          guidance: string | null
+          id: string
+          is_active: boolean
+          item_type: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          checklist_id: string
+          created_at?: string
+          guidance?: string | null
+          id?: string
+          is_active?: boolean
+          item_type: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          checklist_id?: string
+          created_at?: string
+          guidance?: string | null
+          id?: string
+          is_active?: boolean
+          item_type?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "quality_checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_checklists: {
+        Row: {
+          client_campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          valid_from: string
+          version: number
+        }
+        Insert: {
+          client_campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          valid_from?: string
+          version?: number
+        }
+        Update: {
+          client_campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          valid_from?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_checklists_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_controllers: {
+        Row: {
+          created_at: string
+          daily_goal: number | null
+          employee_id: string
+          granted_by: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_goal?: number | null
+          employee_id: string
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_goal?: number | null
+          employee_id?: string
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_controllers_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_controllers_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_controllers_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_daily_completions: {
+        Row: {
+          completed_at: string
+          completion_date: string
+          id: string
+          reviewed_count: number
+          reviewer_employee_id: string | null
+        }
+        Insert: {
+          completed_at?: string
+          completion_date: string
+          id?: string
+          reviewed_count?: number
+          reviewer_employee_id?: string | null
+        }
+        Update: {
+          completed_at?: string
+          completion_date?: string
+          id?: string
+          reviewed_count?: number
+          reviewer_employee_id?: string | null
+        }
+        Relationships: []
+      }
+      quality_error_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          item_type: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_type: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_type?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quality_mail_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          mail_type: string
+          recipient_email: string
+          recipient_name: string | null
+          review_id: string | null
+          sale_id: string | null
+          status: string
+          subject: string | null
+          team_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          mail_type: string
+          recipient_email: string
+          recipient_name?: string | null
+          review_id?: string | null
+          sale_id?: string | null
+          status?: string
+          subject?: string | null
+          team_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          mail_type?: string
+          recipient_email?: string
+          recipient_name?: string | null
+          review_id?: string | null
+          sale_id?: string | null
+          status?: string
+          subject?: string | null
+          team_id?: string | null
+        }
+        Relationships: []
+      }
+      quality_review_error_codes: {
+        Row: {
+          created_at: string
+          error_code_id: string
+          review_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_code_id: string
+          review_id: string
+        }
+        Update: {
+          created_at?: string
+          error_code_id?: string
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_review_error_codes_error_code_id_fkey"
+            columns: ["error_code_id"]
+            isOneToOne: false
+            referencedRelation: "quality_error_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_review_error_codes_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "quality_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_review_items: {
+        Row: {
+          checklist_item_id: string
+          created_at: string
+          id: string
+          item_type: string
+          review_id: string
+          state: string
+        }
+        Insert: {
+          checklist_item_id: string
+          created_at?: string
+          id?: string
+          item_type: string
+          review_id: string
+          state: string
+        }
+        Update: {
+          checklist_item_id?: string
+          created_at?: string
+          id?: string
+          item_type?: string
+          review_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_review_items_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "quality_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_review_items_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "quality_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_reviews: {
+        Row: {
+          assistant_team_leader_id: string | null
+          checklist_id: string
+          checklist_version: number
+          client_campaign_id: string | null
+          comment: string | null
+          completed_at: string
+          created_at: string
+          employee_id: string | null
+          id: string
+          result: string
+          reviewer_employee_id: string
+          sale_date: string | null
+          sale_datetime: string | null
+          sale_id: string
+          search_key: string | null
+          seller_name: string | null
+          started_at: string | null
+          team_id: string | null
+          team_leader_id: string | null
+          team_name: string | null
+        }
+        Insert: {
+          assistant_team_leader_id?: string | null
+          checklist_id: string
+          checklist_version: number
+          client_campaign_id?: string | null
+          comment?: string | null
+          completed_at?: string
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          result: string
+          reviewer_employee_id: string
+          sale_date?: string | null
+          sale_datetime?: string | null
+          sale_id: string
+          search_key?: string | null
+          seller_name?: string | null
+          started_at?: string | null
+          team_id?: string | null
+          team_leader_id?: string | null
+          team_name?: string | null
+        }
+        Update: {
+          assistant_team_leader_id?: string | null
+          checklist_id?: string
+          checklist_version?: number
+          client_campaign_id?: string | null
+          comment?: string | null
+          completed_at?: string
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          result?: string
+          reviewer_employee_id?: string
+          sale_date?: string | null
+          sale_datetime?: string | null
+          sale_id?: string
+          search_key?: string | null
+          seller_name?: string | null
+          started_at?: string | null
+          team_id?: string | null
+          team_leader_id?: string | null
+          team_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_reviews_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "quality_checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_settings: {
+        Row: {
+          created_at: string
+          daily_goal: number
+          id: string
+          min_reviews_for_percentage: number
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_goal?: number
+          id?: string
+          min_reviews_for_percentage?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_goal?: number
+          id?: string
+          min_reviews_for_percentage?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quality_uncontrolled_sales: {
+        Row: {
+          client_campaign_id: string | null
+          employee_id: string | null
+          id: string
+          marked_at: string
+          sale_date: string
+          sale_id: string
+          team_id: string | null
+        }
+        Insert: {
+          client_campaign_id?: string | null
+          employee_id?: string | null
+          id?: string
+          marked_at?: string
+          sale_date: string
+          sale_id: string
+          team_id?: string | null
+        }
+        Update: {
+          client_campaign_id?: string | null
+          employee_id?: string | null
+          id?: string
+          marked_at?: string
+          sale_date?: string
+          sale_id?: string
+          team_id?: string | null
+        }
+        Relationships: []
+      }
       quiz_templates: {
         Row: {
           created_at: string
@@ -16935,6 +17386,28 @@ export type Database = {
         Returns: Json
       }
       get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
+      get_quality_overview: { Args: { p_date: string }; Returns: Json }
+      get_quality_queue: {
+        Args: { p_dates: string[] }
+        Returns: {
+          campaign_name: string
+          client_campaign_id: string
+          employee_id: string
+          is_cancelled: boolean
+          last_review_id: string
+          last_reviewed_at: string
+          sale_date: string
+          sale_datetime: string
+          sale_id: string
+          search_key: string
+          search_key_type: string
+          seller_name: string
+          status: string
+          team_id: string
+          team_name: string
+        }[]
+      }
+      get_quality_reviewer_stats: { Args: { p_date?: string }; Returns: Json }
       get_ramp_for_employee: { Args: { p_employee_id: string }; Returns: Json }
       get_ramp_risk_flags: { Args: never; Returns: Json }
       get_ramp_team_overview: { Args: never; Returns: Json }
@@ -17196,6 +17669,7 @@ export type Database = {
         Args: { p_employee_id: string }
         Returns: boolean
       }
+      is_quality_controller: { Args: { _user_id?: string }; Returns: boolean }
       is_rekruttering: { Args: { _user_id: string }; Returns: boolean }
       is_some: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id?: string }; Returns: boolean }
@@ -17253,6 +17727,33 @@ export type Database = {
         Returns: string
       }
       pay_period_start: { Args: { ts: string }; Returns: string }
+      quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }
+      quality_has_module_access: {
+        Args: { _user_id?: string }
+        Returns: boolean
+      }
+      quality_mark_uncontrolled: { Args: { p_date?: string }; Returns: number }
+      quality_my_leader_team_ids: {
+        Args: { _user_id?: string }
+        Returns: string[]
+      }
+      quality_sales_scope: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          campaign_name: string
+          client_campaign_id: string
+          employee_id: string
+          is_cancelled: boolean
+          sale_date: string
+          sale_datetime: string
+          sale_id: string
+          search_key: string
+          search_key_type: string
+          seller_name: string
+          team_id: string
+          team_name: string
+        }[]
+      }
       ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
