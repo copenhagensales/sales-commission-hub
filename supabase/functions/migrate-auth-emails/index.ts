@@ -6,7 +6,7 @@
 //
 // Rører IKKE ved employee_master_data, password, user id, identities, roller eller RLS.
 
-import { requireOwner, sharedCorsHeaders } from "../_shared/auth.ts";
+import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body, null, 2), {
