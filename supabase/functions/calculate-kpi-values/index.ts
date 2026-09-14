@@ -508,6 +508,8 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    await loadDisplayNameOverrides(supabase);
+
     // Parse chunk parameter for split execution
     let chunk: string | null = null;
     try {
