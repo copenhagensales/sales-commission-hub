@@ -315,6 +315,8 @@ export interface SaveQualityReviewInput {
   errorCodeIds: string[];
   comment: string;
   startedAt: string;
+  /** Send feedback-mail til teamleder, selvom kontrollen er godkendt. */
+  sendFeedbackMail?: boolean;
 }
 
 /**
