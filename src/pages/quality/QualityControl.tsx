@@ -167,7 +167,10 @@ export default function QualityControl() {
    * anmærkning. Godkendt med kommentar giver ingen fejlkode.
    */
   const requiredCodes = useMemo(
-    () => errorCodes.filter((c) => c.item_type === "obligatorisk" && c.is_active),
+    () =>
+      errorCodes.filter(
+        (c) => c.is_active && (c.item_type === "obligatorisk" || c.code === "ANDET"),
+      ),
     [errorCodes],
   );
 
