@@ -85,6 +85,7 @@ const isTvMode = () => {
 export default function CphSalesDashboard() {
   // Runtime access check - redirects if user doesn't have team-based permission
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cph-sales");
+  useDisplayNameOverrides();
   
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
