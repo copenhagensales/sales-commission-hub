@@ -144,7 +144,12 @@ export async function computeWeekPlan(
     for (let iso = start; iso <= end; iso = addDays(iso, 1)) {
       const d = new Date(`${iso}T00:00:00Z`);
       const index = (d.getUTCDay() === 0 ? 7 : d.getUTCDay()) - 1; // 0 = mandag
-      if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(index)) days++;
+      if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(index)) {
+        days++;
+        const set = locationsPerDay.get(index) ?? new Set<string>();
+        set.add(b.location_id);
+        locationsPerDay.set(index, set);
+      }
     }
     if (days === 0) continue;
 
