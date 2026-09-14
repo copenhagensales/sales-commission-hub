@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, Loader2, Settings2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Copy, Loader2, Settings2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   QUALITY_RESULT_LABEL,
@@ -258,6 +258,15 @@ export default function QualityControl() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mb-1 -ml-2 text-muted-foreground"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Tilbage til menu
+          </Button>
           <h1 className="text-2xl font-semibold">Kvalitetskontrol</h1>
           <p className="text-sm text-muted-foreground">
             {formatDanishDate(date)}
