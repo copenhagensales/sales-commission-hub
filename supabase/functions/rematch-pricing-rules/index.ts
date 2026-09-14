@@ -1006,6 +1006,7 @@ serve(async (req) => {
           baseProductFallback: baseProductFallbackCount,
           noMatch: noMatchCount,
           productsCorrected: productCorrectedCount,
+          manualLockSkipped: manualLockSkippedCount,
           updated: dryRun ? 0 : updates.length,
         },
         ruleStats: Object.fromEntries(ruleStats),
