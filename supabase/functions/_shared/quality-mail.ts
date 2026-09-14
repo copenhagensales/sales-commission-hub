@@ -137,6 +137,48 @@ export function renderRejectionMail(data: RejectionMailData): { subject: string;
   return { subject, html };
 }
 
+export interface FeedbackMailData {
+  sellerName: string;
+  teamName: string;
+  campaignName: string;
+  saleDateTime: string | null;
+  searchKey: string | null;
+  comment: string | null;
+  resultLabel: string;
+  saleLink: string;
+}
+
+/**
+ * Feedback uden anmærkning: salget er godkendt, men kontrollanten vil give
+ * teamlederen en kommentar. Ingen fejlkoder — kun feedback.
+ */
+export function renderFeedbackMail(data: FeedbackMailData): { subject: string; html: string } {
+  const subject = `Feedback fra kvalitetskontrol: ${data.sellerName}`;
+  const html = shell("Feedback på et godkendt salg", `
+    <table style="width:100%;border-collapse:collapse;margin-top:18px;">
+      ${labelValue("Sælger", data.sellerName)}
+      ${labelValue("Team", data.teamName)}
+      ${labelValue("Kampagne", data.campaignName)}
+      ${labelValue("Salgstidspunkt", formatDanishDateTime(data.saleDateTime))}
+      ${labelValue("Søgenøgle", data.searchKey ?? "Ikke oplyst")}
+      ${labelValue("Resultat", data.resultLabel)}
+    </table>
+    <div style="margin-top:20px;">
+      <div style="font-size:11px;letter-spacing:1.5px;color:${BRAND.muted};text-transform:uppercase;">Kommentar</div>
+      <div style="margin-top:8px;font-size:14px;line-height:1.6;">${
+        escapeHtml(data.comment) || "Ingen kommentar"
+      }</div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:${BRAND.muted};">
+      Salget er ikke afvist, og der er ikke givet en anmærkning. Dette er alene feedback.
+    </div>
+    <div style="margin-top:26px;">
+      <a href="${escapeHtml(data.saleLink)}" style="display:inline-block;background:${BRAND.ok};color:#0b1a13;text-decoration:none;padding:12px 20px;border-radius:10px;font-size:14px;">Se salget i Stork</a>
+    </div>
+  `);
+  return { subject, html };
+}
+
 export interface TeamSummarySeller {
   sellerName: string;
   sales: Array<{ result: string; campaignName: string; searchKey: string | null; errorCodes: string[] }>;

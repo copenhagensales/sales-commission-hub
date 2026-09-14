@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sharedCorsHeaders } from "../_shared/auth.ts";
 import {
   renderRejectionMail,
+  renderFeedbackMail,
   renderTeamSummaryMail,
   renderManagementMail,
   RESULT_LABEL,
@@ -201,6 +202,57 @@ async function handleRejectedReview(db: Client, reviewId: string) {
   for (const recipient of recipients) {
     await queueMail(db, {
       mailType: "quality_rejected",
+      recipient,
+      subject,
+      html,
+      reviewId: review.id,
+      saleId: review.sale_id,
+      teamId: review.team_id,
+    });
+  }
+
+  return { queued: recipients.length };
+}
+
+/**
+ * Feedback-mail på et godkendt salg. Sendes kun når kontrollen ikke er afvist,
+ * så en feedback aldrig kan forveksles med en anmærkning.
+ */
+async function handleFeedbackReview(db: Client, reviewId: string) {
+  const { data: review, error } = await db
+    .from("quality_reviews")
+    .select(
+      "id, sale_id, sale_datetime, seller_name, team_id, team_name, comment, search_key, result, client_campaign_id",
+    )
+    .eq("id", reviewId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!review) return { queued: 0, reason: "review_not_found" };
+  if (review.result === "afvist") return { queued: 0, reason: "rejected_use_rejected_review" };
+
+  const { data: campaign } = review.client_campaign_id
+    ? await db
+        .from("client_campaigns")
+        .select("name")
+        .eq("id", review.client_campaign_id)
+        .maybeSingle()
+    : { data: null };
+
+  const recipients = await leaderRecipients(db, review.team_id);
+  const { subject, html } = renderFeedbackMail({
+    sellerName: review.seller_name ?? "Ukendt sælger",
+    teamName: review.team_name ?? "Uden team",
+    campaignName: campaign?.name ?? "Ukendt kampagne",
+    saleDateTime: review.sale_datetime,
+    searchKey: review.search_key,
+    comment: review.comment,
+    resultLabel: RESULT_LABEL[review.result] ?? review.result,
+    saleLink: `${APP_URL}/kvalitetskontrol?sale=${review.sale_id}`,
+  });
+
+  for (const recipient of recipients) {
+    await queueMail(db, {
+      mailType: "quality_feedback",
       recipient,
       subject,
       html,
@@ -468,6 +520,14 @@ Deno.serve(async (req) => {
         return json(400, { error: "review_id mangler" });
       }
       const result = await handleRejectedReview(db, body.review_id);
+      return json(200, { action, ...result });
+    }
+
+    if (action === "feedback_review") {
+      if (typeof body.review_id !== "string") {
+        return json(400, { error: "review_id mangler" });
+      }
+      const result = await handleFeedbackReview(db, body.review_id);
       return json(200, { action, ...result });
     }
 

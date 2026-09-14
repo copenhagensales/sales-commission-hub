@@ -17,6 +17,22 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -24,6 +40,7 @@ import {
   CheckCircle2,
   Copy,
   Loader2,
+  MessageSquare,
   Settings2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +66,6 @@ import {
   formatDanishDate,
   formatDanishTime,
 } from "@/lib/qualityDates";
-import { QualityReviewSheet } from "@/components/quality/QualityReviewSheet";
 import { QualityScorePanel } from "@/components/quality/QualityScorePanel";
 
 type QualitySortKey =
@@ -89,8 +105,9 @@ export default function QualityControl() {
 
   const [date, setDate] = useState(defaultQualityDate());
   const [activeTeam, setActiveTeam] = useState<string>("all");
-  const [selectedSale, setSelectedSale] = useState<QualityQueueRow | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [commentRow, setCommentRow] = useState<QualityQueueRow | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [commentCodeId, setCommentCodeId] = useState("");
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [quickSavingId, setQuickSavingId] = useState<string | null>(null);
 
@@ -145,23 +162,87 @@ export default function QualityControl() {
   }, [filteredRows, sortKey, sortDir]);
 
 
-  const openSale = (sale: QualityQueueRow) => {
-    setSelectedSale(sale);
-    setSheetOpen(true);
+  /**
+   * Kommentar-dialogen: giver feedback til teamlederen med eller uden
+   * anmærkning. Godkendt med kommentar giver ingen fejlkode.
+   */
+  const requiredCodes = useMemo(
+    () => errorCodes.filter((c) => c.item_type === "obligatorisk" && c.is_active),
+    [errorCodes],
+  );
+
+  const openComment = (row: QualityQueueRow) => {
+    setCommentRow(row);
+    setCommentText("");
+    setCommentCodeId(
+      requiredCodes.find((c) => c.code === "OA_IKKE_GODKENDT")?.id ??
+        requiredCodes[0]?.id ??
+        "",
+    );
   };
 
-  const handleSaved = (savedSaleId: string) => {
-    const pool = filteredRows.filter(
-      (r) => r.status === "ikke_kontrolleret" && r.sale_id !== savedSaleId,
-    );
-    if (pool.length > 0) {
-      setSelectedSale(pool[0]);
-    } else {
-      setSheetOpen(false);
-      setSelectedSale(null);
+  const runCommentReview = async (approve: boolean) => {
+    const row = commentRow;
+    if (!row) return;
+
+    const resolved = resolveChecklist(row.client_campaign_id);
+    if (!resolved || resolved.items.length === 0) {
+      toast({ title: "Ingen tjekliste fundet for kampagnen", variant: "destructive" });
+      return;
     }
-    void queue.refetch();
+
+    const requiredItem =
+      resolved.items.find((i) => i.item_type === "obligatorisk" && i.label.startsWith("OA")) ??
+      resolved.items.find((i) => i.item_type === "obligatorisk");
+
+    if (!approve && !requiredItem) {
+      toast({ title: "Tjeklisten har ingen obligatoriske punkter", variant: "destructive" });
+      return;
+    }
+    if (!approve && !commentCodeId) {
+      toast({ title: "Vælg en fejlkode", variant: "destructive" });
+      return;
+    }
+
+    const items = resolved.items.map((item) => {
+      let state: QualityItemState = "ok";
+      if (!approve) {
+        state = item.id === requiredItem!.id ? "mangler" : "ikke_relevant";
+      }
+      return { checklist_item_id: item.id, item_type: item.item_type, state };
+    });
+
+    setQuickSavingId(row.sale_id);
+    try {
+      const saved = await saveReview.mutateAsync({
+        sale: row,
+        checklistId: resolved.checklist.id,
+        checklistVersion: resolved.checklist.version,
+        items,
+        errorCodeIds: approve ? [] : [commentCodeId],
+        comment: commentText,
+        startedAt: new Date().toISOString(),
+        sendFeedbackMail: approve,
+      });
+      toast({
+        title:
+          saved.result === "afvist"
+            ? "Afvist og teamlederen har fået kommentaren"
+            : "Godkendt og feedback sendt til teamlederen",
+      });
+      setCommentRow(null);
+      void queue.refetch();
+    } catch (error) {
+      toast({
+        title: "Kunne ikke gemme kontrollen",
+        description: error instanceof Error ? error.message : "Ukendt fejl",
+        variant: "destructive",
+      });
+    } finally {
+      setQuickSavingId(null);
+    }
   };
+
 
   /**
    * Fortryd: trækker kontrollen tilbage, så linjens markering fjernes og salget
@@ -492,14 +573,13 @@ export default function QualityControl() {
                         key={row.sale_id}
                         className={
                           row.status === "afvist"
-                            ? "cursor-pointer bg-destructive/10 hover:bg-destructive/15"
+                            ? "bg-destructive/10 hover:bg-destructive/15"
                             : row.status === "godkendt"
-                            ? "cursor-pointer bg-success/10 hover:bg-success/15"
+                            ? "bg-success/10 hover:bg-success/15"
                             : row.status === "godkendt_med_bemaerkning"
-                            ? "cursor-pointer bg-warning/10 hover:bg-warning/15"
-                            : "cursor-pointer"
+                            ? "bg-warning/10 hover:bg-warning/15"
+                            : ""
                         }
-                        onClick={() => openSale(row)}
                       >
                         <TableCell>
                           <div className="font-medium">{row.seller_name ?? "Ukendt"}</div>
@@ -606,6 +686,15 @@ export default function QualityControl() {
                                 >
                                   OA ikke godkendt
                                 </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => openComment(row)}
+                                >
+                                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                                  Kommentar
+                                </Button>
                                 {row.status !== "ikke_kontrolleret" && (
                                   <Button
                                     size="sm"
@@ -630,12 +719,76 @@ export default function QualityControl() {
         </TabsContent>
       </Tabs>
 
-      <QualityReviewSheet
-        sale={selectedSale}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        onSaved={handleSaved}
-      />
+      <Dialog open={!!commentRow} onOpenChange={(open) => !open && setCommentRow(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Kommentar til teamlederen</DialogTitle>
+            <DialogDescription>
+              {commentRow
+                ? `${commentRow.seller_name ?? "Ukendt sælger"} · ${
+                    commentRow.team_name ?? "Uden team"
+                  } · ${formatDanishTime(commentRow.sale_datetime)}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="kvalitet-kommentar">
+                Kommentar (max 500 tegn)
+              </label>
+              <Textarea
+                id="kvalitet-kommentar"
+                value={commentText}
+                maxLength={500}
+                rows={5}
+                placeholder="Skriv feedback til teamlederen …"
+                onChange={(e) => setCommentText(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Fejlkode ved "Send og ikke godkend"</p>
+              <Select value={commentCodeId} onValueChange={setCommentCodeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg fejlkode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {requiredCodes.map((code) => (
+                    <SelectItem key={code.id} value={code.id}>
+                      {code.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Bruges kun hvis salget ikke godkendes. Ved "Send men godkend" gives ingen
+                anmærkning.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              className="border-success/40 text-success hover:bg-success/10"
+              disabled={saveReview.isPending}
+              onClick={() => void runCommentReview(true)}
+            >
+              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send men godkend
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={saveReview.isPending}
+              onClick={() => void runCommentReview(false)}
+            >
+              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send og ikke godkend
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmFinish} onOpenChange={setConfirmFinish}>
         <AlertDialogContent>
