@@ -35,6 +35,7 @@ import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMen
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import { useCanViewRampTeam } from "@/hooks/useRampTeam";
+import { useQualityAccess } from "@/hooks/useQualityControl";
 import { ViewAsSelector } from "./ViewAsSelector";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
