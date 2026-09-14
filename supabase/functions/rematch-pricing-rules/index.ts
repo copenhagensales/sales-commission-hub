@@ -459,6 +459,7 @@ serve(async (req) => {
       mapped_revenue,
       needs_mapping,
       is_immediate_payment,
+      manual_pricing_lock,
       adversus_product_title,
       sales!inner (
         id,
@@ -701,10 +702,17 @@ serve(async (req) => {
     let noMatchCount = 0;
     let productCorrectedCount = 0;
     let baseProductFallbackCount = 0;
+    let manualLockSkippedCount = 0;
     const matchDetails: { saleItemId: string; productId: string; originalProductId: string; ruleName: string; commission: number; revenue: number }[] = [];
     const deleteIds: string[] = [];
 
     for (const item of saleItems) {
+      // Manually corrected lines are locked: never overwrite provision/revenue here.
+      if (item.manual_pricing_lock === true) {
+        manualLockSkippedCount++;
+        continue;
+      }
+
       // Extract raw_payload.data
       const sale = normalizeJoinedSale(item.sales);
       const rawPayload = (item.sales as any)?.raw_payload as Record<string, unknown> | null;
@@ -909,7 +917,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[rematch-pricing-rules] Matched: ${matchedCount}, Base fallback: ${baseProductFallbackCount}, No match: ${noMatchCount}, Products corrected: ${productCorrectedCount}`);
+    console.log(`[rematch-pricing-rules] Matched: ${matchedCount}, Base fallback: ${baseProductFallbackCount}, No match: ${noMatchCount}, Products corrected: ${productCorrectedCount}, Manual lock skipped: ${manualLockSkippedCount}`);
 
     // Log sample matches
     if (matchDetails.length > 0) {
@@ -998,6 +1006,7 @@ serve(async (req) => {
           baseProductFallback: baseProductFallbackCount,
           noMatch: noMatchCount,
           productsCorrected: productCorrectedCount,
+          manualLockSkipped: manualLockSkippedCount,
           updated: dryRun ? 0 : updates.length,
         },
         ruleStats: Object.fromEntries(ruleStats),

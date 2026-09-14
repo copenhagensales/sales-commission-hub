@@ -13816,6 +13816,7 @@ export type Database = {
           id: string
           is_cancelled: boolean
           is_immediate_payment: boolean | null
+          manual_pricing_lock: boolean
           mapped_commission: number | null
           mapped_revenue: number | null
           matched_pricing_rule_id: string | null
@@ -13835,6 +13836,7 @@ export type Database = {
           id?: string
           is_cancelled?: boolean
           is_immediate_payment?: boolean | null
+          manual_pricing_lock?: boolean
           mapped_commission?: number | null
           mapped_revenue?: number | null
           matched_pricing_rule_id?: string | null
@@ -13854,6 +13856,7 @@ export type Database = {
           id?: string
           is_cancelled?: boolean
           is_immediate_payment?: boolean | null
+          manual_pricing_lock?: boolean
           mapped_commission?: number | null
           mapped_revenue?: number | null
           matched_pricing_rule_id?: string | null
@@ -13986,6 +13989,78 @@ export type Database = {
             columns: ["client_campaign_id"]
             isOneToOne: false
             referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_manual_pricing_corrections: {
+        Row: {
+          condition_key: string | null
+          corrected_by: string | null
+          corrected_by_label: string | null
+          created_at: string
+          id: string
+          new_commission: number | null
+          new_condition_value: string | null
+          new_revenue: number | null
+          previous_commission: number | null
+          previous_condition_value: string | null
+          previous_revenue: number | null
+          product_id: string | null
+          product_name: string | null
+          reason: string
+          sale_id: string
+          sale_item_id: string | null
+        }
+        Insert: {
+          condition_key?: string | null
+          corrected_by?: string | null
+          corrected_by_label?: string | null
+          created_at?: string
+          id?: string
+          new_commission?: number | null
+          new_condition_value?: string | null
+          new_revenue?: number | null
+          previous_commission?: number | null
+          previous_condition_value?: string | null
+          previous_revenue?: number | null
+          product_id?: string | null
+          product_name?: string | null
+          reason: string
+          sale_id: string
+          sale_item_id?: string | null
+        }
+        Update: {
+          condition_key?: string | null
+          corrected_by?: string | null
+          corrected_by_label?: string | null
+          created_at?: string
+          id?: string
+          new_commission?: number | null
+          new_condition_value?: string | null
+          new_revenue?: number | null
+          previous_commission?: number | null
+          previous_condition_value?: string | null
+          previous_revenue?: number | null
+          product_id?: string | null
+          product_name?: string | null
+          reason?: string
+          sale_id?: string
+          sale_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_manual_pricing_corrections_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_manual_pricing_corrections_sale_item_id_fkey"
+            columns: ["sale_item_id"]
+            isOneToOne: false
+            referencedRelation: "sale_items"
             referencedColumns: ["id"]
           },
         ]
