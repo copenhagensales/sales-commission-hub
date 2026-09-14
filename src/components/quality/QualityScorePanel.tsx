@@ -42,6 +42,9 @@ function Trend({ current, previous }: { current: number | null; previous: number
 }
 
 export function QualityScorePanel({ overview, teamId, minReviewsForPercentage }: Props) {
+  const [codesOpen, setCodesOpen] = useState(false);
+  const [sellersOpen, setSellersOpen] = useState(false);
+
   if (!overview) return null;
 
   const source = teamId
