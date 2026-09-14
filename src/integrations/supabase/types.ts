@@ -17392,10 +17392,12 @@ export type Database = {
         Returns: {
           campaign_name: string
           client_campaign_id: string
+          dialer_campaign_label: string
           employee_id: string
           is_cancelled: boolean
           last_review_id: string
           last_reviewed_at: string
+          product_label: string
           sale_date: string
           sale_datetime: string
           sale_id: string
@@ -17742,8 +17744,10 @@ export type Database = {
         Returns: {
           campaign_name: string
           client_campaign_id: string
+          dialer_campaign_label: string
           employee_id: string
           is_cancelled: boolean
+          product_label: string
           sale_date: string
           sale_datetime: string
           sale_id: string
