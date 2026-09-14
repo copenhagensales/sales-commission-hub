@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getStartOfWeek, getPayrollPeriod } from "../_shared/date-helpers.ts";
+import { fetchDisplayNameOverrides, formatDisplayNameWithOverrides } from "../_shared/format-helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
