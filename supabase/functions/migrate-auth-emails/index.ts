@@ -27,25 +27,37 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: sharedCorsHeaders });
   }
 
-  const auth = await requireOwner(req);
+  const auth = await requireCronOrOwner(req);
   if (auth instanceof Response) return auth;
   const { svc } = auth;
 
   let mode = "dry-run";
+  // Valgfri afgrænsning: kør kun for bestemte arbejdsmails.
+  // Uden feltet er adfærden præcis som før (alle aktive medarbejdere).
+  let onlyEmails: string[] | null = null;
   try {
     const body = await req.json();
     if (body?.mode === "execute") mode = "execute";
+    if (Array.isArray(body?.only_emails) && body.only_emails.length > 0) {
+      onlyEmails = body.only_emails
+        .filter((e: unknown): e is string => typeof e === "string")
+        .map((e: string) => e.trim().toLowerCase());
+    }
   } catch {
     // ingen body -> dry-run
   }
 
   // Hent alle aktive medarbejdere med work_email + auth_user_id
-  const { data: employees, error: empErr } = await svc
+  let empQuery = svc
     .from("employee_master_data")
     .select("id, first_name, last_name, work_email, auth_user_id")
     .eq("is_active", true)
     .not("work_email", "is", null)
     .not("auth_user_id", "is", null);
+
+  if (onlyEmails) empQuery = empQuery.in("work_email", onlyEmails);
+
+  const { data: employees, error: empErr } = await empQuery;
 
   if (empErr) return json(500, { error: empErr.message });
 
