@@ -38,6 +38,9 @@ export interface QualityQueueRow {
   last_reviewed_at: string | null;
   dialer_campaign_label: string | null;
   product_label: string | null;
+  /** Årsager til seneste kontrol: valgte fejlkoder og manglende tjeklistepunkter. */
+  reason_labels: string[] | null;
+  review_comment: string | null;
 }
 
 export interface QualityChecklistItem {
