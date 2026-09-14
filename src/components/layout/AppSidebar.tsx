@@ -61,6 +61,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isSuperadmin } = useIsSuperadmin();
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
   const { data: canViewRampTeam } = useCanViewRampTeam();
+  // Kvalitetskontrol er skjult for saelgere; adgangen kommer fra databasen
+  const { hasAccess: hasQualityAccess } = useQualityAccess();
   const { count: complianceReviewCount } = useComplianceReviewStatus();
   const { data: pendingDispatchCount = 0 } = usePendingSupplierDispatchCount(
     p.canViewFmBilling,
