@@ -740,28 +740,36 @@ export function buildClientWeekPlanEmail(params: {
       );
   }
 
-  const detailHtml =
-    locations.length === 0
-      ? bodyText(
-          "Der er ingen bekræftede bookinger i ugen, så planen indeholder ingen lokationer.",
-        )
-      : groupKeys
-          .map((key, i) => {
-            const items: ListItem[] = groups.get(key)!.map((l) => ({
-              name: l.locationName,
-              variant: `${fmtInt(l.sellers)} ${l.sellers === 1 ? "sælger" : "sælgere"}`,
-              value: `${fmtInt(l.days)}`,
-            }));
-            return `${groupHeading(key, i === 0)}${listTable(items, 80)}`;
-          })
-          .join("");
-
   // Dagsopdeling: så modtageren kan se om fx fredag er mindre end mandag.
   const dayFmt = new Intl.DateTimeFormat("da-DK", {
     day: "numeric",
     month: "numeric",
     timeZone: "UTC",
   });
+
+  const gridDates = days.length === 7
+    ? days.map((d) => d.date)
+    : Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(`${weekStart}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+
+  const detailHtml = locations.length === 0
+    ? bodyText(
+      "Der er ingen bookinger i ugen, så planen indeholder ingen lokationer.",
+    )
+    : `${
+      groupKeys
+        .map((key, i) =>
+          `${groupHeading(key, i === 0)}${weekGrid(gridDates, groups.get(key)!, dayFmt)}`
+        )
+        .join("")
+    }<div style="padding-top:16px;">${
+      bodyText(
+        "Tallet i en dagskasse er antal sælgere på lokationen den dag. En streg betyder ingen bemanding.",
+      )
+    }</div>`;
   const daySection = days.length === 0
     ? null
     : {
