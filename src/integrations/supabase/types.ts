@@ -17519,6 +17519,8 @@ export type Database = {
           last_review_id: string
           last_reviewed_at: string
           product_label: string
+          reason_labels: string[]
+          review_comment: string
           sale_date: string
           sale_datetime: string
           sale_id: string
