@@ -523,14 +523,12 @@ Deno.serve(async (req) => {
       console.error("Error fetching cached leaderboard:", leaderboardError);
     }
 
-    // Helper function to format display name as "Firstname L."
-    const formatDisplayName = (fullName: string): string => {
-      const parts = fullName.trim().split(" ");
-      if (parts.length >= 2) {
-        return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-      }
-      return fullName;
-    };
+    // Kort visningsnavn: manuelt override hvis medarbejderen har et, ellers "Fornavn E."
+    const displayNameOverrides = await fetchDisplayNameOverrides(
+      supabase as unknown as { rpc: (fn: string) => Promise<{ data: unknown; error: unknown }> }
+    );
+    const formatDisplayName = (fullName: string): string =>
+      formatDisplayNameWithOverrides(fullName, displayNameOverrides);
 
     // Build top 20 sellers from cached leaderboard
     const topSellers = cachedLeaderboard?.leaderboard_data
