@@ -471,6 +471,14 @@ Deno.serve(async (req) => {
       return json(200, { action, ...result });
     }
 
+    if (action === "feedback_review") {
+      if (typeof body.review_id !== "string") {
+        return json(400, { error: "review_id mangler" });
+      }
+      const result = await handleFeedbackReview(db, body.review_id);
+      return json(200, { action, ...result });
+    }
+
     if (action === "daily_summary") {
       const date =
         typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
