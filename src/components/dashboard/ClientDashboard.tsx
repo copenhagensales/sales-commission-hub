@@ -65,6 +65,7 @@ export interface ClientDashboardConfig {
 
 export default function ClientDashboard({ config }: { config: ClientDashboardConfig }) {
   const { canView, isLoading: accessLoading } = useRequireDashboardAccess(config.slug);
+  useDisplayNameOverrides();
 
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
