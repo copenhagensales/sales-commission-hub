@@ -357,6 +357,10 @@ export function useSaveQualityReview() {
         await supabase.functions.invoke("quality-mails", {
           body: { action: "rejected_review", review_id: saved.review_id },
         });
+      } else if (input.sendFeedbackMail) {
+        await supabase.functions.invoke("quality-mails", {
+          body: { action: "feedback_review", review_id: saved.review_id },
+        });
       }
 
       return { reviewId: saved.review_id, result: saved.result };
