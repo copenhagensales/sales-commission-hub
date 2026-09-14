@@ -109,6 +109,46 @@ export function formatDisplayName(fullName: string): string {
 }
 
 /**
+ * Henter de manuelle korte visningsnavne (employee_master_data.display_name_short).
+ * Returnerer et map: normaliseret fuldt navn -> kort visningsnavn.
+ */
+export async function fetchDisplayNameOverrides(
+  supabase: { rpc: (fn: string) => Promise<{ data: unknown; error: unknown }> }
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const { data, error } = await supabase.rpc("get_display_name_overrides");
+    if (error) {
+      console.error("[format-helpers] Kunne ikke hente display name overrides:", error);
+      return map;
+    }
+    const rows = (data ?? []) as { full_name: string | null; display_name_short: string | null }[];
+    for (const row of rows) {
+      const key = row.full_name?.trim().replace(/\s+/g, " ").toLowerCase();
+      const value = row.display_name_short?.trim();
+      if (key && value) map.set(key, value);
+    }
+  } catch (e) {
+    console.error("[format-helpers] Fejl ved hentning af display name overrides:", e);
+  }
+  return map;
+}
+
+/**
+ * Som formatDisplayName, men bruger et manuelt kort visningsnavn hvis medarbejderen har et.
+ */
+export function formatDisplayNameWithOverrides(
+  fullName: string,
+  overrides?: Map<string, string> | null
+): string {
+  if (!fullName) return "";
+  const key = fullName.trim().replace(/\s+/g, " ").toLowerCase();
+  const override = overrides?.get(key);
+  if (override) return override;
+  return formatDisplayName(fullName);
+}
+
+/**
  * Formats a Danish phone number.
  * 
  * @param phone - Phone number string
