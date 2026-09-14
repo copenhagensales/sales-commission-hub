@@ -165,7 +165,7 @@ export async function computeWeekPlan(
     byLocation.set(key, entry);
   }
 
-  return [...byLocation.values()]
+  const locationsOut = [...byLocation.values()]
     .map((v) => ({
       locationName: v.name,
       locationType: v.type,
@@ -177,6 +177,14 @@ export async function computeWeekPlan(
         a.locationType.localeCompare(b.locationType, "da") ||
         a.locationName.localeCompare(b.locationName, "da"),
     );
+
+  const daysOut: WeekPlanDay[] = emptyDays.map((d) => ({
+    ...d,
+    locations: locationsPerDay.get(d.index)?.size ?? 0,
+    sellers: employeesByDate.get(d.date)?.size ?? 0,
+  }));
+
+  return { locations: locationsOut, days: daysOut };
 }
 
 async function internalAlertRecipient(
