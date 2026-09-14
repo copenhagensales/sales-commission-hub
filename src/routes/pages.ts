@@ -106,6 +106,8 @@ export const Messages = lazyPage(() => import("@/pages/Messages"));
 // Onboarding
 export const OnboardingDashboard = lazyPage(() => import("@/pages/onboarding/OnboardingDashboard"));
 export const RampTeam = lazyPage(() => import("@/pages/onboarding/RampTeam"));
+export const QualityControl = lazyPage(() => import("@/pages/quality/QualityControl"));
+export const QualityAdmin = lazyPage(() => import("@/pages/quality/QualityAdmin"));
 export const OnboardingAdmin = lazyPage(() => import("@/pages/onboarding/OnboardingAdmin"));
 export const OnboardingCourse = lazyPage(() => import("@/pages/onboarding/OnboardingCourse"));
 export const MyFeedback = lazyPage(() => import("@/pages/onboarding/MyFeedback"));

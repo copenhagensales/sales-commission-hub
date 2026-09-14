@@ -86,6 +86,8 @@ import {
   OnboardingAdmin,
   OnboardingDashboard,
   RampTeam,
+  QualityControl,
+  QualityAdmin,
   OnboardingCourse,
   MyFeedback,
   ExcelFieldMatcher,
@@ -415,6 +417,10 @@ export const routes: RouteConfig[] = [
   { path: "/coaching-templates", component: CoachingTemplates, access: "role", positionPermission: "menu_onboarding_admin" },
   // Fareflag: adgangen haandhaeves i databasen og i selve siden (kun ledere)
   { path: "/opstartshold", component: RampTeam, access: "protected" },
+
+  // Kvalitetskontrol: adgangen haandhaeves i databasen (RLS + RPC) og i siden
+  { path: "/kvalitetskontrol", component: QualityControl, access: "protected" },
+  { path: "/kvalitetskontrol/administration", component: QualityAdmin, access: "protected" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 

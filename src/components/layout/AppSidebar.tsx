@@ -35,6 +35,7 @@ import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMen
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import { useCanViewRampTeam } from "@/hooks/useRampTeam";
+import { useQualityAccess } from "@/hooks/useQualityControl";
 import { ViewAsSelector } from "./ViewAsSelector";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
@@ -60,6 +61,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isSuperadmin } = useIsSuperadmin();
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
   const { data: canViewRampTeam } = useCanViewRampTeam();
+  // Kvalitetskontrol er skjult for saelgere; adgangen kommer fra databasen
+  const { hasAccess: hasQualityAccess } = useQualityAccess();
   const { count: complianceReviewCount } = useComplianceReviewStatus();
   const { data: pendingDispatchCount = 0 } = usePendingSupplierDispatchCount(
     p.canViewFmBilling,
@@ -1407,6 +1410,18 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               </CollapsibleContent>
             </Collapsible>
           )}
+
+          {/* Kvalitetskontrol - kvalitetskontrollant, teamledere og superadmin */}
+          {hasQualityAccess && (
+            <NavLink to="/kvalitetskontrol" onClick={handleNavClick} className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/kvalitetskontrol") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <ClipboardCheck className="h-5 w-5" />
+              Kvalitetskontrol
+            </NavLink>
+          )}
+
 
           {/* Onboarding menu - Only admin access for now (system not ready for employees) */}
           {showOnboardingMenu && (
