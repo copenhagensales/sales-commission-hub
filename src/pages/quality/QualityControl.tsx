@@ -445,6 +445,40 @@ export default function QualityControl() {
                             {QUALITY_RESULT_LABEL[row.status]}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {quickSavingId === row.sale_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-success/40 px-2 text-xs text-success hover:bg-success/10"
+                                  onClick={() => void runQuickReview(row, "godkendt")}
+                                >
+                                  Godkendt
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                  onClick={() => void runQuickReview(row, "oa_mangler")}
+                                >
+                                  OA mangler
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                  onClick={() => void runQuickReview(row, "oa_ikke_godkendt")}
+                                >
+                                  OA ikke godkendt
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
