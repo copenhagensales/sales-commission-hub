@@ -12908,6 +12908,41 @@ export type Database = {
           },
         ]
       }
+      quality_review_voids: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string | null
+          review_id: string
+          sale_id: string
+          voided_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          review_id: string
+          sale_id: string
+          voided_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          review_id?: string
+          sale_id?: string
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_review_voids_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "quality_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quality_reviews: {
         Row: {
           assistant_team_leader_id: string | null
@@ -17920,6 +17955,10 @@ export type Database = {
       view_as_candidates: { Args: never; Returns: Json }
       view_as_status: { Args: never; Returns: Json }
       view_as_target: { Args: never; Returns: string }
+      void_quality_review: {
+        Args: { p_reason?: string; p_sale_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
