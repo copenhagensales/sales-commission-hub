@@ -659,17 +659,45 @@ export default function QualityControl() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              row.status === "afvist"
-                                ? "destructive"
-                                : row.status === "ikke_kontrolleret"
-                                ? "outline"
-                                : "secondary"
-                            }
-                          >
-                            {QUALITY_RESULT_LABEL[row.status]}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge
+                              variant={
+                                row.status === "afvist"
+                                  ? "destructive"
+                                  : row.status === "ikke_kontrolleret"
+                                  ? "outline"
+                                  : "secondary"
+                              }
+                            >
+                              {QUALITY_RESULT_LABEL[row.status]}
+                            </Badge>
+                            {row.status !== "ikke_kontrolleret" &&
+                              (row.reason_labels?.length ?? 0) > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {row.reason_labels!.map((label) => (
+                                    <Badge
+                                      key={label}
+                                      variant="outline"
+                                      className={
+                                        row.status === "afvist"
+                                          ? "border-destructive/40 text-destructive text-[11px] font-normal"
+                                          : "border-warning/40 text-warning text-[11px] font-normal"
+                                      }
+                                    >
+                                      {label}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            {row.review_comment && (
+                              <p
+                                className="max-w-[220px] truncate text-[11px] text-muted-foreground"
+                                title={row.review_comment}
+                              >
+                                {row.review_comment}
+                              </p>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
