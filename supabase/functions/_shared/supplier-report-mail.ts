@@ -681,6 +681,37 @@ export function buildClientWeekPlanEmail(params: {
           })
           .join("");
 
+  // Dagsopdeling: så modtageren kan se om fx fredag er mindre end mandag.
+  const dayFmt = new Intl.DateTimeFormat("da-DK", {
+    day: "numeric",
+    month: "numeric",
+    timeZone: "UTC",
+  });
+  const daySection = days.length === 0
+    ? null
+    : {
+      label: "Dage i ugen \u00b7 lokationer pr. dag",
+      html: `${
+        barChart(
+          days.map((d) => ({
+            label: DAY_NAMES[d.index] ?? "",
+            sublabel: dayFmt.format(new Date(`${d.date}T00:00:00Z`)),
+            value: d.locations,
+            weekend: d.index >= 5,
+            latest: false,
+          })),
+        )
+      }<div style="padding-top:14px;">${
+        bodyText(
+          `Tallet er antal lokationer, der er bemandet den dag. Sælgere pr. dag: ${
+            days
+              .map((d) => `${DAY_NAMES[d.index]} ${fmtInt(d.sellers)}`)
+              .join(", ")
+          }.`,
+        )
+      }</div>`,
+    };
+
   const html = renderMail({
     title: subject,
     preheader: `Uge ${isoWeek}: ${fmtInt(totalDays)} dage på ${fmtInt(locations.length)} lokationer for ${clientName}.`,
