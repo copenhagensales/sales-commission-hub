@@ -727,13 +727,14 @@ export function buildClientWeekPlanEmail(params: {
       unit: "count",
     }),
     sections: [
+      ...(daySection ? [daySection] : []),
       {
         label: `Lokationer \u00b7 dage og antal sælgere`,
         html: detailHtml,
       },
     ],
     disclaimer:
-      "Planen viser antal dage og antal sælgere pr. lokation. Ændringer kan forekomme i løbet af ugen.",
+      "Planen viser dagsfordelingen samt antal dage og antal sælgere pr. lokation. Ændringer kan forekomme i løbet af ugen.",
     description: "Ugeplan",
   });
 
