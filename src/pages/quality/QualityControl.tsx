@@ -43,6 +43,36 @@ import {
 import { QualityReviewSheet } from "@/components/quality/QualityReviewSheet";
 import { QualityScorePanel } from "@/components/quality/QualityScorePanel";
 
+type QualitySortKey =
+  | "saelger"
+  | "team"
+  | "kampagne"
+  | "tidspunkt"
+  | "soegenoegle"
+  | "status";
+
+/** Sammenligningsværdi pr. kolonne. Kun til visning — ingen data ændres. */
+function sortValue(row: QualityQueueRow, key: QualitySortKey): string {
+  switch (key) {
+    case "saelger":
+      return row.seller_name ?? "";
+    case "team":
+      return row.team_name ?? "";
+    case "kampagne":
+      return (
+        row.dialer_campaign_label ?? row.product_label ?? row.campaign_name ?? ""
+      );
+    case "tidspunkt":
+      return row.sale_datetime ?? "";
+    case "soegenoegle":
+      return row.search_key ?? "";
+    case "status":
+      return QUALITY_RESULT_LABEL[row.status] ?? row.status ?? "";
+  }
+}
+
+
+
 export default function QualityControl() {
   const navigate = useNavigate();
   const { toast } = useToast();
