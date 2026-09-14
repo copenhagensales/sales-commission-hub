@@ -30,6 +30,7 @@ import {
   useQualityReviewerStats,
   useQualitySettings,
   useSaveQualityReview,
+  useVoidQualityReview,
   type QualityItemState,
   type QualityQueueRow,
 } from "@/hooks/useQualityControl";
@@ -62,6 +63,7 @@ export default function QualityControl() {
   const { data: completion } = useQualityDailyCompletion(date);
   const finishDay = useFinishQualityDay();
   const saveReview = useSaveQualityReview();
+  const voidReview = useVoidQualityReview();
   const { resolve: resolveChecklist } = useQualityChecklistResolver();
   const { data: errorCodes = [] } = useQualityErrorCodes();
 
@@ -96,6 +98,27 @@ export default function QualityControl() {
       setSelectedSale(null);
     }
     void queue.refetch();
+  };
+
+  /**
+   * Fortryd: trækker kontrollen tilbage, så linjens markering fjernes og salget
+   * igen kan kontrolleres. Kontrollen slettes ikke — historikken bevares.
+   */
+  const runUndoReview = async (row: QualityQueueRow) => {
+    setQuickSavingId(row.sale_id);
+    try {
+      await voidReview.mutateAsync(row.sale_id);
+      toast({ title: "Kontrollen er fortrudt" });
+      void queue.refetch();
+    } catch (error) {
+      toast({
+        title: "Kunne ikke fortryde kontrollen",
+        description: error instanceof Error ? error.message : "Ukendt fejl",
+        variant: "destructive",
+      });
+    } finally {
+      setQuickSavingId(null);
+    }
   };
 
   /**
