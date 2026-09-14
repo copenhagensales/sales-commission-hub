@@ -6907,6 +6907,7 @@ export type Database = {
           daily_bonus_client_id: string | null
           default_landing_page: string | null
           department: string | null
+          display_name_short: string | null
           employment_end_date: string | null
           employment_start_date: string | null
           expected_monthly_shifts: number | null
@@ -6972,6 +6973,7 @@ export type Database = {
           daily_bonus_client_id?: string | null
           default_landing_page?: string | null
           department?: string | null
+          display_name_short?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
           expected_monthly_shifts?: number | null
@@ -7037,6 +7039,7 @@ export type Database = {
           daily_bonus_client_id?: string | null
           default_landing_page?: string | null
           department?: string | null
+          display_name_short?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
           expected_monthly_shifts?: number | null
@@ -17380,6 +17383,13 @@ export type Database = {
       get_dialer_credentials: {
         Args: { p_encryption_key: string; p_integration_id: string }
         Returns: Json
+      }
+      get_display_name_overrides: {
+        Args: never
+        Returns: {
+          display_name_short: string
+          full_name: string
+        }[]
       }
       get_distinct_agent_emails_for_client: {
         Args: { p_client_id: string }
