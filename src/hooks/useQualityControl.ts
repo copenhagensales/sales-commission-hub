@@ -21,6 +21,8 @@ export type QualityStatus = QualityResult | "ikke_kontrolleret";
 export interface QualityQueueRow {
   sale_id: string;
   sale_datetime: string | null;
+  /** Samtalens starttidspunkt fra ringesystemet, hvis det kan kobles til salget. */
+  call_start_at: string | null;
   sale_date: string;
   client_campaign_id: string | null;
   campaign_name: string | null;

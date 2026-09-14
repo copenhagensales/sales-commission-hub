@@ -88,7 +88,7 @@ function sortValue(row: QualityQueueRow, key: QualitySortKey): string {
         row.dialer_campaign_label ?? row.product_label ?? row.campaign_name ?? ""
       );
     case "tidspunkt":
-      return row.sale_datetime ?? "";
+      return row.call_start_at ?? row.sale_datetime ?? "";
     case "soegenoegle":
       return row.search_key ?? "";
     case "status":
@@ -616,7 +616,19 @@ export default function QualityControl() {
                             );
                           })()}
                         </TableCell>
-                        <TableCell>{formatDanishTime(row.sale_datetime)}</TableCell>
+                        <TableCell>
+                          {row.call_start_at ? (
+                            <div className="min-w-0">
+                              <p>{formatDanishTime(row.call_start_at)}</p>
+                              <p className="text-xs text-muted-foreground">Samtalestart</p>
+                            </div>
+                          ) : (
+                            <div className="min-w-0">
+                              <p>{formatDanishTime(row.sale_datetime)}</p>
+                              <p className="text-xs text-muted-foreground">Salg lukket</p>
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="min-w-0">
