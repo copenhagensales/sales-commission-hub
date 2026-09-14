@@ -5,6 +5,8 @@
  * Uses Danish locale (da-DK) as the default.
  */
 
+import { getDisplayNameOverride } from '@/lib/displayNameOverrides';
+
 const DEFAULT_LOCALE = 'da-DK';
 
 /**
