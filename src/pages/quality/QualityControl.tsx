@@ -82,6 +82,30 @@ export default function QualityControl() {
     [rows, activeTeam],
   );
 
+  /**
+   * Sortering er rent visuel. Den ændrer ingen data og påvirker hverken
+   * kontroller, løn eller provision.
+   */
+  const [sortKey, setSortKey] = useState<QualitySortKey>("tidspunkt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = (key: QualitySortKey) => {
+    if (key === sortKey) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedRows = useMemo(() => {
+    const factor = sortDir === "asc" ? 1 : -1;
+    return [...filteredRows].sort(
+      (a, b) => factor * sortValue(a, sortKey).localeCompare(sortValue(b, sortKey), "da", { numeric: true }),
+    );
+  }, [filteredRows, sortKey, sortDir]);
+
+
   const openSale = (sale: QualityQueueRow) => {
     setSelectedSale(sale);
     setSheetOpen(true);
