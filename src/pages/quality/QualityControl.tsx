@@ -161,23 +161,87 @@ export default function QualityControl() {
   }, [filteredRows, sortKey, sortDir]);
 
 
-  const openSale = (sale: QualityQueueRow) => {
-    setSelectedSale(sale);
-    setSheetOpen(true);
+  /**
+   * Kommentar-dialogen: giver feedback til teamlederen med eller uden
+   * anmærkning. Godkendt med kommentar giver ingen fejlkode.
+   */
+  const requiredCodes = useMemo(
+    () => errorCodes.filter((c) => c.item_type === "obligatorisk" && c.is_active),
+    [errorCodes],
+  );
+
+  const openComment = (row: QualityQueueRow) => {
+    setCommentRow(row);
+    setCommentText("");
+    setCommentCodeId(
+      requiredCodes.find((c) => c.code === "OA_IKKE_GODKENDT")?.id ??
+        requiredCodes[0]?.id ??
+        "",
+    );
   };
 
-  const handleSaved = (savedSaleId: string) => {
-    const pool = filteredRows.filter(
-      (r) => r.status === "ikke_kontrolleret" && r.sale_id !== savedSaleId,
-    );
-    if (pool.length > 0) {
-      setSelectedSale(pool[0]);
-    } else {
-      setSheetOpen(false);
-      setSelectedSale(null);
+  const runCommentReview = async (approve: boolean) => {
+    const row = commentRow;
+    if (!row) return;
+
+    const resolved = resolveChecklist(row.client_campaign_id);
+    if (!resolved || resolved.items.length === 0) {
+      toast({ title: "Ingen tjekliste fundet for kampagnen", variant: "destructive" });
+      return;
     }
-    void queue.refetch();
+
+    const requiredItem =
+      resolved.items.find((i) => i.item_type === "obligatorisk" && i.label.startsWith("OA")) ??
+      resolved.items.find((i) => i.item_type === "obligatorisk");
+
+    if (!approve && !requiredItem) {
+      toast({ title: "Tjeklisten har ingen obligatoriske punkter", variant: "destructive" });
+      return;
+    }
+    if (!approve && !commentCodeId) {
+      toast({ title: "Vælg en fejlkode", variant: "destructive" });
+      return;
+    }
+
+    const items = resolved.items.map((item) => {
+      let state: QualityItemState = "ok";
+      if (!approve) {
+        state = item.id === requiredItem!.id ? "mangler" : "ikke_relevant";
+      }
+      return { checklist_item_id: item.id, item_type: item.item_type, state };
+    });
+
+    setQuickSavingId(row.sale_id);
+    try {
+      const saved = await saveReview.mutateAsync({
+        sale: row,
+        checklistId: resolved.checklist.id,
+        checklistVersion: resolved.checklist.version,
+        items,
+        errorCodeIds: approve ? [] : [commentCodeId],
+        comment: commentText,
+        startedAt: new Date().toISOString(),
+        sendFeedbackMail: approve,
+      });
+      toast({
+        title:
+          saved.result === "afvist"
+            ? "Afvist og teamlederen har fået kommentaren"
+            : "Godkendt og feedback sendt til teamlederen",
+      });
+      setCommentRow(null);
+      void queue.refetch();
+    } catch (error) {
+      toast({
+        title: "Kunne ikke gemme kontrollen",
+        description: error instanceof Error ? error.message : "Ukendt fejl",
+        variant: "destructive",
+      });
+    } finally {
+      setQuickSavingId(null);
+    }
   };
+
 
   /**
    * Fortryd: trækker kontrollen tilbage, så linjens markering fjernes og salget
