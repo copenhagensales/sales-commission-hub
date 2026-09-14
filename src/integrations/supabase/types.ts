@@ -17500,6 +17500,7 @@ export type Database = {
       get_quality_queue: {
         Args: { p_dates: string[] }
         Returns: {
+          call_start_at: string
           campaign_name: string
           client_campaign_id: string
           dialer_campaign_label: string
@@ -17852,6 +17853,7 @@ export type Database = {
       quality_sales_scope: {
         Args: { p_from: string; p_to: string }
         Returns: {
+          call_start_at: string
           campaign_name: string
           client_campaign_id: string
           dialer_campaign_label: string
