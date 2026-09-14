@@ -27,9 +27,9 @@ export function weekdayOf(isoDate: string): number {
   return new Date(`${isoDate}T12:00:00Z`).getUTCDay();
 }
 
-/** Standarddatoen for kontrolkøen: i går. */
+/** Standarddatoen for kontrolkøen: i dag (dansk tid). */
 export function defaultQualityDate(): string {
-  return addDays(todayInCopenhagen(), -1);
+  return todayInCopenhagen();
 }
 
 /**
