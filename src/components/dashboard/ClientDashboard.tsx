@@ -14,6 +14,7 @@ import { CphBoardFrame, CphLeaderboard, type CphKpi } from "@/components/dashboa
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
 import { calculatePayrollPeriod } from "@/lib/calculations";
 import { getDisplayName } from "@/utils/formatting";
+import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { useLiveDashboardAggregates } from "@/hooks/useLiveDashboardAggregates";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
