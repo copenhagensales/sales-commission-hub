@@ -272,7 +272,12 @@ export async function runWeekPlans(
       continue;
     }
 
-    const locations = await computeWeekPlan(svc, sub.client_id, weekStart, weekEnd);
+    const { locations, days: weekDays } = await computeWeekPlan(
+      svc,
+      sub.client_id,
+      weekStart,
+      weekEnd,
+    );
     const totalDays = locations.reduce((s, l) => s + l.days, 0);
 
     if (opts.dryRun) {
