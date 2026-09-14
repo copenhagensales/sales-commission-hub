@@ -454,7 +454,7 @@ export default function QualityControl() {
       {(isController || isSuperadmin) && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Mine kontroller</CardTitle>
+            <CardTitle className="text-base">Kontroller i alt</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-4">
             <div>
