@@ -97,23 +97,39 @@ export async function computeWeekPlan(
     .gte("end_date", weekStart);
   if (error) throw new Error(error.message);
 
+  const emptyDays: WeekPlanDay[] = Array.from({ length: 7 }, (_, i) => ({
+    index: i,
+    date: addDays(weekStart, i),
+    locations: 0,
+    sellers: 0,
+  }));
+
   const rows = (bookings ?? []) as unknown as BookingRow[];
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { locations: [], days: emptyDays };
 
   const { data: assignments, error: aError } = await svc
     .from("booking_assignment")
-    .select("booking_id, employee_id")
+    .select("booking_id, employee_id, date")
     .in("booking_id", rows.map((b) => b.id))
     .gte("date", weekStart)
     .lte("date", weekEnd);
   if (aError) throw new Error(aError.message);
 
   const employeesByBooking = new Map<string, Set<string>>();
+  const employeesByDate = new Map<string, Set<string>>();
   for (const a of (assignments ?? []) as unknown as AssignmentRow[]) {
     const set = employeesByBooking.get(a.booking_id) ?? new Set<string>();
     set.add(a.employee_id);
     employeesByBooking.set(a.booking_id, set);
+
+    const dateKey = String(a.date).slice(0, 10);
+    const dateSet = employeesByDate.get(dateKey) ?? new Set<string>();
+    dateSet.add(a.employee_id);
+    employeesByDate.set(dateKey, dateSet);
   }
+
+  // Antal bemandede lokationer pr. ugedag (0 = mandag).
+  const locationsPerDay = new Map<number, Set<string>>();
 
   const byLocation = new Map<
     string,
