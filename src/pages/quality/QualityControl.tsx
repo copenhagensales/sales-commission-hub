@@ -573,14 +573,13 @@ export default function QualityControl() {
                         key={row.sale_id}
                         className={
                           row.status === "afvist"
-                            ? "cursor-pointer bg-destructive/10 hover:bg-destructive/15"
+                            ? "bg-destructive/10 hover:bg-destructive/15"
                             : row.status === "godkendt"
-                            ? "cursor-pointer bg-success/10 hover:bg-success/15"
+                            ? "bg-success/10 hover:bg-success/15"
                             : row.status === "godkendt_med_bemaerkning"
-                            ? "cursor-pointer bg-warning/10 hover:bg-warning/15"
-                            : "cursor-pointer"
+                            ? "bg-warning/10 hover:bg-warning/15"
+                            : ""
                         }
-                        onClick={() => openSale(row)}
                       >
                         <TableCell>
                           <div className="font-medium">{row.seller_name ?? "Ukendt"}</div>
