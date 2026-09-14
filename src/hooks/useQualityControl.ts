@@ -242,6 +242,52 @@ export function useQualityChecklist(campaignId: string | null | undefined) {
   });
 }
 
+/**
+ * Alle aktive tjeklister med punkter, så hurtigknapperne i køen kan finde den
+ * rigtige tjekliste pr. kampagne uden et opslag pr. række.
+ */
+export function useQualityChecklistResolver() {
+  const query = useQuery({
+    queryKey: ["quality-checklists-all"],
+    queryFn: async () => {
+      const { data: lists, error } = await supabase
+        .from("quality_checklists")
+        .select("id, client_campaign_id, name, version, is_active")
+        .eq("is_active", true)
+        .order("version", { ascending: false });
+      if (error) throw error;
+
+      const { data: items, error: itemsError } = await supabase
+        .from("quality_checklist_items")
+        .select("id, checklist_id, label, guidance, item_type, sort_order, is_active")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (itemsError) throw itemsError;
+
+      return {
+        lists: lists ?? [],
+        items: (items ?? []) as QualityChecklistItem[],
+      };
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const resolve = (campaignId: string | null | undefined) => {
+    const lists = query.data?.lists ?? [];
+    const checklist =
+      lists.find((l) => campaignId && l.client_campaign_id === campaignId) ??
+      lists.find((l) => l.client_campaign_id === null);
+    if (!checklist) return null;
+    return {
+      checklist,
+      items: (query.data?.items ?? []).filter((i) => i.checklist_id === checklist.id),
+    };
+  };
+
+  return { resolve, isLoading: query.isLoading };
+}
+
+
 export function useQualityErrorCodes() {
   return useQuery({
     queryKey: ["quality-error-codes"],
