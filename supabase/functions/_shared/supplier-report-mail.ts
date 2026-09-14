@@ -595,6 +595,12 @@ export interface WeekPlanLocation {
   locationType: string;
   days: number;
   sellers: number;
+  /** 7 pladser, 0 = mandag: antal sælgere på lokationen den dag (0 = ingen bemanding). */
+  daySellers?: number[];
+  /** 7 pladser, 0 = mandag: true hvis dagen er booket. */
+  dayFlags?: boolean[];
+  /** True hvis mindst én af lokationens bookinger stadig er en kladde. */
+  tentative?: boolean;
 }
 
 /** Én dag i ugen: antal lokationer åbne og antal sælgere på dagen. */
