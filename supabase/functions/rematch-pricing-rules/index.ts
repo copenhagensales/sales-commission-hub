@@ -917,7 +917,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[rematch-pricing-rules] Matched: ${matchedCount}, Base fallback: ${baseProductFallbackCount}, No match: ${noMatchCount}, Products corrected: ${productCorrectedCount}`);
+    console.log(`[rematch-pricing-rules] Matched: ${matchedCount}, Base fallback: ${baseProductFallbackCount}, No match: ${noMatchCount}, Products corrected: ${productCorrectedCount}, Manual lock skipped: ${manualLockSkippedCount}`);
 
     // Log sample matches
     if (matchDetails.length > 0) {
