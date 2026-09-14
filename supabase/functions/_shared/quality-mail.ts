@@ -208,9 +208,6 @@ export function renderRejectionMail(data: RejectionMailData): { subject: string;
         : ""
     }
 
-    <div style="margin-top:30px;">
-      ${primaryButton("Se salget i Stork", data.saleLink)}
-    </div>
   `;
   return {
     subject,
