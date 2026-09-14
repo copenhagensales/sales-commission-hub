@@ -748,6 +748,15 @@ export function buildClientWeekPlanEmail(params: {
   ];
   if (previousWeek) textLines.push(`Uge ${previousWeek.isoWeek}: ${previousWeek.days} dage`);
   textLines.push("");
+  if (days.length > 0) {
+    textLines.push("Dage i ugen (lokationer / sælgere)");
+    for (const d of days) {
+      textLines.push(
+        `  ${DAY_NAMES_LONG[d.index]}: ${d.locations} lokationer, ${d.sellers} sælgere`,
+      );
+    }
+    textLines.push("");
+  }
   for (const key of groupKeys) {
     textLines.push(key);
     for (const l of groups.get(key)!) {
