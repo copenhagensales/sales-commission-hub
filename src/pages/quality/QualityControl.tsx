@@ -228,14 +228,31 @@ export default function QualityControl() {
       )}
 
       <Tabs value={activeTeam} onValueChange={setActiveTeam}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="all">Alle</TabsTrigger>
+        <TabsList className="h-auto flex-wrap gap-1 p-1">
+          <TabsTrigger
+            value="all"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+          >
+            Alle
+          </TabsTrigger>
           {teams.map(([id, name]) => (
-            <TabsTrigger key={id} value={id}>
+            <TabsTrigger
+              key={id}
+              value={id}
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
               {name}
             </TabsTrigger>
           ))}
         </TabsList>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Viser:{" "}
+          <span className="font-semibold text-foreground">
+            {activeTeam === "all"
+              ? "Alle kampagner"
+              : teams.find(([id]) => id === activeTeam)?.[1] ?? "Ukendt"}
+          </span>
+        </p>
 
         <TabsContent value={activeTeam} className="space-y-6">
           <QualityScorePanel
