@@ -37,12 +37,15 @@ type SaleWithItems = {
   sale_items: { sale_id: string; quantity: number; mapped_commission: number; product_id: string | null }[];
 };
 
+// Manuelle korte visningsnavne (employee_master_data.display_name_short), hentes pr. kørsel
+let displayNameOverrides = new Map<string, string>();
+
+async function loadDisplayNameOverrides(supabase: SupabaseClient): Promise<void> {
+  displayNameOverrides = await fetchDisplayNameOverrides(supabase as unknown as { rpc: (fn: string) => Promise<{ data: unknown; error: unknown }> });
+}
+
 function formatDisplayName(fullName: string): string {
-  const parts = fullName.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-  }
-  return fullName;
+  return formatDisplayNameWithOverrides(fullName, displayNameOverrides);
 }
 
 // ============= UNIFIED DATA FETCH =============
