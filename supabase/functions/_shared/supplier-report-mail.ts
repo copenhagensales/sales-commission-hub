@@ -597,6 +597,26 @@ export interface WeekPlanLocation {
   sellers: number;
 }
 
+/** Én dag i ugen: antal lokationer åbne og antal sælgere på dagen. */
+export interface WeekPlanDay {
+  /** 0 = mandag ... 6 = søndag */
+  index: number;
+  date: string; // yyyy-mm-dd
+  locations: number;
+  sellers: number;
+}
+
+const DAY_NAMES = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+const DAY_NAMES_LONG = [
+  "Mandag",
+  "Tirsdag",
+  "Onsdag",
+  "Torsdag",
+  "Fredag",
+  "Lørdag",
+  "Søndag",
+];
+
 export function buildClientWeekPlanEmail(params: {
   clientName: string;
   isoWeek: number;
@@ -604,9 +624,17 @@ export function buildClientWeekPlanEmail(params: {
   weekEnd: string; // yyyy-mm-dd (søndag)
   locations: WeekPlanLocation[];
   previousWeek?: { isoWeek: number; days: number } | null;
+  days?: WeekPlanDay[];
 }): { subject: string; html: string; text: string } {
-  const { clientName, isoWeek, weekStart, weekEnd, locations, previousWeek = null } =
-    params;
+  const {
+    clientName,
+    isoWeek,
+    weekStart,
+    weekEnd,
+    locations,
+    previousWeek = null,
+    days = [],
+  } = params;
 
   const dateFmt = new Intl.DateTimeFormat("da-DK", {
     day: "numeric",
@@ -653,6 +681,37 @@ export function buildClientWeekPlanEmail(params: {
           })
           .join("");
 
+  // Dagsopdeling: så modtageren kan se om fx fredag er mindre end mandag.
+  const dayFmt = new Intl.DateTimeFormat("da-DK", {
+    day: "numeric",
+    month: "numeric",
+    timeZone: "UTC",
+  });
+  const daySection = days.length === 0
+    ? null
+    : {
+      label: "Dage i ugen \u00b7 lokationer pr. dag",
+      html: `${
+        barChart(
+          days.map((d) => ({
+            label: DAY_NAMES[d.index] ?? "",
+            sublabel: dayFmt.format(new Date(`${d.date}T00:00:00Z`)),
+            value: d.locations,
+            weekend: d.index >= 5,
+            latest: false,
+          })),
+        )
+      }<div style="padding-top:14px;">${
+        bodyText(
+          `Tallet er antal lokationer, der er bemandet den dag. Sælgere pr. dag: ${
+            days
+              .map((d) => `${DAY_NAMES[d.index]} ${fmtInt(d.sellers)}`)
+              .join(", ")
+          }.`,
+        )
+      }</div>`,
+    };
+
   const html = renderMail({
     title: subject,
     preheader: `Uge ${isoWeek}: ${fmtInt(totalDays)} dage på ${fmtInt(locations.length)} lokationer for ${clientName}.`,
@@ -668,13 +727,14 @@ export function buildClientWeekPlanEmail(params: {
       unit: "count",
     }),
     sections: [
+      ...(daySection ? [daySection] : []),
       {
         label: `Lokationer \u00b7 dage og antal sælgere`,
         html: detailHtml,
       },
     ],
     disclaimer:
-      "Planen viser antal dage og antal sælgere pr. lokation. Ændringer kan forekomme i løbet af ugen.",
+      "Planen viser dagsfordelingen samt antal dage og antal sælgere pr. lokation. Ændringer kan forekomme i løbet af ugen.",
     description: "Ugeplan",
   });
 
@@ -688,6 +748,15 @@ export function buildClientWeekPlanEmail(params: {
   ];
   if (previousWeek) textLines.push(`Uge ${previousWeek.isoWeek}: ${previousWeek.days} dage`);
   textLines.push("");
+  if (days.length > 0) {
+    textLines.push("Dage i ugen (lokationer / sælgere)");
+    for (const d of days) {
+      textLines.push(
+        `  ${DAY_NAMES_LONG[d.index]}: ${d.locations} lokationer, ${d.sellers} sælgere`,
+      );
+    }
+    textLines.push("");
+  }
   for (const key of groupKeys) {
     textLines.push(key);
     for (const l of groups.get(key)!) {

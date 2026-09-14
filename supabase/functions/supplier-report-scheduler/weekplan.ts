@@ -6,6 +6,7 @@ import { sendM365Mail } from "../_shared/m365-mail.ts";
 import {
   buildClientWeekPlanEmail,
   buildWeekPlanEmptyWarningEmail,
+  type WeekPlanDay,
   type WeekPlanLocation,
 } from "../_shared/supplier-report-mail.ts";
 
@@ -23,6 +24,7 @@ interface BookingRow {
 interface AssignmentRow {
   booking_id: string;
   employee_id: string;
+  date: string;
 }
 
 interface WeekPlanSubscriptionRow {
@@ -73,16 +75,17 @@ export function isoWeekNumber(iso: string): number {
 }
 
 /**
- * Beregner ugeplanen pr. lokation for én kunde.
+ * Beregner ugeplanen pr. lokation for én kunde, samt dagsfordelingen.
  * Dage: booked_days er ugedagsindeks med 0 = mandag; tom/null = alle dage i intervallet.
  * Sælgere: antal DISTINCT employee_id i booking_assignment inden for ugen.
+ * days: pr. ugedag antal bemandede lokationer og antal DISTINCT sælgere den dag.
  */
 export async function computeWeekPlan(
   svc: Svc,
   clientId: string,
   weekStart: string,
   weekEnd: string,
-): Promise<WeekPlanLocation[]> {
+): Promise<{ locations: WeekPlanLocation[]; days: WeekPlanDay[] }> {
   const { data: bookings, error } = await svc
     .from("booking")
     .select(
@@ -94,23 +97,39 @@ export async function computeWeekPlan(
     .gte("end_date", weekStart);
   if (error) throw new Error(error.message);
 
+  const emptyDays: WeekPlanDay[] = Array.from({ length: 7 }, (_, i) => ({
+    index: i,
+    date: addDays(weekStart, i),
+    locations: 0,
+    sellers: 0,
+  }));
+
   const rows = (bookings ?? []) as unknown as BookingRow[];
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { locations: [], days: emptyDays };
 
   const { data: assignments, error: aError } = await svc
     .from("booking_assignment")
-    .select("booking_id, employee_id")
+    .select("booking_id, employee_id, date")
     .in("booking_id", rows.map((b) => b.id))
     .gte("date", weekStart)
     .lte("date", weekEnd);
   if (aError) throw new Error(aError.message);
 
   const employeesByBooking = new Map<string, Set<string>>();
+  const employeesByDate = new Map<string, Set<string>>();
   for (const a of (assignments ?? []) as unknown as AssignmentRow[]) {
     const set = employeesByBooking.get(a.booking_id) ?? new Set<string>();
     set.add(a.employee_id);
     employeesByBooking.set(a.booking_id, set);
+
+    const dateKey = String(a.date).slice(0, 10);
+    const dateSet = employeesByDate.get(dateKey) ?? new Set<string>();
+    dateSet.add(a.employee_id);
+    employeesByDate.set(dateKey, dateSet);
   }
+
+  // Antal bemandede lokationer pr. ugedag (0 = mandag).
+  const locationsPerDay = new Map<number, Set<string>>();
 
   const byLocation = new Map<
     string,
@@ -125,7 +144,12 @@ export async function computeWeekPlan(
     for (let iso = start; iso <= end; iso = addDays(iso, 1)) {
       const d = new Date(`${iso}T00:00:00Z`);
       const index = (d.getUTCDay() === 0 ? 7 : d.getUTCDay()) - 1; // 0 = mandag
-      if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(index)) days++;
+      if (!bookedDays || bookedDays.length === 0 || bookedDays.includes(index)) {
+        days++;
+        const set = locationsPerDay.get(index) ?? new Set<string>();
+        set.add(b.location_id);
+        locationsPerDay.set(index, set);
+      }
     }
     if (days === 0) continue;
 
@@ -141,7 +165,7 @@ export async function computeWeekPlan(
     byLocation.set(key, entry);
   }
 
-  return [...byLocation.values()]
+  const locationsOut = [...byLocation.values()]
     .map((v) => ({
       locationName: v.name,
       locationType: v.type,
@@ -153,6 +177,14 @@ export async function computeWeekPlan(
         a.locationType.localeCompare(b.locationType, "da") ||
         a.locationName.localeCompare(b.locationName, "da"),
     );
+
+  const daysOut: WeekPlanDay[] = emptyDays.map((d) => ({
+    ...d,
+    locations: locationsPerDay.get(d.index)?.size ?? 0,
+    sellers: employeesByDate.get(d.date)?.size ?? 0,
+  }));
+
+  return { locations: locationsOut, days: daysOut };
 }
 
 async function internalAlertRecipient(
@@ -240,7 +272,12 @@ export async function runWeekPlans(
       continue;
     }
 
-    const locations = await computeWeekPlan(svc, sub.client_id, weekStart, weekEnd);
+    const { locations, days: weekDays } = await computeWeekPlan(
+      svc,
+      sub.client_id,
+      weekStart,
+      weekEnd,
+    );
     const totalDays = locations.reduce((s, l) => s + l.days, 0);
 
     if (opts.dryRun) {
@@ -250,7 +287,7 @@ export async function runWeekPlans(
 
     // Sammenligningstal til hero-panelet: samme beregning, forrige ISO-uge.
     const prevStart = addDays(weekStart, -7);
-    const prevLocations = await computeWeekPlan(
+    const prev = await computeWeekPlan(
       svc,
       sub.client_id,
       prevStart,
@@ -258,7 +295,7 @@ export async function runWeekPlans(
     );
     const previousWeek = {
       isoWeek: isoWeekNumber(prevStart),
-      days: prevLocations.reduce((s, l) => s + l.days, 0),
+      days: prev.locations.reduce((s, l) => s + l.days, 0),
     };
 
     const mail = buildClientWeekPlanEmail({
@@ -268,6 +305,7 @@ export async function runWeekPlans(
       weekEnd,
       locations,
       previousWeek,
+      days: weekDays,
     });
 
     if (opts.testEmail) {
