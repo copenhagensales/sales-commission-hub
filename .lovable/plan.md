@@ -1,26 +1,29 @@
-# Lederne: hvorfor står alle salg stadig til 75 kr
+# Lederne: sæt mødetype på de salg der har den, og kør rematch
 
-## Svaret
+## Hvad arket viser
 
-Nej, ingen af salgene er kommet ind med 30/90 kr. Alle 266 Lederne-salg siden 7. september står på basissatsen 75 kr provision / 200 kr omsætning, og ingen af dem har en prisregel påhæftet.
+Arket har 221 rækker med kolonnen `Mødetype`:
 
-Årsagen er ikke reglerne og ikke prismotoren:
+- 84 rækker: Onlinemøde
+- 4 rækker: Telefonmøde
+- 133 rækker: ingen mødetype (tom)
 
-- Begge regler findes og er aktive fra 7. september: Telefonmøde 30 kr (prioritet 1), Onlinemøde 90 kr (prioritet 0), 200 kr omsætning på begge.
-- Importen læser kolonnen og gemmer mødetypen på salget, hvis der står en værdi.
-- Men på samtlige 266 salg er mødetypen slet ikke gemt — feltet mangler helt på salget, også på de 45 salg fra i dag.
+Alle 88 rækker med en mødetype er verificeret til at findes som allerede oprettede Lederne-salg i Stork (matchet 1:1 på Emne-ID). Ingen af de 266 Lederne-salg siden 7. september har mødetype gemt i dag, og ingen af linjerne er manuelt låst.
 
-Systemet gemmer kun mødetypen, når der faktisk står en værdi i den kolonne, den kan finde. Når feltet mangler på hvert enkelt salg, betyder det, at de uploadede ark ikke har haft en mødetype-værdi med — enten fordi kolonnen ikke blev trukket med ud af Adversus, eller fordi den hedder noget andet end de navne importen genkender i dag (Mødetype, Modetype, Type møde, Hvilket type møde). Uden arket kan jeg ikke afgøre hvilken af de to det er. Uden mødetype falder salget korrekt tilbage på 75 kr — det er den forventede opførsel, ikke en fejl i beregningen.
+## Hvad der bliver gjort
 
-## Forslag til hvad vi gør
+1. **Mødetypen skrives på de 88 salg** der har en i arket. Matchning sker udelukkende på Emne-ID mod det Emne-ID, der allerede står på salget. Kun mødetype-feltet tilføjes — dato, sælger, telefon, kampagne og alt andet på salget røres ikke. De 133 rækker uden mødetype ændres ikke.
+2. **Tørkørsel af rematch** på Lederne-produktet fra 7. september. Jeg viser hvor mange linjer der ændrer beløb, og til hvad, før noget skrives.
+3. **Rematch for alvor** efter din bekræftelse af tørkørslens tal.
 
-1. **Find den præcise årsag.** Du sender (eller uploader) et af dagens ark, så jeg kan se de faktiske kolonnenavne. Det afgør endeligt om kolonnen mangler eller hedder noget andet.
-2. **Synlig kontrol i Bulk Salg.** Efter "Kontrollér" vises hvor mange rækker der har en mødetype, og en tydelig advarsel hvis ingen rækker har det. Så bliver det opdaget før import i stedet for bagefter i lønnen.
-3. **Eventuel efterregulering.** Hvis de allerede importerede salg skal have de rigtige satser, kræver det, at mødetypen kan genfindes pr. salg (via Emne-ID mod et ark med mødetype). Det laves som et selvstændigt, godkendt trin med før/efter-visning — ikke i denne omgang.
+Forventet resultat: 84 salg går fra 75 kr til 90 kr provision (Onlinemøde), 4 salg går fra 75 kr til 30 kr (Telefonmøde). Omsætningen bliver 200 kr på alle — uændret. De resterende Lederne-salg uden mødetype bliver ved 75/200 kr, som de skal.
+
+Bagefter uploader du selv arket i Bulk Salg, så de rækker der endnu ikke er oprettet, kommer ind. De får mødetypen med automatisk ved import, fordi bulk-importen læser kolonnen.
 
 ## Teknisk
 
-- Verificeret read-only: `product_pricing_rules` har de to aktive regler på produkt `900fd5ad…`; `sale_items.matched_pricing_rule_id` er NULL på alle 266 linjer; `sales.raw_payload->'data'->>'Hvilket type møde'` er NULL på alle 266.
-- `supabase/functions/manual-sales/index.ts:346,421` gemmer kun `data: { "Hvilket type møde": … }` når værdien er ikke-tom — konsistent med observationen.
-- Punkt 2 rører kun `src/pages/TastSelvSalg.tsx` (visning af tælling/advarsel efter tørkørsel). Ingen ændring i prismotor, `manual-sales`, skema, RLS eller eksisterende salg.
-- Punkt 3 er rød zone (provisionsgrundlag) og udføres først efter separat godkendelse.
+- Verificeret read-only: kampagne `Tryg Products` (`874e09c2…`), produkt `Lederne` (`900fd5ad…`), begge regler aktive fra 2026-09-07 (Tlfmøde 30/200 prioritet 1, Onlinemøde 90/200 prioritet 0) med korrekte betingelser på `Hvilket type møde`. Alle 88 Emne-ID'er findes som `sales.raw_payload->>'subject_id'`.
+- Punkt 1: `UPDATE sales SET raw_payload = jsonb_set(raw_payload, '{data,Hvilket type møde}', <værdi>)` betinget på `source='manual_entry'`, `client_campaign_id='874e09c2…'`, `sale_datetime >= '2026-09-07'` og eksakt subject_id-match. Kun de 88 rækker fra arket, indsat som eksplicit værdiliste. Ingen skema-, RLS- eller kodeændring, ingen migration.
+- Punkt 2/3: eksisterende `rematch-pricing-rules` med `product_id=900fd5ad…` og `min_sale_datetime=2026-09-07T00:00:00`, først `dry_run: true`. Motoren er uændret; ingen deploy.
+- Manuelle låse respekteres (`manual_pricing_lock`) — der er ingen låste Lederne-linjer i perioden.
+- Rød zone (provisionsgrundlag). Ændringen er begrænset til Lederne-linjer fra 7. september og berører ikke andre klienter, produkter, lønsider eller historiske tabeller. Før/efter-tal rapporteres.
