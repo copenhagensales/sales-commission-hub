@@ -16,7 +16,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Copy, Loader2, Settings2, CheckCircle2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  Settings2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   QUALITY_RESULT_LABEL,
@@ -42,6 +51,36 @@ import {
 } from "@/lib/qualityDates";
 import { QualityReviewSheet } from "@/components/quality/QualityReviewSheet";
 import { QualityScorePanel } from "@/components/quality/QualityScorePanel";
+
+type QualitySortKey =
+  | "saelger"
+  | "team"
+  | "kampagne"
+  | "tidspunkt"
+  | "soegenoegle"
+  | "status";
+
+/** Sammenligningsværdi pr. kolonne. Kun til visning — ingen data ændres. */
+function sortValue(row: QualityQueueRow, key: QualitySortKey): string {
+  switch (key) {
+    case "saelger":
+      return row.seller_name ?? "";
+    case "team":
+      return row.team_name ?? "";
+    case "kampagne":
+      return (
+        row.dialer_campaign_label ?? row.product_label ?? row.campaign_name ?? ""
+      );
+    case "tidspunkt":
+      return row.sale_datetime ?? "";
+    case "soegenoegle":
+      return row.search_key ?? "";
+    case "status":
+      return QUALITY_RESULT_LABEL[row.status] ?? row.status ?? "";
+  }
+}
+
+
 
 export default function QualityControl() {
   const navigate = useNavigate();
@@ -81,6 +120,30 @@ export default function QualityControl() {
     () => (activeTeam === "all" ? rows : rows.filter((r) => r.team_id === activeTeam)),
     [rows, activeTeam],
   );
+
+  /**
+   * Sortering er rent visuel. Den ændrer ingen data og påvirker hverken
+   * kontroller, løn eller provision.
+   */
+  const [sortKey, setSortKey] = useState<QualitySortKey>("tidspunkt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = (key: QualitySortKey) => {
+    if (key === sortKey) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedRows = useMemo(() => {
+    const factor = sortDir === "asc" ? 1 : -1;
+    return [...filteredRows].sort(
+      (a, b) => factor * sortValue(a, sortKey).localeCompare(sortValue(b, sortKey), "da", { numeric: true }),
+    );
+  }, [filteredRows, sortKey, sortDir]);
+
 
   const openSale = (sale: QualityQueueRow) => {
     setSelectedSale(sale);
@@ -389,17 +452,42 @@ export default function QualityControl() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Sælger</TableHead>
-                      <TableHead>Team</TableHead>
-                      <TableHead>Kampagne</TableHead>
-                      <TableHead>Tidspunkt</TableHead>
-                      <TableHead>Søgenøgle</TableHead>
-                      <TableHead>Status</TableHead>
+                      {(
+                        [
+                          ["saelger", "Sælger"],
+                          ["team", "Team"],
+                          ["kampagne", "Kampagne"],
+                          ["tidspunkt", "Tidspunkt"],
+                          ["soegenoegle", "Søgenøgle"],
+                          ["status", "Status"],
+                        ] as Array<[QualitySortKey, string]>
+                      ).map(([key, label]) => (
+                        <TableHead key={key}>
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(key)}
+                            className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+                            title={`Sortér efter ${label.toLowerCase()}`}
+                          >
+                            {label}
+                            {sortKey === key ? (
+                              sortDir === "asc" ? (
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                            )}
+                          </button>
+                        </TableHead>
+                      ))}
                       <TableHead className="text-right">Hurtig</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRows.map((row) => (
+                    {sortedRows.map((row) => (
+
                       <TableRow
                         key={row.sale_id}
                         className={
