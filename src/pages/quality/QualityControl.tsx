@@ -710,12 +710,76 @@ export default function QualityControl() {
         </TabsContent>
       </Tabs>
 
-      <QualityReviewSheet
-        sale={selectedSale}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        onSaved={handleSaved}
-      />
+      <Dialog open={!!commentRow} onOpenChange={(open) => !open && setCommentRow(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Kommentar til teamlederen</DialogTitle>
+            <DialogDescription>
+              {commentRow
+                ? `${commentRow.seller_name ?? "Ukendt sælger"} · ${
+                    commentRow.team_name ?? "Uden team"
+                  } · ${formatDanishTime(commentRow.sale_datetime)}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="kvalitet-kommentar">
+                Kommentar (max 500 tegn)
+              </label>
+              <Textarea
+                id="kvalitet-kommentar"
+                value={commentText}
+                maxLength={500}
+                rows={5}
+                placeholder="Skriv feedback til teamlederen …"
+                onChange={(e) => setCommentText(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Fejlkode ved "Send og ikke godkend"</p>
+              <Select value={commentCodeId} onValueChange={setCommentCodeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg fejlkode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {requiredCodes.map((code) => (
+                    <SelectItem key={code.id} value={code.id}>
+                      {code.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Bruges kun hvis salget ikke godkendes. Ved "Send men godkend" gives ingen
+                anmærkning.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              className="border-success/40 text-success hover:bg-success/10"
+              disabled={saveReview.isPending}
+              onClick={() => void runCommentReview(true)}
+            >
+              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send men godkend
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={saveReview.isPending}
+              onClick={() => void runCommentReview(false)}
+            >
+              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send og ikke godkend
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmFinish} onOpenChange={setConfirmFinish}>
         <AlertDialogContent>
