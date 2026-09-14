@@ -123,9 +123,6 @@ function quote(html: string): string {
   return `<div style="border-left:4px solid ${BRAND.accent};background:${BRAND.cellBg};border-radius:0 10px 10px 0;padding:18px 20px;font-size:15px;line-height:1.65;color:${BRAND.text};">${html}</div>`;
 }
 
-function primaryButton(label: string, href: string): string {
-  return `<a href="${escapeHtml(href)}" style="display:inline-block;background:${BRAND.accent};color:${BRAND.accentText};text-decoration:none;font-size:15px;font-weight:700;padding:15px 26px;border-radius:12px;">${escapeHtml(label)}</a>`;
-}
 
 /**
  * Fælles ramme: lys side, hvidt kort, mørk header med statuspille.
@@ -208,9 +205,6 @@ export function renderRejectionMail(data: RejectionMailData): { subject: string;
         : ""
     }
 
-    <div style="margin-top:30px;">
-      ${primaryButton("Se salget i Stork", data.saleLink)}
-    </div>
   `;
   return {
     subject,
@@ -260,9 +254,6 @@ export function renderFeedbackMail(data: FeedbackMailData): { subject: string; h
       Salget er ikke afvist, og der er ikke givet en anmærkning. Dette er alene feedback.
     </div>
 
-    <div style="margin-top:28px;">
-      ${primaryButton("Se salget i Stork", data.saleLink)}
-    </div>
   `;
   return {
     subject,
