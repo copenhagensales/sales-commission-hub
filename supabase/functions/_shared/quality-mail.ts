@@ -260,9 +260,6 @@ export function renderFeedbackMail(data: FeedbackMailData): { subject: string; h
       Salget er ikke afvist, og der er ikke givet en anmærkning. Dette er alene feedback.
     </div>
 
-    <div style="margin-top:28px;">
-      ${primaryButton("Se salget i Stork", data.saleLink)}
-    </div>
   `;
   return {
     subject,
