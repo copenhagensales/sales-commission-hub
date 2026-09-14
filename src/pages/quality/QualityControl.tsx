@@ -300,7 +300,29 @@ export default function QualityControl() {
                           )}
                         </TableCell>
                         <TableCell>{row.team_name ?? "Uden team"}</TableCell>
-                        <TableCell>{row.campaign_name ?? "Ukendt"}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const primary =
+                              row.dialer_campaign_label ??
+                              row.product_label ??
+                              row.campaign_name ??
+                              "Ukendt";
+                            const secondary =
+                              row.campaign_name && row.campaign_name !== primary
+                                ? row.campaign_name
+                                : null;
+                            return (
+                              <div className="min-w-0">
+                                <p className="truncate">{primary}</p>
+                                {secondary && (
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {secondary}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell>{formatDanishTime(row.sale_datetime)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
