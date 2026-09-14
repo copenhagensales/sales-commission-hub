@@ -14,6 +14,7 @@ type Svc = SupabaseClient;
 
 interface BookingRow {
   id: string;
+  status: string | null;
   start_date: string;
   end_date: string;
   booked_days: number[] | null;
