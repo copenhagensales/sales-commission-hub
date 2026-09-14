@@ -61,6 +61,9 @@ export default function QualityControl() {
   const { data: settings } = useQualitySettings();
   const { data: completion } = useQualityDailyCompletion(date);
   const finishDay = useFinishQualityDay();
+  const saveReview = useSaveQualityReview();
+  const { resolve: resolveChecklist } = useQualityChecklistResolver();
+  const { data: errorCodes = [] } = useQualityErrorCodes();
 
   const rows = queue.data ?? [];
 
