@@ -702,10 +702,17 @@ serve(async (req) => {
     let noMatchCount = 0;
     let productCorrectedCount = 0;
     let baseProductFallbackCount = 0;
+    let manualLockSkippedCount = 0;
     const matchDetails: { saleItemId: string; productId: string; originalProductId: string; ruleName: string; commission: number; revenue: number }[] = [];
     const deleteIds: string[] = [];
 
     for (const item of saleItems) {
+      // Manually corrected lines are locked: never overwrite provision/revenue here.
+      if (item.manual_pricing_lock === true) {
+        manualLockSkippedCount++;
+        continue;
+      }
+
       // Extract raw_payload.data
       const sale = normalizeJoinedSale(item.sales);
       const rawPayload = (item.sales as any)?.raw_payload as Record<string, unknown> | null;
