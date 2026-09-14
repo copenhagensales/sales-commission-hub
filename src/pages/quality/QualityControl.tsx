@@ -94,6 +94,79 @@ export default function QualityControl() {
     void queue.refetch();
   };
 
+  /**
+   * Hurtigknapper: gemmer en kontrol med ét klik ud fra den samme tjekliste og
+   * det samme gemme-flow som sidepanelet. Resultatet udledes i databasen.
+   */
+  const runQuickReview = async (
+    row: QualityQueueRow,
+    action: "godkendt" | "oa_mangler" | "oa_ikke_godkendt",
+  ) => {
+    const resolved = resolveChecklist(row.client_campaign_id);
+    if (!resolved || resolved.items.length === 0) {
+      toast({ title: "Ingen tjekliste fundet for kampagnen", variant: "destructive" });
+      return;
+    }
+
+    const requiredItem =
+      resolved.items.find((i) => i.item_type === "obligatorisk" && i.label.startsWith("OA")) ??
+      resolved.items.find((i) => i.item_type === "obligatorisk");
+
+    if (action !== "godkendt" && !requiredItem) {
+      toast({ title: "Tjeklisten har ingen obligatoriske punkter", variant: "destructive" });
+      return;
+    }
+
+    const errorCode =
+      action === "oa_mangler"
+        ? errorCodes.find((c) => c.code === "OA_MANGLER")
+        : action === "oa_ikke_godkendt"
+        ? errorCodes.find((c) => c.code === "OA_IKKE_GODKENDT")
+        : undefined;
+
+    if (action !== "godkendt" && !errorCode) {
+      toast({ title: "Fejlkoden mangler i administrationen", variant: "destructive" });
+      return;
+    }
+
+    const items = resolved.items.map((item) => {
+      let state: QualityItemState = "ok";
+      if (action !== "godkendt") {
+        state = item.id === requiredItem!.id ? "mangler" : "ikke_relevant";
+      }
+      return { checklist_item_id: item.id, item_type: item.item_type, state };
+    });
+
+    setQuickSavingId(row.sale_id);
+    try {
+      const saved = await saveReview.mutateAsync({
+        sale: row,
+        checklistId: resolved.checklist.id,
+        checklistVersion: resolved.checklist.version,
+        items,
+        errorCodeIds: errorCode ? [errorCode.id] : [],
+        comment: "",
+        startedAt: new Date().toISOString(),
+      });
+      toast({
+        title:
+          saved.result === "afvist"
+            ? "Afvist og teamlederen er underrettet"
+            : "Kontrol gemt som godkendt",
+      });
+      void queue.refetch();
+    } catch (error) {
+      toast({
+        title: "Kunne ikke gemme kontrollen",
+        description: error instanceof Error ? error.message : "Ukendt fejl",
+        variant: "destructive",
+      });
+    } finally {
+      setQuickSavingId(null);
+    }
+  };
+
+
   const copyKey = async (value: string) => {
     await navigator.clipboard.writeText(value);
     toast({ title: "Søgenøgle kopieret" });
