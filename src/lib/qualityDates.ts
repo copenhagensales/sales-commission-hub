@@ -1,8 +1,9 @@
 /**
  * Datologik for kvalitetsmodulet.
  *
- * Standardvisning er gårsdagens salg. Mandag dækker fredag, lørdag og søndag,
- * så weekendens salg ikke falder mellem to stole.
+ * Standardvisning er dagens salg, og koen nulstiller derfor hver dag.
+ * Vaelges en soendag manuelt, vises fredag, loerdag og soendag samlet,
+ * saa weekendens salg ikke falder mellem to stole.
  */
 
 /** Dagens dato i dansk tid som YYYY-MM-DD. */
