@@ -26,6 +26,8 @@ import { CreateCohortDialog } from "@/components/personnel/CreateCohortDialog";
 import { AddMemberDialog } from "@/components/personnel/AddMemberDialog";
 import { EditMemberClientDialog } from "@/components/personnel/EditMemberClientDialog";
 import { EditCohortDialog } from "@/components/personnel/EditCohortDialog";
+import { ActivateMemberDialog, type ActivateMemberTarget } from "@/components/personnel/ActivateMemberDialog";
+
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useToast } from "@/hooks/use-toast";
 import { processCohortMember, type ProcessResults } from "@/lib/cohortMemberProcessing";
