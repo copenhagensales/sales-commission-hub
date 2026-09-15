@@ -558,7 +558,13 @@ export default function UpcomingStarts() {
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
-                        {canEdit && cohort.status !== "cancelled" && (
+                        {isActivated && (
+                          <Badge className="text-xs shrink-0 bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Bruger oprettet
+                          </Badge>
+                        )}
+                        {canEdit && cohort.status !== "cancelled" && !isActivated && (
                           <Button
                             variant="secondary"
                             size="sm"
