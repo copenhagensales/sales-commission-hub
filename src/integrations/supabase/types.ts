@@ -12794,6 +12794,59 @@ export type Database = {
         }
         Relationships: []
       }
+      quality_feedback_acknowledgements: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          review_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          review_id: string
+          role: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          review_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_feedback_acknowledgements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_feedback_acknowledgements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_feedback_acknowledgements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_feedback_acknowledgements_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "quality_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quality_mail_log: {
         Row: {
           created_at: string
@@ -17042,6 +17095,10 @@ export type Database = {
       }
     }
     Functions: {
+      acknowledge_quality_feedback: {
+        Args: { p_review_id: string; p_role: string }
+        Returns: Json
+      }
       am_i_superadmin: { Args: never; Returns: boolean }
       assign_role_by_email: {
         Args: {
@@ -17489,6 +17546,25 @@ export type Database = {
           revenue: number
         }[]
       }
+      get_my_quality_feedback: {
+        Args: never
+        Returns: {
+          campaign_name: string
+          comment: string
+          completed_at: string
+          employee_id: string
+          occurred_at: string
+          reason_labels: string[]
+          result: string
+          review_id: string
+          role: string
+          sale_id: string
+          search_key: string
+          seller_name: string
+          team_id: string
+          team_name: string
+        }[]
+      }
       get_my_ramp: { Args: never; Returns: Json }
       get_personal_daily_commission: {
         Args: {
@@ -17506,6 +17582,20 @@ export type Database = {
         Returns: Json
       }
       get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
+      get_quality_feedback_history: {
+        Args: { p_employee_id?: string }
+        Returns: {
+          acknowledged_at: string
+          campaign_name: string
+          comment: string
+          completed_at: string
+          occurred_at: string
+          reason_labels: string[]
+          result: string
+          review_id: string
+          search_key: string
+        }[]
+      }
       get_quality_overview: { Args: { p_date: string }; Returns: Json }
       get_quality_queue: {
         Args: { p_dates: string[] }
@@ -17936,6 +18026,7 @@ export type Database = {
           p_comment: string
           p_employee_id: string
           p_error_code_ids: string[]
+          p_intent?: string
           p_items: Json
           p_sale_date: string
           p_sale_datetime: string
