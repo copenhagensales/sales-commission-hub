@@ -641,7 +641,7 @@ export default function QualityControl() {
                           </button>
                         </TableHead>
                       ))}
-                      <TableHead className="text-right">Hurtig</TableHead>
+                      <TableHead className="text-right">Handling</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -651,11 +651,11 @@ export default function QualityControl() {
                         key={row.sale_id}
                         className={
                           row.status === "afvist"
-                            ? "bg-destructive/10 hover:bg-destructive/15"
+                            ? "bg-destructive/5 hover:bg-destructive/10"
                             : row.status === "godkendt"
-                            ? "bg-success/10 hover:bg-success/15"
+                            ? "bg-success/5 hover:bg-success/10"
                             : row.status === "godkendt_med_bemaerkning"
-                            ? "bg-warning/10 hover:bg-warning/15"
+                            ? "bg-warning/5 hover:bg-warning/10"
                             : ""
                         }
                       >
