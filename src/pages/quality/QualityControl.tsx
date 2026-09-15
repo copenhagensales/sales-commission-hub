@@ -805,11 +805,19 @@ export default function QualityControl() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => openComment(row)}
+                                  className="h-7 border-warning/40 px-2 text-xs text-warning hover:bg-warning/10"
+                                  onClick={() => openComment(row, "feedback")}
                                 >
                                   <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                                  Kommentar
+                                  Send feedback
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => openComment(row, "afvist")}
+                                >
+                                  Afvis salg
                                 </Button>
                                 {row.status !== "ikke_kontrolleret" && (
                                   <Button
