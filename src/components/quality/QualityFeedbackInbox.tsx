@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Info, Loader2, MessageSquare 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useViewAsStatus } from "@/hooks/useViewAs";
 import {
   useAcknowledgeQualityFeedback,
   useMyQualityFeedback,
@@ -39,6 +40,9 @@ export function QualityFeedbackInbox() {
   const acknowledge = useAcknowledgeQualityFeedback();
   const { toast } = useToast();
   const [index, setIndex] = useState(0);
+  // "Se som" er ren læseadgang: kvittering skal bindes til den, der er logget ind.
+  const { data: viewAs } = useViewAsStatus();
+  const viewAsActive = viewAs?.active === true;
 
   useEffect(() => {
     if (index > rows.length - 1) setIndex(rows.length > 0 ? rows.length - 1 : 0);
