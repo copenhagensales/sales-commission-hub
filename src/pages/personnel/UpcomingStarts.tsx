@@ -153,7 +153,7 @@ export default function UpcomingStarts() {
             .select(`
               *,
               candidate:candidates(id, first_name, last_name, applied_position, email, phone),
-              employee:employee_master_data(id, first_name, last_name)
+              employee:employee_master_data(id, first_name, last_name, work_email, invitation_status, auth_user_id)
             `)
             .eq("cohort_id", cohort.id);
 
