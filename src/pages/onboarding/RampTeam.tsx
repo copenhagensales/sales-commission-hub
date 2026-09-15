@@ -652,12 +652,7 @@ function FeedbackDialog({
 
   useEffect(() => {
     textareaRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   const submit = () => {
     if (!ready || send.isPending) return;
