@@ -41,10 +41,21 @@ const json = (status: number, body: unknown) =>
 type Client = ReturnType<typeof svc>;
 
 async function resolveCaller(req: Request, db: Client) {
+  // Planlagt daglig kørsel: internt cron-token, verificeret i databasen.
+  const cronSecret = req.headers.get("x-cron-secret");
+  if (cronSecret) {
+    const { data: ok } = await db.rpc("verify_internal_cron_secret", { _token: cronSecret });
+    if (ok === true) {
+      return { employeeId: null, isController: false, isSuperadmin: false, isCron: true };
+    }
+    return null;
+  }
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const { data, error } = await db.auth.getUser(authHeader.replace("Bearer ", ""));
   if (error || !data?.user) return null;
+
 
   const email = data.user.email?.toLowerCase() ?? "";
   const { data: employee } = await db
