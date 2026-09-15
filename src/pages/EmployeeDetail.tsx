@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock, Trash2, ShieldCheck } from "lucide-react";
+import { QualityFeedbackHistory } from "@/components/quality/QualityFeedbackHistory";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
