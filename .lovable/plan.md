@@ -1,31 +1,42 @@
-# Hvorfor Oliver Lyng Christensen ikke kan logge ind
+# "Opret bruger" skal genbruge et eksisterende stamkort
 
-## Kort svar
+## Hvad der sker (bekræftet)
 
-Ja, han er oprettet i Stork som **medarbejder** (Eesy TM, Salgskonsulent, start 15/9, arbejdsmail `olic@copenhagensales.dk`) — men han har **ingen loginkonto**. Det er to forskellige ting: profilen findes, brugeren gør ikke.
+Oliver Lyng Christensen har **allerede et stamkort** i Stork (aktiv, Eesy TM, arbejdsmail `olic@copenhagensales.dk`, privat mail `oliverlyngchristensen@gmail.com`) — men **ingen loginkonto** (`auth_user_id` er tom, status "afventer").
 
-## Bekræftet i data
+Knappen "Opret bruger" i Kommende Opstarter forsøger altid at oprette et **nyt** stamkort (`src/lib/cohortMemberProcessing.ts`, linje 100-117). Databasens dublettospærring (`trg_prevent_duplicate_employee`) afviser det korrekt, og du får beskeden "Denne medarbejder findes allerede".
 
-- status: afventer ("pending")
-- ingen kobling til en loginkonto
-- der findes ingen loginkonto på `olic@copenhagensales.dk` eller hans private mail
-- ingen fejlede loginforsøg registreret på hans mail
+Så fejlen er reel og beskyttende: den forhindrer en dublet. Men flowet mangler den anden vej — at genbruge det stamkort, der allerede findes.
 
-Login med Microsoft lukker kun folk ind, hvis loginkontoen allerede findes. Derfor bliver han afvist.
+## Ændring
 
-## Hvad vi gør
+I `processCohortMember`:
 
-1. Åbn Oliver under Kommende Opstarter og brug knappen **Opret bruger**.
-2. Bekræft arbejdsmail `olic@copenhagensales.dk` og startdato 15/9 i dialogen.
-3. Systemet opretter hans loginkonto, kobler den til hans profil, sætter ham aktiv og sender velkomstmail til hans private mail.
-4. Bekræft bagefter, at profilen har en loginkonto, og at status ikke længere er "afventer".
+1. Slå op med den eksisterende `findExistingEmployeeByEmail` (arbejdsmail + privat mail) **før** oprettelse.
+2. **Findes ingen:** som i dag — opret nyt stamkort.
+3. **Findes én:** genbrug den i stedet for at oprette:
+   - genaktivér kun hvis medarbejderen er inaktiv
+   - udfyld kun **tomme** felter (jobtitel, privat telefon, privat mail, startdato) — eksisterende værdier overskrives ikke
+   - sikr holdtilknytning via den eksisterende `ensureTeamMembership`
+   - kobl deltageren på opstartsholdet til det eksisterende stamkort
+   - kør samme oprettelse af loginkonto + velkomstmail som i dag
+4. Er den fundne medarbejder allerede koblet til en **anden** loginkonto end arbejdsmailen, stopper vi med en klar besked i stedet for at ændre loginkontoen.
 
-Hans hold (Eesy TM) og klienter (Eesy TM, Hiper) er allerede sat korrekt og ændres ikke.
+Resultatet: knappen virker både for helt nye og for dem der allerede har et stamkort, uden at der nogensinde opstår dubletter.
 
-## Forudsætning
+## Bevares uændret
 
-Microsoft-kontoen `olic@copenhagensales.dk` skal findes i Microsoft 365 først. Er den ikke oprettet der, kan han stadig ikke logge ind, selv om Stork-brugeren findes.
+Dublettospærringen i databasen, dublettjekket i "Opret ny medarbejder", løn, provision, pricing, rettigheder, RLS, historiske tabeller og alle eksisterende mails. Ingen migration, intet skemaskift.
 
-## Afgrænsning
+## Teknisk
 
-Ingen ændringer i løn, provision, pricing, rettigheder, RLS eller historiske data. Kun oprettelse af Olivers loginkonto.
+- Fil: `src/lib/cohortMemberProcessing.ts` (genbrugsgren i `processCohortMember`).
+- Genbruger `findExistingEmployeeByEmail` og `ensureTeamMembership` — ingen ny parallel logik.
+- Opdateringen er betinget (`is null`-tjek pr. felt), så eksisterende data ikke overskrives.
+- Loginkontoen oprettes fortsat i edge-funktionen `activate-employee-account`, som allerede er idempotent på arbejdsmailen.
+
+## Verifikation
+
+- Typecheck.
+- Oliver: "Opret bruger" skal nu lykkes, genbruge hans stamkort, give ham en loginkonto og sende velkomstmail til hans private mail.
+- Kontrollér at der stadig kun findes ét stamkort på hans mails, og at hold, klienter og jobtitel er uændrede.
