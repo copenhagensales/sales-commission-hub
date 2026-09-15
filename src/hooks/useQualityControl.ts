@@ -330,6 +330,12 @@ export interface SaveQualityReviewInput {
   startedAt: string;
   /** Send feedback-mail til teamleder, selvom kontrollen er godkendt. */
   sendFeedbackMail?: boolean;
+  /**
+   * Kontrollantens eksplicitte handling. "feedback" = salget står ved magt
+   * (godkendt med bemærkning), "afvist" = trækning. Udelades ved almindelige
+   * kontroller, hvor resultatet udledes af tjeklisten i databasen.
+   */
+  intent?: "feedback" | "afvist";
 }
 
 /**
