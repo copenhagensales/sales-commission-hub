@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2, Pencil, ChevronRight } from "lucide-react";
+import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, UserCheck, Mail, Loader2, Trash2, Pencil, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Link } from "react-router-dom";
 import {
