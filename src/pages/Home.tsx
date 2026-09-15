@@ -536,6 +536,10 @@ const Home = () => {
         {/* Pulsmåling der mangler besvarelse */}
         <PendingPulseSurveyBanner />
 
+        {/* Kvalitetsfeedback: sælgerens egne sager og teamets sager for ledere */}
+        <QualityFeedbackInbox />
+
+
 
         {/* ZONE 1: Hero + seneste 10 dage */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
