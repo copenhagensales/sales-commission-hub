@@ -249,6 +249,11 @@ export default function QualityControl() {
       toast({ title: "Vælg en fejltype", variant: "destructive" });
       return;
     }
+    // Både afvisning og feedback skal altid have en kommentar med.
+    if (commentText.trim().length === 0) {
+      toast({ title: "Skriv en kommentar", variant: "destructive" });
+      return;
+    }
 
     const items = resolved.items.map((item) => {
       let state: QualityItemState = "ok";
