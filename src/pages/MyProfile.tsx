@@ -2246,6 +2246,10 @@ export default function MyProfile() {
             </div>
           </TabsContent>
 
+          <TabsContent value="kvalitet" className="mt-6">
+            <QualityFeedbackHistory employeeId={employee?.id} />
+          </TabsContent>
+
           <TabsContent value="gdpr" className="mt-6">
             <GdprSettingsCard />
           </TabsContent>
