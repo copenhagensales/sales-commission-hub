@@ -188,8 +188,10 @@ export default function QualityControl() {
 
 
   /**
-   * Kommentar-dialogen: giver feedback til teamlederen med eller uden
-   * anmærkning. Godkendt med kommentar giver ingen fejlkode.
+   * To adskilte handlinger: "Send feedback" (salget står ved magt, gemmes som
+   * godkendt med bemærkning) og "Afvis salg" (trækning i kvalitetskontrollen).
+   * Begge er kun en markering — de påvirker ikke provision, løn, afregning,
+   * annullering eller nogen KPI.
    */
   const requiredCodes = useMemo(
     () =>
@@ -199,17 +201,20 @@ export default function QualityControl() {
     [errorCodes],
   );
 
-  const openComment = (row: QualityQueueRow) => {
+  const openComment = (row: QualityQueueRow, mode: "feedback" | "afvist") => {
     setCommentRow(row);
+    setCommentMode(mode);
     setCommentText("");
     setCommentCodeId(
-      requiredCodes.find((c) => c.code === "OA_IKKE_GODKENDT")?.id ??
-        requiredCodes[0]?.id ??
-        "",
+      mode === "feedback"
+        ? "none"
+        : requiredCodes.find((c) => c.code === "OA_IKKE_GODKENDT")?.id ??
+            requiredCodes[0]?.id ??
+            "",
     );
   };
 
-  const runCommentReview = async (approve: boolean) => {
+  const runCommentReview = async (mode: "feedback" | "afvist") => {
     const row = commentRow;
     if (!row) return;
 
@@ -219,26 +224,30 @@ export default function QualityControl() {
       return;
     }
 
+    const reject = mode === "afvist";
     const requiredItem =
       resolved.items.find((i) => i.item_type === "obligatorisk" && i.label.startsWith("OA")) ??
       resolved.items.find((i) => i.item_type === "obligatorisk");
 
-    if (!approve && !requiredItem) {
+    if (reject && !requiredItem) {
       toast({ title: "Tjeklisten har ingen obligatoriske punkter", variant: "destructive" });
       return;
     }
-    if (!approve && !commentCodeId) {
-      toast({ title: "Vælg en fejlkode", variant: "destructive" });
+    if (reject && (!commentCodeId || commentCodeId === "none")) {
+      toast({ title: "Vælg en fejltype", variant: "destructive" });
       return;
     }
 
     const items = resolved.items.map((item) => {
       let state: QualityItemState = "ok";
-      if (!approve) {
+      if (reject) {
         state = item.id === requiredItem!.id ? "mangler" : "ikke_relevant";
       }
       return { checklist_item_id: item.id, item_type: item.item_type, state };
     });
+
+    const errorCodeIds =
+      commentCodeId && commentCodeId !== "none" ? [commentCodeId] : [];
 
     setQuickSavingId(row.sale_id);
     try {
@@ -247,16 +256,17 @@ export default function QualityControl() {
         checklistId: resolved.checklist.id,
         checklistVersion: resolved.checklist.version,
         items,
-        errorCodeIds: approve ? [] : [commentCodeId],
+        errorCodeIds,
         comment: commentText,
         startedAt: new Date().toISOString(),
-        sendFeedbackMail: approve,
+        sendFeedbackMail: !reject,
+        intent: mode,
       });
       toast({
         title:
           saved.result === "afvist"
-            ? "Afvist og teamlederen har fået kommentaren"
-            : "Godkendt og feedback sendt til teamlederen",
+            ? "Salget er afvist — sælger og teamledelse er orienteret"
+            : "Feedback sendt til sælger og teamledelse",
       });
       setCommentRow(null);
       void queue.refetch();
