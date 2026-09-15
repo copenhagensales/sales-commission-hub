@@ -52,6 +52,9 @@ interface CohortMember {
     id: string;
     first_name: string;
     last_name: string;
+    work_email: string | null;
+    invitation_status: string | null;
+    auth_user_id: string | null;
   } | null;
 }
 
