@@ -555,8 +555,14 @@ export default function QualityControl() {
           Viser:{" "}
           <span className="font-semibold text-foreground">
             {activeTeam === "all"
-              ? "Alle kampagner"
+              ? "Alle teams"
               : teams.find(([id]) => id === activeTeam)?.[1] ?? "Ukendt"}
+          </span>{" "}
+          ·{" "}
+          <span className="font-semibold text-foreground">
+            {activeCampaign === "all"
+              ? "Alle kampagner"
+              : campaigns.find(([id]) => id === activeCampaign)?.[1] ?? "Ukendt"}
           </span>
         </p>
 
