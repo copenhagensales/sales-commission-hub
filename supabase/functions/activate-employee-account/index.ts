@@ -23,6 +23,19 @@ function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "Ukendt fejl";
+}
+
 function randomPassword(): string {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
@@ -218,7 +231,7 @@ serve(async (req) => {
     // 3. Kobl medarbejder til auth-bruger og sæt arbejdsmail (uden at overskrive en anden mail)
     const employeeUpdate: Record<string, unknown> = {
       auth_user_id: authUserId,
-      invitation_status: "active",
+      invitation_status: "completed",
     };
     const currentWorkEmail = (employee.work_email as string | null)?.toLowerCase() ?? null;
     if (!currentWorkEmail || currentWorkEmail === workEmail) {
@@ -282,7 +295,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("activate-employee-account fejl:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Ukendt fejl" }),
+      JSON.stringify({ error: getErrorMessage(error) }),
       { status: 500, headers: jsonHeaders },
     );
   }
