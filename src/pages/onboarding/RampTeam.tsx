@@ -652,12 +652,7 @@ function FeedbackDialog({
 
   useEffect(() => {
     textareaRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   const submit = () => {
     if (!ready || send.isPending) return;
@@ -679,7 +674,6 @@ function FeedbackDialog({
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-3 sm:items-center sm:p-4"
       style={{ background: "rgba(20,28,25,.45)" }}
-      onClick={onClose}
     >
       <div
         role="dialog"
