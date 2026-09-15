@@ -33,16 +33,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
   AlertTriangle,
   ArrowUpDown,
+  Check,
   CheckCircle2,
   Copy,
   Loader2,
   MessageSquare,
+  MoreHorizontal,
   Settings2,
+  Undo2,
+  XCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
