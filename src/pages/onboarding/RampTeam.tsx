@@ -679,7 +679,6 @@ function FeedbackDialog({
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-3 sm:items-center sm:p-4"
       style={{ background: "rgba(20,28,25,.45)" }}
-      onClick={onClose}
     >
       <div
         role="dialog"
