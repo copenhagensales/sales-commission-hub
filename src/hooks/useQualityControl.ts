@@ -389,6 +389,7 @@ export function useSaveQualityReview() {
       queryClient.invalidateQueries({ queryKey: ["quality-queue"] });
       queryClient.invalidateQueries({ queryKey: ["quality-overview"] });
       queryClient.invalidateQueries({ queryKey: ["quality-reviewer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["quality-feedback"] });
     },
   });
 }
