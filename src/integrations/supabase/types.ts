@@ -18011,6 +18011,15 @@ export type Database = {
       ramp_campaign_ids: { Args: { p_campaign: string }; Returns: string[] }
       ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
+      ramp_product_count: {
+        Args: {
+          p_campaigns: string[]
+          p_email: string
+          p_from: string
+          p_to: string
+        }
+        Returns: number
+      }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
       ramp_session_recipients: {
         Args: { p_employee_id: string }
