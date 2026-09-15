@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ensureTeamMembership } from "@/lib/employees/ensureTeamMembership";
+import { findExistingEmployeeByEmail } from "@/lib/employees/findExistingEmployeeByEmail";
 
 export interface ProcessableCohortMember {
   id: string;
@@ -169,14 +170,14 @@ export async function processCohortMember(
     // 2. Link cohort_members row back to the new employee
     const { error: memberError } = await supabase
       .from("cohort_members")
-      .update({ employee_id: employee.id, status: "confirmed" })
+      .update({ employee_id: employeeId, status: "confirmed" })
       .eq("id", member.id);
     if (memberError) throw memberError;
 
     // 3. Opret brugeradgang på arbejdsmailen + send velkomstmail
     //    (erstatter det gamle link-baserede invitationsflow, som SSO gjorde ubrugeligt)
     const activation = await activateEmployeeAccount({
-      employeeId: employee.id,
+      employeeId,
       workEmail,
       privateEmail: candidate.email,
       firstName: candidate.first_name,
@@ -227,7 +228,7 @@ export async function processCohortMember(
 
         const { error: mappingError } = await supabase
           .from("employee_agent_mapping")
-          .insert({ employee_id: employee.id, agent_id: agentId })
+          .insert({ employee_id: employeeId, agent_id: agentId })
           .select()
           .single();
         if (mappingError && !mappingError.message.includes("duplicate")) {
