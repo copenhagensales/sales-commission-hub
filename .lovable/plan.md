@@ -26,7 +26,23 @@ Derfor bygges der ingen parallel datastruktur — kun én ny kvitteringstabel ov
    - `get_quality_feedback_history(p_employee_id)` → permanent historik til profilen, med samme adgangsregler.
    - Kun sager med `result` i (`afvist`, `godkendt_med_bemaerkning`) og uden void kommer med.
 
-Ingen ændring i løn, provision, pricing, afregning eller annullering. Resultatet er fortsat kun internt kvalitetsoverblik.
+Ingen ændring i løn, provision, pricing, afregning eller annullering. Kvalitetsstatussen bliver ved med at ligge udelukkende i kvalitetstabellerne, adskilt fra salgs-, provisions-, annullerings- og KPI-data, så den senere kan gives en konsekvens uden ombygning. Der bygges ingen kobling til annulleringsprocent, churn, attrition eller andre nøgletal.
+
+## To adskilte handlinger for kontrollanten
+
+I kontrolfladen (`src/pages/quality/QualityControl.tsx`) erstattes den nuværende samlede kommentar-dialog med to tydeligt adskilte knapper — ikke en dropdown:
+
+- **Send feedback** (løftet pegefinger, dæmpet gul): små ting, salget står ved magt → `result = godkendt_med_bemaerkning`.
+- **Afvis salg** (rød): store fejl → `result = afvist`.
+
+Begge åbner samme lille felt med fejltype(r) og kommentar; ved afvisning kræves mindst én fejltype som i dag. Kvalitetskontrollanten (og superadmin) kan gøre det alene — der bygges intet godkendelsestrin.
+
+Teknisk: `save_quality_review` udvides med en valgfri hensigt (`feedback` / `afvist`), så en feedback-sag gemmes som `godkendt_med_bemaerkning` selv når alle obligatoriske punkter er OK. Den nuværende automatiske udledning fra tjeklisten bevares uændret for de almindelige kontroller, og eksisterende kald virker videre.
+
+## Tekst til sælgeren
+
+- Afvist: "Salget er afvist i kvalitetskontrollen. Det påvirker ikke din provision." står som fast linje i kassen.
+- Feedback: fast linje om at salget står ved magt, og at det kun er en tilbagemelding.
 
 ## Frontend
 

@@ -81,3 +81,10 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 - [ ] Frontend: `useIsSuperadmin`, guards på DB pr. klient, DB-oversigt, Omsætning per klient, Beregningsindstillinger, personalelønfaner, Excel-eksport
 - [ ] Erstat `select("*")` på `employee_master_data` (7 steder) + vagtplanens lønopslag
 
+
+## Kvalitetsfeedback 1.0 (åben)
+- [ ] Kvitteringstabel + RLS + RPC'er for tilbagemeldinger
+- [ ] Forsidekasse til sælger og teamledelse (live, kø, ingen fokus-tyveri)
+- [ ] Permanent historik på profil
+- [ ] To adskilte kontrollant-knapper: "Send feedback" og "Afvis salg"
+- [ ] Tydelig tekst: afvisning påvirker ikke provision; ingen KPI-kobling
