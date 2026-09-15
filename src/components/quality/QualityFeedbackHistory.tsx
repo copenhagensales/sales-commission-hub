@@ -26,8 +26,8 @@ export function QualityFeedbackHistory({ employeeId }: { employeeId?: string | n
       <CardHeader>
         <CardTitle>Kvalitetstilbagemeldinger</CardTitle>
         <CardDescription>
-          Tilbagemeldinger fra kvalitetskontrollen. De påvirker ikke provision, løn eller
-          annulleringer.
+          Tilbagemeldinger fra kvalitetskontrollen.
+
         </CardDescription>
       </CardHeader>
       <CardContent>
