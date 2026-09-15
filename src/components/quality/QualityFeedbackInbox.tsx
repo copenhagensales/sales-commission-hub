@@ -163,8 +163,17 @@ export function QualityFeedbackInbox() {
               : "Salget står ved magt. Det er en tilbagemelding — ikke en anmærkning, og det påvirker ikke din provision."}
         </p>
 
-        <div className="mt-3 flex justify-end">
-          <Button size="sm" onClick={() => void handleAck()} disabled={acknowledge.isPending}>
+        <div className="mt-3 flex items-center justify-end gap-3">
+          {viewAsActive && (
+            <span className="text-xs text-muted-foreground">
+              Du ser Stork som en anden — kvittering er slået fra.
+            </span>
+          )}
+          <Button
+            size="sm"
+            onClick={() => void handleAck()}
+            disabled={acknowledge.isPending || viewAsActive}
+          >
             {acknowledge.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLeader ? "Set" : "OK"}
           </Button>
