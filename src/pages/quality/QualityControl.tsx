@@ -33,14 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -51,7 +43,6 @@ import {
   Copy,
   Loader2,
   MessageSquare,
-  MoreHorizontal,
   Settings2,
   Undo2,
   XCircle,
@@ -247,6 +238,11 @@ export default function QualityControl() {
     }
     if (reject && (!commentCodeId || commentCodeId === "none")) {
       toast({ title: "Vælg en fejltype", variant: "destructive" });
+      return;
+    }
+    // Både afvisning og feedback skal altid have en kommentar med.
+    if (commentText.trim().length === 0) {
+      toast({ title: "Skriv en kommentar", variant: "destructive" });
       return;
     }
 
@@ -803,90 +799,43 @@ export default function QualityControl() {
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             ) : (
                               <>
-                                {row.status === "ikke_kontrolleret" ? (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      className="h-8 bg-success px-3 text-xs font-semibold text-success-foreground hover:bg-success/90"
-                                      onClick={() => void runQuickReview(row, "godkendt")}
-                                    >
-                                      <Check className="mr-1 h-3.5 w-3.5" />
-                                      Godkend
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-8 border-destructive/40 px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
-                                      onClick={() => openComment(row, "afvist")}
-                                    >
-                                      <XCircle className="mr-1 h-3.5 w-3.5" />
-                                      Afvis
-                                    </Button>
-                                  </>
-                                ) : (
+                                <Button
+                                  size="sm"
+                                  className="h-8 bg-success px-3 text-xs font-semibold text-success-foreground hover:bg-success/90"
+                                  onClick={() => void runQuickReview(row, "godkendt")}
+                                >
+                                  <Check className="mr-1 h-3.5 w-3.5" />
+                                  Godkend
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 border-destructive/40 px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
+                                  onClick={() => openComment(row, "afvist")}
+                                >
+                                  <XCircle className="mr-1 h-3.5 w-3.5" />
+                                  Afvis
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 border-warning/40 px-3 text-xs font-medium text-warning hover:bg-warning/10"
+                                  onClick={() => openComment(row, "feedback")}
+                                >
+                                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                                  Feedback
+                                </Button>
+                                {row.status !== "ikke_kontrolleret" && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
+                                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
                                     onClick={() => void runUndoReview(row)}
+                                    title="Fortryd kontrollen"
                                   >
-                                    <Undo2 className="mr-1 h-3.5 w-3.5" />
-                                    Fortryd
+                                    <Undo2 className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8"
-                                      title="Flere handlinger"
-                                    >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuLabel>Hurtige handlinger</DropdownMenuLabel>
-                                    <DropdownMenuItem
-                                      onClick={() => void runQuickReview(row, "godkendt")}
-                                    >
-                                      <Check className="mr-2 h-4 w-4 text-success" />
-                                      Godkend
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => void runQuickReview(row, "oa_mangler")}
-                                    >
-                                      <AlertTriangle className="mr-2 h-4 w-4 text-destructive" />
-                                      OA mangler
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => void runQuickReview(row, "oa_ikke_godkendt")}
-                                    >
-                                      <AlertTriangle className="mr-2 h-4 w-4 text-destructive" />
-                                      OA ikke godkendt
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuLabel>Med kommentar</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={() => openComment(row, "feedback")}>
-                                      <MessageSquare className="mr-2 h-4 w-4 text-warning" />
-                                      Send feedback
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => openComment(row, "afvist")}>
-                                      <XCircle className="mr-2 h-4 w-4 text-destructive" />
-                                      Afvis salg
-                                    </DropdownMenuItem>
-                                    {row.status !== "ikke_kontrolleret" && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => void runUndoReview(row)}>
-                                          <Undo2 className="mr-2 h-4 w-4" />
-                                          Fortryd kontrol
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
                               </>
                             )}
                           </div>
@@ -931,7 +880,7 @@ export default function QualityControl() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="kvalitet-kommentar">
-                Kommentar (max 500 tegn)
+                Kommentar (påkrævet, max 500 tegn)
               </label>
               <Textarea
                 id="kvalitet-kommentar"
@@ -976,7 +925,7 @@ export default function QualityControl() {
             {commentMode === "afvist" ? (
               <Button
                 variant="destructive"
-                disabled={saveReview.isPending}
+                disabled={saveReview.isPending || commentText.trim().length === 0}
                 onClick={() => void runCommentReview("afvist")}
               >
                 {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -986,7 +935,7 @@ export default function QualityControl() {
               <Button
                 variant="outline"
                 className="border-warning/40 text-warning hover:bg-warning/10"
-                disabled={saveReview.isPending}
+                disabled={saveReview.isPending || commentText.trim().length === 0}
                 onClick={() => void runCommentReview("feedback")}
               >
                 {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
