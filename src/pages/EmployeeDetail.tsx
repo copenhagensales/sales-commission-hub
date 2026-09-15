@@ -711,7 +711,15 @@ export default function EmployeeDetail() {
               <History className="h-4 w-4 mr-2" />
               Historik
             </TabsTrigger>
+            <TabsTrigger value="kvalitet">
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Kvalitet
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="kvalitet" className="mt-6">
+            <QualityFeedbackHistory employeeId={id} />
+          </TabsContent>
 
           <TabsContent value="stamdata" className="mt-6">
             <div className="grid gap-4 md:grid-cols-2">
