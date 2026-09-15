@@ -516,6 +516,10 @@ export default function UpcomingStarts() {
                       : "Ukendt";
                   const position = member.candidate?.applied_position;
                   const canRemove = canEdit && cohort.status !== "completed" && cohort.status !== "cancelled";
+                  const isActivated = Boolean(
+                    member.employee?.auth_user_id &&
+                      member.employee?.invitation_status === "completed"
+                  );
                   
                   return (
                     <div 
