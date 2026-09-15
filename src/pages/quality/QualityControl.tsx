@@ -62,10 +62,12 @@ import {
   type QualityQueueRow,
 } from "@/hooks/useQualityControl";
 import {
+  addDays,
   datesForQualityDay,
   defaultQualityDate,
   formatDanishDate,
   formatDanishTime,
+  todayInCopenhagen,
 } from "@/lib/qualityDates";
 import { QualityScorePanel } from "@/components/quality/QualityScorePanel";
 
