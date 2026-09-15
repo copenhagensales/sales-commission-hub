@@ -373,15 +373,9 @@ export function useSaveQualityReview() {
 
       const saved = data as unknown as { review_id: string; result: QualityResult };
 
-      if (saved.result === "afvist") {
-        await supabase.functions.invoke("quality-mails", {
-          body: { action: "rejected_review", review_id: saved.review_id },
-        });
-      } else if (input.sendFeedbackMail) {
-        await supabase.functions.invoke("quality-mails", {
-          body: { action: "feedback_review", review_id: saved.review_id },
-        });
-      }
+      // Ingen straks-mail til lederne. Sagen vises live i Stork, og lederne
+      // modtager i stedet én daglig opsummering (action = "daily_summary").
+
 
       return { reviewId: saved.review_id, result: saved.result };
     },
