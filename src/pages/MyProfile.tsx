@@ -1200,6 +1200,10 @@ export default function MyProfile() {
               <Sparkles className="h-4 w-4 mr-2" />
               Karriere
             </TabsTrigger>
+            <TabsTrigger value="kvalitet">
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Kvalitet
+            </TabsTrigger>
             <TabsTrigger value="gdpr">
               <Shield className="h-4 w-4 mr-2" />
               GDPR
