@@ -29,6 +29,25 @@ function randomPassword(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("") + "Aa1!";
 }
 
+// auth.users er ikke tilgængelig via PostgREST — brug GoTrue admin-API'et.
+async function findAuthUserIdByEmail(email: string): Promise<string | undefined> {
+  const base = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!base || !key) return undefined;
+
+  const url = `${base}/auth/v1/admin/users?per_page=200&filter=${encodeURIComponent(email)}`;
+  const res = await fetch(url, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) {
+    console.error("admin users-opslag fejlede:", res.status, await res.text());
+    return undefined;
+  }
+  const payload = (await res.json()) as { users?: Array<{ id: string; email?: string | null }> };
+  const target = email.toLowerCase();
+  return payload.users?.find((u) => (u.email ?? "").toLowerCase() === target)?.id;
+}
+
 function formatDanishDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const date = new Date(`${value}T00:00:00`);
