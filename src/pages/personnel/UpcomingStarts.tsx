@@ -106,7 +106,11 @@ export default function UpcomingStarts() {
     agentEmail: string | null;
     employeeId: string | null;
   } | null>(null);
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [selectedMemberForActivation, setSelectedMemberForActivation] =
+    useState<ActivateMemberTarget | null>(null);
   const [editCohortDialogOpen, setEditCohortDialogOpen] = useState(false);
+
   const [selectedCohortForEdit, setSelectedCohortForEdit] = useState<{
     id: string;
     name: string;
