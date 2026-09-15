@@ -134,9 +134,30 @@ export default function QualityControl() {
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "da"));
   }, [rows]);
 
+  /**
+   * Kampagnefilter. Grupperer efter kampagnen på salget (client_campaign_id),
+   * så man kan se én kampagne ad gangen. Rent visuelt filter.
+   */
+  const [activeCampaign, setActiveCampaign] = useState<string>("all");
+
+  const campaigns = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      const key = row.client_campaign_id ?? "ukendt";
+      if (!map.has(key)) map.set(key, row.campaign_name ?? "Uden kampagne");
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "da"));
+  }, [rows]);
+
   const filteredRows = useMemo(
-    () => (activeTeam === "all" ? rows : rows.filter((r) => r.team_id === activeTeam)),
-    [rows, activeTeam],
+    () =>
+      rows.filter(
+        (r) =>
+          (activeTeam === "all" || r.team_id === activeTeam) &&
+          (activeCampaign === "all" ||
+            (r.client_campaign_id ?? "ukendt") === activeCampaign),
+      ),
+    [rows, activeTeam, activeCampaign],
   );
 
   /**
