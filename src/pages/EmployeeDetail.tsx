@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock, Trash2, ShieldCheck } from "lucide-react";
+import { QualityFeedbackHistory } from "@/components/quality/QualityFeedbackHistory";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
@@ -711,7 +712,15 @@ export default function EmployeeDetail() {
               <History className="h-4 w-4 mr-2" />
               Historik
             </TabsTrigger>
+            <TabsTrigger value="kvalitet">
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Kvalitet
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="kvalitet" className="mt-6">
+            <QualityFeedbackHistory employeeId={id} />
+          </TabsContent>
 
           <TabsContent value="stamdata" className="mt-6">
             <div className="grid gap-4 md:grid-cols-2">

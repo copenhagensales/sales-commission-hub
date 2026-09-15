@@ -83,8 +83,8 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 
 
 ## Kvalitetsfeedback 1.0 (åben)
-- [ ] Kvitteringstabel + RLS + RPC'er for tilbagemeldinger
-- [ ] Forsidekasse til sælger og teamledelse (live, kø, ingen fokus-tyveri)
-- [ ] Permanent historik på profil
-- [ ] To adskilte kontrollant-knapper: "Send feedback" og "Afvis salg"
-- [ ] Tydelig tekst: afvisning påvirker ikke provision; ingen KPI-kobling
+- [x] Kvitteringstabel + RLS + RPC'er for tilbagemeldinger
+- [x] Forsidekasse til sælger og teamledelse (live, kø, ingen fokus-tyveri)
+- [x] Permanent historik på profil (fanen "Kvalitet")
+- [x] To adskilte kontrollant-knapper: "Send feedback" og "Afvis salg"
+- [x] Tydelig tekst: afvisning påvirker ikke provision; ingen KPI-kobling

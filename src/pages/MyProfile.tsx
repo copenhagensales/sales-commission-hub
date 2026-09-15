@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUploadMyAvatar, useRemoveMyAvatar } from "@/hooks/useMyAvatar";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen, Camera, Loader2 } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, ShieldCheck, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen, Camera, Loader2 } from "lucide-react";
+import { QualityFeedbackHistory } from "@/components/quality/QualityFeedbackHistory";
 import { downloadContractAsPdf } from "@/utils/contractPdfGenerator";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
@@ -1200,6 +1201,10 @@ export default function MyProfile() {
               <Sparkles className="h-4 w-4 mr-2" />
               Karriere
             </TabsTrigger>
+            <TabsTrigger value="kvalitet">
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Kvalitet
+            </TabsTrigger>
             <TabsTrigger value="gdpr">
               <Shield className="h-4 w-4 mr-2" />
               GDPR
@@ -2239,6 +2244,10 @@ export default function MyProfile() {
                 </Card>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="kvalitet" className="mt-6">
+            <QualityFeedbackHistory employeeId={employee?.id} />
           </TabsContent>
 
           <TabsContent value="gdpr" className="mt-6">

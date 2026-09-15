@@ -109,6 +109,7 @@ export default function QualityControl() {
   const [date, setDate] = useState(defaultQualityDate());
   const [activeTeam, setActiveTeam] = useState<string>("all");
   const [commentRow, setCommentRow] = useState<QualityQueueRow | null>(null);
+  const [commentMode, setCommentMode] = useState<"feedback" | "afvist">("feedback");
   const [commentText, setCommentText] = useState("");
   const [commentCodeId, setCommentCodeId] = useState("");
   const [confirmFinish, setConfirmFinish] = useState(false);
@@ -187,8 +188,10 @@ export default function QualityControl() {
 
 
   /**
-   * Kommentar-dialogen: giver feedback til teamlederen med eller uden
-   * anmærkning. Godkendt med kommentar giver ingen fejlkode.
+   * To adskilte handlinger: "Send feedback" (salget står ved magt, gemmes som
+   * godkendt med bemærkning) og "Afvis salg" (trækning i kvalitetskontrollen).
+   * Begge er kun en markering — de påvirker ikke provision, løn, afregning,
+   * annullering eller nogen KPI.
    */
   const requiredCodes = useMemo(
     () =>
@@ -198,17 +201,20 @@ export default function QualityControl() {
     [errorCodes],
   );
 
-  const openComment = (row: QualityQueueRow) => {
+  const openComment = (row: QualityQueueRow, mode: "feedback" | "afvist") => {
     setCommentRow(row);
+    setCommentMode(mode);
     setCommentText("");
     setCommentCodeId(
-      requiredCodes.find((c) => c.code === "OA_IKKE_GODKENDT")?.id ??
-        requiredCodes[0]?.id ??
-        "",
+      mode === "feedback"
+        ? "none"
+        : requiredCodes.find((c) => c.code === "OA_IKKE_GODKENDT")?.id ??
+            requiredCodes[0]?.id ??
+            "",
     );
   };
 
-  const runCommentReview = async (approve: boolean) => {
+  const runCommentReview = async (mode: "feedback" | "afvist") => {
     const row = commentRow;
     if (!row) return;
 
@@ -218,26 +224,30 @@ export default function QualityControl() {
       return;
     }
 
+    const reject = mode === "afvist";
     const requiredItem =
       resolved.items.find((i) => i.item_type === "obligatorisk" && i.label.startsWith("OA")) ??
       resolved.items.find((i) => i.item_type === "obligatorisk");
 
-    if (!approve && !requiredItem) {
+    if (reject && !requiredItem) {
       toast({ title: "Tjeklisten har ingen obligatoriske punkter", variant: "destructive" });
       return;
     }
-    if (!approve && !commentCodeId) {
-      toast({ title: "Vælg en fejlkode", variant: "destructive" });
+    if (reject && (!commentCodeId || commentCodeId === "none")) {
+      toast({ title: "Vælg en fejltype", variant: "destructive" });
       return;
     }
 
     const items = resolved.items.map((item) => {
       let state: QualityItemState = "ok";
-      if (!approve) {
+      if (reject) {
         state = item.id === requiredItem!.id ? "mangler" : "ikke_relevant";
       }
       return { checklist_item_id: item.id, item_type: item.item_type, state };
     });
+
+    const errorCodeIds =
+      commentCodeId && commentCodeId !== "none" ? [commentCodeId] : [];
 
     setQuickSavingId(row.sale_id);
     try {
@@ -246,16 +256,17 @@ export default function QualityControl() {
         checklistId: resolved.checklist.id,
         checklistVersion: resolved.checklist.version,
         items,
-        errorCodeIds: approve ? [] : [commentCodeId],
+        errorCodeIds,
         comment: commentText,
         startedAt: new Date().toISOString(),
-        sendFeedbackMail: approve,
+        sendFeedbackMail: !reject,
+        intent: mode,
       });
       toast({
         title:
           saved.result === "afvist"
-            ? "Afvist og teamlederen har fået kommentaren"
-            : "Godkendt og feedback sendt til teamlederen",
+            ? "Salget er afvist — sælger og teamledelse er orienteret"
+            : "Feedback sendt til sælger og teamledelse",
       });
       setCommentRow(null);
       void queue.refetch();
@@ -772,7 +783,10 @@ export default function QualityControl() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="ml-auto flex max-w-[260px] flex-wrap justify-end gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             {quickSavingId === row.sale_id ? (
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             ) : (
@@ -804,11 +818,19 @@ export default function QualityControl() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => openComment(row)}
+                                  className="h-7 border-warning/40 px-2 text-xs text-warning hover:bg-warning/10"
+                                  onClick={() => openComment(row, "feedback")}
                                 >
                                   <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                                  Kommentar
+                                  Send feedback
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => openComment(row, "afvist")}
+                                >
+                                  Afvis salg
                                 </Button>
                                 {row.status !== "ikke_kontrolleret" && (
                                   <Button
@@ -837,7 +859,9 @@ export default function QualityControl() {
       <Dialog open={!!commentRow} onOpenChange={(open) => !open && setCommentRow(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Kommentar til teamlederen</DialogTitle>
+            <DialogTitle>
+              {commentMode === "afvist" ? "Afvis salg" : "Send feedback"}
+            </DialogTitle>
             <DialogDescription>
               {commentRow
                 ? `${commentRow.seller_name ?? "Ukendt sælger"} · ${
@@ -848,6 +872,18 @@ export default function QualityControl() {
           </DialogHeader>
 
           <div className="space-y-4">
+            <div
+              className={`rounded-md border-l-2 px-3 py-2 text-xs leading-snug ${
+                commentMode === "afvist"
+                  ? "border-l-destructive bg-destructive/5 text-destructive"
+                  : "border-l-warning bg-warning/5 text-warning"
+              }`}
+            >
+              {commentMode === "afvist"
+                ? "Salget markeres som afvist i kvalitetskontrollen. Det påvirker ikke sælgerens provision, løn, afregning eller annulleringer."
+                : "Salget står ved magt. Sælgeren får en tilbagemelding — ikke en anmærkning."}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="kvalitet-kommentar">
                 Kommentar (max 500 tegn)
@@ -857,18 +893,27 @@ export default function QualityControl() {
                 value={commentText}
                 maxLength={500}
                 rows={5}
-                placeholder="Skriv feedback til teamlederen …"
+                placeholder={
+                  commentMode === "afvist"
+                    ? "Skriv hvorfor salget afvises …"
+                    : "Skriv din tilbagemelding til sælgeren …"
+                }
                 onChange={(e) => setCommentText(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium">Fejlkode ved "Send og ikke godkend"</p>
+              <p className="text-sm font-medium">
+                {commentMode === "afvist" ? "Fejltype (påkrævet)" : "Fejltype (valgfri)"}
+              </p>
               <Select value={commentCodeId} onValueChange={setCommentCodeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Vælg fejlkode" />
+                  <SelectValue placeholder="Vælg fejltype" />
                 </SelectTrigger>
                 <SelectContent>
+                  {commentMode === "feedback" && (
+                    <SelectItem value="none">Ingen fejltype</SelectItem>
+                  )}
                   {requiredCodes.map((code) => (
                     <SelectItem key={code.id} value={code.id}>
                       {code.label}
@@ -876,31 +921,33 @@ export default function QualityControl() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Bruges kun hvis salget ikke godkendes. Ved "Send men godkend" gives ingen
-                anmærkning.
-              </p>
             </div>
           </div>
 
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button
-              variant="outline"
-              className="border-success/40 text-success hover:bg-success/10"
-              disabled={saveReview.isPending}
-              onClick={() => void runCommentReview(true)}
-            >
-              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send men godkend
+            <Button variant="outline" onClick={() => setCommentRow(null)}>
+              Annullér
             </Button>
-            <Button
-              variant="destructive"
-              disabled={saveReview.isPending}
-              onClick={() => void runCommentReview(false)}
-            >
-              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send og ikke godkend
-            </Button>
+            {commentMode === "afvist" ? (
+              <Button
+                variant="destructive"
+                disabled={saveReview.isPending}
+                onClick={() => void runCommentReview("afvist")}
+              >
+                {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Afvis salg
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="border-warning/40 text-warning hover:bg-warning/10"
+                disabled={saveReview.isPending}
+                onClick={() => void runCommentReview("feedback")}
+              >
+                {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send feedback
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

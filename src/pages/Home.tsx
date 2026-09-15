@@ -59,6 +59,7 @@ import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { PendingContractBanner } from "@/components/home/PendingContractBanner";
 import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBanner";
+import { QualityFeedbackInbox } from "@/components/quality/QualityFeedbackInbox";
 import { EventGallery } from "@/components/home/EventGallery";
 import { RampCurveCard } from "@/components/ramp/RampCurveCard";
 
@@ -535,6 +536,10 @@ const Home = () => {
 
         {/* Pulsmåling der mangler besvarelse */}
         <PendingPulseSurveyBanner />
+
+        {/* Kvalitetsfeedback: sælgerens egne sager og teamets sager for ledere */}
+        <QualityFeedbackInbox />
+
 
 
         {/* ZONE 1: Hero + seneste 10 dage */}
