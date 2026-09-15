@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ensureTeamMembership } from "@/lib/employees/ensureTeamMembership";
+import { findExistingEmployeeByEmail } from "@/lib/employees/findExistingEmployeeByEmail";
 
 export interface ProcessableCohortMember {
   id: string;
@@ -96,43 +97,87 @@ export async function processCohortMember(
   }
 
   try {
-    // 1. Create employee record with daily_bonus_client_id
-    const { data: employee, error: empError } = await supabase
-      .from("employee_master_data")
-      .insert({
-        first_name: candidate.first_name,
-        last_name: candidate.last_name,
-        private_email: candidate.email,
-        private_phone: candidate.phone,
-        job_title: candidate.applied_position,
-        employment_start_date: startDate,
-        team_id: cohort.team_id,
-        is_active: true,
-        invitation_status: "pending",
-        daily_bonus_client_id: member.daily_bonus_client_id,
-      })
-      .select()
-      .single();
+    // 1. Genbrug et eksisterende stamkort hvis medarbejderen allerede findes.
+    //    Databasen har en dublet-spærring (trg_prevent_duplicate_employee), så et
+    //    blindt insert fejler for folk der allerede er oprettet manuelt.
+    const existing = await findExistingEmployeeByEmail(workEmail, candidate.email);
 
-    if (empError) throw empError;
+    let employeeId: string;
+
+    if (existing) {
+      // Udfyld KUN tomme felter — eksisterende data må ikke overskrives.
+      const { data: current, error: currentErr } = await supabase
+        .from("employee_master_data")
+        .select(
+          "id, is_active, job_title, private_phone, private_email, employment_start_date, daily_bonus_client_id",
+        )
+        .eq("id", existing.id)
+        .single();
+      if (currentErr) throw currentErr;
+
+      const patch: Record<string, unknown> = {};
+      if (!current.is_active) patch.is_active = true;
+      if (!current.job_title && candidate.applied_position) {
+        patch.job_title = candidate.applied_position;
+      }
+      if (!current.private_phone && candidate.phone) patch.private_phone = candidate.phone;
+      if (!current.private_email && candidate.email) patch.private_email = candidate.email;
+      if (!current.employment_start_date && startDate) {
+        patch.employment_start_date = startDate;
+      }
+      if (!current.daily_bonus_client_id && member.daily_bonus_client_id) {
+        patch.daily_bonus_client_id = member.daily_bonus_client_id;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        const { error: patchErr } = await supabase
+          .from("employee_master_data")
+          .update(patch)
+          .eq("id", current.id);
+        if (patchErr) throw patchErr;
+      }
+
+      employeeId = current.id;
+    } else {
+      const { data: employee, error: empError } = await supabase
+        .from("employee_master_data")
+        .insert({
+          first_name: candidate.first_name,
+          last_name: candidate.last_name,
+          private_email: candidate.email,
+          private_phone: candidate.phone,
+          job_title: candidate.applied_position,
+          employment_start_date: startDate,
+          team_id: cohort.team_id,
+          is_active: true,
+          invitation_status: "pending",
+          daily_bonus_client_id: member.daily_bonus_client_id,
+        })
+        .select()
+        .single();
+
+      if (empError) throw empError;
+      employeeId = employee.id;
+    }
 
     // 1b. Team membership (team_members is the authoritative source of truth —
     // employee_master_data.team_id above is only the planned team)
     if (cohort.team_id) {
-      await ensureTeamMembership({ employeeId: employee.id, teamId: cohort.team_id });
+      await ensureTeamMembership({ employeeId, teamId: cohort.team_id });
     }
+
 
     // 2. Link cohort_members row back to the new employee
     const { error: memberError } = await supabase
       .from("cohort_members")
-      .update({ employee_id: employee.id, status: "confirmed" })
+      .update({ employee_id: employeeId, status: "confirmed" })
       .eq("id", member.id);
     if (memberError) throw memberError;
 
     // 3. Opret brugeradgang på arbejdsmailen + send velkomstmail
     //    (erstatter det gamle link-baserede invitationsflow, som SSO gjorde ubrugeligt)
     const activation = await activateEmployeeAccount({
-      employeeId: employee.id,
+      employeeId,
       workEmail,
       privateEmail: candidate.email,
       firstName: candidate.first_name,
@@ -183,7 +228,7 @@ export async function processCohortMember(
 
         const { error: mappingError } = await supabase
           .from("employee_agent_mapping")
-          .insert({ employee_id: employee.id, agent_id: agentId })
+          .insert({ employee_id: employeeId, agent_id: agentId })
           .select()
           .single();
         if (mappingError && !mappingError.message.includes("duplicate")) {
