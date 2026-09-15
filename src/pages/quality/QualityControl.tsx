@@ -33,14 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -51,7 +43,6 @@ import {
   Copy,
   Loader2,
   MessageSquare,
-  MoreHorizontal,
   Settings2,
   Undo2,
   XCircle,
@@ -889,7 +880,7 @@ export default function QualityControl() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="kvalitet-kommentar">
-                Kommentar (max 500 tegn)
+                Kommentar (påkrævet, max 500 tegn)
               </label>
               <Textarea
                 id="kvalitet-kommentar"
@@ -934,7 +925,7 @@ export default function QualityControl() {
             {commentMode === "afvist" ? (
               <Button
                 variant="destructive"
-                disabled={saveReview.isPending}
+                disabled={saveReview.isPending || commentText.trim().length === 0}
                 onClick={() => void runCommentReview("afvist")}
               >
                 {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -944,7 +935,7 @@ export default function QualityControl() {
               <Button
                 variant="outline"
                 className="border-warning/40 text-warning hover:bg-warning/10"
-                disabled={saveReview.isPending}
+                disabled={saveReview.isPending || commentText.trim().length === 0}
                 onClick={() => void runCommentReview("feedback")}
               >
                 {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
