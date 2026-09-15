@@ -115,10 +115,20 @@ function FeedbackRow({
           )}
         </div>
 
-        <Button size="sm" variant="outline" onClick={onAcknowledge} disabled={disabled}>
+        <Button
+          size="sm"
+          onClick={onAcknowledge}
+          disabled={disabled}
+          className={`shrink-0 font-semibold shadow-sm ${
+            rejected
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              : "bg-warning text-warning-foreground hover:bg-warning/90"
+          }`}
+        >
           {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLeader ? "Set" : "OK"}
+          {isLeader ? "Set — fjern" : "OK, forstået"}
         </Button>
+
       </div>
     </div>
   );
