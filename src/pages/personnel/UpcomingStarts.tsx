@@ -869,6 +869,13 @@ export default function UpcomingStarts() {
         onOpenChange={setEditCohortDialogOpen}
         cohort={selectedCohortForEdit}
       />
+
+      <ActivateMemberDialog
+        open={activateDialogOpen}
+        onOpenChange={setActivateDialogOpen}
+        target={selectedMemberForActivation}
+      />
+
     </MainLayout>
   );
 }
