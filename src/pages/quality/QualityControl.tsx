@@ -838,7 +838,9 @@ export default function QualityControl() {
       <Dialog open={!!commentRow} onOpenChange={(open) => !open && setCommentRow(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Kommentar til teamlederen</DialogTitle>
+            <DialogTitle>
+              {commentMode === "afvist" ? "Afvis salg" : "Send feedback"}
+            </DialogTitle>
             <DialogDescription>
               {commentRow
                 ? `${commentRow.seller_name ?? "Ukendt sælger"} · ${
@@ -849,6 +851,18 @@ export default function QualityControl() {
           </DialogHeader>
 
           <div className="space-y-4">
+            <div
+              className={`rounded-md border-l-2 px-3 py-2 text-xs leading-snug ${
+                commentMode === "afvist"
+                  ? "border-l-destructive bg-destructive/5 text-destructive"
+                  : "border-l-warning bg-warning/5 text-warning"
+              }`}
+            >
+              {commentMode === "afvist"
+                ? "Salget markeres som afvist i kvalitetskontrollen. Det påvirker ikke sælgerens provision, løn, afregning eller annulleringer."
+                : "Salget står ved magt. Sælgeren får en tilbagemelding — ikke en anmærkning."}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="kvalitet-kommentar">
                 Kommentar (max 500 tegn)
@@ -858,18 +872,27 @@ export default function QualityControl() {
                 value={commentText}
                 maxLength={500}
                 rows={5}
-                placeholder="Skriv feedback til teamlederen …"
+                placeholder={
+                  commentMode === "afvist"
+                    ? "Skriv hvorfor salget afvises …"
+                    : "Skriv din tilbagemelding til sælgeren …"
+                }
                 onChange={(e) => setCommentText(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium">Fejlkode ved "Send og ikke godkend"</p>
+              <p className="text-sm font-medium">
+                {commentMode === "afvist" ? "Fejltype (påkrævet)" : "Fejltype (valgfri)"}
+              </p>
               <Select value={commentCodeId} onValueChange={setCommentCodeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Vælg fejlkode" />
+                  <SelectValue placeholder="Vælg fejltype" />
                 </SelectTrigger>
                 <SelectContent>
+                  {commentMode === "feedback" && (
+                    <SelectItem value="none">Ingen fejltype</SelectItem>
+                  )}
                   {requiredCodes.map((code) => (
                     <SelectItem key={code.id} value={code.id}>
                       {code.label}
@@ -877,31 +900,33 @@ export default function QualityControl() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Bruges kun hvis salget ikke godkendes. Ved "Send men godkend" gives ingen
-                anmærkning.
-              </p>
             </div>
           </div>
 
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button
-              variant="outline"
-              className="border-success/40 text-success hover:bg-success/10"
-              disabled={saveReview.isPending}
-              onClick={() => void runCommentReview(true)}
-            >
-              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send men godkend
+            <Button variant="outline" onClick={() => setCommentRow(null)}>
+              Annullér
             </Button>
-            <Button
-              variant="destructive"
-              disabled={saveReview.isPending}
-              onClick={() => void runCommentReview(false)}
-            >
-              {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send og ikke godkend
-            </Button>
+            {commentMode === "afvist" ? (
+              <Button
+                variant="destructive"
+                disabled={saveReview.isPending}
+                onClick={() => void runCommentReview("afvist")}
+              >
+                {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Afvis salg
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="border-warning/40 text-warning hover:bg-warning/10"
+                disabled={saveReview.isPending}
+                onClick={() => void runCommentReview("feedback")}
+              >
+                {saveReview.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send feedback
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
