@@ -109,6 +109,7 @@ export default function QualityControl() {
   const [date, setDate] = useState(defaultQualityDate());
   const [activeTeam, setActiveTeam] = useState<string>("all");
   const [commentRow, setCommentRow] = useState<QualityQueueRow | null>(null);
+  const [commentMode, setCommentMode] = useState<"feedback" | "afvist">("feedback");
   const [commentText, setCommentText] = useState("");
   const [commentCodeId, setCommentCodeId] = useState("");
   const [confirmFinish, setConfirmFinish] = useState(false);
