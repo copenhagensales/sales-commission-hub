@@ -545,6 +545,33 @@ export default function UpcomingStarts() {
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
+                        {canEdit && cohort.status !== "cancelled" && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 shrink-0 text-xs"
+                            onClick={() => {
+                              setSelectedMemberForActivation({
+                                memberId: member.id,
+                                name,
+                                employeeId: member.employee_id,
+                                agentEmail: member.agent_email,
+                                dailyBonusClientId: member.daily_bonus_client_id,
+                                candidate: member.candidate ?? null,
+                                cohort: {
+                                  id: cohort.id,
+                                  team_id: cohort.team_id,
+                                  start_date: cohort.start_date,
+                                },
+                              });
+                              setActivateDialogOpen(true);
+                            }}
+                          >
+                            <UserCheck className="h-3.5 w-3.5 mr-1" />
+                            Opret bruger
+                          </Button>
+                        )}
+
                         {canEdit && cohort.status !== "completed" && cohort.status !== "cancelled" && (
                           <TooltipProvider>
                             <Tooltip>
