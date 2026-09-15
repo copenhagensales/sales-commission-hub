@@ -367,6 +367,7 @@ export function useSaveQualityReview() {
         p_error_code_ids: input.errorCodeIds,
         p_comment: input.comment,
         p_started_at: input.startedAt,
+        p_intent: input.intent ?? null,
       });
       if (error) throw error;
 
