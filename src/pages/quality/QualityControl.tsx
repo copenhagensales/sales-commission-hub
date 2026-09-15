@@ -440,16 +440,38 @@ export default function QualityControl() {
           <p className="text-sm text-muted-foreground">
             {formatDanishDate(date)}
             {dates.length > 1 ? " (weekend samlet med fredag)" : ""} ·{" "}
-            {rows.length} salg i køen
+            {filteredRows.length} af {rows.length} salg i køen
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setDate(todayInCopenhagen())}>
+            I dag
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setDate(addDays(todayInCopenhagen(), -1))}
+          >
+            I går
+          </Button>
           <Input
             type="date"
             value={date}
             onChange={(e) => e.target.value && setDate(e.target.value)}
             className="w-[170px]"
           />
+          <Select value={activeCampaign} onValueChange={setActiveCampaign}>
+            <SelectTrigger className="w-[230px]">
+              <SelectValue placeholder="Alle kampagner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle kampagner</SelectItem>
+              {campaigns.map(([id, name]) => (
+                <SelectItem key={id} value={id}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {isSuperadmin && (
             <Button variant="outline" onClick={() => navigate("/kvalitetskontrol/administration")}>
               <Settings2 className="mr-2 h-4 w-4" />
