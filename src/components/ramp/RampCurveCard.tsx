@@ -24,10 +24,10 @@ interface RampCurveCardProps {
 }
 
 const MILESTONES = [
-  { label: "Første salg", target: 1 },
-  { label: "10 salg", target: 10 },
-  { label: "25 salg", target: 25 },
-  { label: "50 salg", target: 50 },
+  { label: "Første produkt", target: 1 },
+  { label: "10 produkter", target: 10 },
+  { label: "25 produkter", target: 25 },
+  { label: "50 produkter", target: 50 },
 ];
 
 const ZONE_FROM = 10;
@@ -125,7 +125,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
                 className="text-[15px] font-semibold pb-3"
                 style={{ color: "var(--rs-on-dark-muted)" }}
               >
-                salg
+                produkter
               </span>
             </div>
 
@@ -137,7 +137,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
             </p>
 
             <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--rs-on-dark-muted)" }}>
-              Typisk på dag {view.currentDay}: {view.p25}–{view.p75} salg · midt i feltet {view.p50}
+              Typisk på dag {view.currentDay}: {view.p25}–{view.p75} produkter · midt i feltet {view.p50}
             </p>
           </div>
 
@@ -182,7 +182,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
               <div className="mt-2 flex items-end gap-2">
                 <span className="rs-num text-[30px] font-extrabold leading-none">{view.last7}</span>
                 <span className="text-[12px] pb-1" style={{ color: "var(--rs-on-dark-muted)" }}>
-                  salg
+                  produkter
                 </span>
               </div>
               <div className="mt-3 flex h-16 items-end gap-1.5">
@@ -233,7 +233,7 @@ export function RampCurveCard({ employeeId, hideWhenCompleted, className }: Ramp
             className="rounded-full px-2.5 py-1 text-[11px] font-bold"
             style={{ background: "#e8faf0", color: "#13623c" }}
           >
-            Prognose: ca. {view.forecast40} salg på dag 40
+            Prognose: ca. {view.forecast40} produkter på dag 40
           </span>
         </div>
 
@@ -519,8 +519,8 @@ function buildView(data: RampData) {
   const gapToNext = next ? Math.max(0, next.target - myTotal) : 0;
   const nextMilestoneWhen = next
     ? next.forecastDay
-      ? `${gapToNext} salg igen · ventes omkring dag ${next.forecastDay}`
-      : `${gapToNext} salg igen`
+      ? `${gapToNext} produkter igen · ventes omkring dag ${next.forecastDay}`
+      : `${gapToNext} produkter igen`
     : "Flot forløb hele vejen gennem de 40 dage";
 
   // ── Hovedlinjen ────────────────────────────────────────────────────
@@ -595,13 +595,13 @@ function buildHeadline(input: {
 
   // Under p25 → intet percentiltal, kun sande udsagn om sælgeren selv.
   if (last7 > prev7 && last7 > 0) {
-    return `Din bedste uge indtil nu — ${last7} salg de sidste 7 dage`;
+    return `Din bedste uge indtil nu — ${last7} produkter de sidste 7 dage`;
   }
   if (last7 > 0) {
-    return `${last7} salg de sidste 7 dage`;
+    return `${last7} produkter de sidste 7 dage`;
   }
   if (nextLabel && gapToNext > 0 && gapToNext <= 5) {
-    return `${gapToNext} salg fra din næste milepæl`;
+    return `${gapToNext} produkter fra din næste milepæl`;
   }
   return "Dag 10 til 25 er der, hvor de fleste bygger rutinerne op";
 }

@@ -239,7 +239,7 @@ function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor:
 
   return (
     <div>
-      <SectionLabel>Salg pr. uge mod typisk spænd</SectionLabel>
+      <SectionLabel>Produkter pr. uge mod typisk spænd</SectionLabel>
       <div className="relative mt-3.5 flex items-end gap-2" style={{ height: H }}>
         {bandHigh > 0 && (
           <div
