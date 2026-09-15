@@ -162,15 +162,9 @@ serve(async (req) => {
       );
     }
 
-    // 2. Auth-bruger: genbrug hvis mailen allerede findes, ellers opret
-    const { data: existingAuthRow } = await svc
-      .schema("auth")
-      .from("users")
-      .select("id")
-      .ilike("email", workEmail)
-      .maybeSingle();
-
-    let authUserId = existingAuthRow?.id as string | undefined;
+    // 2. Auth-bruger: genbrug hvis mailen allerede findes, ellers opret.
+    //    auth.users kan ikke læses via PostgREST, så vi bruger admin-API'et.
+    let authUserId = await findAuthUserIdByEmail(workEmail);
     let accountCreated = false;
 
     if (!authUserId) {
@@ -185,15 +179,22 @@ serve(async (req) => {
         },
       });
       if (createError) {
-        console.error("createUser-fejl:", createError);
-        return new Response(JSON.stringify({ error: createError.message }), {
-          status: 500,
-          headers: jsonHeaders,
-        });
+        // Race/edge: brugeren fandtes alligevel — genbrug den i stedet for at fejle
+        const fallbackId = await findAuthUserIdByEmail(workEmail);
+        if (!fallbackId) {
+          console.error("createUser-fejl:", createError);
+          return new Response(JSON.stringify({ error: createError.message }), {
+            status: 500,
+            headers: jsonHeaders,
+          });
+        }
+        authUserId = fallbackId;
+      } else {
+        authUserId = created.user.id;
+        accountCreated = true;
       }
-      authUserId = created.user.id;
-      accountCreated = true;
     }
+
 
     // 3. Kobl medarbejder til auth-bruger og sæt arbejdsmail (uden at overskrive en anden mail)
     const employeeUpdate: Record<string, unknown> = {
