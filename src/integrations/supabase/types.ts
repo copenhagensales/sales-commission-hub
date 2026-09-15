@@ -13163,6 +13163,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ramp_campaign_link: {
+        Row: {
+          created_at: string
+          id: string
+          included_campaign_id: string
+          ramp_campaign_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          included_campaign_id: string
+          ramp_campaign_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          included_campaign_id?: string
+          ramp_campaign_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ramp_campaign_link_included_campaign_id_fkey"
+            columns: ["included_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ramp_campaign_link_ramp_campaign_id_fkey"
+            columns: ["ramp_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ramp_curve: {
         Row: {
           client_campaign_id: string
@@ -17972,6 +18008,7 @@ export type Database = {
           team_name: string
         }[]
       }
+      ramp_campaign_ids: { Args: { p_campaign: string }; Returns: string[] }
       ramp_create_risk_flags: { Args: never; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
