@@ -52,6 +52,9 @@ interface CohortMember {
     id: string;
     first_name: string;
     last_name: string;
+    work_email: string | null;
+    invitation_status: string | null;
+    auth_user_id: string | null;
   } | null;
 }
 
@@ -150,7 +153,7 @@ export default function UpcomingStarts() {
             .select(`
               *,
               candidate:candidates(id, first_name, last_name, applied_position, email, phone),
-              employee:employee_master_data(id, first_name, last_name)
+              employee:employee_master_data(id, first_name, last_name, work_email, invitation_status, auth_user_id)
             `)
             .eq("cohort_id", cohort.id);
 
@@ -513,6 +516,10 @@ export default function UpcomingStarts() {
                       : "Ukendt";
                   const position = member.candidate?.applied_position;
                   const canRemove = canEdit && cohort.status !== "completed" && cohort.status !== "cancelled";
+                  const isActivated = Boolean(
+                    member.employee?.auth_user_id &&
+                      member.employee?.invitation_status === "completed"
+                  );
                   
                   return (
                     <div 
@@ -551,7 +558,13 @@ export default function UpcomingStarts() {
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
-                        {canEdit && cohort.status !== "cancelled" && (
+                        {isActivated && (
+                          <Badge className="text-xs shrink-0 bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Bruger oprettet
+                          </Badge>
+                        )}
+                        {canEdit && cohort.status !== "cancelled" && !isActivated && (
                           <Button
                             variant="secondary"
                             size="sm"
