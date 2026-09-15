@@ -36,16 +36,62 @@ export interface ProcessResults {
  * late-add flow (AddMemberDialog on an already-started cohort) so both
  * paths follow the exact same activation logic (Bibel §8 — single source).
  */
+export interface ActivationOverrides {
+  /** Copenhagensales-mail der bruges som arbejdsmail og login. Falder tilbage til agent_email. */
+  workEmail?: string | null;
+  /** Startdato der overstyrer holdets startdato. */
+  startDate?: string | null;
+}
+
+/**
+ * Opretter/genbruger brugeradgangen på arbejdsmailen og sender velkomstmailen.
+ * Login sker via Microsoft, så brugeren skal findes på præcis arbejdsmailen.
+ */
+export async function activateEmployeeAccount(params: {
+  employeeId: string;
+  workEmail: string;
+  privateEmail?: string | null;
+  firstName: string;
+  lastName?: string | null;
+  startDate?: string | null;
+}): Promise<{ mailSent: boolean; mailError: string | null }> {
+  const { data, error } = await supabase.functions.invoke("activate-employee-account", {
+    body: {
+      employeeId: params.employeeId,
+      workEmail: params.workEmail,
+      privateEmail: params.privateEmail ?? null,
+      firstName: params.firstName,
+      lastName: params.lastName ?? "",
+      startDate: params.startDate ?? null,
+    },
+  });
+  if (error) throw error;
+  const result = (data ?? {}) as { mailSent?: boolean; mailError?: string | null };
+  return { mailSent: !!result.mailSent, mailError: result.mailError ?? null };
+}
+
 export async function processCohortMember(
   member: ProcessableCohortMember,
   cohort: CohortContext,
-  results: ProcessResults
+  results: ProcessResults,
+  overrides: ActivationOverrides = {},
 ): Promise<void> {
   const candidate = member.candidate;
 
   if (!candidate.email) {
     results.skipped++;
     results.errors.push(`${candidate.first_name} ${candidate.last_name} mangler email`);
+    return;
+  }
+
+  const workEmail = (overrides.workEmail ?? member.agent_email ?? "").trim().toLowerCase();
+  const startDate = overrides.startDate ?? cohort.start_date;
+
+  if (!workEmail) {
+    results.skipped++;
+    results.errors.push(
+      `${candidate.first_name} ${candidate.last_name} mangler Copenhagensales-mail`,
+    );
     return;
   }
 
@@ -59,7 +105,7 @@ export async function processCohortMember(
         private_email: candidate.email,
         private_phone: candidate.phone,
         job_title: candidate.applied_position,
-        employment_start_date: cohort.start_date,
+        employment_start_date: startDate,
         team_id: cohort.team_id,
         is_active: true,
         invitation_status: "pending",
@@ -83,19 +129,22 @@ export async function processCohortMember(
       .eq("id", member.id);
     if (memberError) throw memberError;
 
-    // 3. Send invitation email
-    const { error: inviteError } = await supabase.functions.invoke(
-      "send-employee-invitation",
-      {
-        body: {
-          employeeId: employee.id,
-          email: candidate.email,
-          firstName: candidate.first_name,
-          lastName: candidate.last_name,
-        },
-      }
-    );
-    if (inviteError) throw inviteError;
+    // 3. Opret brugeradgang på arbejdsmailen + send velkomstmail
+    //    (erstatter det gamle link-baserede invitationsflow, som SSO gjorde ubrugeligt)
+    const activation = await activateEmployeeAccount({
+      employeeId: employee.id,
+      workEmail,
+      privateEmail: candidate.email,
+      firstName: candidate.first_name,
+      lastName: candidate.last_name,
+      startDate,
+    });
+    if (!activation.mailSent && activation.mailError) {
+      results.errors.push(
+        `${candidate.first_name}: bruger oprettet, men velkomstmail fejlede (${activation.mailError})`,
+      );
+    }
+
 
     // 4. Update candidate status
     const { error: candError } = await supabase
