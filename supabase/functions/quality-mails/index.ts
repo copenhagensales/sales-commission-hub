@@ -85,7 +85,13 @@ async function resolveCaller(req: Request, db: Client) {
   }
 
   if (!isController && !superadmin) return null;
-  return { employeeId: employee?.id ?? null, isController, isSuperadmin: !!superadmin };
+  return {
+    employeeId: employee?.id ?? null,
+    isController,
+    isSuperadmin: !!superadmin,
+    isCron: false,
+  };
+
 }
 
 async function leaderRecipients(
