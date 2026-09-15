@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2, Pencil, ChevronRight } from "lucide-react";
+import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, UserCheck, Mail, Loader2, Trash2, Pencil, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Link } from "react-router-dom";
 import {
@@ -26,6 +26,8 @@ import { CreateCohortDialog } from "@/components/personnel/CreateCohortDialog";
 import { AddMemberDialog } from "@/components/personnel/AddMemberDialog";
 import { EditMemberClientDialog } from "@/components/personnel/EditMemberClientDialog";
 import { EditCohortDialog } from "@/components/personnel/EditCohortDialog";
+import { ActivateMemberDialog, type ActivateMemberTarget } from "@/components/personnel/ActivateMemberDialog";
+
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useToast } from "@/hooks/use-toast";
 import { processCohortMember, type ProcessResults } from "@/lib/cohortMemberProcessing";
@@ -106,7 +108,11 @@ export default function UpcomingStarts() {
     agentEmail: string | null;
     employeeId: string | null;
   } | null>(null);
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [selectedMemberForActivation, setSelectedMemberForActivation] =
+    useState<ActivateMemberTarget | null>(null);
   const [editCohortDialogOpen, setEditCohortDialogOpen] = useState(false);
+
   const [selectedCohortForEdit, setSelectedCohortForEdit] = useState<{
     id: string;
     name: string;
@@ -545,6 +551,33 @@ export default function UpcomingStarts() {
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
+                        {canEdit && cohort.status !== "cancelled" && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 shrink-0 text-xs"
+                            onClick={() => {
+                              setSelectedMemberForActivation({
+                                memberId: member.id,
+                                name,
+                                employeeId: member.employee_id,
+                                agentEmail: member.agent_email,
+                                dailyBonusClientId: member.daily_bonus_client_id,
+                                candidate: member.candidate ?? null,
+                                cohort: {
+                                  id: cohort.id,
+                                  team_id: cohort.team_id,
+                                  start_date: cohort.start_date,
+                                },
+                              });
+                              setActivateDialogOpen(true);
+                            }}
+                          >
+                            <UserCheck className="h-3.5 w-3.5 mr-1" />
+                            Opret bruger
+                          </Button>
+                        )}
+
                         {canEdit && cohort.status !== "completed" && cohort.status !== "cancelled" && (
                           <TooltipProvider>
                             <Tooltip>
@@ -836,6 +869,13 @@ export default function UpcomingStarts() {
         onOpenChange={setEditCohortDialogOpen}
         cohort={selectedCohortForEdit}
       />
+
+      <ActivateMemberDialog
+        open={activateDialogOpen}
+        onOpenChange={setActivateDialogOpen}
+        target={selectedMemberForActivation}
+      />
+
     </MainLayout>
   );
 }
