@@ -154,9 +154,13 @@ export function QualityFeedbackInbox() {
         )}
 
         <p className="mt-3 text-xs leading-snug text-muted-foreground">
-          {rejected
-            ? "Salget er afvist i kvalitetskontrollen. Det påvirker ikke din provision."
-            : "Salget står ved magt. Det er en tilbagemelding — ikke en anmærkning, og det påvirker ikke din provision."}
+          {isLeader
+            ? rejected
+              ? "Salget er afvist i kvalitetskontrollen. Det påvirker ikke sælgerens provision, løn eller annulleringer."
+              : "Salget står ved magt. Det er en tilbagemelding til sælgeren — ikke en anmærkning."
+            : rejected
+              ? "Salget er afvist i kvalitetskontrollen. Det påvirker ikke din provision."
+              : "Salget står ved magt. Det er en tilbagemelding — ikke en anmærkning, og det påvirker ikke din provision."}
         </p>
 
         <div className="mt-3 flex justify-end">
