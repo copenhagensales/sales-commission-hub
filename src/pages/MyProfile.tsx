@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUploadMyAvatar, useRemoveMyAvatar } from "@/hooks/useMyAvatar";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen, Camera, Loader2 } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, ShieldCheck, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen, Camera, Loader2 } from "lucide-react";
+import { QualityFeedbackHistory } from "@/components/quality/QualityFeedbackHistory";
 import { downloadContractAsPdf } from "@/utils/contractPdfGenerator";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
