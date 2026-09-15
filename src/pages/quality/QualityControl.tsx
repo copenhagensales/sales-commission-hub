@@ -783,7 +783,10 @@ export default function QualityControl() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="ml-auto flex max-w-[260px] flex-wrap justify-end gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             {quickSavingId === row.sale_id ? (
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             ) : (
