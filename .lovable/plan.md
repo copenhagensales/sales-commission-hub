@@ -23,7 +23,7 @@ Vi viser kun det kontrollanten selv har valgt. Tjeklistepunkter bruges kun som r
 **Tydelig forskel på de to slags beskeder.**
 - Afvist: rød ramme, teksten "Afvist i kvalitetskontrollen".
 - Feedback: gul ramme, teksten "Feedback — salget står ved magt".
-Under begge står, at kvalitetsstatus ikke rører provision, løn eller annulleringer.
+Teksten om at kvalitetsstatus ikke rører provision, løn eller annulleringer fjernes helt fra kasserne.
 
 **Ledere ser hvem det handler om.**
 Er man leder, står sælgerens navn og team først på linjen. Er man sælger, står ens eget navn selvfølgelig ikke.
