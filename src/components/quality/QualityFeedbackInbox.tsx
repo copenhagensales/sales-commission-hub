@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Info, Loader2, MessageSquare 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useViewAsStatus } from "@/hooks/useViewAs";
 import {
   useAcknowledgeQualityFeedback,
   useMyQualityFeedback,
@@ -39,6 +40,9 @@ export function QualityFeedbackInbox() {
   const acknowledge = useAcknowledgeQualityFeedback();
   const { toast } = useToast();
   const [index, setIndex] = useState(0);
+  // "Se som" er ren læseadgang: kvittering skal bindes til den, der er logget ind.
+  const { data: viewAs } = useViewAsStatus();
+  const viewAsActive = viewAs?.active === true;
 
   useEffect(() => {
     if (index > rows.length - 1) setIndex(rows.length > 0 ? rows.length - 1 : 0);
@@ -163,8 +167,17 @@ export function QualityFeedbackInbox() {
               : "Salget står ved magt. Det er en tilbagemelding — ikke en anmærkning, og det påvirker ikke din provision."}
         </p>
 
-        <div className="mt-3 flex justify-end">
-          <Button size="sm" onClick={() => void handleAck()} disabled={acknowledge.isPending}>
+        <div className="mt-3 flex items-center justify-end gap-3">
+          {viewAsActive && (
+            <span className="text-xs text-muted-foreground">
+              Du ser Stork som en anden — kvittering er slået fra.
+            </span>
+          )}
+          <Button
+            size="sm"
+            onClick={() => void handleAck()}
+            disabled={acknowledge.isPending || viewAsActive}
+          >
             {acknowledge.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLeader ? "Set" : "OK"}
           </Button>
