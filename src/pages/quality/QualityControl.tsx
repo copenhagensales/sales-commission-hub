@@ -794,66 +794,99 @@ export default function QualityControl() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right align-middle">
                           <div
-                            className="ml-auto flex max-w-[260px] flex-wrap justify-end gap-1.5"
+                            className="ml-auto flex items-center justify-end gap-1.5 whitespace-nowrap"
                             onClick={(e) => e.stopPropagation()}
                           >
                             {quickSavingId === row.sale_id ? (
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             ) : (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-success/40 px-2 text-xs text-success hover:bg-success/10"
-                                  onClick={() => void runQuickReview(row, "godkendt")}
-                                >
-                                  Godkendt
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
-                                  onClick={() => void runQuickReview(row, "oa_mangler")}
-                                >
-                                  OA mangler
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
-                                  onClick={() => void runQuickReview(row, "oa_ikke_godkendt")}
-                                >
-                                  OA ikke godkendt
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-warning/40 px-2 text-xs text-warning hover:bg-warning/10"
-                                  onClick={() => openComment(row, "feedback")}
-                                >
-                                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                                  Send feedback
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => openComment(row, "afvist")}
-                                >
-                                  Afvis salg
-                                </Button>
-                                {row.status !== "ikke_kontrolleret" && (
+                                {row.status === "ikke_kontrolleret" ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="h-8 bg-success px-3 text-xs font-semibold text-success-foreground hover:bg-success/90"
+                                      onClick={() => void runQuickReview(row, "godkendt")}
+                                    >
+                                      <Check className="mr-1 h-3.5 w-3.5" />
+                                      Godkend
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 border-destructive/40 px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
+                                      onClick={() => openComment(row, "afvist")}
+                                    >
+                                      <XCircle className="mr-1 h-3.5 w-3.5" />
+                                      Afvis
+                                    </Button>
+                                  </>
+                                ) : (
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 px-2 text-xs text-muted-foreground"
+                                    className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
                                     onClick={() => void runUndoReview(row)}
                                   >
+                                    <Undo2 className="mr-1 h-3.5 w-3.5" />
                                     Fortryd
                                   </Button>
                                 )}
+
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8"
+                                      title="Flere handlinger"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>Hurtige handlinger</DropdownMenuLabel>
+                                    <DropdownMenuItem
+                                      onClick={() => void runQuickReview(row, "godkendt")}
+                                    >
+                                      <Check className="mr-2 h-4 w-4 text-success" />
+                                      Godkend
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => void runQuickReview(row, "oa_mangler")}
+                                    >
+                                      <AlertTriangle className="mr-2 h-4 w-4 text-destructive" />
+                                      OA mangler
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => void runQuickReview(row, "oa_ikke_godkendt")}
+                                    >
+                                      <AlertTriangle className="mr-2 h-4 w-4 text-destructive" />
+                                      OA ikke godkendt
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel>Med kommentar</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => openComment(row, "feedback")}>
+                                      <MessageSquare className="mr-2 h-4 w-4 text-warning" />
+                                      Send feedback
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openComment(row, "afvist")}>
+                                      <XCircle className="mr-2 h-4 w-4 text-destructive" />
+                                      Afvis salg
+                                    </DropdownMenuItem>
+                                    {row.status !== "ikke_kontrolleret" && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => void runUndoReview(row)}>
+                                          <Undo2 className="mr-2 h-4 w-4" />
+                                          Fortryd kontrol
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </>
                             )}
                           </div>
