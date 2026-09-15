@@ -62,10 +62,12 @@ import {
   type QualityQueueRow,
 } from "@/hooks/useQualityControl";
 import {
+  addDays,
   datesForQualityDay,
   defaultQualityDate,
   formatDanishDate,
   formatDanishTime,
+  todayInCopenhagen,
 } from "@/lib/qualityDates";
 import { QualityScorePanel } from "@/components/quality/QualityScorePanel";
 
@@ -134,9 +136,30 @@ export default function QualityControl() {
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "da"));
   }, [rows]);
 
+  /**
+   * Kampagnefilter. Grupperer efter kampagnen på salget (client_campaign_id),
+   * så man kan se én kampagne ad gangen. Rent visuelt filter.
+   */
+  const [activeCampaign, setActiveCampaign] = useState<string>("all");
+
+  const campaigns = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      const key = row.client_campaign_id ?? "ukendt";
+      if (!map.has(key)) map.set(key, row.campaign_name ?? "Uden kampagne");
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "da"));
+  }, [rows]);
+
   const filteredRows = useMemo(
-    () => (activeTeam === "all" ? rows : rows.filter((r) => r.team_id === activeTeam)),
-    [rows, activeTeam],
+    () =>
+      rows.filter(
+        (r) =>
+          (activeTeam === "all" || r.team_id === activeTeam) &&
+          (activeCampaign === "all" ||
+            (r.client_campaign_id ?? "ukendt") === activeCampaign),
+      ),
+    [rows, activeTeam, activeCampaign],
   );
 
   /**
@@ -419,16 +442,38 @@ export default function QualityControl() {
           <p className="text-sm text-muted-foreground">
             {formatDanishDate(date)}
             {dates.length > 1 ? " (weekend samlet med fredag)" : ""} ·{" "}
-            {rows.length} salg i køen
+            {filteredRows.length} af {rows.length} salg i køen
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setDate(todayInCopenhagen())}>
+            I dag
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setDate(addDays(todayInCopenhagen(), -1))}
+          >
+            I går
+          </Button>
           <Input
             type="date"
             value={date}
             onChange={(e) => e.target.value && setDate(e.target.value)}
             className="w-[170px]"
           />
+          <Select value={activeCampaign} onValueChange={setActiveCampaign}>
+            <SelectTrigger className="w-[230px]">
+              <SelectValue placeholder="Alle kampagner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle kampagner</SelectItem>
+              {campaigns.map(([id, name]) => (
+                <SelectItem key={id} value={id}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {isSuperadmin && (
             <Button variant="outline" onClick={() => navigate("/kvalitetskontrol/administration")}>
               <Settings2 className="mr-2 h-4 w-4" />
@@ -510,8 +555,14 @@ export default function QualityControl() {
           Viser:{" "}
           <span className="font-semibold text-foreground">
             {activeTeam === "all"
-              ? "Alle kampagner"
+              ? "Alle teams"
               : teams.find(([id]) => id === activeTeam)?.[1] ?? "Ukendt"}
+          </span>{" "}
+          ·{" "}
+          <span className="font-semibold text-foreground">
+            {activeCampaign === "all"
+              ? "Alle kampagner"
+              : campaigns.find(([id]) => id === activeCampaign)?.[1] ?? "Ukendt"}
           </span>
         </p>
 
