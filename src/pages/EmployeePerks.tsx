@@ -165,9 +165,21 @@ export default function EmployeePerks() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                {perk.discount_value && (
+                  <p className="text-xl font-bold text-primary">{perk.discount_value}</p>
+                )}
+
                 {perk.description && (
                   <p className="whitespace-pre-line text-sm text-muted-foreground">{perk.description}</p>
                 )}
+
+                {perk.address && (
+                  <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{perk.address}</span>
+                  </p>
+                )}
+
 
                 {perk.discount_code && (
                   <div className="flex items-center gap-2">
