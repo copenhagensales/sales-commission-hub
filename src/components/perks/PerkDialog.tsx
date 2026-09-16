@@ -40,6 +40,8 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
   const [partnerName, setPartnerName] = useState("");
   const [description, setDescription] = useState("");
   const [redemptionType, setRedemptionType] = useState<PerkRedemptionType>("online");
+  const [discountValue, setDiscountValue] = useState("");
+  const [address, setAddress] = useState("");
   const [discountCode, setDiscountCode] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [isActive, setIsActive] = useState(true);
