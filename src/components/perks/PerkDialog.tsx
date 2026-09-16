@@ -52,6 +52,8 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
     setPartnerName(perk?.partner_name ?? "");
     setDescription(perk?.description ?? "");
     setRedemptionType(perk?.redemption_type ?? "online");
+    setDiscountValue(perk?.discount_value ?? "");
+    setAddress(perk?.address ?? "");
     setDiscountCode(perk?.discount_code ?? "");
     setLinkUrl(perk?.link_url ?? "");
     setIsActive(perk?.is_active ?? true);
@@ -70,6 +72,8 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
       partner_name: partnerName.trim(),
       description: description.trim() || null,
       redemption_type: redemptionType,
+      discount_value: discountValue.trim() || null,
+      address: redemptionType === "online" ? null : address.trim() || null,
       discount_code: discountCode.trim() || null,
       link_url: linkUrl.trim() || null,
       is_active: isActive,
