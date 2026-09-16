@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +88,7 @@ export default function EmployeePerks() {
   };
 
   return (
+    <MainLayout>
     <div className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -251,5 +253,6 @@ export default function EmployeePerks() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </MainLayout>
   );
 }
