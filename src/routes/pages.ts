@@ -135,6 +135,7 @@ export const SecurityDashboard = lazyPage(() => import("@/pages/admin/SecurityDa
 
 // Referral Program
 export const ReferAFriend = lazyPage(() => import("@/pages/ReferAFriend"));
+export const EmployeePerks = lazyPage(() => import("@/pages/EmployeePerks"));
 export const PublicReferralForm = lazyPage(() => import("@/pages/PublicReferralForm"));
 export const Referrals = lazyPage(() => import("@/pages/recruitment/Referrals"));
 

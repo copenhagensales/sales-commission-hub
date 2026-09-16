@@ -7216,6 +7216,48 @@ export type Database = {
           },
         ]
       }
+      employee_perks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          discount_code: string | null
+          id: string
+          is_active: boolean
+          link_url: string | null
+          partner_name: string
+          redemption_type: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discount_code?: string | null
+          id?: string
+          is_active?: boolean
+          link_url?: string | null
+          partner_name: string
+          redemption_type?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discount_code?: string | null
+          id?: string
+          is_active?: boolean
+          link_url?: string | null
+          partner_name?: string
+          redemption_type?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employee_profile_stats: {
         Row: {
           avg_per_pay_period: number
@@ -17170,6 +17212,10 @@ export type Database = {
         Returns: boolean
       }
       can_manage_dpa_documents: { Args: { _user_id: string }; Returns: boolean }
+      can_manage_employee_perks: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       can_manage_event_gallery: { Args: { _user_id: string }; Returns: boolean }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {

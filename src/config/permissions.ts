@@ -97,6 +97,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: false,
       },
       {
+        key: "menu_employee_perks",
+        label: "Fordele",
+        description: "Adgang til at se firmaets rabataftaler (redigering styres af databasen)",
+        hasEditOption: false,
+      },
+      {
         key: "menu_immediate_payment_ase",
         label: "Straksbetaling (ASE)",
         description: "Adgang til at se ASE-salg med mulighed for straksbetaling",
