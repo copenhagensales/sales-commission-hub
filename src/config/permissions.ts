@@ -99,8 +99,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       {
         key: "menu_employee_perks",
         label: "Fordele",
-        description: "Adgang til at se firmaets rabataftaler (redigering styres af databasen)",
-        hasEditOption: false,
+        description: "Se firmaets rabataftaler. Redigering giver adgang til at tilføje, rette og slette aftaler",
+        hasEditOption: true,
       },
       {
         key: "menu_immediate_payment_ase",
