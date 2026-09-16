@@ -144,6 +144,28 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="perk-discount">Rabatsats</Label>
+            <Input
+              id="perk-discount"
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
+              placeholder="Fx 20% eller 200 kr."
+            />
+          </div>
+
+          {redemptionType !== "online" && (
+            <div className="space-y-2">
+              <Label htmlFor="perk-address">Adresse</Label>
+              <Input
+                id="perk-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Fx Vesterbrogade 1, 1620 København V"
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="perk-code">Rabatkode</Label>
