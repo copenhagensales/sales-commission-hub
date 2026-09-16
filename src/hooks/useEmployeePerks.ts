@@ -9,6 +9,8 @@ export interface EmployeePerk {
   partner_name: string;
   description: string | null;
   redemption_type: PerkRedemptionType;
+  discount_value: string | null;
+  address: string | null;
   discount_code: string | null;
   link_url: string | null;
   is_active: boolean;
@@ -21,6 +23,8 @@ export interface EmployeePerkInput {
   partner_name: string;
   description: string | null;
   redemption_type: PerkRedemptionType;
+  discount_value: string | null;
+  address: string | null;
   discount_code: string | null;
   link_url: string | null;
   is_active: boolean;

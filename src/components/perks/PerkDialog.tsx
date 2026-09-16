@@ -40,6 +40,8 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
   const [partnerName, setPartnerName] = useState("");
   const [description, setDescription] = useState("");
   const [redemptionType, setRedemptionType] = useState<PerkRedemptionType>("online");
+  const [discountValue, setDiscountValue] = useState("");
+  const [address, setAddress] = useState("");
   const [discountCode, setDiscountCode] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -50,6 +52,8 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
     setPartnerName(perk?.partner_name ?? "");
     setDescription(perk?.description ?? "");
     setRedemptionType(perk?.redemption_type ?? "online");
+    setDiscountValue(perk?.discount_value ?? "");
+    setAddress(perk?.address ?? "");
     setDiscountCode(perk?.discount_code ?? "");
     setLinkUrl(perk?.link_url ?? "");
     setIsActive(perk?.is_active ?? true);
@@ -68,6 +72,8 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
       partner_name: partnerName.trim(),
       description: description.trim() || null,
       redemption_type: redemptionType,
+      discount_value: discountValue.trim() || null,
+      address: redemptionType === "online" ? null : address.trim() || null,
       discount_code: discountCode.trim() || null,
       link_url: linkUrl.trim() || null,
       is_active: isActive,
@@ -137,6 +143,28 @@ export function PerkDialog({ open, onOpenChange, perk }: PerkDialogProps) {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="perk-discount">Rabatsats</Label>
+            <Input
+              id="perk-discount"
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
+              placeholder="Fx 20% eller 200 kr."
+            />
+          </div>
+
+          {redemptionType !== "online" && (
+            <div className="space-y-2">
+              <Label htmlFor="perk-address">Adresse</Label>
+              <Input
+                id="perk-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Fx Vesterbrogade 1, 1620 København V"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

@@ -7218,10 +7218,12 @@ export type Database = {
       }
       employee_perks: {
         Row: {
+          address: string | null
           created_at: string
           created_by: string | null
           description: string | null
           discount_code: string | null
+          discount_value: string | null
           id: string
           is_active: boolean
           link_url: string | null
@@ -7231,10 +7233,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           discount_code?: string | null
+          discount_value?: string | null
           id?: string
           is_active?: boolean
           link_url?: string | null
@@ -7244,10 +7248,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           discount_code?: string | null
+          discount_value?: string | null
           id?: string
           is_active?: boolean
           link_url?: string | null
