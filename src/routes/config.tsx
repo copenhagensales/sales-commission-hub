@@ -203,6 +203,7 @@ export const routes: RouteConfig[] = [
   { path: "/extra-work", component: ExtraWork, access: "role", positionPermission: "menu_extra_work" },
   { path: "/messages", component: Messages, access: "role", positionPermission: "menu_messages_personal" },
   { path: "/refer-a-friend", component: ReferAFriend, access: "role", positionPermission: "menu_refer_a_friend" },
+  { path: "/perks", component: EmployeePerks, access: "role", positionPermission: "menu_employee_perks" },
   { path: "/immediate-payment-ase", component: ImmediatePaymentASE, access: "protected" },
   { path: "/commission-league", component: CommissionLeague, access: "role", positionPermission: "menu_commission_league" },
   

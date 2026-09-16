@@ -696,6 +696,21 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
 
+              {/* Fordele (rabataftaler) */}
+              {p.canViewEmployeePerks && (
+                <NavLink
+                  to="/perks"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/perks" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Tag className="h-4 w-4" />
+                  Fordele
+                </NavLink>
+              )}
+
               {/* Straksbetaling (ASE) - shown dynamically based on qualifying sales */}
               {hasImmediatePaymentSales && (
                 <NavLink
