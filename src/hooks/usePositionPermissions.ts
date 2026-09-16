@@ -691,6 +691,7 @@ export function usePermissions() {
     canViewCareerWishes: hasPermission("menu_career_wishes"),
     canViewMyFeedback: hasPermission("menu_my_feedback"),
     canViewReferAFriend: hasPermission("menu_refer_a_friend"),
+    canViewEmployeePerks: hasPermission("menu_employee_perks"),
     canViewImmediatePaymentAse: canView("menu_immediate_payment_ase"),
     canViewTimeStamp: hasPermission("menu_time_stamp"),
     // System menu

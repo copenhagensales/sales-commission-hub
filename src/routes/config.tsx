@@ -99,6 +99,7 @@ import {
   HeadToHead,
   CoachingTemplates,
   ReferAFriend,
+  EmployeePerks,
   PublicReferralForm,
   Referrals,
   ReportsAdmin,

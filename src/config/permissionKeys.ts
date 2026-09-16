@@ -96,6 +96,7 @@ export const PERMISSION_KEYS = {
   menu_career_wishes: { label: 'Karriereønsker', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_my_feedback: { label: 'Min feedback', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_refer_a_friend: { label: 'Henvis en ven', section: 'mit_hjem', parent: 'menu_section_personal' },
+  menu_employee_perks: { label: 'Fordele', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_immediate_payment_ase: { label: 'Straksbetaling (ASE)', section: 'mit_hjem', parent: 'menu_section_personal' },
 
   // ==================== EKSTRAARBEJDE (top-level) ====================
