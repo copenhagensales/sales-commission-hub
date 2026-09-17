@@ -550,11 +550,185 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ---- h) Success-leads = salg (mødebooking) on the Lederne account ----------
+  // Aggregated counts only: no lead values are returned except the DISTINCT
+  // registration values chosen by the seller (dropdowns). Any field that looks
+  // like free text, or has more than 30 distinct values, is reported as a count
+  // only — its values are never echoed.
+  const DISTINCT_LIMIT = 30;
+
+  type FieldAgg = {
+    field_id: string;
+    label: string;
+    filled: number;
+    values: Map<string, number>;
+  };
+
+  const aggregate = (store: Map<string, FieldAgg>, entry: Record<string, unknown>) => {
+    const id = String(entry.id ?? "ukendt");
+    const label = String(entry.label ?? id);
+    const raw = entry.value;
+    if (raw === null || raw === undefined || String(raw).trim() === "") return;
+    const key = `${id}::${label}`;
+    let agg = store.get(key);
+    if (!agg) {
+      agg = { field_id: id, label, filled: 0, values: new Map() };
+      store.set(key, agg);
+    }
+    agg.filled++;
+    const v = String(raw).trim();
+    agg.values.set(v, (agg.values.get(v) ?? 0) + 1);
+  };
+
+  const renderFields = (store: Map<string, FieldAgg>) =>
+    [...store.values()].map((agg) => {
+      const distinct = agg.values.size;
+      const freeText = isFreeText(agg.label) || distinct > DISTINCT_LIMIT;
+      return {
+        field_id: agg.field_id,
+        label: agg.label,
+        filled: agg.filled,
+        distinct_values: distinct,
+        value_distribution: freeText
+          ? `fritekst, ${distinct} distinkte værdier (værdier ikke gengivet)`
+          : Object.fromEntries([...agg.values.entries()].sort((a, b) => b[1] - a[1])),
+      };
+    });
+
+  let successLeadAnalysis: Record<string, unknown> | null = null;
+  {
+    // Ids of our own users, used only to count overlap with lastContactedBy.
+    const ourUserIds = new Set<string>();
+    let ourUserCount = 0;
+    for (let page = 1; page <= 10; page++) {
+      const data = await getJson(`/users?pageSize=1000&page=${page}`);
+      if (!data) break;
+      const batch = asArray(data, "users", "data");
+      if (batch.length === 0) break;
+      for (const u of batch) {
+        const email = String(u.email ?? u.username ?? "").toLowerCase();
+        if (!email.endsWith("@copenhagensales.dk")) continue;
+        ourUserCount++;
+        const id = u.id ?? u.userId;
+        if (id !== undefined && id !== null) ourUserIds.add(String(id));
+      }
+      if (batch.length < 1000) break;
+    }
+
+    const perCampaign: Record<string, {
+      success_leads: number;
+      with_result_data: number;
+      without_result_data: number;
+      result_fields: Map<string, FieldAgg>;
+      master_fields: Map<string, FieldAgg>;
+    }> = {};
+    const contactedBy: Record<string, number> = {};
+    const timestampProbes: Array<Record<string, unknown>> = [];
+    let successTotal = 0;
+    let scanned = 0;
+
+    const MASTER_LABELS_OF_INTEREST = ["emne", "kildekampagne"];
+
+    for (let page = 1; page <= 25; page++) {
+      const data = await getJson(`/leads?pageSize=1000&page=${page}`);
+      if (!data) break;
+      const rows = asArray(data, "leads", "data");
+      if (rows.length === 0) break;
+      for (const lead of rows) {
+        scanned++;
+        if (String(lead.status ?? "") !== "success") continue;
+        successTotal++;
+        const cid = String(lead.campaignId ?? "ukendt");
+        perCampaign[cid] ??= {
+          success_leads: 0,
+          with_result_data: 0,
+          without_result_data: 0,
+          result_fields: new Map(),
+          master_fields: new Map(),
+        };
+        const bucket = perCampaign[cid];
+        bucket.success_leads++;
+
+        const resultData = asArray(lead.resultData);
+        const hasResult = resultData.some(
+          (f) => f.value !== null && f.value !== undefined && String(f.value).trim() !== "",
+        );
+        if (hasResult) bucket.with_result_data++;
+        else bucket.without_result_data++;
+        for (const f of resultData) aggregate(bucket.result_fields, f);
+
+        for (const f of asArray(lead.masterData)) {
+          const label = String(f.label ?? "").toLowerCase();
+          if (MASTER_LABELS_OF_INTEREST.some((m) => label.includes(m))) {
+            aggregate(bucket.master_fields, f);
+          }
+        }
+
+        const by = lead.lastContactedBy;
+        const byKey = by === null || by === undefined ? "(tom)" : String(by);
+        contactedBy[byKey] = (contactedBy[byKey] ?? 0) + 1;
+
+        if (timestampProbes.length < 3) {
+          const stamps: Record<string, string> = {};
+          for (const k of ["created", "updated", "lastModifiedTime", "lastUpdatedTime"] as const) {
+            const v = lead[k];
+            if (typeof v === "string") stamps[k] = v;
+          }
+          const entries = Object.entries(stamps);
+          if (entries.length > 0) {
+            const latest = entries.reduce((a, b) => (b[1] > a[1] ? b : a));
+            const distinct = new Set(entries.map(([, v]) => v)).size;
+            timestampProbes.push({
+              fields_present: entries.map(([k]) => k),
+              distinct_timestamp_values: distinct,
+              all_identical: distinct === 1,
+              latest_field: latest[0],
+              created_equals_updated: stamps.created === stamps.updated,
+              updated_equals_last_modified: stamps.updated === stamps.lastModifiedTime,
+              last_modified_equals_last_updated:
+                stamps.lastModifiedTime === stamps.lastUpdatedTime,
+            });
+          }
+        }
+      }
+      if (rows.length < 1000) break;
+    }
+
+    const ourIdMatches = Object.keys(contactedBy).filter((id) => ourUserIds.has(id));
+
+    successLeadAnalysis = {
+      leads_scanned: scanned,
+      success_leads_total: successTotal,
+      per_campaign: Object.fromEntries(
+        Object.entries(perCampaign).map(([cid, b]) => [
+          cid,
+          {
+            success_leads: b.success_leads,
+            with_result_data: b.with_result_data,
+            without_result_data: b.without_result_data,
+            result_fields: renderFields(b.result_fields),
+            master_fields_emne_kildekampagne: renderFields(b.master_fields),
+          },
+        ]),
+      ),
+      success_leads_per_last_contacted_by: Object.fromEntries(
+        Object.entries(contactedBy).sort((a, b) => b[1] - a[1]),
+      ),
+      distinct_last_contacted_by_ids: Object.keys(contactedBy).length,
+      our_copenhagensales_user_count: ourUserCount,
+      last_contacted_by_ids_matching_our_users: ourIdMatches.length,
+      success_leads_by_our_users: ourIdMatches.reduce((sum, id) => sum + contactedBy[id], 0),
+      timestamp_probes: timestampProbes,
+    };
+  }
+
   return json({
     endpoint_status: endpointStatus,
+    success_lead_analysis: successLeadAnalysis,
     sales_summary: salesSummary,
     leads_cross_check: leadsCrossCheck,
     users_summary: usersSummary,
+
     ok: true,
     mode: "read-only discovery — ingen data gemt",
     account,
