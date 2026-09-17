@@ -232,8 +232,8 @@ async function syncUsers(svc: SupabaseClient, auth: string) {
     const row = {
       external_adversus_id: externalId,
       name: info.name || `Adversus-bruger ${advId}`,
-      // Placeholder only: the real Adversus e-mail is never stored.
-      email: `agent-lederne-${advId}@adversus.local`,
+      // The Adversus e-mail is never stored — the column stays empty.
+      email: null,
       is_active: info.active,
       source: SOURCE,
     };
