@@ -820,7 +820,7 @@ const Home = () => {
                     {/* Deltag / afbud */}
                     <div className="border-t border-[hsl(var(--cph-onyx)/0.1)] pt-4">
                       <p className="mb-2.5 text-[13px] text-foreground/60">Kommer du?</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           type="button"
                           onClick={() =>
@@ -830,7 +830,7 @@ const Home = () => {
                             })
                           }
                           disabled={toggleAttendanceMutation.isPending}
-                          className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                          className={`flex w-full items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-[13px] font-extrabold sm:gap-2 sm:px-4 sm:text-[14px] transition-colors ${
                             myStatus === "attending"
                               ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
                               : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
@@ -856,7 +856,7 @@ const Home = () => {
                             })
                           }
                           disabled={toggleAttendanceMutation.isPending}
-                          className={`flex-1 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                          className={`w-full rounded-full px-2 py-2.5 text-[13px] font-extrabold sm:px-4 sm:text-[14px] transition-colors ${
                             myStatus === "maybe"
                               ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
                               : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
@@ -873,7 +873,7 @@ const Home = () => {
                             })
                           }
                           disabled={toggleAttendanceMutation.isPending}
-                          className={`flex-1 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                          className={`w-full rounded-full px-2 py-2.5 text-[13px] font-extrabold sm:px-4 sm:text-[14px] transition-colors ${
                             myStatus === "not_attending"
                               ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
                               : "border border-[hsl(var(--cph-onyx)/0.16)] text-foreground/55 hover:bg-[hsl(var(--cph-onyx)/0.06)]"
