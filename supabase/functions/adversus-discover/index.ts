@@ -309,6 +309,7 @@ Deno.serve(async (req) => {
     account,
     base_url: baseUrl,
     campaign_count: campaigns.length,
+    campaign_metadata_derived_from: derivedFrom,
     campaigns,
     global_field_definitions: globalFields,
     campaigns_with_fields: perCampaignFields,
