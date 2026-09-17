@@ -62,6 +62,7 @@ import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBa
 import { QualityFeedbackInbox } from "@/components/quality/QualityFeedbackInbox";
 import { EventGallery } from "@/components/home/EventGallery";
 import { RampCurveCard } from "@/components/ramp/RampCurveCard";
+import { NextEventHero } from "@/components/home/NextEventHero";
 
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
