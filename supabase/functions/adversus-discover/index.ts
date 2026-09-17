@@ -86,11 +86,27 @@ Deno.serve(async (req) => {
   const { data: isSuperadmin } = await svc.rpc("is_superadmin", { _user_id: userData.user.id });
   if (isSuperadmin !== true) return json({ error: "Forbidden — superadmin required" }, 403);
 
-  // ---- Credentials -----------------------------------------------------------
-  const username = Deno.env.get("ADVERSUS_API_USERNAME");
-  const password = Deno.env.get("ADVERSUS_API_PASSWORD");
+  // ---- Credentials (account selectable; default = existing integration) ------
+  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const account = String((body as Record<string, unknown>).account ?? "default").toLowerCase();
+
+  const SECRET_NAMES: Record<string, { user: string; pass: string }> = {
+    default: { user: "ADVERSUS_API_USERNAME", pass: "ADVERSUS_API_PASSWORD" },
+    lederne: { user: "ADVERSUS_LEDERNE_API_USERNAME", pass: "ADVERSUS_LEDERNE_API_PASSWORD" },
+  };
+
+  const names = SECRET_NAMES[account];
+  if (!names) {
+    return json(
+      { error: `Ukendt account: ${account}. Gyldige: ${Object.keys(SECRET_NAMES).join(", ")}` },
+      400,
+    );
+  }
+
+  const username = Deno.env.get(names.user);
+  const password = Deno.env.get(names.pass);
   if (!username || !password) {
-    return json({ error: "ADVERSUS_API_USERNAME / ADVERSUS_API_PASSWORD mangler" }, 500);
+    return json({ error: `${names.user} / ${names.pass} mangler` }, 500);
   }
   const basic = `Basic ${btoa(`${username}:${password}`)}`;
 
