@@ -156,11 +156,18 @@ Deno.serve(async (req) => {
 
   // ---- a) Campaigns ----------------------------------------------------------
   const campaignList = asArray(campaignsRaw, "campaigns", "data");
+  const campaignName = (c: Record<string, unknown>): string | null => {
+    const s = (c.settings ?? {}) as Record<string, unknown>;
+    return (c.name ?? s.name ?? s.campaignName ?? null) as string | null;
+  };
+  const campaignActive = (c: Record<string, unknown>): unknown => {
+    const s = (c.settings ?? {}) as Record<string, unknown>;
+    return c.active ?? c.status ?? s.active ?? s.status ?? null;
+  };
   const campaigns = campaignList.map((c) => ({
     id: c.id,
-    name: (c.name as string) ?? null,
-    active: (c.active ?? c.status ?? null) as unknown,
-    raw_keys: Object.keys(c),
+    name: campaignName(c),
+    active: campaignActive(c),
   }));
 
   // ---- b) Field definitions --------------------------------------------------
@@ -174,7 +181,7 @@ Deno.serve(async (req) => {
       field_id: f.id ?? null,
       label,
       type,
-      kind, // masterData | resultData | unknown
+      kind, // masterData | resultData | campaignData
       active: f.active ?? null,
       free_text: isFreeText(label, type) ? "note/fritekst (indhold ikke hentet)" : null,
       pii_hint: looksLikePii(label, type),
@@ -185,37 +192,34 @@ Deno.serve(async (req) => {
     describeField(f, String(f.dataSet ?? f.dataset ?? f.group ?? "unknown")),
   );
 
-  // Per-campaign field definitions (campaign detail typically holds master/result fields)
-  const perCampaignFields: Array<Record<string, unknown>> = [];
-  for (const c of campaignList) {
-    const detail = await getJson(`/campaigns/${c.id}`);
-    if (!detail || typeof detail !== "object") continue;
-    const d = detail as Record<string, unknown>;
-    const settings = (d.settings ?? {}) as Record<string, unknown>;
+  // Lookup so campaigns that only reference field ids can be resolved to labels.
+  const fieldById = new Map<string, Record<string, unknown>>();
+  for (const f of fieldDefs) if (f.id !== undefined) fieldById.set(String(f.id), f);
 
-    const pick = (source: unknown, kind: string) =>
-      asArray(source, "fields").map((f) => describeField(f, kind));
-
-    const master = [
-      ...pick(d.masterData, "masterData"),
-      ...pick(settings.masterData, "masterData"),
-      ...pick((d as Record<string, unknown>).masterDataFields, "masterData"),
-    ];
-    const result = [
-      ...pick(d.resultData, "resultData"),
-      ...pick(settings.resultData, "resultData"),
-      ...pick((d as Record<string, unknown>).resultDataFields, "resultData"),
-    ];
-
-    perCampaignFields.push({
-      campaign_id: c.id,
-      campaign_name: (c.name as string) ?? null,
-      active: (c.active ?? c.status ?? null) as unknown,
-      campaign_detail_keys: Object.keys(d),
-      master_data_fields: master,
-      result_data_fields: result,
+  const resolveFields = (source: unknown, kind: string) => {
+    const raw = Array.isArray(source) ? source : asArray(source, "fields", "data");
+    return raw.map((entry) => {
+      if (entry && typeof entry === "object") {
+        const e = entry as Record<string, unknown>;
+        const def = e.id !== undefined ? fieldById.get(String(e.id)) : undefined;
+        return describeField({ ...(def ?? {}), ...e }, kind);
+      }
+      const def = fieldById.get(String(entry));
+      return describeField(def ?? { id: entry }, kind);
     });
-  }
+  };
+
+  const perCampaignFields = campaignList.map((c) => {
+    const s = (c.settings ?? {}) as Record<string, unknown>;
+    return {
+      campaign_id: c.id,
+      campaign_name: campaignName(c),
+      active: campaignActive(c),
+      master_data_fields: resolveFields(c.masterFields ?? s.masterFields, "masterData"),
+      result_data_fields: resolveFields(c.resultFields ?? s.resultFields, "resultData"),
+      campaign_fields: resolveFields(c.campaignFields ?? s.campaignFields, "campaignData"),
+    };
+  });
 
   // ---- c) One sample record per endpoint → keys only -------------------------
   const shapeOf = async (label: string, path: string) => {
