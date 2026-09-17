@@ -301,9 +301,109 @@ Deno.serve(async (req) => {
     await shapeOf("sales", "/sales?pageSize=1&page=1"),
     await shapeOf("appointments", "/appointments?pageSize=1&page=1"),
     await shapeOf("sessions", "/sessions?pageSize=1&page=1"),
+    await shapeOf("cdr", "/cdr?pageSize=1&page=1"),
+    await shapeOf("users", "/users?pageSize=1&page=1"),
+    await shapeOf("products", "/products?pageSize=1&page=1"),
   ];
 
+  // ---- d) Endpoint permission status (read-only probes) ----------------------
+  const probe = async (path: string) => {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        headers: { Authorization: basic, "Content-Type": "application/json" },
+      });
+      const message = res.ok ? "OK" : (await res.text()).slice(0, 200);
+      return { endpoint: path, status: res.status, message };
+    } catch (e) {
+      return { endpoint: path, status: null, message: (e as Error).message };
+    }
+  };
+
+  const endpointStatus = [];
+  for (
+    const p of [
+      "/leads?pageSize=1",
+      "/sales?pageSize=1",
+      "/users?pageSize=1",
+      "/campaigns",
+      "/fields",
+      "/appointments?pageSize=1",
+      "/sessions?pageSize=1",
+      "/cdr?pageSize=1",
+      "/products?pageSize=1",
+    ]
+  ) {
+    endpointStatus.push(await probe(p));
+  }
+
+  // ---- e) Sales aggregate counts (no values returned) ------------------------
+  let salesSummary: Record<string, unknown> | null = null;
+  const closedByIds = new Set<string>();
+  {
+    const perCampaign: Record<string, number> = {};
+    const perState: Record<string, number> = {};
+    const saleLineKeys = new Set<string>();
+    let total = 0;
+    let page = 1;
+    let permitted = false;
+    while (page <= 20) {
+      const data = await getJson(`/sales?pageSize=1000&page=${page}`);
+      if (!data) break;
+      permitted = true;
+      const rows = asArray(data, "sales", "data");
+      if (rows.length === 0) break;
+      for (const s of rows) {
+        total++;
+        const cid = String(s.campaignId ?? "ukendt");
+        perCampaign[cid] = (perCampaign[cid] ?? 0) + 1;
+        const st = String(s.state ?? s.status ?? "(tom)");
+        perState[st] = (perState[st] ?? 0) + 1;
+        if (s.closedBy !== undefined && s.closedBy !== null) closedByIds.add(String(s.closedBy));
+        for (const key of ["products", "items", "saleLines", "lines"] as const) {
+          for (const line of asArray(s[key])) {
+            for (const k of Object.keys(line)) saleLineKeys.add(`${key}.${k}`);
+          }
+        }
+      }
+      if (rows.length < 1000) break;
+      page++;
+    }
+    if (permitted) {
+      salesSummary = {
+        total_sales: total,
+        per_campaign: perCampaign,
+        per_state: perState,
+        sale_line_keys: [...saleLineKeys],
+        distinct_closed_by_count: closedByIds.size,
+      };
+    }
+  }
+
+  // ---- f) Users: counts and key names only ----------------------------------
+  let usersSummary: Record<string, unknown> | null = null;
+  {
+    const data = await getJson("/users?pageSize=1000&page=1");
+    const rows = asArray(data, "users", "data");
+    if (rows.length > 0) {
+      const idKeys = ["id", "userId"] as const;
+      const userIds = new Set<string>();
+      for (const u of rows) {
+        for (const k of idKeys) if (u[k] !== undefined && u[k] !== null) userIds.add(String(u[k]));
+      }
+      let overlap = 0;
+      for (const id of userIds) if (closedByIds.has(id)) overlap++;
+      usersSummary = {
+        user_count: rows.length,
+        keys: keysOf(rows[0]),
+        users_appearing_as_closed_by: overlap,
+      };
+    }
+  }
+
   return json({
+    endpoint_status: endpointStatus,
+    sales_summary: salesSummary,
+    users_summary: usersSummary,
     ok: true,
     mode: "read-only discovery — ingen data gemt",
     account,
