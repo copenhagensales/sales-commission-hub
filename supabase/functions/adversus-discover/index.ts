@@ -112,26 +112,30 @@ Deno.serve(async (req) => {
 
   const errors: Array<{ endpoint: string; status?: number; message: string }> = [];
 
-  // Resolve base URL by probing /campaigns
+  // Resolve base URL. Some API users are only permitted on a subset of endpoints,
+  // so probe several read-only endpoints before giving up.
   let baseUrl: string | null = null;
   let campaignsRaw: unknown = null;
-  for (const candidate of BASE_URLS) {
-    try {
-      const res = await fetch(`${candidate}/campaigns`, {
-        headers: { Authorization: basic, "Content-Type": "application/json" },
-      });
-      if (res.ok) {
-        baseUrl = candidate;
-        campaignsRaw = await res.json();
-        break;
+  const probePaths = ["/campaigns", "/leads?pageSize=1"];
+  outer: for (const candidate of BASE_URLS) {
+    for (const probe of probePaths) {
+      try {
+        const res = await fetch(`${candidate}${probe}`, {
+          headers: { Authorization: basic, "Content-Type": "application/json" },
+        });
+        if (res.ok) {
+          baseUrl = candidate;
+          if (probe === "/campaigns") campaignsRaw = await res.json();
+          break outer;
+        }
+        errors.push({
+          endpoint: `${candidate}${probe}`,
+          status: res.status,
+          message: (await res.text()).slice(0, 300),
+        });
+      } catch (e) {
+        errors.push({ endpoint: `${candidate}${probe}`, message: (e as Error).message });
       }
-      errors.push({
-        endpoint: `${candidate}/campaigns`,
-        status: res.status,
-        message: (await res.text()).slice(0, 300),
-      });
-    } catch (e) {
-      errors.push({ endpoint: `${candidate}/campaigns`, message: (e as Error).message });
     }
   }
 
