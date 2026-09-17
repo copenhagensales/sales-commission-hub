@@ -920,7 +920,7 @@ const Home = () => {
 
         {/* ZONE 4: Fødselsdage & jubilæer */}
         {upcomingCelebrations.length > 0 && (
-          <section className="rounded-3xl bg-card p-5 sm:p-6 md:px-8">
+          <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6 md:px-8">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold text-foreground">
                 <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
@@ -931,13 +931,13 @@ const Home = () => {
                 {upcomingCelebrations.length} kollegaer
               </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {upcomingCelebrations.map((celebration, idx) => {
                 const isAnniversary = celebration.type === 'anniversary';
                  return (
                    <div
                      key={idx}
-                     className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${
+                     className={`flex min-w-0 items-center gap-3 rounded-2xl px-3.5 py-3 ${
                        isAnniversary
                          ? 'bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]'
                          : 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
