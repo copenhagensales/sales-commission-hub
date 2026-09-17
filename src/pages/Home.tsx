@@ -817,68 +817,72 @@ const Home = () => {
                     )}
 
                     {/* Deltag / afbud */}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleAttendanceMutation.mutate({
-                            eventId: featured.id,
-                            status: "attending",
-                          })
-                        }
-                        disabled={toggleAttendanceMutation.isPending}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
-                          myStatus === "attending"
-                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                        }`}
-                      >
-                        <Check
-                          className={`h-3.5 w-3.5 ${
-                            myStatus === "attending" ? "text-[hsl(var(--cph-emerald))]" : ""
+                    <div className="border-t border-[hsl(var(--cph-onyx)/0.1)] pt-4">
+                      <p className="mb-2.5 text-[13px] text-foreground/60">Kommer du?</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleAttendanceMutation.mutate({
+                              eventId: featured.id,
+                              status: "attending",
+                            })
+                          }
+                          disabled={toggleAttendanceMutation.isPending}
+                          className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                            myStatus === "attending"
+                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                              : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
                           }`}
-                        />
-                        {(featured as any).requires_registration
-                          ? myStatus === "attending"
-                            ? "Tilmeldt"
-                            : "Tilmeld"
-                          : "Deltager"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleAttendanceMutation.mutate({
-                            eventId: featured.id,
-                            status: "maybe",
-                          })
-                        }
-                        disabled={toggleAttendanceMutation.isPending}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
-                          myStatus === "maybe"
-                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                        }`}
-                      >
-                        Måske
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleAttendanceMutation.mutate({
-                            eventId: featured.id,
-                            status: "not_attending",
-                          })
-                        }
-                        disabled={toggleAttendanceMutation.isPending}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
-                          myStatus === "not_attending"
-                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                        }`}
-                      >
-                        Afbud
-                      </button>
+                        >
+                          <Check
+                            className={`h-3.5 w-3.5 ${
+                              myStatus === "attending" ? "text-[hsl(var(--cph-emerald))]" : ""
+                            }`}
+                          />
+                          {(featured as any).requires_registration
+                            ? myStatus === "attending"
+                              ? "Tilmeldt"
+                              : "Tilmeld"
+                            : "Jeg deltager"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleAttendanceMutation.mutate({
+                              eventId: featured.id,
+                              status: "maybe",
+                            })
+                          }
+                          disabled={toggleAttendanceMutation.isPending}
+                          className={`flex-1 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                            myStatus === "maybe"
+                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                              : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                          }`}
+                        >
+                          Måske
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleAttendanceMutation.mutate({
+                              eventId: featured.id,
+                              status: "not_attending",
+                            })
+                          }
+                          disabled={toggleAttendanceMutation.isPending}
+                          className={`flex-1 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                            myStatus === "not_attending"
+                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                              : "border border-[hsl(var(--cph-onyx)/0.16)] text-foreground/55 hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                          }`}
+                        >
+                          Afbud
+                        </button>
+                      </div>
                     </div>
+
 
                     {/* Øvrige begivenheder */}
                     {rest.length > 0 && (
