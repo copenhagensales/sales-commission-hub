@@ -88,3 +88,12 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 - [x] Permanent historik på profil (fanen "Kvalitet")
 - [x] To adskilte kontrollant-knapper: "Send feedback" og "Afvis salg"
 - [x] Tydelig tekst: afvisning påvirker ikke provision; ingen KPI-kobling
+
+## Lederne-integration (Adversus success-leads) — løsning B
+- [ ] Map Adversus-kampagner 118971/118972 til eksisterende Tryg-kampagne med produktet "Lederne"
+- [ ] Edge function `lederne-sync` med positivliste, watermark = nu, ingen backfill
+- [ ] agents-kobling (kun id/navn/aktiv) + agent_email fra employee_master_data via navnematch
+- [ ] Mødetype (132892) i raw_payload i prisregel-format + verificér match via rematch på kunstigt testsalg
+- [ ] Retention: Medlemsnummer anonymiseres efter 90 dage for source = 'adversus_lederne' uden at ændre øvrige Tryg-salg
+- [ ] Cron hver 15. min + tilbagetrækning ved status væk fra success
+- [ ] Ryd debug-kode i adversus-discover
