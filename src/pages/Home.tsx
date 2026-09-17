@@ -544,8 +544,8 @@ const Home = () => {
 
 
         {/* ZONE 1: Hero + seneste 10 dage */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="min-w-0 xl:col-span-2">
             <HeroPerformanceCard
               firstName={firstName}
               periodCommission={personalStats?.periodCommission || 0}
@@ -571,8 +571,8 @@ const Home = () => {
 
 
         {/* ZONE 2: Liga + kommende begivenheder */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="min-w-0 xl:col-span-2">
             <CompactLeagueView />
           </div>
 

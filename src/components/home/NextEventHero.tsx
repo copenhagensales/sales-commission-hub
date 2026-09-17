@@ -98,11 +98,11 @@ export function NextEventHero({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
         {units.map((unit) => (
           <div key={unit.label}>
             <p
-              className={`text-[clamp(34px,7vw,46px)] font-extrabold leading-none tracking-[-0.03em] tabular-nums ${
+              className={`text-[clamp(28px,5vw,46px)] font-extrabold leading-none tracking-[-0.03em] tabular-nums ${
                 unit.accent ? "text-[hsl(var(--cph-emerald))]" : ""
               }`}
             >
