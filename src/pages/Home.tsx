@@ -961,13 +961,13 @@ const Home = () => {
                      </PlayerProfileHoverCard>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-extrabold">{celebration.name}</p>
-                      <p
-                        className={`text-[12px] ${
-                          isAnniversary
-                            ? 'font-extrabold text-[hsl(var(--cph-emerald))]'
-                            : 'text-[hsl(var(--cph-onyx)/0.76)]'
-                        }`}
-                      >
+                       <p
+                         className={`truncate text-[12px] ${
+                           isAnniversary
+                             ? 'font-extrabold text-[hsl(var(--cph-emerald))]'
+                             : 'text-[hsl(var(--cph-onyx)/0.76)]'
+                         }`}
+                       >
                         {isAnniversary
                           ? `${celebration.years} års jubilæum · ${formatCelebrationDate(celebration.date, celebration.isToday)}`
                           : `Fødselsdag · ${formatCelebrationDate(celebration.date, celebration.isToday)}`}
