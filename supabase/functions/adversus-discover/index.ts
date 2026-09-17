@@ -86,36 +86,56 @@ Deno.serve(async (req) => {
   const { data: isSuperadmin } = await svc.rpc("is_superadmin", { _user_id: userData.user.id });
   if (isSuperadmin !== true) return json({ error: "Forbidden — superadmin required" }, 403);
 
-  // ---- Credentials -----------------------------------------------------------
-  const username = Deno.env.get("ADVERSUS_API_USERNAME");
-  const password = Deno.env.get("ADVERSUS_API_PASSWORD");
+  // ---- Credentials (account selectable; default = existing integration) ------
+  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const account = String((body as Record<string, unknown>).account ?? "default").toLowerCase();
+
+  const SECRET_NAMES: Record<string, { user: string; pass: string }> = {
+    default: { user: "ADVERSUS_API_USERNAME", pass: "ADVERSUS_API_PASSWORD" },
+    lederne: { user: "ADVERSUS_LEDERNE_API_USERNAME", pass: "ADVERSUS_LEDERNE_API_PASSWORD" },
+  };
+
+  const names = SECRET_NAMES[account];
+  if (!names) {
+    return json(
+      { error: `Ukendt account: ${account}. Gyldige: ${Object.keys(SECRET_NAMES).join(", ")}` },
+      400,
+    );
+  }
+
+  const username = Deno.env.get(names.user);
+  const password = Deno.env.get(names.pass);
   if (!username || !password) {
-    return json({ error: "ADVERSUS_API_USERNAME / ADVERSUS_API_PASSWORD mangler" }, 500);
+    return json({ error: `${names.user} / ${names.pass} mangler` }, 500);
   }
   const basic = `Basic ${btoa(`${username}:${password}`)}`;
 
   const errors: Array<{ endpoint: string; status?: number; message: string }> = [];
 
-  // Resolve base URL by probing /campaigns
+  // Resolve base URL. Some API users are only permitted on a subset of endpoints,
+  // so probe several read-only endpoints before giving up.
   let baseUrl: string | null = null;
   let campaignsRaw: unknown = null;
-  for (const candidate of BASE_URLS) {
-    try {
-      const res = await fetch(`${candidate}/campaigns`, {
-        headers: { Authorization: basic, "Content-Type": "application/json" },
-      });
-      if (res.ok) {
-        baseUrl = candidate;
-        campaignsRaw = await res.json();
-        break;
+  const probePaths = ["/campaigns", "/leads?pageSize=1"];
+  outer: for (const candidate of BASE_URLS) {
+    for (const probe of probePaths) {
+      try {
+        const res = await fetch(`${candidate}${probe}`, {
+          headers: { Authorization: basic, "Content-Type": "application/json" },
+        });
+        if (res.ok) {
+          baseUrl = candidate;
+          if (probe === "/campaigns") campaignsRaw = await res.json();
+          break outer;
+        }
+        errors.push({
+          endpoint: `${candidate}${probe}`,
+          status: res.status,
+          message: (await res.text()).slice(0, 300),
+        });
+      } catch (e) {
+        errors.push({ endpoint: `${candidate}${probe}`, message: (e as Error).message });
       }
-      errors.push({
-        endpoint: `${candidate}/campaigns`,
-        status: res.status,
-        message: (await res.text()).slice(0, 300),
-      });
-    } catch (e) {
-      errors.push({ endpoint: `${candidate}/campaigns`, message: (e as Error).message });
     }
   }
 
@@ -221,6 +241,48 @@ Deno.serve(async (req) => {
     };
   });
 
+  // Fallback: if /campaigns and /fields are not permitted for this API user,
+  // derive campaign ids and field metadata (id + label + inferred type ONLY —
+  // never values) from a sample of leads.
+  let derivedFrom: string | null = null;
+  if (campaignList.length === 0) {
+    const sample = await getJson("/leads?pageSize=1000&page=1");
+    const leads = asArray(sample, "leads", "data");
+    if (leads.length > 0) {
+      derivedFrom = `afledt af ${leads.length} leads (kun felt-id, label og datatype — ingen værdier)`;
+      const byCampaign = new Map<
+        string,
+        { master: Map<string, ReturnType<typeof describeField>>; result: Map<string, ReturnType<typeof describeField>> }
+      >();
+      for (const lead of leads) {
+        const cid = String(lead.campaignId ?? "ukendt");
+        if (!byCampaign.has(cid)) byCampaign.set(cid, { master: new Map(), result: new Map() });
+        const entry = byCampaign.get(cid)!;
+        for (const [key, kind, target] of [
+          ["masterData", "masterData", entry.master],
+          ["resultData", "resultData", entry.result],
+        ] as const) {
+          for (const f of asArray(lead[key])) {
+            const id = String(f.id ?? f.label ?? "");
+            if (!id || target.has(id)) continue;
+            target.set(id, describeField({ id: f.id, name: f.label, type: describeType(f.value) }, kind));
+          }
+        }
+      }
+      for (const [cid, entry] of byCampaign) {
+        campaigns.push({ id: cid, name: null, active: null });
+        perCampaignFields.push({
+          campaign_id: cid,
+          campaign_name: null,
+          active: null,
+          master_data_fields: [...entry.master.values()],
+          result_data_fields: [...entry.result.values()],
+          campaign_fields: [],
+        });
+      }
+    }
+  }
+
   // ---- c) One sample record per endpoint → keys only -------------------------
   const shapeOf = async (label: string, path: string) => {
     const data = await getJson(path);
@@ -244,8 +306,10 @@ Deno.serve(async (req) => {
   return json({
     ok: true,
     mode: "read-only discovery — ingen data gemt",
+    account,
     base_url: baseUrl,
     campaign_count: campaigns.length,
+    campaign_metadata_derived_from: derivedFrom,
     campaigns,
     global_field_definitions: globalFields,
     campaigns_with_fields: perCampaignFields,
