@@ -255,3 +255,6 @@ verify_jwt = false
 
 [functions.twilio-sms-status]
 verify_jwt = false
+
+[functions.lederne-sync]
+verify_jwt = false
