@@ -99,7 +99,7 @@ export function HeroPerformanceCard({
   }, [hasGoal, progressPercent]);
 
   return (
-    <section className="relative h-full overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-6 md:p-10 text-[hsl(var(--cph-light-blue))]">
+    <section className="relative h-full overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-5 sm:p-6 md:p-10 text-[hsl(var(--cph-light-blue))]">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -111,12 +111,12 @@ export function HeroPerformanceCard({
       />
       {/* Top row: KPI + supporting numbers */}
 
-      <div className="relative flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-        <div>
+      <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between md:gap-8">
+        <div className="min-w-0">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[hsl(var(--cph-emerald))]">
             Provision denne periode
           </p>
-          <p className="mt-3 text-[clamp(44px,7vw,72px)] font-extrabold leading-none tracking-[-0.03em] tabular-nums">
+          <p className="mt-3 text-[clamp(36px,11vw,72px)] font-extrabold leading-none tracking-[-0.03em] tabular-nums">
             {formatCommission(animatedCommission)} kr
           </p>
           {vacationPay > 0 && (
@@ -126,21 +126,22 @@ export function HeroPerformanceCard({
           )}
         </div>
 
-        <div className="flex gap-10 md:flex-col md:items-end md:gap-6 md:text-right">
-          <div>
-            <p className="text-[22px] font-extrabold leading-none tabular-nums">
+        <div className="flex flex-wrap gap-x-8 gap-y-4 md:flex-col md:items-end md:gap-6 md:text-right">
+          <div className="min-w-0">
+            <p className="text-[20px] font-extrabold leading-none tabular-nums sm:text-[22px]">
               {hasGoal ? `${animatedPercent}%` : "—"}
             </p>
             <p className="mt-1 text-[13px] text-[hsl(var(--cph-light-blue)/0.72)]">af dit mål</p>
           </div>
-          <div>
-            <p className="text-[22px] font-extrabold leading-none tabular-nums text-[hsl(var(--cph-emerald))]">
+          <div className="min-w-0">
+            <p className="text-[20px] font-extrabold leading-none tabular-nums text-[hsl(var(--cph-emerald))] sm:text-[22px]">
               {hasGoal ? `${formatCommission(targetAmount)} kr` : "Intet mål"}
             </p>
             <p className="mt-1 text-[13px] text-[hsl(var(--cph-light-blue)/0.72)]">månedsmål</p>
           </div>
         </div>
       </div>
+
 
       {/* Progress line */}
       {hasGoal && (
