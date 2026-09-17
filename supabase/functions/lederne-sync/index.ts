@@ -475,7 +475,7 @@ async function run(svc: SupabaseClient) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
       },
-      body: JSON.stringify({ saleIds: newSaleIds }),
+      body: JSON.stringify({ sale_ids: newSaleIds }),
     });
     rematch = { status: res.status };
   }
