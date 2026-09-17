@@ -406,7 +406,7 @@ async function run(svc: SupabaseClient) {
       if (existingSale && (existingSale as { validation_status: string }).validation_status !== "cancelled") {
         await svc
           .from("sales")
-          .update({ validation_status: "cancelled", status: "withdrawn" })
+          .update({ validation_status: "cancelled" })
           .eq("id", (existingSale as { id: string }).id);
         withdrawn++;
       }
@@ -436,7 +436,6 @@ async function run(svc: SupabaseClient) {
       agent_external_id: `lederne-${lead.lastContactedBy}`,
       agent_email: emailByAdversusId.get(lead.lastContactedBy) ?? null,
       sale_datetime: lead.updated,
-      status: "success",
       raw_payload: payload,
     };
 
