@@ -920,7 +920,7 @@ const Home = () => {
 
         {/* ZONE 4: Fødselsdage & jubilæer */}
         {upcomingCelebrations.length > 0 && (
-          <section className="rounded-3xl bg-card p-6 md:px-8">
+          <section className="rounded-3xl bg-card p-5 sm:p-6 md:px-8">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold text-foreground">
                 <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
