@@ -62,6 +62,7 @@ import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBa
 import { QualityFeedbackInbox } from "@/components/quality/QualityFeedbackInbox";
 import { EventGallery } from "@/components/home/EventGallery";
 import { RampCurveCard } from "@/components/ramp/RampCurveCard";
+import { NextEventHero } from "@/components/home/NextEventHero";
 
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
@@ -731,67 +732,18 @@ const Home = () => {
 
                 return (
                   <div className="flex flex-col gap-5">
-                    {/* Fremhævet begivenhed */}
-                    <div className="flex items-start gap-4">
-                      <div className="min-w-[60px] flex-none rounded-2xl bg-[hsl(var(--cph-onyx))] px-3.5 py-2.5 text-center text-[hsl(var(--cph-light-blue))]">
-                        <div className="text-[26px] font-extrabold leading-none tracking-[-0.02em] text-[hsl(var(--cph-emerald))] tabular-nums">
-                          {format(parseISO(featured.event_date), "d")}
-                        </div>
-                        <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.12em]">
-                          {format(parseISO(featured.event_date), "MMM", { locale: da })}
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className="cursor-pointer text-[17px] font-extrabold leading-[1.3] hover:underline"
-                          onClick={() => setSelectedEventForDetail(featured.id)}
-                        >
-                          {featured.title}
-                        </p>
-                        <p className="mt-1 text-[13px] text-foreground/70">
-                          {[
-                            whenLabel,
-                            featured.event_time ? `Kl. ${featured.event_time.slice(0, 5)}` : null,
-                            featured.location,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                      </div>
-                      <div className="flex flex-none items-center gap-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setSelectedEventForDetail(featured.id)}
-                          title="Læs mere"
-                        >
-                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                        {(isOwner || featured.created_by === user?.id) && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => setEditingEvent(featured.id)}
-                              title="Rediger"
-                            >
-                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => deleteEventMutation.mutate(featured.id)}
-                              title="Slet"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    {/* Fremhævet begivenhed – countdown-hero */}
+                    <NextEventHero
+                      eventDate={parseISO(featured.event_date)}
+                      eventTime={featured.event_time}
+                      title={featured.title}
+                      location={featured.location}
+                      onOpenDetail={() => setSelectedEventForDetail(featured.id)}
+                      canManage={isOwner || featured.created_by === user?.id}
+                      onEdit={() => setEditingEvent(featured.id)}
+                      onDelete={() => deleteEventMutation.mutate(featured.id)}
+                    />
+
 
                     {/* Deltagere */}
                     {attendees.length > 0 && (
@@ -866,68 +818,72 @@ const Home = () => {
                     )}
 
                     {/* Deltag / afbud */}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleAttendanceMutation.mutate({
-                            eventId: featured.id,
-                            status: "attending",
-                          })
-                        }
-                        disabled={toggleAttendanceMutation.isPending}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
-                          myStatus === "attending"
-                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                        }`}
-                      >
-                        <Check
-                          className={`h-3.5 w-3.5 ${
-                            myStatus === "attending" ? "text-[hsl(var(--cph-emerald))]" : ""
+                    <div className="border-t border-[hsl(var(--cph-onyx)/0.1)] pt-4">
+                      <p className="mb-2.5 text-[13px] text-foreground/60">Kommer du?</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleAttendanceMutation.mutate({
+                              eventId: featured.id,
+                              status: "attending",
+                            })
+                          }
+                          disabled={toggleAttendanceMutation.isPending}
+                          className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                            myStatus === "attending"
+                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                              : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
                           }`}
-                        />
-                        {(featured as any).requires_registration
-                          ? myStatus === "attending"
-                            ? "Tilmeldt"
-                            : "Tilmeld"
-                          : "Deltager"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleAttendanceMutation.mutate({
-                            eventId: featured.id,
-                            status: "maybe",
-                          })
-                        }
-                        disabled={toggleAttendanceMutation.isPending}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
-                          myStatus === "maybe"
-                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                        }`}
-                      >
-                        Måske
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleAttendanceMutation.mutate({
-                            eventId: featured.id,
-                            status: "not_attending",
-                          })
-                        }
-                        disabled={toggleAttendanceMutation.isPending}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
-                          myStatus === "not_attending"
-                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                        }`}
-                      >
-                        Afbud
-                      </button>
+                        >
+                          <Check
+                            className={`h-3.5 w-3.5 ${
+                              myStatus === "attending" ? "text-[hsl(var(--cph-emerald))]" : ""
+                            }`}
+                          />
+                          {(featured as any).requires_registration
+                            ? myStatus === "attending"
+                              ? "Tilmeldt"
+                              : "Tilmeld"
+                            : "Jeg deltager"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleAttendanceMutation.mutate({
+                              eventId: featured.id,
+                              status: "maybe",
+                            })
+                          }
+                          disabled={toggleAttendanceMutation.isPending}
+                          className={`flex-1 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                            myStatus === "maybe"
+                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                              : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                          }`}
+                        >
+                          Måske
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleAttendanceMutation.mutate({
+                              eventId: featured.id,
+                              status: "not_attending",
+                            })
+                          }
+                          disabled={toggleAttendanceMutation.isPending}
+                          className={`flex-1 rounded-full px-4 py-2.5 text-[14px] font-extrabold transition-colors ${
+                            myStatus === "not_attending"
+                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                              : "border border-[hsl(var(--cph-onyx)/0.16)] text-foreground/55 hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                          }`}
+                        >
+                          Afbud
+                        </button>
+                      </div>
                     </div>
+
 
                     {/* Øvrige begivenheder */}
                     {rest.length > 0 && (
