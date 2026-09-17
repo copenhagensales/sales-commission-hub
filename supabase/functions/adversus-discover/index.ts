@@ -368,6 +368,51 @@ Deno.serve(async (req) => {
       if (rows.length < 1000) break;
       page++;
     }
+    // Adversus /sales often needs an explicit filter; probe variants and report
+    // ONLY the number of records returned plus the top-level response keys.
+    const variants: Array<{ query: string; status?: number; count: number; response_keys?: string[] }> = [];
+    const since = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
+    for (
+      const q of [
+        "/sales?pageSize=5",
+        `/sales?pageSize=5&filters=${encodeURIComponent(JSON.stringify({ lastModifiedTime: { $gt: since } }))}`,
+        `/sales?pageSize=5&filters=${encodeURIComponent(JSON.stringify({ closedTime: { $gt: since } }))}`,
+        "/sales?pageSize=5&campaignId=118971",
+        "/sales?pageSize=5&campaignId=118972",
+      ]
+    ) {
+      try {
+        const res = await fetch(`${baseUrl}${q}`, {
+          headers: { Authorization: basic, "Content-Type": "application/json" },
+        });
+        if (!res.ok) {
+          variants.push({ query: q, status: res.status, count: -1 });
+          continue;
+        }
+        const data = await res.json();
+        const rows = asArray(data, "sales", "data");
+        variants.push({
+          query: q,
+          status: res.status,
+          count: rows.length,
+          response_keys: data && typeof data === "object" && !Array.isArray(data)
+            ? Object.keys(data as Record<string, unknown>)
+            : ["(array)"],
+        });
+        if (rows.length > 0 && !salesSummary) {
+          for (const s of rows) {
+            const cid = String(s.campaignId ?? "ukendt");
+            perCampaign[cid] = (perCampaign[cid] ?? 0) + 1;
+            const st = String(s.state ?? s.status ?? "(tom)");
+            perState[st] = (perState[st] ?? 0) + 1;
+            if (s.closedBy !== undefined && s.closedBy !== null) closedByIds.add(String(s.closedBy));
+          }
+        }
+      } catch (e) {
+        variants.push({ query: q, count: -1, response_keys: [(e as Error).message] });
+      }
+    }
+
     if (permitted) {
       salesSummary = {
         total_sales: total,
@@ -375,6 +420,7 @@ Deno.serve(async (req) => {
         per_state: perState,
         sale_line_keys: [...saleLineKeys],
         distinct_closed_by_count: closedByIds.size,
+        variant_probes: variants,
       };
     }
   }
