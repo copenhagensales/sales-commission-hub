@@ -241,6 +241,48 @@ Deno.serve(async (req) => {
     };
   });
 
+  // Fallback: if /campaigns and /fields are not permitted for this API user,
+  // derive campaign ids and field metadata (id + label + inferred type ONLY —
+  // never values) from a sample of leads.
+  let derivedFrom: string | null = null;
+  if (campaignList.length === 0) {
+    const sample = await getJson("/leads?pageSize=1000&page=1");
+    const leads = asArray(sample, "leads", "data");
+    if (leads.length > 0) {
+      derivedFrom = `afledt af ${leads.length} leads (kun felt-id, label og datatype — ingen værdier)`;
+      const byCampaign = new Map<
+        string,
+        { master: Map<string, ReturnType<typeof describeField>>; result: Map<string, ReturnType<typeof describeField>> }
+      >();
+      for (const lead of leads) {
+        const cid = String(lead.campaignId ?? "ukendt");
+        if (!byCampaign.has(cid)) byCampaign.set(cid, { master: new Map(), result: new Map() });
+        const entry = byCampaign.get(cid)!;
+        for (const [key, kind, target] of [
+          ["masterData", "masterData", entry.master],
+          ["resultData", "resultData", entry.result],
+        ] as const) {
+          for (const f of asArray(lead[key])) {
+            const id = String(f.id ?? f.label ?? "");
+            if (!id || target.has(id)) continue;
+            target.set(id, describeField({ id: f.id, name: f.label, type: describeType(f.value) }, kind));
+          }
+        }
+      }
+      for (const [cid, entry] of byCampaign) {
+        campaigns.push({ id: cid, name: null, active: null });
+        perCampaignFields.push({
+          campaign_id: cid,
+          campaign_name: null,
+          active: null,
+          master_data_fields: [...entry.master.values()],
+          result_data_fields: [...entry.result.values()],
+          campaign_fields: [],
+        });
+      }
+    }
+  }
+
   // ---- c) One sample record per endpoint → keys only -------------------------
   const shapeOf = async (label: string, path: string) => {
     const data = await getJson(path);
