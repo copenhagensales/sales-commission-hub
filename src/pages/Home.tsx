@@ -731,67 +731,18 @@ const Home = () => {
 
                 return (
                   <div className="flex flex-col gap-5">
-                    {/* Fremhævet begivenhed */}
-                    <div className="flex items-start gap-4">
-                      <div className="min-w-[60px] flex-none rounded-2xl bg-[hsl(var(--cph-onyx))] px-3.5 py-2.5 text-center text-[hsl(var(--cph-light-blue))]">
-                        <div className="text-[26px] font-extrabold leading-none tracking-[-0.02em] text-[hsl(var(--cph-emerald))] tabular-nums">
-                          {format(parseISO(featured.event_date), "d")}
-                        </div>
-                        <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.12em]">
-                          {format(parseISO(featured.event_date), "MMM", { locale: da })}
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className="cursor-pointer text-[17px] font-extrabold leading-[1.3] hover:underline"
-                          onClick={() => setSelectedEventForDetail(featured.id)}
-                        >
-                          {featured.title}
-                        </p>
-                        <p className="mt-1 text-[13px] text-foreground/70">
-                          {[
-                            whenLabel,
-                            featured.event_time ? `Kl. ${featured.event_time.slice(0, 5)}` : null,
-                            featured.location,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                      </div>
-                      <div className="flex flex-none items-center gap-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setSelectedEventForDetail(featured.id)}
-                          title="Læs mere"
-                        >
-                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                        {(isOwner || featured.created_by === user?.id) && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => setEditingEvent(featured.id)}
-                              title="Rediger"
-                            >
-                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => deleteEventMutation.mutate(featured.id)}
-                              title="Slet"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    {/* Fremhævet begivenhed – countdown-hero */}
+                    <NextEventHero
+                      eventDate={parseISO(featured.event_date)}
+                      eventTime={featured.event_time}
+                      title={featured.title}
+                      location={featured.location}
+                      onOpenDetail={() => setSelectedEventForDetail(featured.id)}
+                      canManage={isOwner || featured.created_by === user?.id}
+                      onEdit={() => setEditingEvent(featured.id)}
+                      onDelete={() => deleteEventMutation.mutate(featured.id)}
+                    />
+
 
                     {/* Deltagere */}
                     {attendees.length > 0 && (
