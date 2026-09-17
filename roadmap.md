@@ -97,3 +97,12 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 - [ ] Retention: Medlemsnummer anonymiseres efter 90 dage for source = 'adversus_lederne' uden at ændre øvrige Tryg-salg
 - [ ] Cron hver 15. min + tilbagetrækning ved status væk fra success
 - [ ] Ryd debug-kode i adversus-discover
+
+## Lederne (løsning B) — status 17-09-2026
+- [x] Kampagner 118971/118972 mappet til Tryg Products → produkt "Lederne"
+- [x] `lederne-sync` deployet; watermark forhindrer historisk backfill
+- [x] Prisregler verificeret: Telefonmøde 30/200, Onlinemøde 90/200
+- [x] Sælgerkobling: 7 af 9 koblet; Chanell Gorel + Flora Klug mangler medarbejderprofil
+- [x] Cron hvert 15. min + daglig anonymisering af medlemsnummer (90 dage)
+- [ ] Oprydning i `adversus-discover` (read-only, superadmin) når opdagelsesfasen lukkes
+- [ ] Beslutning: Hiper Lukning/Viderestilling-regler med 0 kr omsætning
