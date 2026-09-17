@@ -238,11 +238,21 @@ async function syncUsers(svc: SupabaseClient, auth: string) {
       is_active: info.active,
       source: SOURCE,
     };
-    const { data: existing } = await svc
+    // Reuse an existing agent for the same person: first by external id, then by work e-mail.
+    const { data: byExternal } = await svc
       .from("agents")
       .select("id")
       .eq("external_adversus_id", externalId)
       .maybeSingle();
+    let existing = byExternal as { id?: string } | null;
+    if (!existing && info.email) {
+      const { data: byMail } = await svc
+        .from("agents")
+        .select("id")
+        .eq("email", info.email)
+        .maybeSingle();
+      existing = byMail as { id?: string } | null;
+    }
     let agentId: string | null = (existing as { id?: string } | null)?.id ?? null;
     if (agentId) {
       await svc.from("agents").update(row).eq("id", agentId);
@@ -271,12 +281,12 @@ async function mapAgentsToEmployees(
   const emailByAdversusId = new Map<string, string>();
   const { data: employees } = await svc
     .from("employee_master_data")
-    .select("id, full_name, work_email, is_active")
+    .select("id, first_name, last_name, work_email, is_active")
     .eq("is_active", true);
   const byName = new Map<string, Array<{ id: string; work_email: string | null }>>();
   const byEmail = new Map<string, { id: string; work_email: string | null }>();
   for (const e of (employees ?? []) as Array<Record<string, unknown>>) {
-    const key = safeString(e.full_name).toLowerCase();
+    const key = `${safeString(e.first_name)} ${safeString(e.last_name)}`.trim().toLowerCase();
     if (!key) continue;
     const row = { id: String(e.id), work_email: (e.work_email as string | null) ?? null };
     const list = byName.get(key) ?? [];
