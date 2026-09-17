@@ -260,6 +260,7 @@ Deno.serve(async (req) => {
   return json({
     ok: true,
     mode: "read-only discovery — ingen data gemt",
+    account,
     base_url: baseUrl,
     campaign_count: campaigns.length,
     campaigns,
