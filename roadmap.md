@@ -88,3 +88,21 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 - [x] Permanent historik på profil (fanen "Kvalitet")
 - [x] To adskilte kontrollant-knapper: "Send feedback" og "Afvis salg"
 - [x] Tydelig tekst: afvisning påvirker ikke provision; ingen KPI-kobling
+
+## Lederne-integration (Adversus success-leads) — løsning B
+- [ ] Map Adversus-kampagner 118971/118972 til eksisterende Tryg-kampagne med produktet "Lederne"
+- [ ] Edge function `lederne-sync` med positivliste, watermark = nu, ingen backfill
+- [ ] agents-kobling (kun id/navn/aktiv) + agent_email fra employee_master_data via navnematch
+- [ ] Mødetype (132892) i raw_payload i prisregel-format + verificér match via rematch på kunstigt testsalg
+- [ ] Retention: Medlemsnummer anonymiseres efter 90 dage for source = 'adversus_lederne' uden at ændre øvrige Tryg-salg
+- [ ] Cron hver 15. min + tilbagetrækning ved status væk fra success
+- [ ] Ryd debug-kode i adversus-discover
+
+## Lederne (løsning B) — status 17-09-2026
+- [x] Kampagner 118971/118972 mappet til Tryg Products → produkt "Lederne"
+- [x] `lederne-sync` deployet; watermark forhindrer historisk backfill
+- [x] Prisregler verificeret: Telefonmøde 30/200, Onlinemøde 90/200
+- [x] Sælgerkobling: 7 af 9 koblet; Chanell Gorel + Flora Klug mangler medarbejderprofil
+- [x] Cron hvert 15. min + daglig anonymisering af medlemsnummer (90 dage)
+- [ ] Oprydning i `adversus-discover` (read-only, superadmin) når opdagelsesfasen lukkes
+- [ ] Beslutning: Hiper Lukning/Viderestilling-regler med 0 kr omsætning

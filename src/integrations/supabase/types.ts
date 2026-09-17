@@ -10803,6 +10803,50 @@ export type Database = {
         }
         Relationships: []
       }
+      lederne_campaign_review: {
+        Row: {
+          adversus_campaign_id: string
+          client_campaign_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          reviewed: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          adversus_campaign_id: string
+          client_campaign_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adversus_campaign_id?: string
+          client_campaign_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lederne_campaign_review_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location: {
         Row: {
           address_city: string | null
@@ -17333,6 +17377,14 @@ export type Database = {
           p_allowed_metadata_keys: string[]
           p_cutoff: string
           p_dry_run?: boolean
+        }
+        Returns: Json
+      }
+      gdpr_clean_lederne_member_numbers: {
+        Args: {
+          p_batch_size?: number
+          p_dry_run?: boolean
+          p_retention_days?: number
         }
         Returns: Json
       }
