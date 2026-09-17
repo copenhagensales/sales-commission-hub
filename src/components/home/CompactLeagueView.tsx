@@ -69,9 +69,9 @@ export function CompactLeagueView() {
               const name = formatPlayerName(standing.employee);
 
               return (
-                <div key={standing.id} className="flex items-center gap-4 py-4">
+                <div key={standing.id} className="flex items-center gap-2.5 py-4 sm:gap-4">
                   <span
-                    className={`w-6 text-[20px] font-extrabold tracking-[-0.02em] tabular-nums ${
+                    className={`w-5 flex-none text-[18px] font-extrabold tracking-[-0.02em] tabular-nums sm:w-6 sm:text-[20px] ${
                       rank === 1 ? "text-foreground" : "text-foreground/70"
                     }`}
                   >
@@ -79,7 +79,7 @@ export function CompactLeagueView() {
                   </span>
                   <PlayerProfileHoverCard employeeId={standing.employee_id}>
                     <span
-                      className={`flex h-10 w-10 flex-none cursor-pointer items-center justify-center overflow-hidden rounded-full text-[13px] font-extrabold ${
+                      className={`flex h-9 w-9 flex-none cursor-pointer items-center justify-center overflow-hidden rounded-full text-[12px] font-extrabold sm:h-10 sm:w-10 sm:text-[13px] ${
                         rank === 1
                           ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-emerald))]"
                           : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
@@ -97,31 +97,32 @@ export function CompactLeagueView() {
                     </span>
                   </PlayerProfileHoverCard>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-extrabold text-foreground">
+                    <p className="truncate text-[14px] font-extrabold text-foreground sm:text-[15px]">
                       {name}
                       {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
                     </p>
-                    <p className="text-[13px] text-foreground/70">
+                    <p className="truncate text-[12px] text-foreground/70 sm:text-[13px]">
                       {standing.rounds_played
                         ? `${standing.rounds_played} runder spillet`
                         : "Ingen runder endnu"}
                     </p>
-                  </div>
-                  <div className="flex flex-none items-center gap-3">
                     {isPodium(rank) && (
-                      <FeedReactionRow
-                        targetType="league_round"
-                        targetKey={leagueTargetKey(standing.employee_id)}
-                        reactions={getReactions(leagueTargetKey(standing.employee_id))}
-                        disabled={!canInteract}
-                        onToggle={(args) => toggleReaction.mutate(args)}
-                      />
+                      <div className="mt-1.5 flex flex-wrap">
+                        <FeedReactionRow
+                          targetType="league_round"
+                          targetKey={leagueTargetKey(standing.employee_id)}
+                          reactions={getReactions(leagueTargetKey(standing.employee_id))}
+                          disabled={!canInteract}
+                          onToggle={(args) => toggleReaction.mutate(args)}
+                        />
+                      </div>
                     )}
-                    <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
-                      {formatPoints(standing.total_points || 0)}
-                    </span>
                   </div>
+                  <span className="flex-none text-[17px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground sm:text-[20px]">
+                    {formatPoints(standing.total_points || 0)}
+                  </span>
                 </div>
+
               );
             })}
           </div>
