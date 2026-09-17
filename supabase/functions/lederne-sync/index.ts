@@ -214,7 +214,7 @@ async function getWatermark(svc: SupabaseClient, integrationId: string): Promise
 async function syncUsers(svc: SupabaseClient, auth: string) {
   const raw = await getJson("/users?pageSize=1000", auth);
   const users = asArray(raw, "users", "data");
-  const ours = new Map<string, { name: string; active: boolean }>();
+  const ours = new Map<string, { name: string; active: boolean; email: string }>();
   for (const u of users) {
     const email = safeString(u.email ?? u.username).toLowerCase();
     if (!email.endsWith(OUR_DOMAIN)) continue;
@@ -223,17 +223,18 @@ async function syncUsers(svc: SupabaseClient, auth: string) {
     const activeRaw = u.active ?? u.enabled ?? u.status;
     const active =
       activeRaw === true || activeRaw === 1 || String(activeRaw).toLowerCase() === "active";
-    ours.set(id, { name: safeString(u.name ?? u.displayName), active });
+    // Only our own @copenhagensales.dk work e-mail is kept — never customer data.
+    ours.set(id, { name: safeString(u.name ?? u.displayName), active, email });
   }
 
-  const agentByAdversusId = new Map<string, { agentId: string; name: string }>();
+  const agentByAdversusId = new Map<string, { agentId: string; name: string; email: string }>();
   for (const [advId, info] of ours) {
     const externalId = `lederne-${advId}`;
     const row = {
       external_adversus_id: externalId,
       name: info.name || `Adversus-bruger ${advId}`,
-      // The Adversus e-mail is never stored — the column stays empty.
-      email: null,
+      // Our own company work e-mail; required by agents.email (NOT NULL + domain whitelist).
+      email: info.email,
       is_active: info.active,
       source: SOURCE,
     };
@@ -253,7 +254,7 @@ async function syncUsers(svc: SupabaseClient, auth: string) {
       }
       agentId = (inserted as { id: string }).id;
     }
-    agentByAdversusId.set(advId, { agentId: agentId!, name: row.name });
+    agentByAdversusId.set(advId, { agentId: agentId!, name: row.name, email: info.email });
   }
   log("INFO", `Brugere hentet: ${users.length}, vores egne gemt: ${agentByAdversusId.size}`);
   return agentByAdversusId;
@@ -265,7 +266,7 @@ async function syncUsers(svc: SupabaseClient, auth: string) {
  */
 async function mapAgentsToEmployees(
   svc: SupabaseClient,
-  agents: Map<string, { agentId: string; name: string }>,
+  agents: Map<string, { agentId: string; name: string; email: string }>,
 ) {
   const emailByAdversusId = new Map<string, string>();
   const { data: employees } = await svc
@@ -273,23 +274,29 @@ async function mapAgentsToEmployees(
     .select("id, full_name, work_email, is_active")
     .eq("is_active", true);
   const byName = new Map<string, Array<{ id: string; work_email: string | null }>>();
+  const byEmail = new Map<string, { id: string; work_email: string | null }>();
   for (const e of (employees ?? []) as Array<Record<string, unknown>>) {
     const key = safeString(e.full_name).toLowerCase();
     if (!key) continue;
+    const row = { id: String(e.id), work_email: (e.work_email as string | null) ?? null };
     const list = byName.get(key) ?? [];
-    list.push({ id: String(e.id), work_email: (e.work_email as string | null) ?? null });
+    list.push(row);
     byName.set(key, list);
+    const mail = safeString(e.work_email).toLowerCase();
+    if (mail) byEmail.set(mail, row);
   }
 
   let mapped = 0;
   let unmapped = 0;
   for (const [advId, agent] of agents) {
+    // Work e-mail is the deterministic key; name is only a fallback.
+    const byMail = agent.email ? byEmail.get(agent.email) : undefined;
     const matches = byName.get(agent.name.toLowerCase()) ?? [];
-    if (matches.length !== 1) {
+    const employee = byMail ?? (matches.length === 1 ? matches[0] : null);
+    if (!employee) {
       unmapped++;
       continue;
     }
-    const employee = matches[0];
     const { data: existingMap } = await svc
       .from("employee_agent_mapping")
       .select("id")
