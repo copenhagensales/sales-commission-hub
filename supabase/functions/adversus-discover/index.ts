@@ -336,112 +336,216 @@ Deno.serve(async (req) => {
     endpointStatus.push(await probe(p));
   }
 
-  // ---- e) Sales aggregate counts (no values returned) ------------------------
-  let salesSummary: Record<string, unknown> | null = null;
+  // ---- e) Sales debugging: many query variants, raw top-level shape ----------
   const closedByIds = new Set<string>();
+  let salesSummary: Record<string, unknown> | null = null;
   {
+    const enc = (o: unknown) => encodeURIComponent(JSON.stringify(o));
+    const variantDefs: Array<{ label: string; path: string }> = [
+      { label: "uden parametre", path: "/sales" },
+      { label: "page=1 uden pageSize", path: "/sales?page=1" },
+      { label: "pageSize=5", path: "/sales?pageSize=5" },
+      {
+        label: 'filters createdTime $gt 2026-01-01',
+        path: `/sales?filters=${enc({ createdTime: { $gt: "2026-01-01T00:00:00Z" } })}`,
+      },
+      {
+        label: "filters campaignId $eq 118971",
+        path: `/sales?filters=${enc({ campaignId: { $eq: 118971 } })}`,
+      },
+      {
+        label: "filters campaignId $eq 118972",
+        path: `/sales?filters=${enc({ campaignId: { $eq: 118972 } })}`,
+      },
+      {
+        label: 'filters state $eq closed',
+        path: `/sales?filters=${enc({ state: { $eq: "closed" } })}`,
+      },
+      { label: "filter[campaignId]=118971", path: "/sales?filter[campaignId]=118971" },
+      { label: "campaign_id=118971", path: "/sales?campaign_id=118971" },
+      { label: "campaignId=118971", path: "/sales?campaignId=118971" },
+      { label: "campaignId=118972", path: "/sales?campaignId=118972" },
+    ];
+
     const perCampaign: Record<string, number> = {};
     const perState: Record<string, number> = {};
-    const saleLineKeys = new Set<string>();
-    let total = 0;
-    let page = 1;
-    let permitted = false;
-    while (page <= 20) {
-      const data = await getJson(`/sales?pageSize=1000&page=${page}`);
-      if (!data) break;
-      permitted = true;
-      const rows = asArray(data, "sales", "data");
-      if (rows.length === 0) break;
-      for (const s of rows) {
-        total++;
-        const cid = String(s.campaignId ?? "ukendt");
-        perCampaign[cid] = (perCampaign[cid] ?? 0) + 1;
-        const st = String(s.state ?? s.status ?? "(tom)");
-        perState[st] = (perState[st] ?? 0) + 1;
-        if (s.closedBy !== undefined && s.closedBy !== null) closedByIds.add(String(s.closedBy));
-        for (const key of ["products", "items", "saleLines", "lines"] as const) {
-          for (const line of asArray(s[key])) {
-            for (const k of Object.keys(line)) saleLineKeys.add(`${key}.${k}`);
-          }
-        }
-      }
-      if (rows.length < 1000) break;
-      page++;
-    }
-    // Adversus /sales often needs an explicit filter; probe variants and report
-    // ONLY the number of records returned plus the top-level response keys.
-    const variants: Array<{ query: string; status?: number; count: number; response_keys?: string[] }> = [];
-    const since = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
-    for (
-      const q of [
-        "/sales?pageSize=5",
-        `/sales?pageSize=5&filters=${encodeURIComponent(JSON.stringify({ lastModifiedTime: { $gt: since } }))}`,
-        `/sales?pageSize=5&filters=${encodeURIComponent(JSON.stringify({ closedTime: { $gt: since } }))}`,
-        "/sales?pageSize=5&campaignId=118971",
-        "/sales?pageSize=5&campaignId=118972",
-      ]
-    ) {
+    const variants: Array<Record<string, unknown>> = [];
+    let sampleKeys: Array<{ key: string; type: string; pii_hint: boolean }> | null = null;
+    let sampleLineKeys: string[] = [];
+    let scopeNote: string | null = null;
+
+    for (const v of variantDefs) {
       try {
-        const res = await fetch(`${baseUrl}${q}`, {
+        const res = await fetch(`${baseUrl}${v.path}`, {
           headers: { Authorization: basic, "Content-Type": "application/json" },
         });
+        const text = await res.text();
         if (!res.ok) {
-          variants.push({ query: q, status: res.status, count: -1 });
+          variants.push({
+            variant: v.label,
+            status: res.status,
+            count: null,
+            message: text.slice(0, 200),
+          });
           continue;
         }
-        const data = await res.json();
-        const rows = asArray(data, "sales", "data");
+        let data: unknown = null;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          variants.push({
+            variant: v.label,
+            status: res.status,
+            count: null,
+            message: "svar var ikke gyldig JSON",
+          });
+          continue;
+        }
+        const isArr = Array.isArray(data);
+        const topKeys = isArr
+          ? ["(array)"]
+          : data && typeof data === "object"
+          ? Object.keys(data as Record<string, unknown>)
+          : [typeof data];
+        const rows = asArray(data, "sales", "data", "records", "items", "results");
+        // Look for scope/limitation messages in the envelope (key names + short
+        // message strings only — no customer data is present at this level).
+        if (!isArr && data && typeof data === "object") {
+          for (const [k, val] of Object.entries(data as Record<string, unknown>)) {
+            if (/message|error|warning|scope|note/i.test(k) && typeof val === "string") {
+              scopeNote = `${k}: ${val.slice(0, 200)}`;
+            }
+          }
+        }
         variants.push({
-          query: q,
+          variant: v.label,
           status: res.status,
           count: rows.length,
-          response_keys: data && typeof data === "object" && !Array.isArray(data)
-            ? Object.keys(data as Record<string, unknown>)
-            : ["(array)"],
+          top_level_keys: topKeys,
+          envelope_hint: isArr ? null : "data ligger muligvis under en anden nøgle",
         });
-        if (rows.length > 0 && !salesSummary) {
-          for (const s of rows) {
-            const cid = String(s.campaignId ?? "ukendt");
-            perCampaign[cid] = (perCampaign[cid] ?? 0) + 1;
-            const st = String(s.state ?? s.status ?? "(tom)");
-            perState[st] = (perState[st] ?? 0) + 1;
-            if (s.closedBy !== undefined && s.closedBy !== null) closedByIds.add(String(s.closedBy));
+        for (const s of rows) {
+          const cid = String(s.campaignId ?? s.campaign_id ?? "ukendt");
+          perCampaign[cid] = (perCampaign[cid] ?? 0) + 1;
+          const st = String(s.state ?? s.status ?? "(tom)");
+          perState[st] = (perState[st] ?? 0) + 1;
+          if (s.closedBy !== undefined && s.closedBy !== null) closedByIds.add(String(s.closedBy));
+          if (!sampleKeys) {
+            sampleKeys = keysOf(s);
+            const lineKeys = new Set<string>();
+            for (const key of ["products", "items", "saleLines", "lines"] as const) {
+              for (const line of asArray(s[key])) {
+                for (const k of Object.keys(line)) lineKeys.add(`${key}.${k}`);
+              }
+            }
+            sampleLineKeys = [...lineKeys];
           }
         }
       } catch (e) {
-        variants.push({ query: q, count: -1, response_keys: [(e as Error).message] });
+        variants.push({ variant: v.label, status: null, count: null, message: (e as Error).message });
       }
     }
 
-    if (permitted) {
-      salesSummary = {
-        total_sales: total,
-        per_campaign: perCampaign,
-        per_state: perState,
-        sale_line_keys: [...saleLineKeys],
-        distinct_closed_by_count: closedByIds.size,
-        variant_probes: variants,
-      };
-    }
+    salesSummary = {
+      variant_probes: variants,
+      records_found: sampleKeys !== null,
+      sample_keys: sampleKeys,
+      sale_line_keys: sampleLineKeys,
+      per_campaign: perCampaign,
+      per_state: perState,
+      distinct_closed_by_count: closedByIds.size,
+      scope_note: scopeNote,
+    };
   }
 
-  // ---- f) Users: counts and key names only ----------------------------------
+  // ---- f) Cross-check via leads: status counts per campaign ------------------
+  let leadsCrossCheck: Record<string, unknown> | null = null;
+  {
+    const perCampaignStatus: Record<string, Record<string, number>> = {};
+    let scanned = 0;
+    let successLeadKeys: unknown = null;
+    let successResultFieldLabels: string[] | null = null;
+    let successStatusValue: string | null = null;
+
+    for (let page = 1; page <= 20; page++) {
+      const data = await getJson(`/leads?pageSize=1000&page=${page}`);
+      if (!data) break;
+      const rows = asArray(data, "leads", "data");
+      if (rows.length === 0) break;
+      for (const lead of rows) {
+        scanned++;
+        const cid = String(lead.campaignId ?? "ukendt");
+        const status = String(lead.status ?? "(tom)");
+        perCampaignStatus[cid] ??= {};
+        perCampaignStatus[cid][status] = (perCampaignStatus[cid][status] ?? 0) + 1;
+        if (!successLeadKeys && /success|closed|sale/i.test(status)) {
+          successStatusValue = status;
+          successLeadKeys = keysOf(lead);
+          successResultFieldLabels = asArray(lead.resultData).map((f) =>
+            String(f.label ?? f.id ?? "(ukendt)"),
+          );
+        }
+      }
+      if (rows.length < 1000) break;
+    }
+
+    leadsCrossCheck = {
+      leads_scanned: scanned,
+      status_counts_per_campaign: perCampaignStatus,
+      success_lead_found: successLeadKeys !== null,
+      success_status_value: successStatusValue,
+      success_lead_keys: successLeadKeys,
+      success_lead_result_field_labels: successResultFieldLabels,
+    };
+  }
+
+  // ---- g) Users: counts, domain filter and team names only -------------------
   let usersSummary: Record<string, unknown> | null = null;
   {
-    const data = await getJson("/users?pageSize=1000&page=1");
-    const rows = asArray(data, "users", "data");
+    const rows: Record<string, unknown>[] = [];
+    for (let page = 1; page <= 10; page++) {
+      const data = await getJson(`/users?pageSize=1000&page=${page}`);
+      if (!data) break;
+      const batch = asArray(data, "users", "data");
+      if (batch.length === 0) break;
+      rows.push(...batch);
+      if (batch.length < 1000) break;
+    }
     if (rows.length > 0) {
-      const idKeys = ["id", "userId"] as const;
-      const userIds = new Set<string>();
+      const DOMAIN = "@copenhagensales.dk";
+      const teamNames = new Set<string>();
+      let domainCount = 0;
+      let domainActive = 0;
+      let overlapClosedBy = 0;
       for (const u of rows) {
-        for (const k of idKeys) if (u[k] !== undefined && u[k] !== null) userIds.add(String(u[k]));
+        const email = String(u.email ?? u.username ?? "").toLowerCase();
+        const isOurs = email.endsWith(DOMAIN);
+        if (!isOurs) continue;
+        domainCount++;
+        const active = u.active ?? u.enabled ?? u.status;
+        if (active === true || active === 1 || String(active).toLowerCase() === "active") {
+          domainActive++;
+        }
+        const id = u.id ?? u.userId;
+        if (id !== undefined && id !== null && closedByIds.has(String(id))) overlapClosedBy++;
+        for (const key of ["memberOf", "teams", "groups"] as const) {
+          for (const t of asArray(u[key])) {
+            const n = t.name ?? t.title ?? t.label;
+            if (typeof n === "string") teamNames.add(n);
+          }
+          const raw = u[key];
+          if (Array.isArray(raw)) {
+            for (const t of raw) if (typeof t === "string") teamNames.add(t);
+          }
+        }
       }
-      let overlap = 0;
-      for (const id of userIds) if (closedByIds.has(id)) overlap++;
       usersSummary = {
-        user_count: rows.length,
+        user_count_total: rows.length,
+        user_count_with_copenhagensales_domain: domainCount,
+        active_of_those: domainActive,
+        team_names: [...teamNames],
+        users_appearing_as_closed_by: overlapClosedBy,
         keys: keysOf(rows[0]),
-        users_appearing_as_closed_by: overlap,
       };
     }
   }
@@ -449,6 +553,7 @@ Deno.serve(async (req) => {
   return json({
     endpoint_status: endpointStatus,
     sales_summary: salesSummary,
+    leads_cross_check: leadsCrossCheck,
     users_summary: usersSummary,
     ok: true,
     mode: "read-only discovery — ingen data gemt",
