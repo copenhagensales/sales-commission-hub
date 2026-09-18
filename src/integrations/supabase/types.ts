@@ -10498,6 +10498,7 @@ export type Database = {
       }
       lead_closing_statuses: {
         Row: {
+          counts_in_hitrate: boolean
           created_at: string
           is_closing: boolean
           label_da: string
@@ -10506,6 +10507,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          counts_in_hitrate?: boolean
           created_at?: string
           is_closing?: boolean
           label_da: string
@@ -10514,6 +10516,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          counts_in_hitrate?: boolean
           created_at?: string
           is_closing?: boolean
           label_da?: string

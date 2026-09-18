@@ -106,6 +106,24 @@ export default function WeeklyLeadClosureReport() {
     [statuses],
   );
 
+  /** Statusser der er lukkede, men ikke må tælle i mødebook-hitraten. */
+  const excludedStatuses = useMemo(
+    () =>
+      statuses
+        .filter((s) => s.is_closing && s.counts_in_hitrate === false)
+        .map((s) => ({ status: s.status, label: s.label_da || s.status }))
+        .sort((a, b) => a.label.localeCompare(b.label, "da")),
+    [statuses],
+  );
+
+  const hitrateStatuses = useMemo(
+    () =>
+      statuses
+        .filter((s) => s.is_closing && s.counts_in_hitrate !== false)
+        .map((s) => s.status),
+    [statuses],
+  );
+
   const availableWeeks = useMemo(
     () => [...new Set(stats.map((s) => s.week_start))].sort().reverse(),
     [stats],
@@ -120,23 +138,32 @@ export default function WeeklyLeadClosureReport() {
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
       const rows = weekRows.filter((r) => r.report_line === line.report_line);
-      const closed = rows
-        .filter((r) => closingStatuses.includes(r.status))
-        .reduce((sum, r) => sum + r.lead_count, 0);
-      const booked = rows
-        .filter((r) => r.status === "success")
-        .reduce((sum, r) => sum + r.lead_count, 0);
-      return { reportLine: line.report_line, closed, booked };
+      const sum = (predicate: (status: string) => boolean) =>
+        rows.filter((r) => predicate(r.status)).reduce((total, r) => total + r.lead_count, 0);
+      const extras: Record<string, number> = {};
+      for (const s of excludedStatuses) extras[s.status] = sum((status) => status === s.status);
+      return {
+        reportLine: line.report_line,
+        closed: sum((status) => closingStatuses.includes(status)),
+        decided: sum((status) => hitrateStatuses.includes(status)),
+        booked: sum((status) => status === "success"),
+        extras,
+      };
     });
-  }, [lines, weekRows, closingStatuses]);
+  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses]);
 
-  const totals = useMemo(
-    () => ({
+  const totals = useMemo(() => {
+    const extras: Record<string, number> = {};
+    for (const s of excludedStatuses) {
+      extras[s.status] = lineTotals.reduce((sum, l) => sum + (l.extras[s.status] ?? 0), 0);
+    }
+    return {
       closed: lineTotals.reduce((s, l) => s + l.closed, 0),
+      decided: lineTotals.reduce((s, l) => s + l.decided, 0),
       booked: lineTotals.reduce((s, l) => s + l.booked, 0),
-    }),
-    [lineTotals],
-  );
+      extras,
+    };
+  }, [lineTotals, excludedStatuses]);
 
   const unmapped = useMemo(() => {
     const out = new Map<string, { account: string; campaignId: string; closed: number }>();
@@ -284,8 +311,14 @@ export default function WeeklyLeadClosureReport() {
                   <TableRow>
                     <TableHead>Rapportlinje</TableHead>
                     <TableHead className="text-right">Antal lukkede emner</TableHead>
+                    <TableHead className="text-right">Lukkede ja/nej</TableHead>
                     <TableHead className="text-right">Antal bookede møder</TableHead>
                     <TableHead className="text-right">Mødebook hitrate</TableHead>
+                    {excludedStatuses.map((s) => (
+                      <TableHead key={s.status} className="text-right">
+                        {s.label}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -293,17 +326,31 @@ export default function WeeklyLeadClosureReport() {
                     <TableRow key={row.reportLine}>
                       <TableCell>{row.reportLine}</TableCell>
                       <TableCell className="text-right">{row.closed}</TableCell>
+                      <TableCell className="text-right">{row.decided}</TableCell>
                       <TableCell className="text-right">{row.booked}</TableCell>
-                      <TableCell className="text-right">{hitrate(row.booked, row.closed)}</TableCell>
+                      <TableCell className="text-right">
+                        {hitrate(row.booked, row.decided)}
+                      </TableCell>
+                      {excludedStatuses.map((s) => (
+                        <TableCell key={s.status} className="text-right">
+                          {row.extras[s.status] ?? 0}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                   <TableRow className="font-semibold">
                     <TableCell>Tryg i alt</TableCell>
                     <TableCell className="text-right">{totals.closed}</TableCell>
+                    <TableCell className="text-right">{totals.decided}</TableCell>
                     <TableCell className="text-right">{totals.booked}</TableCell>
                     <TableCell className="text-right">
-                      {hitrate(totals.booked, totals.closed)}
+                      {hitrate(totals.booked, totals.decided)}
                     </TableCell>
+                    {excludedStatuses.map((s) => (
+                      <TableCell key={s.status} className="text-right">
+                        {totals.extras[s.status] ?? 0}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 </TableBody>
               </Table>

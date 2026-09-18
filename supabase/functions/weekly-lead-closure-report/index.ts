@@ -309,6 +309,10 @@ async function streamEnreachWeek(
 // ---------------------------------------------------------------------------
 interface Config {
   closing: Set<string>;
+  /** Lukkede statusser der tæller i mødebook-hitraten (lukkede ja/nej). */
+  hitrate: Set<string>;
+  /** Lukkede statusser der vises for sig og holdes ude af hitraten. */
+  excluded: { status: string; label: string }[];
   known: Map<string, string>;
   /** Kildeudfald → kanonisk status (fx Enreach "Success" → "success"). */
   alias: Map<string, string>;
@@ -324,7 +328,9 @@ function mapKey(account: string, campaignId: string) {
 
 async function loadConfig(svc: SupabaseClient): Promise<Config> {
   const [statuses, lines, mapRows, trygRows, settings] = await Promise.all([
-    svc.from("lead_closing_statuses").select("status, is_closing, label_da, maps_to_status"),
+    svc
+      .from("lead_closing_statuses")
+      .select("status, is_closing, label_da, maps_to_status, counts_in_hitrate"),
     svc.from("weekly_lead_report_lines").select("report_line, sort_order").order("sort_order"),
     svc
       .from("weekly_lead_report_campaign_map")
@@ -336,6 +342,8 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
   ]);
 
   const closing = new Set<string>();
+  const hitrate = new Set<string>();
+  const excluded: { status: string; label: string }[] = [];
   const known = new Map<string, string>();
   const alias = new Map<string, string>();
   for (const r of (statuses.data ?? []) as Record<string, unknown>[]) {
@@ -346,9 +354,16 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
       alias.set(status, mapsTo);
       continue;
     }
-    known.set(status, safeString(r.label_da) || status);
-    if (r.is_closing === true) closing.add(status);
+    const label = safeString(r.label_da) || status;
+    known.set(status, label);
+    if (r.is_closing === true) {
+      closing.add(status);
+      // counts_in_hitrate styrer om statussen indgår i "lukkede ja/nej".
+      if (r.counts_in_hitrate === false) excluded.push({ status, label });
+      else hitrate.add(status);
+    }
   }
+  excluded.sort((a, b) => a.label.localeCompare(b.label, "da"));
 
   const mapping = new Map<string, { reportLine: string | null; name: string | null }>();
   for (const r of (mapRows.data ?? []) as Record<string, unknown>[]) {
@@ -372,6 +387,8 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
 
   return {
     closing,
+    hitrate,
+    excluded,
     known,
     alias,
     lines: ((lines.data ?? []) as Record<string, unknown>[]).map((r) => safeString(r.report_line)),
@@ -577,10 +594,16 @@ type StatRow = {
 function lineTotals(rows: StatRow[], config: Config): LineTotals[] {
   return config.lines.map((reportLine) => {
     const mine = rows.filter((r) => r.report_line === reportLine);
+    const sum = (predicate: (status: string) => boolean) =>
+      mine.filter((r) => predicate(r.status)).reduce((s, r) => s + r.lead_count, 0);
+    const extras: Record<string, number> = {};
+    for (const e of config.excluded) extras[e.status] = sum((status) => status === e.status);
     return {
       reportLine,
-      closed: mine.filter((r) => config.closing.has(r.status)).reduce((s, r) => s + r.lead_count, 0),
-      booked: mine.filter((r) => r.status === BOOKED_STATUS).reduce((s, r) => s + r.lead_count, 0),
+      closed: sum((status) => config.closing.has(status)),
+      decided: sum((status) => config.hitrate.has(status)),
+      booked: sum((status) => status === BOOKED_STATUS),
+      extras,
     };
   });
 }
@@ -610,8 +633,9 @@ function buildMail(
   const sellerMap = new Map<string, SellerTotals>();
   for (const r of rows) {
     const name = sellerNames.get(r.agent_reference) ?? r.agent_reference;
-    const entry = sellerMap.get(name) ?? { sellerName: name, closed: 0, booked: 0 };
+    const entry = sellerMap.get(name) ?? { sellerName: name, closed: 0, decided: 0, booked: 0 };
     if (config.closing.has(r.status)) entry.closed += r.lead_count;
+    if (config.hitrate.has(r.status)) entry.decided += r.lead_count;
     if (r.status === BOOKED_STATUS) entry.booked += r.lead_count;
     sellerMap.set(name, entry);
   }
@@ -650,6 +674,7 @@ function buildMail(
     weekNumber: isoWeekNumber(weekStart),
     lines: lineTotals(rows, config),
     statusKeys,
+    excludedStatuses: config.excluded,
     statusRows,
     sellers: [...sellerMap.values()].sort((a, b) => b.closed - a.closed),
     previousWeeks,
