@@ -340,6 +340,8 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
   ]);
 
   const closing = new Set<string>();
+  const hitrate = new Set<string>();
+  const excluded: { status: string; label: string }[] = [];
   const known = new Map<string, string>();
   const alias = new Map<string, string>();
   for (const r of (statuses.data ?? []) as Record<string, unknown>[]) {
@@ -350,9 +352,16 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
       alias.set(status, mapsTo);
       continue;
     }
-    known.set(status, safeString(r.label_da) || status);
-    if (r.is_closing === true) closing.add(status);
+    const label = safeString(r.label_da) || status;
+    known.set(status, label);
+    if (r.is_closing === true) {
+      closing.add(status);
+      // counts_in_hitrate styrer om statussen indgår i "lukkede ja/nej".
+      if (r.counts_in_hitrate === false) excluded.push({ status, label });
+      else hitrate.add(status);
+    }
   }
+  excluded.sort((a, b) => a.label.localeCompare(b.label, "da"));
 
   const mapping = new Map<string, { reportLine: string | null; name: string | null }>();
   for (const r of (mapRows.data ?? []) as Record<string, unknown>[]) {
