@@ -18,6 +18,7 @@ import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
 import TdcMonthlyGoalBoard from "@/pages/dashboards/TdcMonthlyGoalBoard";
 import RelatelMonthlyGoalBoard from "@/pages/dashboards/RelatelMonthlyGoalBoard";
 import EesyFmMonthlyGoalBoard from "@/pages/dashboards/EesyFmMonthlyGoalBoard";
+import EesyTmMonthlyGoalBoard from "@/pages/dashboards/EesyTmMonthlyGoalBoard";
 
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,

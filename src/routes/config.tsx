@@ -151,6 +151,7 @@ import {
   TdcMonthlyGoalBoard,
   RelatelMonthlyGoalBoard,
   EesyFmMonthlyGoalBoard,
+  EesyTmMonthlyGoalBoard,
   PowerdagInput,
   PowerdagAdmin,
   SystemFeedback,
