@@ -4,21 +4,25 @@
  * Kun aggregerede tal indgår: rapportlinje, sælgernavn (vores egen medarbejder),
  * status og antal. Ingen lead-data, ingen kundeoplysninger.
  *
- * Designet følger det godkendte Copenhagen Sales mail-design, som
- * kvalitetsmodulets mails bruger.
+ * Designet følger den godkendte Copenhagen Sales ugerapport-skabelon: lys
+ * baggrund, mørkt hero-kort med grøn topkant, nøgletalskort, tabeller med
+ * hitrate-bjælker og en forklarende fodnote.
  */
 
 import { escapeHtml, pct } from "./quality-mail.ts";
 
 const BRAND = {
-  pageBg: "#e6eff1",
+  pageBg: "#eaf0f1",
   card: "#ffffff",
-  header: "#26262a",
+  dark: "#0f1115",
+  darkSoft: "#1b1e24",
   text: "#111318",
   muted: "#7b8794",
+  faint: "#9aa5b1",
   headerMuted: "#b9bcc4",
-  cellBg: "#f4f8f9",
-  cellBorder: "#e2eaec",
+  cellBorder: "#e4eaec",
+  track: "#e2e8ea",
+  accent: "#25c26a",
 };
 
 export interface LineTotals {
@@ -91,48 +95,167 @@ function shortDate(dateIso: string): string {
   }).format(new Date(`${dateIso}T12:00:00Z`));
 }
 
-function th(text: string, align = "left"): string {
-  return `<th style="text-align:${align};font-size:12px;font-weight:700;letter-spacing:0.4px;color:${BRAND.muted};text-transform:uppercase;padding:8px 10px;border-bottom:1px solid ${BRAND.cellBorder};">${escapeHtml(text)}</th>`;
+function longDate(dateIso: string): string {
+  return new Intl.DateTimeFormat("da-DK", {
+    timeZone: "Europe/Copenhagen",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${dateIso}T12:00:00Z`));
 }
 
-function td(text: string, align = "left", bold = false): string {
-  return `<td style="text-align:${align};font-size:14px;color:${BRAND.text};padding:8px 10px;border-bottom:1px solid ${BRAND.cellBorder};${bold ? "font-weight:700;" : ""}">${escapeHtml(text)}</td>`;
+function addDays(dateIso: string, days: number): string {
+  const d = new Date(`${dateIso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekRange(weekStart: string): string {
+  const end = addDays(weekStart, 6);
+  return `${shortDate(weekStart).replace(".", "")} – ${longDate(end)}`;
+}
+
+function nf(value: number): string {
+  return new Intl.NumberFormat("da-DK").format(value);
+}
+
+function ratio(part: number, whole: number): number {
+  if (!whole) return 0;
+  return Math.max(0, Math.min(1, part / whole));
+}
+
+/** Slank hitrate-bjælke i mailvenlig tabelform. */
+function bar(part: number, whole: number, onDark = false): string {
+  const filled = Math.round(ratio(part, whole) * 100);
+  const empty = 100 - filled;
+  const track = onDark ? "#343841" : BRAND.track;
+  const cells: string[] = [];
+  if (filled > 0) {
+    cells.push(
+      `<td width="${filled}%" style="background:${BRAND.accent};border-radius:4px;font-size:0;line-height:6px;height:6px;">&nbsp;</td>`,
+    );
+  }
+  if (empty > 0) {
+    cells.push(
+      `<td width="${empty}%" style="background:${track};border-radius:4px;font-size:0;line-height:6px;height:6px;">&nbsp;</td>`,
+    );
+  }
+  return `<table role="presentation" width="110" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:2px 0;width:110px;"><tr>${cells.join("")}</tr></table>`;
+}
+
+function th(text: string, align = "left"): string {
+  return `<th style="text-align:${align};font-size:10px;font-weight:700;letter-spacing:1.2px;color:${BRAND.muted};text-transform:uppercase;padding:14px 12px;border-bottom:1px solid ${BRAND.cellBorder};white-space:nowrap;">${escapeHtml(text)}</th>`;
+}
+
+function td(
+  text: string,
+  align = "left",
+  opts: { bold?: boolean; dim?: boolean; accent?: boolean; onDark?: boolean } = {},
+): string {
+  const color = opts.onDark
+    ? opts.accent
+      ? BRAND.accent
+      : "#ffffff"
+    : opts.dim
+      ? BRAND.faint
+      : opts.accent
+        ? BRAND.accent
+        : BRAND.text;
+  const border = opts.onDark ? "none" : `1px solid ${BRAND.cellBorder}`;
+  return `<td style="text-align:${align};font-size:14px;color:${color};padding:14px 12px;border-bottom:${border};font-weight:${opts.bold ? 700 : 500};white-space:nowrap;">${escapeHtml(text)}</td>`;
+}
+
+function rawTd(html: string, align = "left", onDark = false): string {
+  const border = onDark ? "none" : `1px solid ${BRAND.cellBorder}`;
+  return `<td style="text-align:${align};padding:14px 12px;border-bottom:${border};">${html}</td>`;
+}
+
+function sectionTitle(title: string, subtitle: string): string {
+  return `
+    <div style="margin:0 0 10px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.6px;color:${BRAND.text};text-transform:uppercase;">${escapeHtml(title)}</div>
+      <div style="font-size:13px;color:${BRAND.muted};margin-top:4px;">${escapeHtml(subtitle)}</div>
+    </div>`;
+}
+
+function card(tableHtml: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:collapse;background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;overflow:hidden;">${tableHtml}</table>`;
 }
 
 function section(title: string, subtitle: string, tableHtml: string): string {
-  return `
-    <div style="margin:0 0 28px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1.6px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 4px;">${escapeHtml(title)}</div>
-      <div style="font-size:13px;color:${BRAND.muted};margin:0 0 10px;">${escapeHtml(subtitle)}</div>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:${BRAND.cellBg};border:1px solid ${BRAND.cellBorder};border-radius:8px;">
-        ${tableHtml}
-      </table>
-    </div>`;
+  return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(tableHtml)}</div>`;
+}
+
+function statCard(options: {
+  label: string;
+  value: string;
+  note: string;
+  dark?: boolean;
+}): string {
+  const { label, value, note, dark } = options;
+  const bg = dark ? BRAND.dark : BRAND.card;
+  const border = dark ? BRAND.dark : BRAND.cellBorder;
+  const labelColor = dark ? BRAND.headerMuted : BRAND.muted;
+  const valueColor = dark ? BRAND.accent : BRAND.text;
+  const noteColor = dark ? BRAND.headerMuted : BRAND.muted;
+  return `<td width="25%" valign="top" style="padding:0 6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${bg};border:1px solid ${border};border-radius:12px;">
+      <tr><td style="padding:16px 16px 18px;">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;color:${labelColor};text-transform:uppercase;">${escapeHtml(label)}</div>
+        <div style="font-size:28px;font-weight:800;color:${valueColor};margin-top:10px;line-height:1.1;">${escapeHtml(value)}</div>
+        <div style="font-size:12px;color:${noteColor};margin-top:10px;line-height:1.5;">${escapeHtml(note)}</div>
+      </td></tr>
+    </table>
+  </td>`;
 }
 
 function lineTable(lines: LineTotals[], excluded: { status: string; label: string }[]): string {
   const totalClosed = lines.reduce((s, l) => s + l.closed, 0);
   const totalDecided = lines.reduce((s, l) => s + l.decided, 0);
   const totalBooked = lines.reduce((s, l) => s + l.booked, 0);
+
   const rows = lines
-    .map(
-      (l) =>
-        `<tr>${td(l.reportLine)}${td(String(l.closed), "right")}${td(String(l.decided), "right")}${td(String(l.booked), "right")}${td(pct(l.booked, l.decided), "right")}${excluded
-          .map((e) => td(String(l.extras[e.status] ?? 0), "right"))
-          .join("")}</tr>`,
-    )
+    .map((l) => {
+      const dim = l.closed === 0;
+      return `<tr>${td(l.reportLine, "left", { bold: true, dim })}${td(nf(l.closed), "right", { dim })}${td(
+        nf(l.decided),
+        "right",
+        { dim },
+      )}${td(nf(l.booked), "right", { dim })}${rawTd(bar(l.booked, l.decided), "left")}${td(
+        pct(l.booked, l.decided),
+        "right",
+        { bold: true, accent: !dim, dim },
+      )}${excluded.map((e) => td(nf(l.extras[e.status] ?? 0), "right", { dim })).join("")}</tr>`;
+    })
     .join("");
+
   const totalExtras = excluded
     .map((e) =>
-      td(String(lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", true),
+      td(nf(lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
+        bold: true,
+        onDark: true,
+      }),
     )
     .join("");
+
   return `
-    <thead><tr>${th("Rapportlinje")}${th("Antal lukkede emner", "right")}${th("Lukkede ja/nej", "right")}${th("Antal bookede møder", "right")}${th("Mødebook hitrate", "right")}${excluded
-      .map((e) => th(e.label, "right"))
-      .join("")}</tr></thead>
+    <thead><tr>${th("Rapportlinje")}${th("Lukkede", "right")}${th("Ja/nej", "right")}${th("Bookede", "right")}${th("")}${th(
+      "Hitrate",
+      "right",
+    )}${excluded.map((e) => th(e.label, "right")).join("")}</tr></thead>
     <tbody>${rows}
-      <tr>${td("Tryg i alt", "left", true)}${td(String(totalClosed), "right", true)}${td(String(totalDecided), "right", true)}${td(String(totalBooked), "right", true)}${td(pct(totalBooked, totalDecided), "right", true)}${totalExtras}</tr>
+      <tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", { bold: true, onDark: true })}${td(
+        nf(totalClosed),
+        "right",
+        { bold: true, onDark: true },
+      )}${td(nf(totalDecided), "right", { bold: true, onDark: true })}${td(nf(totalBooked), "right", {
+        bold: true,
+        onDark: true,
+      })}${rawTd(bar(totalBooked, totalDecided, true), "left", true)}${td(pct(totalBooked, totalDecided), "right", {
+        bold: true,
+        accent: true,
+        onDark: true,
+      })}${totalExtras}</tr>
     </tbody>`;
 }
 
@@ -142,9 +265,45 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
 } {
   const subject = `Mødebook-rapport Tryg — uge ${input.weekNumber}`;
 
+  const totalClosed = input.lines.reduce((s, l) => s + l.closed, 0);
+  const totalDecided = input.lines.reduce((s, l) => s + l.decided, 0);
+  const totalBooked = input.lines.reduce((s, l) => s + l.booked, 0);
+  const activeLines = input.lines.filter((l) => l.closed > 0).length;
+  const extraTotals = input.excludedStatuses.map((e) => ({
+    label: e.label,
+    value: input.lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0),
+  }));
+
+  const statCards = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 30px;">
+      <tr>
+        ${statCard({
+          label: "Lukkede emner",
+          value: nf(totalClosed),
+          note: `heraf ${nf(totalDecided)} ja/nej`,
+        })}
+        ${statCard({
+          label: "Bookede møder",
+          value: nf(totalBooked),
+          note: `på tværs af ${activeLines} aktive linjer`,
+        })}
+        ${statCard({
+          label: "Mødebook-hitrate",
+          value: pct(totalBooked, totalDecided),
+          note: "bookede / lukkede ja/nej",
+          dark: true,
+        })}
+        ${statCard({
+          label: extraTotals.length ? extraTotals.map((e) => e.label).join(" / ") : "Uden udfald",
+          value: extraTotals.length ? extraTotals.map((e) => nf(e.value)).join(" / ") : "0",
+          note: "ikke talt med i hitrate",
+        })}
+      </tr>
+    </table>`;
+
   const table1 = section(
     "Tabel 1 — Trygs skabelon",
-    `Uge ${input.weekNumber} (${shortDate(input.weekStart)} – søndag)`,
+    `Pr. rapportlinje, uge ${input.weekNumber}. Hitrate = bookede møder ÷ lukkede ja/nej.`,
     lineTable(input.lines, input.excludedStatuses),
   );
 
@@ -152,29 +311,59 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     .map((s) => th(s.label, "right"))
     .join("")}</tr></thead>`;
   const statusBody = input.statusRows
-    .map(
-      (r) =>
-        `<tr>${td(r.reportLine)}${input.statusKeys
-          .map((s) => td(String(r.counts[s.status] ?? 0), "right"))
-          .join("")}</tr>`,
-    )
+    .map((r) => {
+      const sum = input.statusKeys.reduce((s, k) => s + (r.counts[k.status] ?? 0), 0);
+      const dim = sum === 0;
+      return `<tr>${td(r.reportLine, "left", { bold: true, dim })}${input.statusKeys
+        .map((s, idx) =>
+          td(nf(r.counts[s.status] ?? 0), "right", { dim, accent: idx === 0 && !dim, bold: idx === 0 }),
+        )
+        .join("")}</tr>`;
+    })
     .join("");
+  const statusTotals = `<tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", {
+    bold: true,
+    onDark: true,
+  })}${input.statusKeys
+    .map((s) =>
+      td(
+        nf(input.statusRows.reduce((sum, r) => sum + (r.counts[s.status] ?? 0), 0)),
+        "right",
+        { bold: true, onDark: true },
+      ),
+    )
+    .join("")}</tr>`;
   const table2 = section(
     "Tabel 2 — status pr. rapportlinje",
-    "Antal afsluttede emner fordelt på Adversus-status",
-    `${statusHead}<tbody>${statusBody}</tbody>`,
+    "Antal afsluttede emner fordelt på lead-status.",
+    `${statusHead}<tbody>${statusBody}${statusTotals}</tbody>`,
   );
 
   const sellerRows = input.sellers
     .map(
       (s) =>
-        `<tr>${td(s.sellerName)}${td(String(s.closed), "right")}${td(String(s.decided), "right")}${td(String(s.booked), "right")}${td(pct(s.booked, s.decided), "right")}</tr>`,
+        `<tr>${td(s.sellerName, "left", { bold: true })}${td(nf(s.closed), "right")}${td(
+          nf(s.decided),
+          "right",
+        )}${td(nf(s.booked), "right")}${rawTd(bar(s.booked, s.decided), "left")}${td(
+          pct(s.booked, s.decided),
+          "right",
+          { bold: true, accent: true },
+        )}</tr>`,
     )
     .join("");
   const table3 = section(
     "Tabel 3 — pr. sælger",
-    `Uge ${input.weekNumber}`,
-    `<thead><tr>${th("Sælger")}${th("Lukkede", "right")}${th("Lukkede ja/nej", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}</tr></thead><tbody>${sellerRows}</tbody>`,
+    "Sorteret efter antal lukkede emner. Hitrate = bookede ÷ lukkede ja/nej.",
+    `<thead><tr>${th("Sælger")}${th("Lukkede", "right")}${th("Ja/nej", "right")}${th("Bookede", "right")}${th(
+      "",
+    )}${th("Hitrate", "right")}</tr></thead><tbody>${
+      sellerRows ||
+      `<tr>${td("Ingen sælgere med lukkede emner i ugen.", "left", { dim: true })}${td("", "right")}${td(
+        "",
+        "right",
+      )}${td("", "right")}${td("", "right")}${td("", "right")}</tr>`
+    }</tbody>`,
   );
 
   const table4 = input.previousWeeks.length
@@ -182,7 +371,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
         .map((w) =>
           section(
             `Tabel 4 — uge ${w.weekNumber}`,
-            `${shortDate(w.weekStart)} – søndag`,
+            weekRange(w.weekStart),
             lineTable(w.lines, input.excludedStatuses),
           ),
         )
@@ -195,7 +384,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
       `<strong>Ikke mappet:</strong> ${input.unmapped
         .map(
           (u) =>
-            `${escapeHtml(u.campaignName ?? u.campaignId)} (${escapeHtml(u.account)}/${escapeHtml(u.campaignId)}): ${u.closed} lukkede, ${u.booked} bookede`,
+            `${escapeHtml(u.campaignName ?? u.campaignId)} (${escapeHtml(u.account)}/${escapeHtml(u.campaignId)}): ${nf(u.closed)} lukkede, ${nf(u.booked)} bookede`,
         )
         .join("; ")}`,
     );
@@ -203,28 +392,71 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   if (input.unknownStatuses.length) {
     notes.push(
       `<strong>Ukendte statusser:</strong> ${input.unknownStatuses
-        .map((s) => `${escapeHtml(s.status)} (${s.count})`)
+        .map((s) => `${escapeHtml(s.status)} (${nf(s.count)})`)
         .join(", ")} — tilføj dem i statusopsætningen, hvis de skal tælle som lukkede.`,
     );
   }
   const notesHtml = notes.length
-    ? `<div style="font-size:13px;color:${BRAND.muted};line-height:1.6;border-top:1px solid ${BRAND.cellBorder};padding-top:14px;">${notes
+    ? `<div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;font-size:13px;color:${BRAND.text};line-height:1.65;margin:0 0 20px;">${notes
         .map((n) => `<p style="margin:0 0 8px;">${n}</p>`)
         .join("")}</div>`
     : "";
 
+  const legendExtras = input.excludedStatuses.length
+    ? input.excludedStatuses.map((e) => e.label.toLowerCase()).join(" og ")
+    : "statusser uden udfald";
+
   const html = `<!DOCTYPE html>
-<html lang="da"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
-<body style="margin:0;padding:24px;background:${BRAND.pageBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:760px;margin:0 auto;width:100%;background:${BRAND.card};border-radius:14px;overflow:hidden;">
-    <tr><td style="background:${BRAND.header};padding:22px 26px;">
-      <div style="font-size:18px;font-weight:700;color:#ffffff;">Mødebook-rapport — Tryg</div>
-      <div style="font-size:13px;color:${BRAND.headerMuted};margin-top:4px;">Uge ${input.weekNumber} · lukkede emner, bookede møder og hitrate</div>
-    </td></tr>
-    <tr><td style="padding:26px;">
-      ${table1}${table2}${table3}${table4}${notesHtml}
-    </td></tr>
-  </table>
+<html lang="da"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:26px 14px;background:${BRAND.pageBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <div style="max-width:760px;margin:0 auto;">
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${BRAND.dark};border-top:4px solid ${BRAND.accent};border-radius:16px;overflow:hidden;margin:0 0 26px;">
+      <tr><td style="padding:26px 28px 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          <tr>
+            <td style="font-size:13px;font-weight:800;letter-spacing:2px;color:#ffffff;text-transform:uppercase;">
+              <span style="display:inline-block;background:${BRAND.accent};color:${BRAND.dark};font-size:12px;font-weight:800;letter-spacing:0;padding:6px 8px;border-radius:7px;margin-right:10px;">CS</span>Copenhagen Sales
+            </td>
+            <td align="right" style="font-size:12px;color:${BRAND.headerMuted};">Ugerapport · Uge ${input.weekNumber}</td>
+          </tr>
+        </table>
+        <div style="font-size:28px;font-weight:800;color:#ffffff;margin-top:24px;line-height:1.2;">Mødebook-rapport — Tryg</div>
+        <div style="font-size:13px;color:${BRAND.headerMuted};margin-top:10px;">${escapeHtml(weekRange(input.weekStart))} · lukkede emner, bookede møder og hitrate</div>
+      </td></tr>
+    </table>
+
+    <div style="font-size:15px;color:${BRAND.text};line-height:1.7;margin:0 0 26px;">
+      Her er ugens tal for mødebooking på Tryg. Øverst ser I totalerne, derefter tallene pr. rapportlinje,
+      statusfordeling og pr. sælger. Skriv endelig, hvis I vil have en anden opdeling.
+    </div>
+
+    ${statCards}
+    ${table1}${table2}${table3}${table4}${notesHtml}
+
+    <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
+      <div style="font-size:13px;color:${BRAND.text};line-height:1.7;">
+        <strong>Lukkede emner</strong> er alle emner afsluttet i ugen, uanset status.
+        <strong>Lukkede ja/nej</strong> er de emner, hvor kunden reelt er nået og har svaret ja eller nej —
+        ${escapeHtml(legendExtras)} er trukket ud. <strong>Hitrate</strong> er bookede møder delt med lukkede ja/nej.
+      </div>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;padding:0;">
+      <tr>
+        <td style="font-size:12px;color:${BRAND.text};line-height:1.7;">
+          <strong>Copenhagen Sales ApS</strong><br />
+          <span style="color:${BRAND.muted};">Vesterbrogade 149 · 1620 København V</span>
+        </td>
+        <td align="right" style="font-size:12px;color:${BRAND.muted};line-height:1.7;">
+          Rapporten sendes hver mandag kl. 07.00.<br />Spørgsmål? Svar blot på denne mail.
+        </td>
+      </tr>
+    </table>
+
+  </div>
 </body></html>`;
 
   return { subject, html };
