@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.weekly_lead_closure_add(jsonb) FROM anon, authenticated;
