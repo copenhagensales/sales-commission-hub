@@ -40,6 +40,8 @@ export interface StatusTotals {
 export interface SellerTotals {
   sellerName: string;
   closed: number;
+  /** Lukkede ja/nej — grundlaget for sælgerens hitrate. */
+  decided: number;
   booked: number;
 }
 
@@ -143,7 +145,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   const table1 = section(
     "Tabel 1 — Trygs skabelon",
     `Uge ${input.weekNumber} (${shortDate(input.weekStart)} – søndag)`,
-    lineTable(input.lines),
+    lineTable(input.lines, input.excludedStatuses),
   );
 
   const statusHead = `<thead><tr>${th("Rapportlinje")}${input.statusKeys
@@ -166,13 +168,13 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   const sellerRows = input.sellers
     .map(
       (s) =>
-        `<tr>${td(s.sellerName)}${td(String(s.closed), "right")}${td(String(s.booked), "right")}${td(pct(s.booked, s.closed), "right")}</tr>`,
+        `<tr>${td(s.sellerName)}${td(String(s.closed), "right")}${td(String(s.decided), "right")}${td(String(s.booked), "right")}${td(pct(s.booked, s.decided), "right")}</tr>`,
     )
     .join("");
   const table3 = section(
     "Tabel 3 — pr. sælger",
     `Uge ${input.weekNumber}`,
-    `<thead><tr>${th("Sælger")}${th("Lukkede", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}</tr></thead><tbody>${sellerRows}</tbody>`,
+    `<thead><tr>${th("Sælger")}${th("Lukkede", "right")}${th("Lukkede ja/nej", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}</tr></thead><tbody>${sellerRows}</tbody>`,
   );
 
   const table4 = input.previousWeeks.length
@@ -181,7 +183,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
           section(
             `Tabel 4 — uge ${w.weekNumber}`,
             `${shortDate(w.weekStart)} – søndag`,
-            lineTable(w.lines),
+            lineTable(w.lines, input.excludedStatuses),
           ),
         )
         .join("")
