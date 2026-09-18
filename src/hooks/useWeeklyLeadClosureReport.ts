@@ -126,6 +126,27 @@ export function useRunWeeklyLeadClosureReport() {
   });
 }
 
+/**
+ * Sender mandagsmailen med tallene for den igangværende uge til alle aktive
+ * modtagere. Kørslen henter først ugens tal og lægger derefter mailen i køen.
+ */
+export function useSendWeeklyLeadClosureMailNow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("weekly-lead-closure-report", {
+        body: { current_week: true, send_mail: true, force_mail: true },
+      });
+      if (error) throw error;
+      return data as { stage?: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: STATS_KEY });
+      queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "runs"] });
+    },
+  });
+}
+
 export type ClosureRecipientRow =
   Database["public"]["Tables"]["weekly_lead_closure_settings"]["Row"];
 
