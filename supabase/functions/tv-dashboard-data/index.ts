@@ -2920,6 +2920,7 @@ async function handleVoiceMonthlyGoal(
             items.push({
               agentEmail: email,
               productId: item.product_id ?? null,
+              productName: item.products?.name ?? null,
               quantity: Number(item.quantity ?? 1),
               saleDate,
             });
