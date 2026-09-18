@@ -266,63 +266,75 @@ interface RunResult {
   mailQueued: boolean;
 }
 
-async function collect(svc: SupabaseClient, weeks: string[], config: Config) {
-  const weekSet = new Set(weeks);
-  const counts = new Map<string, number>(); // week|account|campaign|user|status
-  const sellerNames = new Map<string, string>();
-  const accountLog: RunResult["accounts"] = [];
+/**
+ * Én arbejdsbid: op til PAGES_PER_CHUNK sider af ÉN kampagne.
+ *
+ * Adversus understøtter ikke datofilter på /leads (afprøvet: HTTP 400), så hele
+ * kampagnens emner skal læses. Det overskrider funktionens CPU-grænse i én
+ * kørsel, og derfor arbejder jobbet i bidder der kæder sig selv videre.
+ * Tallene lægges sammen i databasen via weekly_lead_closure_add, og rækkerne
+ * for kampagnen nulstilles ved sidste side, så gentagne kørsler er idempotente.
+ */
+async function processChunk(
+  svc: SupabaseClient,
+  config: Config,
+  chunk: { weeks: string[]; account: AccountKey; campaignIndex: number; page: number },
+): Promise<{ scanned: number; nextPage: number | null; campaignCount: number }> {
+  const account = ACCOUNTS.find((a) => a.key === chunk.account)!;
+  const campaigns = campaignsFor(chunk.account, config);
+  const campaign = campaigns[chunk.campaignIndex];
+  if (!campaign) return { scanned: 0, nextPage: null, campaignCount: campaigns.length };
 
-  for (const account of ACCOUNTS) {
-    const runRow = await svc
-      .from("weekly_lead_closure_runs")
-      .insert({
-        account: account.key,
-        weeks_covered: weeks.length,
-        triggered_by: "weekly-lead-closure-report",
-      })
-      .select("id")
-      .single();
-    const runId = (runRow.data as { id: string } | null)?.id ?? null;
+  const auth = authHeader(account);
+  const users = await ourUsers(auth);
+  const weekSet = new Set(chunk.weeks);
+  const counts = new Map<string, number>();
 
-    let campaignsScanned = 0;
-    let leadsScanned = 0;
-    let error: string | undefined;
-    try {
-      const auth = authHeader(account);
-      const users = await ourUsers(auth);
-      for (const [id, name] of users) sellerNames.set(`${account.key}:${id}`, name);
-
-      for (const campaign of campaignsFor(account.key, config)) {
-        leadsScanned += await streamCampaignLeads(auth, campaign.id, (lead) => {
-          if (!lead.day) return;
-          const week = mondayOf(lead.day);
-          if (!weekSet.has(week)) return;
-          if (!users.has(lead.user)) return; // kun vores egne sælgere
-          const status = lead.status || UNKNOWN_BUCKET;
-          const key = `${week}|${account.key}|${campaign.id}|${lead.user}|${status}`;
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        });
-        campaignsScanned++;
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    }
-
-    if (runId) {
-      await svc
-        .from("weekly_lead_closure_runs")
-        .update({
-          finished_at: new Date().toISOString(),
-          campaigns_scanned: campaignsScanned,
-          leads_scanned: leadsScanned,
-          error: error ?? null,
-        })
-        .eq("id", runId);
-    }
-    accountLog.push({ account: account.key, campaigns: campaignsScanned, leadsScanned, error });
+  if (chunk.page === 1) {
+    // Nulstil kampagnens tal for de berørte uger, så genkørsler ikke lægger oveni.
+    await svc
+      .from("weekly_lead_closure_stats")
+      .delete()
+      .eq("account", chunk.account)
+      .eq("adversus_campaign_id", campaign.id)
+      .in("week_start", chunk.weeks);
   }
 
-  return { counts, sellerNames, accountLog };
+  const { scanned, nextPage } = await streamCampaignPages(
+    auth,
+    campaign.id,
+    chunk.page,
+    (lead) => {
+      if (!lead.day) return;
+      const week = mondayOf(lead.day);
+      if (!weekSet.has(week)) return;
+      if (!users.has(lead.user)) return; // kun vores egne sælgere
+      const status = lead.status || UNKNOWN_BUCKET;
+      const key = `${week}|${chunk.account}|${campaign.id}|${lead.user}|${status}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    },
+  );
+
+  if (counts.size > 0) {
+    const rows = [...counts.entries()].map(([key, lead_count]) => {
+      const [week_start, acc, campaignId, user, status] = key.split("|");
+      return {
+        week_start,
+        account: acc,
+        adversus_campaign_id: campaignId,
+        report_line: config.mapping.get(mapKey(acc, campaignId))?.reportLine ?? "",
+        agent_reference: `${acc}:${user}`,
+        status,
+        lead_count,
+      };
+    });
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await svc.rpc("weekly_lead_closure_add", { _rows: rows.slice(i, i + 500) });
+      if (error) throw new Error(`Kunne ikke gemme ugetal: ${error.message}`);
+    }
+  }
+
+  return { scanned, nextPage, campaignCount: campaigns.length };
 }
 
 async function persist(
