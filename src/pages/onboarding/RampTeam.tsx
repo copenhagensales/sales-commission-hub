@@ -130,15 +130,15 @@ function derive(member: RampTeamMember): Derived {
   }
 
   const urgency =
-    (missedListen >= 2 ? 100 : 0) +
-    (member.week_required ? (2 - doneThisWeek) * 20 : 0) +
+    (missedWeeks >= 2 ? 100 : 0) +
+    (member.week_required && sessionsThisWeek === 0 ? 40 : 0) +
     gap * 3 +
     (trend === "down" ? 10 : 0);
 
   return {
     gap,
-    doneThisWeek,
-    missedListen,
+    sessionsThisWeek,
+    missedWeeks,
     trend,
     urgency,
     stripColor: gap >= 4 ? RED : AMBER_STRIP,
