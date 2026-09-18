@@ -782,6 +782,9 @@ async function finishAndMail(
     );
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
+    // Mailkøen tømmes normalt af cron hvert 5. minut. Ved manuel afsendelse
+    // skal mailen ud med det samme, så køen skubbes her.
+    await flushMailQueue();
   }
 
   await svc.from("weekly_lead_closure_runs").insert({
