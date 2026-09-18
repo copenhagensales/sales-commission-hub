@@ -339,32 +339,9 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     `${statusHead}<tbody>${statusBody}${statusTotals}</tbody>`,
   );
 
-  const sellerRows = input.sellers
-    .map(
-      (s) =>
-        `<tr>${td(s.sellerName, "left", { bold: true })}${td(nf(s.closed), "right")}${td(
-          nf(s.decided),
-          "right",
-        )}${td(nf(s.booked), "right")}${rawTd(bar(s.booked, s.decided), "left")}${td(
-          pct(s.booked, s.decided),
-          "right",
-          { bold: true, accent: true },
-        )}</tr>`,
-    )
-    .join("");
-  const table3 = section(
-    "Tabel 3 — pr. sælger",
-    "Sorteret efter antal lukkede emner. Hitrate = bookede ÷ lukkede ja/nej.",
-    `<thead><tr>${th("Sælger")}${th("Lukkede", "right")}${th("Ja/nej", "right")}${th("Bookede", "right")}${th(
-      "",
-    )}${th("Hitrate", "right")}</tr></thead><tbody>${
-      sellerRows ||
-      `<tr>${td("Ingen sælgere med lukkede emner i ugen.", "left", { dim: true })}${td("", "right")}${td(
-        "",
-        "right",
-      )}${td("", "right")}${td("", "right")}${td("", "right")}</tr>`
-    }</tbody>`,
-  );
+  // Tabel 3 (pr. sælger) vises ikke i mailen efter ønske — tallene findes stadig på rapportsiden.
+
+
 
   const table4 = input.previousWeeks.length
     ? input.previousWeeks
@@ -433,7 +410,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     </div>
 
     ${statCards}
-    ${table1}${table2}${table3}${table4}${notesHtml}
+    ${table1}${table2}${table4}${notesHtml}
 
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
