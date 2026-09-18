@@ -81,9 +81,8 @@ function buildContent(payload: RecipientPayload, week: number): string {
 
   return `
     ${intro}
-    <p>Alle i deres første 40 arbejdsdage skal have både en 1-1 coaching og en 1-1 lyt med
-    feedback hver uge. Mandag til torsdag er den normale periode — <strong>I har i dag til at
-    nå det.</strong></p>
+    <p>Alle i deres første 40 arbejdsdage skal have mindst én 1-1 session med feedback hver uge.
+    Mandag til torsdag er den normale periode — <strong>I har i dag til at nå det.</strong></p>
     <table style="border-collapse:collapse;width:100%;font-size:14px;color:#1b1f1d;">
       <thead>
         <tr style="text-align:left;background:#e7f4ed;">
