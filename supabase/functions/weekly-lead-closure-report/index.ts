@@ -633,8 +633,9 @@ function buildMail(
   const sellerMap = new Map<string, SellerTotals>();
   for (const r of rows) {
     const name = sellerNames.get(r.agent_reference) ?? r.agent_reference;
-    const entry = sellerMap.get(name) ?? { sellerName: name, closed: 0, booked: 0 };
+    const entry = sellerMap.get(name) ?? { sellerName: name, closed: 0, decided: 0, booked: 0 };
     if (config.closing.has(r.status)) entry.closed += r.lead_count;
+    if (config.hitrate.has(r.status)) entry.decided += r.lead_count;
     if (r.status === BOOKED_STATUS) entry.booked += r.lead_count;
     sellerMap.set(name, entry);
   }
@@ -673,6 +674,7 @@ function buildMail(
     weekNumber: isoWeekNumber(weekStart),
     lines: lineTotals(rows, config),
     statusKeys,
+    excludedStatuses: config.excluded,
     statusRows,
     sellers: [...sellerMap.values()].sort((a, b) => b.closed - a.closed),
     previousWeeks,
