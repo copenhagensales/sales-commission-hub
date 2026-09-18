@@ -137,7 +137,26 @@ Deno.serve(async (req) => {
         statuses: Object.fromEntries(statuses),
         campaignValues: Object.fromEntries([...campaignValues.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15)),
         userFieldsPresent: Object.fromEntries(userFields),
-        sampleUserValue: leads.length ? pick((leads[0] as Record<string, unknown>).lastModifiedByUser) : null,
+        userObjectKeys: (() => {
+          const keys = new Set<string>();
+          for (const lead of leads.slice(0, 200)) {
+            for (const f of ["lastModifiedByUser", "firstProcessedByUser"]) {
+              const v = (lead as Record<string, unknown>)[f];
+              if (v && typeof v === "object") for (const k of Object.keys(v as object)) keys.add(`${f}.${k}`);
+            }
+          }
+          return [...keys];
+        })(),
+        userSample: (() => {
+          const out = new Map<string, number>();
+          for (const lead of leads) {
+            const v = (lead as Record<string, unknown>).firstProcessedByUser as Record<string, unknown> | null;
+            if (!v) continue;
+            const label = String(v.userName ?? v.email ?? v.login ?? v.name ?? v.id ?? Object.keys(v).join("+"));
+            out.set(label, (out.get(label) ?? 0) + 1);
+          }
+          return Object.fromEntries([...out.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10));
+        })(),
       });
       break; // én kampagne er nok til kortlægningen
     }
