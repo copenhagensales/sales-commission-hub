@@ -847,12 +847,14 @@ export function SendContractDialog({
                           {employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : <span className="text-destructive">Mangler</span>}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Løn:</span>
-                        <span className="font-medium">
-                          {employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : <span className="text-destructive">Mangler</span>}
-                        </span>
-                      </div>
+                      {selectedContractType !== "team_leader" && selectedContractType !== "assistant_team_leader" && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Løn:</span>
+                          <span className="font-medium">
+                            {employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : <span className="text-destructive">Mangler</span>}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Ferietype:</span>
                         <span className="font-medium">
