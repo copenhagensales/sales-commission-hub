@@ -148,7 +148,6 @@ function derive(member: RampTeamMember): Derived {
 }
 
 function priorityBand(member: RampTeamMember, d: Derived) {
-  const missingKind = member.has_coaching ? KIND_LABEL.listen : KIND_LABEL.coaching;
   if (member.has_absence) {
     return {
       tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
@@ -157,28 +156,20 @@ function priorityBand(member: RampTeamMember, d: Derived) {
       sub: "Ugen er lukket — forløbet genoptages næste uge.",
     };
   }
-  if (d.missedListen >= 2) {
+  if (d.missedWeeks >= 2) {
     return {
       tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
       mark: "!",
-      title: `Lyt mangler — ${d.missedListen} uger i træk`,
-      sub: "Sæt et lyt i kalenderen i dag",
+      title: `Session mangler — ${d.missedWeeks} uger i træk`,
+      sub: "Sæt en 1-1 session i kalenderen i dag",
     };
   }
-  if (member.week_required && d.doneThisWeek === 0) {
+  if (member.week_required && d.sessionsThisWeek === 0) {
     return {
       tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
       mark: "!",
-      title: `Begge forløb mangler i uge ${member.iso_week}`,
-      sub: "Coaching og lyt skal holdes denne uge",
-    };
-  }
-  if (member.week_required && d.doneThisWeek === 1) {
-    return {
-      tone: { bg: "#fdf2e3", icon: AMBER_TEXT, text: "#7a4e11" },
-      mark: "!",
-      title: `${missingKind} mangler i uge ${member.iso_week}`,
-      sub: "Ét forløb tilbage før ugen er lukket",
+      title: `Ugens 1-1 session mangler i uge ${member.iso_week}`,
+      sub: "Der skal holdes mindst én session denne uge",
     };
   }
   if (!member.week_required && !member.weekly_program_active) {
