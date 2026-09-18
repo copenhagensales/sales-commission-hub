@@ -2939,7 +2939,7 @@ async function handleVoiceMonthlyGoal(
       const { data, error } = await supabase
         .from("board_monthly_goals")
         .select("employee_id, target_amount")
-        .eq("board_key", EESY_FM_BOARD_KEY_EF)
+        .eq("board_key", boardKey)
         .eq("month_key", monthKey);
       if (error) throw error;
       goals = (data || []).map((g: any) => ({
@@ -3027,7 +3027,7 @@ async function handleVoiceMonthlyGoal(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    console.error("[handleEesyFmMonthlyGoal] error:", err);
+    console.error("[handleVoiceMonthlyGoal] error:", err);
     return new Response(JSON.stringify({ error: err?.message || "unknown" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
