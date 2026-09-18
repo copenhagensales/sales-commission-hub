@@ -604,6 +604,30 @@ Deno.serve(async (req) => {
 
     const chunk = await processChunk(svc, config, state);
 
+    // Løbende logning på kontoens seneste kørselsrække — kun tal, ingen lead-data.
+    const { data: openRun } = await svc
+      .from("weekly_lead_closure_runs")
+      .select("id, campaigns_scanned, leads_scanned")
+      .eq("account", state.account)
+      .is("finished_at", null)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (openRun) {
+      const row = openRun as { id: string; campaigns_scanned: number | null; leads_scanned: number | null };
+      await svc
+        .from("weekly_lead_closure_runs")
+        .update({
+          leads_scanned: (row.leads_scanned ?? 0) + chunk.scanned,
+          campaigns_scanned: (row.campaigns_scanned ?? 0) + (chunk.nextPage ? 0 : 1),
+          finished_at:
+            !chunk.nextPage && state.campaignIndex + 1 >= chunk.campaignCount
+              ? new Date().toISOString()
+              : null,
+        })
+        .eq("id", row.id);
+    }
+
     // Næste bid: flere sider → samme kampagne, ellers næste kampagne, ellers
     // næste konto, ellers færdig (mail).
     if (chunk.nextPage) {
