@@ -358,17 +358,13 @@ function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
       <div className="flex flex-1 gap-1">
         {member.weeks.map((w) => {
           const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
-          const count = (entry?.coaching ? 1 : 0) + (entry?.listen ? 1 : 0);
-          const color = entry?.absence
-            ? "#e7eeeb"
-            : count === 2
-              ? GREEN
-              : count === 1
-                ? AMBER
-                : "#e3908b";
+          const count = entry?.sessions ?? 0;
+          const color = entry?.absence ? "#e7eeeb" : count >= 1 ? GREEN : "#e3908b";
           const label = entry?.absence
             ? `Uge ${w.iso_week}: fravær hele ugen`
-            : `Uge ${w.iso_week}: ${count} af 2 forløb holdt`;
+            : count === 1
+              ? `Uge ${w.iso_week}: 1 session holdt`
+              : `Uge ${w.iso_week}: ${count} sessioner holdt`;
           return (
             <span
               key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
