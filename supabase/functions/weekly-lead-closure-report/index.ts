@@ -27,7 +27,9 @@ import {
 const BASE_URL = "https://api.adversus.io/v1";
 const OUR_DOMAIN = "@copenhagensales.dk";
 const PAGE_SIZE = 1000;
-const MAX_PAGES = 100;
+const MAX_PAGES = 400;
+/** Sider pr. kørsel — holder CPU-forbruget under funktionens grænse. */
+const PAGES_PER_CHUNK = 3;
 const BOOKED_STATUS = "success";
 const UNKNOWN_BUCKET = "ukendt";
 
