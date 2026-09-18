@@ -263,7 +263,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   subject: string;
   html: string;
 } {
-  const subject = `Mødebook-rapport Tryg — uge ${input.weekNumber}`;
+  const subject = `Kampagneoversigt Tryg — uge ${input.weekNumber}`;
 
   const totalClosed = input.lines.reduce((s, l) => s + l.closed, 0);
   const totalDecided = input.lines.reduce((s, l) => s + l.decided, 0);
@@ -399,7 +399,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
             <td align="right" style="font-size:12px;color:${BRAND.headerMuted};">Ugerapport · Uge ${input.weekNumber}</td>
           </tr>
         </table>
-        <div style="font-size:28px;font-weight:800;color:#ffffff;margin-top:24px;line-height:1.2;">Mødebook-rapport — Tryg</div>
+        <div style="font-size:28px;font-weight:800;color:#ffffff;margin-top:24px;line-height:1.2;">Kampagneoversigt Tryg</div>
         <div style="font-size:13px;color:${BRAND.headerMuted};margin-top:10px;">${escapeHtml(weekRange(input.weekStart))} · lukkede emner, bookede møder og hitrate</div>
       </td></tr>
     </table>
