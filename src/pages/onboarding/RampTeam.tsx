@@ -52,6 +52,7 @@ const FOCUS_AREAS = [
   "Værdiargumentation",
   "Indvendingshåndtering",
   "Lukkefasen",
+  "Brug af delaccepter",
   "Mersalg",
   "Tonen i samtalen",
   "Struktur og disciplin",
