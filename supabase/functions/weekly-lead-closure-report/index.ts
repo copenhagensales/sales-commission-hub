@@ -704,6 +704,8 @@ interface ChunkState {
   campaignIndex: number;
   page: number;
   sendMail: boolean;
+  /** Manuel afsendelse: mailen sendes selvom der allerede er sendt i dag. */
+  forceMail: boolean;
   triggeredBy: string;
 }
 
@@ -720,6 +722,7 @@ async function chainNext(state: ChunkState): Promise<void> {
     campaign_index: state.campaignIndex,
     page: state.page,
     send_mail: state.sendMail,
+    force_mail: state.forceMail,
     triggered_by: state.triggeredBy,
   });
   try {
