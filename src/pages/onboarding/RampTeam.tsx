@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Loader2, Check, X } from "lucide-react";
+import { Loader2, Check, X, Plus } from "lucide-react";
 import {
   RAMP_WEEKLY_ABSENCE,
   RAMP_WEEKLY_COACHING,
@@ -914,7 +914,7 @@ export default function RampTeam() {
   const missingList = useMemo(
     () =>
       allList.filter(
-        (m) => m.week_required && !m.has_absence && (!m.has_coaching || !m.has_listen),
+        (m) => m.week_required && !m.has_absence && !m.has_coaching && !m.has_listen,
       ),
     [allList],
   );
@@ -1050,7 +1050,7 @@ export default function RampTeam() {
                     ? `Starter ${programStartLabel}`
                     : "Ordningen er ikke trådt i kraft endnu"
                   : counts.missing > 0
-                    ? "Coaching eller lyt mangler stadig"
+                    ? "Ugens 1-1 session mangler stadig"
                     : "Alle forløb er afviklet",
                 extraColor: !programActive
                   ? "#57635e"
@@ -1167,8 +1167,9 @@ export default function RampTeam() {
                       : "Alle nye i opstart"}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Alle nye får 1-1 coaching og 1-1 lyt hver uge i de første 40 arbejdsdage — også
-                  dem der ligger flot.
+                  Alle nye får mindst én 1-1 session med feedback hver uge i de første 40
+                  arbejdsdage — også dem der ligger flot. Der kan tilføjes flere sessioner efter
+                  behov.
                 </p>
               </div>
               <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>
