@@ -743,6 +743,23 @@ async function chainNext(state: ChunkState): Promise<void> {
   }
 }
 
+async function flushMailQueue(): Promise<void> {
+  try {
+    await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-scheduled-emails`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: "{}",
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (e) {
+    // Fejler afsendelsen her, sender cron den alligevel inden for 5 minutter.
+    console.error("[weekly-lead-closure-report] kunne ikke skubbe mailkøen", String(e));
+  }
+}
+
 async function finishAndMail(
   svc: SupabaseClient,
   config: Config,
