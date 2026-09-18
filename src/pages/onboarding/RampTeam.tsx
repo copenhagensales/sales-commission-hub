@@ -296,22 +296,23 @@ function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor:
 }
 
 function ProgramRow({
-  kind,
-  done,
+  sessions,
   member,
-  missedListen,
+  missedWeeks,
   onOpen,
 }: {
-  kind: SessionKind;
-  done: boolean;
+  sessions: number;
   member: RampTeamMember;
-  missedListen: number;
+  missedWeeks: number;
   onOpen: () => void;
 }) {
+  const done = sessions > 0;
   const status = done
-    ? `Holdt i uge ${member.iso_week}`
-    : kind === "listen" && missedListen >= 2
-      ? `Mangler ${missedListen} uger i træk`
+    ? sessions > 1
+      ? `Holdt i uge ${member.iso_week} · ${sessions} sessioner`
+      : `Holdt i uge ${member.iso_week}`
+    : missedWeeks >= 2
+      ? `Mangler ${missedWeeks} uger i træk`
       : "Skal holdes denne uge";
 
   return (
