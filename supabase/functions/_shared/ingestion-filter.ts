@@ -260,13 +260,18 @@ function decide(
   opts: FilterOptions,
   stats: FilterStats,
 ): FilterRule | null {
-  // Regel 0: telefonfelter holdes udenfor indtil flaget slås til.
-  if (!opts.phoneFilterEnabled && isPhoneField(label)) return null;
-
   const decision = opts.lookup(container, label);
 
-  // Regel 1: BLOKER — hårdt, uden undtagelse.
+  // Regel 1: BLOKER — hårdt, uden undtagelse. Går FØR telefonundtagelsen:
+  // et felt der er besluttet blokeret må ikke slippe igennem, blot fordi
+  // feltnavnet ligner et telefonfelt (fx "Teledata: Nyeste nummer opdateret").
+  // Rettet 18. sep 2026 efter at heal-jobbet lukkede blokerede Teledata-felter
+  // ind i raw_payload.masterData igen.
   if (decision === "BLOKER") return "BLOKER";
+
+  // Regel 0: telefonfelter UDEN en truffet beslutning holdes udenfor, indtil
+  // flaget slås til. Gælder kun ukendte/UAFKLARET-felter.
+  if (!opts.phoneFilterEnabled && isPhoneField(label)) return null;
 
   // Regel 2: BEHOLD — fritekstdetektoren springes over for netop dette felt.
   if (decision === "BEHOLD") return null;

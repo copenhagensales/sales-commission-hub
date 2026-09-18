@@ -12,6 +12,7 @@
 //     than the stored watermark is fetched or written.
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
+import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
 
 const BASE_URL = "https://api.adversus.io/v1";
 const OUR_DOMAIN = "@copenhagensales.dk";
@@ -392,6 +393,13 @@ async function run(svc: SupabaseClient) {
   const agents = await syncUsers(svc, auth);
   const { emailByAdversusId, mapped, unmapped } = await mapAgentsToEmployees(svc, agents);
 
+  // GDPR: alt der skrives til sales.raw_payload går gennem det databasedrevne
+  // indtagsfilter — samme regler og samme feltregister som webhook-indgangen.
+  const gdprFilter = await createIngestionFilter(svc, {
+    integration: "adversus",
+    triggeredBy: "lederne-sync",
+  });
+
   const rawLeads = await fetchLeadsSince(auth, watermark);
   const newCampaigns: string[] = [];
   let newWatermark = watermark;
@@ -442,7 +450,8 @@ async function run(svc: SupabaseClient) {
       newCampaigns,
     );
     const agent = agents.get(lead.lastContactedBy)!;
-    const payload = buildRawPayload(lead);
+    const payload = gdprFilter.filter(buildRawPayload(lead));
+    gdprFilter.countSale();
     const row = {
       adversus_external_id: externalId,
       source: SOURCE,
@@ -482,6 +491,8 @@ async function run(svc: SupabaseClient) {
     created++;
     newSaleIds.push(saleId);
   }
+
+  await gdprFilter.flush();
 
   // Let the existing pricing engine apply the Mødetype rules.
   let rematch: unknown = null;
