@@ -309,6 +309,10 @@ async function streamEnreachWeek(
 // ---------------------------------------------------------------------------
 interface Config {
   closing: Set<string>;
+  /** Lukkede statusser der tæller i mødebook-hitraten (lukkede ja/nej). */
+  hitrate: Set<string>;
+  /** Lukkede statusser der vises for sig og holdes ude af hitraten. */
+  excluded: { status: string; label: string }[];
   known: Map<string, string>;
   /** Kildeudfald → kanonisk status (fx Enreach "Success" → "success"). */
   alias: Map<string, string>;
