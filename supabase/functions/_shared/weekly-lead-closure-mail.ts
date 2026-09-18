@@ -23,8 +23,13 @@ const BRAND = {
 
 export interface LineTotals {
   reportLine: string;
+  /** Alle afsluttende statusser. */
   closed: number;
+  /** Lukkede ja/nej — kun statusser der tæller i mødebook-hitraten. */
+  decided: number;
   booked: number;
+  /** Lukkede statusser der vises for sig og holdes ude af hitraten. */
+  extras: Record<string, number>;
 }
 
 export interface StatusTotals {
