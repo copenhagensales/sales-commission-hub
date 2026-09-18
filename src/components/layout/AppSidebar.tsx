@@ -1052,7 +1052,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     location.pathname === "/reports/weekly-lead-closure" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
                     <BarChart3 className="h-4 w-4" />
-                    Mødebook-rapport (Tryg)
+                    Kampagneoversigt Tryg
                   </NavLink>
                 )}
                 {p.canViewPulseSurvey && (

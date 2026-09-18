@@ -223,7 +223,7 @@ export default function WeeklyLeadClosureReport() {
       <div className="space-y-6 p-4 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Mødebook-rapport (Tryg)</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Kampagneoversigt Tryg</h1>
             <p className="text-sm text-muted-foreground">
               Lukkede emner, bookede møder og hitrate pr. uge. Sendes automatisk mandag kl. 07.00.
             </p>
