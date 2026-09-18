@@ -10496,6 +10496,30 @@ export type Database = {
           },
         ]
       }
+      lead_closing_statuses: {
+        Row: {
+          created_at: string
+          is_closing: boolean
+          label_da: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          is_closing?: boolean
+          label_da: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          is_closing?: boolean
+          label_da?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       league_enrollments: {
         Row: {
           employee_id: string
@@ -17039,6 +17063,173 @@ export type Database = {
           tiktok_videos_target?: number
           updated_at?: string | null
           week_start_date?: string
+        }
+        Relationships: []
+      }
+      weekly_lead_closure_runs: {
+        Row: {
+          account: string | null
+          campaigns_scanned: number
+          error: string | null
+          finished_at: string | null
+          id: string
+          leads_scanned: number
+          mail_sent: boolean
+          started_at: string
+          triggered_by: string | null
+          weeks_covered: number
+        }
+        Insert: {
+          account?: string | null
+          campaigns_scanned?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          leads_scanned?: number
+          mail_sent?: boolean
+          started_at?: string
+          triggered_by?: string | null
+          weeks_covered?: number
+        }
+        Update: {
+          account?: string | null
+          campaigns_scanned?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          leads_scanned?: number
+          mail_sent?: boolean
+          started_at?: string
+          triggered_by?: string | null
+          weeks_covered?: number
+        }
+        Relationships: []
+      }
+      weekly_lead_closure_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          recipient_email: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          recipient_email: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          recipient_email?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      weekly_lead_closure_stats: {
+        Row: {
+          account: string
+          adversus_campaign_id: string
+          agent_reference: string
+          created_at: string
+          id: string
+          lead_count: number
+          report_line: string | null
+          status: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          account: string
+          adversus_campaign_id: string
+          agent_reference: string
+          created_at?: string
+          id?: string
+          lead_count?: number
+          report_line?: string | null
+          status: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          account?: string
+          adversus_campaign_id?: string
+          agent_reference?: string
+          created_at?: string
+          id?: string
+          lead_count?: number
+          report_line?: string | null
+          status?: string
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      weekly_lead_report_campaign_map: {
+        Row: {
+          account: string
+          adversus_campaign_id: string
+          adversus_campaign_name: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          is_confirmed: boolean
+          report_line: string | null
+          updated_at: string
+        }
+        Insert: {
+          account: string
+          adversus_campaign_id: string
+          adversus_campaign_name?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          is_confirmed?: boolean
+          report_line?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account?: string
+          adversus_campaign_id?: string
+          adversus_campaign_name?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          is_confirmed?: boolean
+          report_line?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_lead_report_campaign_map_report_line_fkey"
+            columns: ["report_line"]
+            isOneToOne: false
+            referencedRelation: "weekly_lead_report_lines"
+            referencedColumns: ["report_line"]
+          },
+        ]
+      }
+      weekly_lead_report_lines: {
+        Row: {
+          created_at: string
+          report_line: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          report_line: string
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          report_line?: string
+          sort_order?: number
         }
         Relationships: []
       }
