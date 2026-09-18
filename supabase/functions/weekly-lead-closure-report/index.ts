@@ -842,12 +842,20 @@ Deno.serve(async (req) => {
     if (config.lines.length === 0) throw new Error("Rapportlinjerne mangler i opsætningen");
     await assertFieldsAllowed(svc);
 
+    // current_week: den igangværende uge (mandag → i dag) i stedet for de
+    // seneste hele uger. Bruges af "Send mail nu" i Stork.
+    const currentWeek = [mondayOf(copenhagenDay(new Date().toISOString()))];
     const state: ChunkState = {
-      weeks: body.weeks_list ?? targetWeeks(Math.max(1, Math.min(Number(body.weeks ?? 1), 12))),
+      weeks:
+        body.weeks_list ??
+        (body.current_week
+          ? currentWeek
+          : targetWeeks(Math.max(1, Math.min(Number(body.weeks ?? 1), 12)))),
       account: body.account ?? "main",
       campaignIndex: body.campaign_index ?? 0,
       page: body.page ?? 1,
       sendMail: body.send_mail !== false,
+      forceMail: body.force_mail === true,
       triggeredBy: body.triggered_by ?? (auth.userId ? "manuel" : "cron"),
     };
 
