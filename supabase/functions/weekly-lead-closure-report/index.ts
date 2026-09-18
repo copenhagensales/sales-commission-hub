@@ -458,15 +458,8 @@ async function alreadyMailedToday(svc: SupabaseClient): Promise<boolean> {
   return (data ?? []).length > 0;
 }
 
-async function run(
-  svc: SupabaseClient,
-  options: { weeks: number; sendMail: boolean; triggeredBy: string },
-): Promise<RunResult> {
-  const config = await loadConfig(svc);
-  if (config.lines.length === 0) throw new Error("Rapportlinjerne mangler i opsætningen");
-
-  // GDPR: indtagsfilteret skal tillade de tre felter vi læser. Blokeres et af
-  // dem, stopper vi i stedet for at hente data vi ikke må behandle.
+/** GDPR: indtagsfilteret skal tillade de tre felter vi læser. */
+async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
   const gdprFilter = await createIngestionFilter(svc, {
     integration: "adversus",
     triggeredBy: "weekly-lead-closure-report",
@@ -482,11 +475,44 @@ async function run(
       throw new Error(`Indtagsfilteret blokerer feltet ${field} — rapporten er standset`);
     }
   }
+}
 
-  const weeks = targetWeeks(Math.max(1, Math.min(options.weeks, 12)));
-  const { counts, sellerNames, accountLog } = await collect(svc, weeks, config);
-  await persist(svc, weeks, counts, config);
+interface ChunkState {
+  weeks: string[];
+  account: AccountKey;
+  campaignIndex: number;
+  page: number;
+  sendMail: boolean;
+  triggeredBy: string;
+}
 
+/** Sætter næste bid i gang uden at vente på den (kæden kører videre selv). */
+function chainNext(state: ChunkState): void {
+  const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/weekly-lead-closure-report`;
+  const body = JSON.stringify({
+    weeks_list: state.weeks,
+    account: state.account,
+    campaign_index: state.campaignIndex,
+    page: state.page,
+    send_mail: state.sendMail,
+    triggered_by: state.triggeredBy,
+  });
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+    },
+    body,
+  }).catch((e) => console.error("[weekly-lead-closure-report] kæde fejlede", String(e)));
+}
+
+async function finishAndMail(
+  svc: SupabaseClient,
+  config: Config,
+  state: ChunkState,
+): Promise<{ mailQueued: boolean; statusBreakdown: Record<string, Record<string, number>> }> {
+  const weeks = state.weeks;
   const { data: stored } = await svc
     .from("weekly_lead_closure_stats")
     .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, lead_count")
@@ -501,8 +527,8 @@ async function run(
     .map((week) => ({ weekStart: week, rows: rows.filter((r) => r.week_start === week) }));
 
   let mailQueued = false;
-  if (options.sendMail && config.recipient && !(await alreadyMailedToday(svc))) {
-    const mail = buildMail(latest, latestRows, previous, config, sellerNames);
+  if (state.sendMail && config.recipient && !(await alreadyMailedToday(svc))) {
+    const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll());
     const { error } = await svc.from("scheduled_emails").insert({
       recipient_email: config.recipient,
       subject: mail.subject,
@@ -513,24 +539,23 @@ async function run(
     });
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
-    await svc.from("weekly_lead_closure_runs").insert({
-      account: null,
-      weeks_covered: weeks.length,
-      mail_sent: true,
-      triggered_by: options.triggeredBy,
-      finished_at: new Date().toISOString(),
-    });
   }
 
-  // Statusfordeling pr. rapportlinje for seneste uge — kun tal.
+  await svc.from("weekly_lead_closure_runs").insert({
+    account: null,
+    weeks_covered: weeks.length,
+    mail_sent: mailQueued,
+    triggered_by: state.triggeredBy,
+    finished_at: new Date().toISOString(),
+  });
+
   const statusBreakdown: Record<string, Record<string, number>> = {};
   for (const r of latestRows) {
     const line = r.report_line ?? `Ikke mappet (${r.account}/${r.adversus_campaign_id})`;
     statusBreakdown[line] = statusBreakdown[line] ?? {};
     statusBreakdown[line][r.status] = (statusBreakdown[line][r.status] ?? 0) + r.lead_count;
   }
-
-  return { weeks, accounts: accountLog, statusBreakdown, mailQueued };
+  return { mailQueued, statusBreakdown };
 }
 
 Deno.serve(async (req) => {
@@ -542,19 +567,72 @@ Deno.serve(async (req) => {
   try {
     const body = (await req.json().catch(() => ({}))) as {
       weeks?: number;
+      weeks_list?: string[];
+      account?: AccountKey;
+      campaign_index?: number;
+      page?: number;
       send_mail?: boolean;
+      triggered_by?: string;
     };
     const svc = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
-    const result = await run(svc, {
-      weeks: Number(body.weeks ?? 1),
+
+    const config = await loadConfig(svc);
+    if (config.lines.length === 0) throw new Error("Rapportlinjerne mangler i opsætningen");
+    await assertFieldsAllowed(svc);
+
+    const state: ChunkState = {
+      weeks: body.weeks_list ?? targetWeeks(Math.max(1, Math.min(Number(body.weeks ?? 1), 12))),
+      account: body.account ?? "main",
+      campaignIndex: body.campaign_index ?? 0,
+      page: body.page ?? 1,
       sendMail: body.send_mail !== false,
-      triggeredBy: auth.userId ? "manuel" : "cron",
-    });
-    return json(200, result);
+      triggeredBy: body.triggered_by ?? (auth.userId ? "manuel" : "cron"),
+    };
+
+    // Start på en ny kæde: log kørslen, så den kan følges i Stork.
+    if (!body.account) {
+      await svc.from("weekly_lead_closure_runs").insert({
+        account: state.account,
+        weeks_covered: state.weeks.length,
+        triggered_by: state.triggeredBy,
+      });
+    }
+
+    const chunk = await processChunk(svc, config, state);
+
+    // Næste bid: flere sider → samme kampagne, ellers næste kampagne, ellers
+    // næste konto, ellers færdig (mail).
+    if (chunk.nextPage) {
+      chainNext({ ...state, page: chunk.nextPage });
+      return json(200, { stage: "kører", account: state.account, page: chunk.nextPage });
+    }
+    if (state.campaignIndex + 1 < chunk.campaignCount) {
+      chainNext({ ...state, campaignIndex: state.campaignIndex + 1, page: 1 });
+      return json(200, {
+        stage: "kører",
+        account: state.account,
+        nextCampaignIndex: state.campaignIndex + 1,
+        scanned: chunk.scanned,
+      });
+    }
+    const nextAccountIndex = ACCOUNTS.findIndex((a) => a.key === state.account) + 1;
+    if (nextAccountIndex < ACCOUNTS.length) {
+      const nextAccount = ACCOUNTS[nextAccountIndex].key;
+      chainNext({ ...state, account: nextAccount, campaignIndex: 0, page: 1 });
+      await svc.from("weekly_lead_closure_runs").insert({
+        account: nextAccount,
+        weeks_covered: state.weeks.length,
+        triggered_by: state.triggeredBy,
+      });
+      return json(200, { stage: "kører", nextAccount });
+    }
+
+    const finished = await finishAndMail(svc, config, state);
+    return json(200, { stage: "færdig", weeks: state.weeks, ...finished });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[weekly-lead-closure-report]", message);
