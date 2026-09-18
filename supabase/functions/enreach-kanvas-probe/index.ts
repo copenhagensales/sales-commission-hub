@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
       campaigns_only: `${baseUrl}/simpleleads?Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
       projects_star_campaigns: `${baseUrl}/simpleleads?Projects=*&Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
       campaign_singular: `${baseUrl}/simpleleads?Campaign=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
-      projects_star_only: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
+      include_user: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&Include=user,campaign`,
+      users_endpoint: `${baseUrl}/leads?Projects=*&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true`,
     });
 
     for (const row of mapRows ?? []) {
@@ -93,11 +94,18 @@ Deno.serve(async (req) => {
         }
         const parsed = asArray(await res.json());
         attempts[variant] = { httpStatus: 200, leads: parsed.length };
+        if (parsed.length > 0) {
+          const first = parsed[0] as Record<string, unknown>;
+          (attempts[variant] as Record<string, unknown>).userKeys = Object.keys(
+            (first.firstProcessedByUser ?? first.user ?? {}) as object,
+          );
+          (attempts[variant] as Record<string, unknown>).topKeys = Object.keys(first);
+        }
         if (!usedVariant && parsed.length > 0) {
           usedVariant = variant;
           leads = parsed;
         }
-        if (variant === "projects_star_only") break;
+
       }
 
       const closures = new Map<string, number>();
