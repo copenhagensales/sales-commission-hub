@@ -284,12 +284,17 @@ async function mapAgentsToEmployees(
     .from("employee_master_data")
     .select("id, first_name, last_name, work_email, is_active")
     .eq("is_active", true);
-  const byName = new Map<string, Array<{ id: string; work_email: string | null }>>();
-  const byEmail = new Map<string, { id: string; work_email: string | null }>();
+  type EmpRow = { id: string; work_email: string | null; first_name: string };
+  const byName = new Map<string, EmpRow[]>();
+  const byEmail = new Map<string, EmpRow>();
   for (const e of (employees ?? []) as Array<Record<string, unknown>>) {
     const key = `${safeString(e.first_name)} ${safeString(e.last_name)}`.trim().toLowerCase();
     if (!key) continue;
-    const row = { id: String(e.id), work_email: (e.work_email as string | null) ?? null };
+    const row: EmpRow = {
+      id: String(e.id),
+      work_email: (e.work_email as string | null) ?? null,
+      first_name: safeString(e.first_name).toLowerCase(),
+    };
     const list = byName.get(key) ?? [];
     list.push(row);
     byName.set(key, list);
@@ -297,13 +302,37 @@ async function mapAgentsToEmployees(
     if (mail) byEmail.set(mail, row);
   }
 
+  /**
+   * Adversus-logins følger husets konvention: arbejdsmailens initialer med et
+   * løbenummer foran @ (fx flk1@ for flk@). Nummeret fjernes, så koblingen
+   * bliver deterministisk uden at opfinde et nyt matchningslag.
+   */
+  const stripLoginSuffix = (mail: string) => {
+    const at = mail.indexOf("@");
+    if (at <= 0) return "";
+    const local = mail.slice(0, at).replace(/\d+$/, "");
+    return local ? `${local}${mail.slice(at)}` : "";
+  };
+
   let mapped = 0;
   let unmapped = 0;
   for (const [advId, agent] of agents) {
     // Work e-mail is the deterministic key; name is only a fallback.
-    const byMail = agent.email ? byEmail.get(agent.email) : undefined;
-    const matches = byName.get(agent.name.toLowerCase()) ?? [];
-    const employee = byMail ?? (matches.length === 1 ? matches[0] : null);
+    const agentMail = agent.email ? agent.email.toLowerCase() : "";
+    const agentFirstName = agent.name.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+    let employee: EmpRow | null = (agentMail ? byEmail.get(agentMail) : undefined) ?? null;
+    if (!employee && agentMail) {
+      // Login-mail med løbenummer: kun accepteret hvis fornavnet også passer.
+      const stripped = stripLoginSuffix(agentMail);
+      const candidate = stripped && stripped !== agentMail ? byEmail.get(stripped) : undefined;
+      if (candidate && agentFirstName && candidate.first_name === agentFirstName) {
+        employee = candidate;
+      }
+    }
+    if (!employee) {
+      const matches = byName.get(agent.name.toLowerCase()) ?? [];
+      employee = matches.length === 1 ? matches[0] : null;
+    }
     if (!employee) {
       unmapped++;
       continue;
