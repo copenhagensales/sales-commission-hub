@@ -74,10 +74,10 @@ Deno.serve(async (req) => {
     const fieldNames = new Set<string>();
 
     const variants = (id: string) => ({
-      campaigns_only: `${baseUrl}/simpleleads?Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
-      projects_star_campaigns: `${baseUrl}/simpleleads?Projects=*&Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
-      campaign_singular: `${baseUrl}/simpleleads?Campaign=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
-      projects_star_only: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
+      campaigns_only: `${baseUrl}/simpleleads?Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
+      projects_star_campaigns: `${baseUrl}/simpleleads?Projects=*&Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
+      campaign_singular: `${baseUrl}/simpleleads?Campaign=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
+      projects_star_only: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}&AllClosedStatuses=true&AllOpenStatuses=true`,
     });
 
     for (const row of mapRows ?? []) {
