@@ -292,6 +292,93 @@ export default function WeeklyLeadClosureReport() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
+              <Mail className="h-4 w-4" />
+              Modtagere af mandagsmailen
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recipientsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Henter modtagere…
+              </div>
+            ) : recipients.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Der er ingen modtagere. Mailen sendes ikke, før mindst én er tilføjet.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mailadresse</TableHead>
+                    <TableHead className="text-right">Modtager mailen</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recipients.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.recipient_email}</TableCell>
+                      <TableCell className="text-right">
+                        <Switch
+                          checked={row.is_active}
+                          disabled={!isSuperadmin || toggleRecipient.isPending}
+                          onCheckedChange={(checked) =>
+                            toggleRecipient.mutate(
+                              { id: row.id, isActive: checked },
+                              { onError: (error: Error) => toast.error(error.message) },
+                            )
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isSuperadmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={removeRecipient.isPending}
+                            onClick={() =>
+                              removeRecipient.mutate(row.id, {
+                                onSuccess: () => toast.success("Modtager fjernet"),
+                                onError: (error: Error) => toast.error(error.message),
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {isSuperadmin && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="email"
+                  placeholder="navn@copenhagensales.dk"
+                  className="w-[280px]"
+                  value={newRecipient}
+                  onChange={(e) => setNewRecipient(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddRecipient();
+                  }}
+                />
+                <Button
+                  variant="secondary"
+                  onClick={handleAddRecipient}
+                  disabled={addRecipient.isPending}
+                >
+                  Tilføj modtager
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
               Kampagner og rapportlinjer
               {unconfirmed > 0 && (
                 <Badge variant="secondary">{unconfirmed} ikke bekræftet</Badge>
