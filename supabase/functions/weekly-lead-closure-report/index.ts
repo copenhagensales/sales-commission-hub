@@ -136,18 +136,20 @@ type LeadFacts = { status: string; user: string; day: string };
  * side. Emnerne holdes IKKE i hukommelsen efter optællingen — kun id'et bruges
  * til deduplikering, og kun for den aktuelle kampagne.
  */
-async function streamCampaignLeads(
+async function streamCampaignPages(
   auth: string,
   campaignId: string,
+  startPage: number,
   onLead: (lead: LeadFacts) => void,
-): Promise<number> {
+): Promise<{ scanned: number; nextPage: number | null }> {
   const numeric = /^\d+$/.test(campaignId);
   const filters = JSON.stringify({
     campaignId: { $eq: numeric ? Number(campaignId) : campaignId },
   });
-  const seen = new Set<string>();
   let scanned = 0;
-  for (let page = 1; page <= MAX_PAGES; page++) {
+  let page = startPage;
+  for (let i = 0; i < PAGES_PER_CHUNK; i++, page++) {
+    if (page > MAX_PAGES) return { scanned, nextPage: null };
     const batch = asArray(
       await getJson(
         `/leads?filters=${encodeURIComponent(filters)}&pageSize=${PAGE_SIZE}&page=${page}`,
@@ -157,9 +159,6 @@ async function streamCampaignLeads(
       "data",
     );
     for (const lead of batch) {
-      const id = safeString(lead.id);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
       scanned++;
       onLead({
         status: safeString(lead.status),
@@ -167,9 +166,9 @@ async function streamCampaignLeads(
         day: copenhagenDay(safeString(lead.updated)),
       });
     }
-    if (batch.length < PAGE_SIZE) break;
+    if (batch.length < PAGE_SIZE) return { scanned, nextPage: null };
   }
-  return scanned;
+  return { scanned, nextPage: page };
 }
 
 // ---------------------------------------------------------------------------
