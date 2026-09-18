@@ -73,12 +73,14 @@ function isoWeekOf(date: Date): { year: number; week: number } {
 
 interface Derived {
   gap: number;
-  doneThisWeek: number;
-  missedListen: number;
+  /** Antal 1-1 sessioner holdt i den indevaerende uge (kravet er 1). */
+  sessionsThisWeek: number;
+  /** Sammenhaengende uger bagud helt uden en session. */
+  missedWeeks: number;
   trend: "up" | "down" | "flat" | "unknown";
   urgency: number;
   stripColor: string;
-  weekActions: Map<string, { coaching: boolean; listen: boolean; absence: boolean }>;
+  weekActions: Map<string, { sessions: number; absence: boolean }>;
   feedbackLog: RampAction[];
 }
 
@@ -87,23 +89,26 @@ function weekKey(year: number, week: number) {
 }
 
 function derive(member: RampTeamMember): Derived {
-  const weekActions = new Map<string, { coaching: boolean; listen: boolean; absence: boolean }>();
+  const weekActions = new Map<string, { sessions: number; absence: boolean }>();
   for (const action of member.actions) {
     const { year, week } = isoWeekOf(new Date(action.performed_at));
     const key = weekKey(year, week);
-    const entry = weekActions.get(key) ?? { coaching: false, listen: false, absence: false };
-    if (action.action_type === RAMP_WEEKLY_COACHING) entry.coaching = true;
-    if (action.action_type === RAMP_WEEKLY_LISTEN) entry.listen = true;
+    const entry = weekActions.get(key) ?? { sessions: 0, absence: false };
+    if (action.action_type === RAMP_WEEKLY_COACHING || action.action_type === RAMP_WEEKLY_LISTEN) {
+      entry.sessions += 1;
+    }
     if (action.action_type === RAMP_WEEKLY_ABSENCE) entry.absence = true;
     weekActions.set(key, entry);
   }
 
   const gap = member.p25 === null ? 0 : Math.max(0, Math.round(member.p25 - member.cum_sales));
-  const doneThisWeek = (member.has_coaching ? 1 : 0) + (member.has_listen ? 1 : 0);
+  const countedThisWeek = weekActions.get(weekKey(member.iso_year, member.iso_week))?.sessions ?? 0;
+  const sessionsThisWeek =
+    member.has_coaching || member.has_listen ? Math.max(1, countedThisWeek) : countedThisWeek;
 
-  // Sammenhaengende uger bagud uden et lyt (den aktuelle uge taelles med).
+  // Sammenhaengende uger bagud uden en session (den aktuelle uge taelles med).
   // Uger foer ordningens startdato taeller ikke som manglende.
-  let missedListen = 0;
+  let missedWeeks = 0;
   if (member.weekly_program_active && member.weekly_program_start_date) {
     const start = isoWeekOf(new Date(`${member.weekly_program_start_date}T00:00:00`));
     const startRank = start.year * 100 + start.week;
@@ -112,8 +117,8 @@ function derive(member: RampTeamMember): Derived {
       if (w.iso_year * 100 + w.iso_week < startRank) break;
       const entry = weekActions.get(weekKey(w.iso_year, w.iso_week));
       if (entry?.absence) break;
-      if (entry?.listen) break;
-      missedListen += 1;
+      if ((entry?.sessions ?? 0) > 0) break;
+      missedWeeks += 1;
     }
   }
 
