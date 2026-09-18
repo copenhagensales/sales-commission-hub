@@ -63,12 +63,7 @@ function buildContent(payload: RecipientPayload, week: number): string {
     .slice()
     .sort((a, b) => a.day_no - b.day_no)
     .map((s) => {
-      const missing = [
-        s.missing_coaching ? "1-1 coaching" : null,
-        s.missing_listen ? "1-1 lyt" : null,
-      ]
-        .filter(Boolean)
-        .join(" og ");
+      const missing = "1-1 session";
       return `
         <tr>
           <td style="padding:8px 12px;border-bottom:1px solid #e7eeeb;">${escapeHtml(s.employee_name)}</td>
