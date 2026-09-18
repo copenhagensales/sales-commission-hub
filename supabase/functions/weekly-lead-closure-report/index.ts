@@ -338,38 +338,18 @@ async function processChunk(
   return { scanned, nextPage, campaignCount: campaigns.length };
 }
 
-async function persist(
-  svc: SupabaseClient,
-  weeks: string[],
-  counts: Map<string, number>,
-  config: Config,
-) {
+/** Navne på vores Adversus-brugere, kun til mailens sælgertabel. */
+async function sellerNamesForAll(): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
   for (const account of ACCOUNTS) {
-    await svc
-      .from("weekly_lead_closure_stats")
-      .delete()
-      .eq("account", account.key)
-      .in("week_start", weeks);
+    try {
+      const users = await ourUsers(authHeader(account));
+      for (const [id, name] of users) names.set(`${account.key}:${id}`, name);
+    } catch {
+      // Mangler legitimation for en konto, vises sælgerreferencen i stedet.
+    }
   }
-
-  const rows = [...counts.entries()].map(([key, lead_count]) => {
-    const [week_start, account, campaignId, user, status] = key.split("|");
-    return {
-      week_start,
-      account,
-      adversus_campaign_id: campaignId,
-      report_line: config.mapping.get(mapKey(account, campaignId))?.reportLine ?? null,
-      agent_reference: `${account}:${user}`,
-      status,
-      lead_count,
-    };
-  });
-
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await svc.from("weekly_lead_closure_stats").insert(rows.slice(i, i + 500));
-    if (error) throw new Error(`Kunne ikke gemme ugetal: ${error.message}`);
-  }
-  return rows.length;
+  return names;
 }
 
 type StatRow = {
