@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { getPublicUrl } from "@/lib/getPublicUrl";
+import { CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "assistant_team_leader" | "other";
 
