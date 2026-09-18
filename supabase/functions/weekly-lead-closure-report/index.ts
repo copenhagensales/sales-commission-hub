@@ -704,6 +704,8 @@ interface ChunkState {
   campaignIndex: number;
   page: number;
   sendMail: boolean;
+  /** Manuel afsendelse: mailen sendes selvom der allerede er sendt i dag. */
+  forceMail: boolean;
   triggeredBy: string;
 }
 
@@ -720,6 +722,7 @@ async function chainNext(state: ChunkState): Promise<void> {
     campaign_index: state.campaignIndex,
     page: state.page,
     send_mail: state.sendMail,
+    force_mail: state.forceMail,
     triggered_by: state.triggeredBy,
   });
   try {
@@ -760,7 +763,11 @@ async function finishAndMail(
     .map((week) => ({ weekStart: week, rows: rows.filter((r) => r.week_start === week) }));
 
   let mailQueued = false;
-  if (state.sendMail && config.recipients.length > 0 && !(await alreadyMailedToday(svc))) {
+  if (
+    state.sendMail &&
+    config.recipients.length > 0 &&
+    (state.forceMail || !(await alreadyMailedToday(svc)))
+  ) {
     const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll(svc));
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
@@ -808,6 +815,8 @@ Deno.serve(async (req) => {
       campaign_index?: number;
       page?: number;
       send_mail?: boolean;
+      force_mail?: boolean;
+      current_week?: boolean;
       triggered_by?: string;
     };
     const svc = createClient(
@@ -833,12 +842,20 @@ Deno.serve(async (req) => {
     if (config.lines.length === 0) throw new Error("Rapportlinjerne mangler i opsætningen");
     await assertFieldsAllowed(svc);
 
+    // current_week: den igangværende uge (mandag → i dag) i stedet for de
+    // seneste hele uger. Bruges af "Send mail nu" i Stork.
+    const currentWeek = [mondayOf(copenhagenDay(new Date().toISOString()))];
     const state: ChunkState = {
-      weeks: body.weeks_list ?? targetWeeks(Math.max(1, Math.min(Number(body.weeks ?? 1), 12))),
+      weeks:
+        body.weeks_list ??
+        (body.current_week
+          ? currentWeek
+          : targetWeeks(Math.max(1, Math.min(Number(body.weeks ?? 1), 12)))),
       account: body.account ?? "main",
       campaignIndex: body.campaign_index ?? 0,
       page: body.page ?? 1,
       sendMail: body.send_mail !== false,
+      forceMail: body.force_mail === true,
       triggeredBy: body.triggered_by ?? (auth.userId ? "manuel" : "cron"),
     };
 

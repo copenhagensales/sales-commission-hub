@@ -29,6 +29,7 @@ import {
   useLeadClosingStatuses,
   useRemoveClosureRecipient,
   useRunWeeklyLeadClosureReport,
+  useSendWeeklyLeadClosureMailNow,
   useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
@@ -78,6 +79,8 @@ export default function WeeklyLeadClosureReport() {
   const addRecipient = useAddClosureRecipient();
   const toggleRecipient = useToggleClosureRecipient();
   const removeRecipient = useRemoveClosureRecipient();
+  const sendMailNow = useSendWeeklyLeadClosureMailNow();
+  const activeRecipients = recipients.filter((r) => r.is_active).length;
 
   const handleAddRecipient = () => {
     const email = newRecipient.trim().toLowerCase();
@@ -175,6 +178,19 @@ export default function WeeklyLeadClosureReport() {
     );
   };
 
+  const handleSendMailNow = () => {
+    sendMailNow.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(
+          "Ugens tal hentes nu, og mailen sendes til alle aktive modtagere når kørslen er færdig",
+        );
+      },
+      onError: (error: unknown) => {
+        toast.error(error instanceof Error ? error.message : "Kunne ikke sende mailen");
+      },
+    });
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6 p-4 md:p-6">
@@ -210,6 +226,23 @@ export default function WeeklyLeadClosureReport() {
                   <Play className="mr-2 h-4 w-4" />
                 )}
                 Kør nu
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleSendMailNow}
+                disabled={sendMailNow.isPending || activeRecipients === 0}
+                title={
+                  activeRecipients === 0
+                    ? "Tilføj mindst én aktiv modtager først"
+                    : "Sender tallene for den igangværende uge"
+                }
+              >
+                {sendMailNow.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                Send mail nu
               </Button>
             </div>
           )}
