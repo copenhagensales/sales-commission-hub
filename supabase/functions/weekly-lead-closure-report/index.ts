@@ -594,10 +594,16 @@ type StatRow = {
 function lineTotals(rows: StatRow[], config: Config): LineTotals[] {
   return config.lines.map((reportLine) => {
     const mine = rows.filter((r) => r.report_line === reportLine);
+    const sum = (predicate: (status: string) => boolean) =>
+      mine.filter((r) => predicate(r.status)).reduce((s, r) => s + r.lead_count, 0);
+    const extras: Record<string, number> = {};
+    for (const e of config.excluded) extras[e.status] = sum((status) => status === e.status);
     return {
       reportLine,
-      closed: mine.filter((r) => config.closing.has(r.status)).reduce((s, r) => s + r.lead_count, 0),
-      booked: mine.filter((r) => r.status === BOOKED_STATUS).reduce((s, r) => s + r.lead_count, 0),
+      closed: sum((status) => config.closing.has(status)),
+      decided: sum((status) => config.hitrate.has(status)),
+      booked: sum((status) => status === BOOKED_STATUS),
+      extras,
     };
   });
 }
