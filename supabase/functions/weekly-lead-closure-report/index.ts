@@ -328,7 +328,9 @@ function mapKey(account: string, campaignId: string) {
 
 async function loadConfig(svc: SupabaseClient): Promise<Config> {
   const [statuses, lines, mapRows, trygRows, settings] = await Promise.all([
-    svc.from("lead_closing_statuses").select("status, is_closing, label_da, maps_to_status"),
+    svc
+      .from("lead_closing_statuses")
+      .select("status, is_closing, label_da, maps_to_status, counts_in_hitrate"),
     svc.from("weekly_lead_report_lines").select("report_line, sort_order").order("sort_order"),
     svc
       .from("weekly_lead_report_campaign_map")
@@ -385,6 +387,8 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
 
   return {
     closing,
+    hitrate,
+    excluded,
     known,
     alias,
     lines: ((lines.data ?? []) as Record<string, unknown>[]).map((r) => safeString(r.report_line)),
