@@ -763,7 +763,11 @@ async function finishAndMail(
     .map((week) => ({ weekStart: week, rows: rows.filter((r) => r.week_start === week) }));
 
   let mailQueued = false;
-  if (state.sendMail && config.recipients.length > 0 && !(await alreadyMailedToday(svc))) {
+  if (
+    state.sendMail &&
+    config.recipients.length > 0 &&
+    (state.forceMail || !(await alreadyMailedToday(svc)))
+  ) {
     const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll(svc));
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
@@ -811,6 +815,8 @@ Deno.serve(async (req) => {
       campaign_index?: number;
       page?: number;
       send_mail?: boolean;
+      force_mail?: boolean;
+      current_week?: boolean;
       triggered_by?: string;
     };
     const svc = createClient(
