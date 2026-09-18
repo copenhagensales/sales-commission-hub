@@ -33,12 +33,30 @@ const PAGES_PER_CHUNK = 3;
 const BOOKED_STATUS = "success";
 const UNKNOWN_BUCKET = "ukendt";
 
-type AccountKey = "main" | "lederne";
+type AccountKey = "main" | "lederne" | "enreach";
 
-const ACCOUNTS: { key: AccountKey; userEnv: string; passEnv: string }[] = [
-  { key: "main", userEnv: "ADVERSUS_API_USERNAME", passEnv: "ADVERSUS_API_PASSWORD" },
-  { key: "lederne", userEnv: "ADVERSUS_LEDERNE_API_USERNAME", passEnv: "ADVERSUS_LEDERNE_API_PASSWORD" },
+type AccountDef = {
+  key: AccountKey;
+  kind: "adversus" | "enreach";
+  userEnv?: string;
+  passEnv?: string;
+};
+
+const ACCOUNTS: AccountDef[] = [
+  { key: "main", kind: "adversus", userEnv: "ADVERSUS_API_USERNAME", passEnv: "ADVERSUS_API_PASSWORD" },
+  {
+    key: "lederne",
+    kind: "adversus",
+    userEnv: "ADVERSUS_LEDERNE_API_USERNAME",
+    passEnv: "ADVERSUS_LEDERNE_API_PASSWORD",
+  },
+  // Kanvas-kampagnerne ligger i Enreach. Emnerne hentes pr. uge og grupperes
+  // på kampagnen i svaret, fordi Enreach ignorerer kampagnefilteret.
+  { key: "enreach", kind: "enreach" },
 ];
+
+/** Enreach-integrationen der ejer Tryg-kampagnerne. */
+const ENREACH_INTEGRATION = "tryg";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -46,9 +64,9 @@ const json = (status: number, body: unknown) =>
     headers: { ...sharedCorsHeaders, "Content-Type": "application/json" },
   });
 
-function authHeader(account: { userEnv: string; passEnv: string; key: string }): string {
-  const user = Deno.env.get(account.userEnv);
-  const pass = Deno.env.get(account.passEnv);
+function authHeader(account: AccountDef): string {
+  const user = account.userEnv ? Deno.env.get(account.userEnv) : undefined;
+  const pass = account.passEnv ? Deno.env.get(account.passEnv) : undefined;
   if (!user || !pass) throw new Error(`Adversus-legitimation mangler for kontoen ${account.key}`);
   return `Basic ${btoa(`${user}:${pass}`)}`;
 }
@@ -186,11 +204,114 @@ async function streamCampaignPages(
 }
 
 // ---------------------------------------------------------------------------
+// Enreach (Kanvas)
+// ---------------------------------------------------------------------------
+/** Felter der læses fra Enreach. Intet fra data/closureData. */
+const ENREACH_FIELDS = ["status", "closure", "lastModifiedTime", "firstProcessedByUser"];
+
+type EnreachAccess = { baseUrl: string; headers: Record<string, string> };
+
+/** Legitimation til Enreach hentes krypteret fra dialer_integrations. */
+async function enreachAccess(svc: SupabaseClient): Promise<EnreachAccess> {
+  const { data: integration } = await svc
+    .from("dialer_integrations")
+    .select("id, api_url")
+    .eq("name", ENREACH_INTEGRATION)
+    .eq("provider", "enreach")
+    .maybeSingle();
+  if (!integration) throw new Error("Enreach-integrationen findes ikke");
+
+  const { data: creds, error } = await svc.rpc("get_dialer_credentials", {
+    p_integration_id: (integration as { id: string }).id,
+    p_encryption_key: Deno.env.get("DB_ENCRYPTION_KEY"),
+  });
+  if (error || !creds) throw new Error("Kunne ikke læse Enreach-legitimation");
+  const c = creds as { api_url?: string; username?: string; password?: string; api_token?: string };
+
+  let baseUrl = safeString(c.api_url || (integration as { api_url?: string }).api_url)
+    .replace(/^(Web|URL|API|Endpoint):\s*/i, "");
+  if (!baseUrl) throw new Error("Enreach-adressen mangler");
+  if (!/^https?:\/\//.test(baseUrl)) baseUrl = `https://${baseUrl}`;
+  if (!baseUrl.endsWith("/api")) baseUrl = baseUrl.replace(/\/$/, "") + "/api";
+
+  const auth = c.username && c.password
+    ? `Basic ${btoa(`${c.username}:${c.password}`)}`
+    : `Bearer ${c.api_token ?? ""}`;
+  return { baseUrl, headers: { Authorization: auth, Accept: "application/json" } };
+}
+
+type EnreachFacts = { campaignId: string; closure: string; user: string; day: string };
+
+/**
+ * Henter én uges afsluttede emner fra Enreach. Kampagnefilteret ignoreres af
+ * API'et, så hele ugen hentes og grupperes på kampagnen i svaret. Kun
+ * afsluttede emner (AllClosedStatuses) læses, og kun de fire felter ovenfor.
+ */
+async function streamEnreachWeek(
+  access: EnreachAccess,
+  weekStart: string,
+  onLead: (lead: EnreachFacts) => void,
+): Promise<number> {
+  const weekEnd = addDays(weekStart, 7);
+  const url = `${access.baseUrl}/simpleleads?Projects=*&ModifiedFrom=${weekStart}` +
+    `&ModifiedTo=${weekEnd}&AllClosedStatuses=true`;
+  const delays = [1000, 3000, 7000];
+  let payload: unknown = null;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { headers: access.headers });
+    if (res.ok) {
+      payload = await res.json();
+      break;
+    }
+    if (res.status < 500 || attempt >= delays.length) {
+      throw new Error(`Enreach simpleleads svarede ${res.status}`);
+    }
+    await sleep(delays[attempt]);
+  }
+
+  const leads = asArray(payload, "Results", "results", "leads", "data");
+  let scanned = 0;
+  for (const lead of leads) {
+    scanned++;
+    // Kampagnen kan komme som streng eller som objekt. Enreach lægger
+    // kampagnekoden i ét af felterne uniqueId/id/code/name.
+    const campaign = lead.campaign;
+    let campaignId = "";
+    if (campaign && typeof campaign === "object") {
+      const c = campaign as Record<string, unknown>;
+      for (const k of ["uniqueId", "id", "code", "name"]) {
+        const candidate = safeString(c[k]);
+        if (candidate.startsWith("CAMP")) {
+          campaignId = candidate;
+          break;
+        }
+        if (!campaignId && candidate) campaignId = candidate;
+      }
+    } else {
+      campaignId = safeString(campaign);
+    }
+    const userObj = (lead.firstProcessedByUser ?? lead.lastModifiedByUser) as
+      | Record<string, unknown>
+      | null;
+    onLead({
+      campaignId,
+      closure: safeString(lead.closure),
+      // Tryg-opsætningen har sælgerens mail i orgCode.
+      user: safeString(userObj?.orgCode).toLowerCase(),
+      day: copenhagenDay(safeString(lead.lastModifiedTime)),
+    });
+  }
+  return scanned;
+}
+
+// ---------------------------------------------------------------------------
 // Opsætning
 // ---------------------------------------------------------------------------
 interface Config {
   closing: Set<string>;
   known: Map<string, string>;
+  /** Kildeudfald → kanonisk status (fx Enreach "Success" → "success"). */
+  alias: Map<string, string>;
   lines: string[];
   mapping: Map<string, { reportLine: string | null; name: string | null }>;
   campaignNames: Map<string, string>;
@@ -203,7 +324,7 @@ function mapKey(account: string, campaignId: string) {
 
 async function loadConfig(svc: SupabaseClient): Promise<Config> {
   const [statuses, lines, mapRows, trygRows, settings] = await Promise.all([
-    svc.from("lead_closing_statuses").select("status, is_closing, label_da"),
+    svc.from("lead_closing_statuses").select("status, is_closing, label_da, maps_to_status"),
     svc.from("weekly_lead_report_lines").select("report_line, sort_order").order("sort_order"),
     svc
       .from("weekly_lead_report_campaign_map")
@@ -216,8 +337,15 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
 
   const closing = new Set<string>();
   const known = new Map<string, string>();
+  const alias = new Map<string, string>();
   for (const r of (statuses.data ?? []) as Record<string, unknown>[]) {
     const status = safeString(r.status);
+    const mapsTo = safeString(r.maps_to_status);
+    if (mapsTo) {
+      // Rækken beskriver et kildeudfald der tælles som en kanonisk status.
+      alias.set(status, mapsTo);
+      continue;
+    }
     known.set(status, safeString(r.label_da) || status);
     if (r.is_closing === true) closing.add(status);
   }
@@ -245,6 +373,7 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
   return {
     closing,
     known,
+    alias,
     lines: ((lines.data ?? []) as Record<string, unknown>[]).map((r) => safeString(r.report_line)),
     mapping,
     campaignNames,
@@ -261,8 +390,9 @@ function campaignsFor(account: AccountKey, config: Config): { id: string; name: 
   }
   if (account === "main") {
     for (const [campaignId, name] of config.campaignNames) {
-      // Kampagner der er mappet til den anden konto scannes ikke her.
+      // Kampagner der er mappet til en anden konto scannes ikke her.
       if (config.mapping.has(mapKey("lederne", campaignId))) continue;
+      if (config.mapping.has(mapKey("enreach", campaignId))) continue;
       if (!out.has(campaignId)) out.set(campaignId, name);
     }
   }
@@ -277,6 +407,77 @@ interface RunResult {
   accounts: { account: AccountKey; campaigns: number; leadsScanned: number; error?: string }[];
   statusBreakdown: Record<string, Record<string, number>>;
   mailQueued: boolean;
+}
+
+/** Gemmer optællinger via RPC'en der lægger tal oveni i databasen. */
+async function saveCounts(
+  svc: SupabaseClient,
+  config: Config,
+  counts: Map<string, number>,
+): Promise<void> {
+  if (counts.size === 0) return;
+  const rows = [...counts.entries()].map(([key, lead_count]) => {
+    const [week_start, acc, campaignId, user, status] = key.split("|");
+    return {
+      week_start,
+      account: acc,
+      adversus_campaign_id: campaignId,
+      report_line: config.mapping.get(mapKey(acc, campaignId))?.reportLine ?? "",
+      agent_reference: `${acc}:${user}`,
+      status,
+      lead_count,
+    };
+  });
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await svc.rpc("weekly_lead_closure_add", { _rows: rows.slice(i, i + 500) });
+    if (error) throw new Error(`Kunne ikke gemme ugetal: ${error.message}`);
+  }
+}
+
+/**
+ * Én arbejdsbid for Enreach: ÉN uge. Enreach kan afgrænse på ændringstidspunkt,
+ * så uge for uge er nok — til gengæld ignoreres kampagnefilteret, og derfor
+ * grupperes svaret selv på de mappede kampagner. campaignIndex bruges som
+ * ugeindeks i kæden.
+ */
+async function processEnreachChunk(
+  svc: SupabaseClient,
+  config: Config,
+  chunk: { weeks: string[]; account: AccountKey; campaignIndex: number; page: number },
+): Promise<{ scanned: number; nextPage: number | null; campaignCount: number }> {
+  const weekStart = chunk.weeks[chunk.campaignIndex];
+  if (!weekStart) return { scanned: 0, nextPage: null, campaignCount: chunk.weeks.length };
+
+  const wanted = new Set(campaignsFor("enreach", config).map((c) => c.id));
+  if (wanted.size === 0) return { scanned: 0, nextPage: null, campaignCount: chunk.weeks.length };
+
+  // Nulstil ugens Enreach-tal, så genkørsler ikke lægger oveni.
+  await svc
+    .from("weekly_lead_closure_stats")
+    .delete()
+    .eq("account", "enreach")
+    .eq("week_start", weekStart);
+
+  const access = await enreachAccess(svc);
+  const counts = new Map<string, number>();
+  const scanned = await streamEnreachWeek(access, weekStart, (lead) => {
+    if (!wanted.has(lead.campaignId)) return;
+    if (!lead.day || mondayOf(lead.day) !== weekStart) return;
+    if (!lead.user.endsWith(OUR_DOMAIN)) return; // kun vores egne sælgere
+    // Kun emner der faktisk er afsluttet af en sælger tælles med. Emner uden
+    // udfald ("NotSet") er stadig åbne og hører ikke i opgørelsen.
+    if (!lead.closure || lead.closure === "NotSet") return;
+    const status = config.alias.get(lead.closure) ?? lead.closure ?? UNKNOWN_BUCKET;
+    const key = `${weekStart}|enreach|${lead.campaignId}|${lead.user}|${status}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+
+  await saveCounts(svc, config, counts);
+  // Kun tal logges — aldrig lead-data.
+  console.log(
+    `[weekly-lead-closure-report] enreach uge=${weekStart} hentet=${scanned} kampagner=${wanted.size} grupper=${counts.size}`,
+  );
+  return { scanned, nextPage: null, campaignCount: chunk.weeks.length };
 }
 
 /**
@@ -294,6 +495,7 @@ async function processChunk(
   chunk: { weeks: string[]; account: AccountKey; campaignIndex: number; page: number },
 ): Promise<{ scanned: number; nextPage: number | null; campaignCount: number }> {
   const account = ACCOUNTS.find((a) => a.key === chunk.account)!;
+  if (account.kind === "enreach") return await processEnreachChunk(svc, config, chunk);
   const campaigns = campaignsFor(chunk.account, config);
   const campaign = campaigns[chunk.campaignIndex];
   if (!campaign) return { scanned: 0, nextPage: null, campaignCount: campaigns.length };
@@ -328,32 +530,24 @@ async function processChunk(
     },
   );
 
-  if (counts.size > 0) {
-    const rows = [...counts.entries()].map(([key, lead_count]) => {
-      const [week_start, acc, campaignId, user, status] = key.split("|");
-      return {
-        week_start,
-        account: acc,
-        adversus_campaign_id: campaignId,
-        report_line: config.mapping.get(mapKey(acc, campaignId))?.reportLine ?? "",
-        agent_reference: `${acc}:${user}`,
-        status,
-        lead_count,
-      };
-    });
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error } = await svc.rpc("weekly_lead_closure_add", { _rows: rows.slice(i, i + 500) });
-      if (error) throw new Error(`Kunne ikke gemme ugetal: ${error.message}`);
-    }
-  }
+  await saveCounts(svc, config, counts);
 
   return { scanned, nextPage, campaignCount: campaigns.length };
 }
 
-/** Navne på vores Adversus-brugere, kun til mailens sælgertabel. */
-async function sellerNamesForAll(): Promise<Map<string, string>> {
+/** Navne til mailens sælgertabel. Enreach-referencer er sælgerens mail. */
+async function sellerNamesForAll(svc: SupabaseClient): Promise<Map<string, string>> {
   const names = new Map<string, string>();
+  const { data: employees } = await svc
+    .from("employee_master_data")
+    .select("full_name, work_email")
+    .not("work_email", "is", null);
+  for (const e of (employees ?? []) as { full_name: string | null; work_email: string | null }[]) {
+    const email = safeString(e.work_email).toLowerCase();
+    if (email) names.set(`enreach:${email}`, safeString(e.full_name) || email);
+  }
   for (const account of ACCOUNTS) {
+    if (account.kind !== "adversus") continue;
     try {
       const users = await ourUsers(authHeader(account));
       for (const [id, name] of users) names.set(`${account.key}:${id}`, name);
@@ -470,21 +664,30 @@ async function alreadyMailedToday(svc: SupabaseClient): Promise<boolean> {
   return (data ?? []).length > 0;
 }
 
-/** GDPR: indtagsfilteret skal tillade de tre felter vi læser. */
+/** GDPR: indtagsfilteret skal tillade præcis de felter vi læser — pr. kilde. */
 async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
-  const gdprFilter = await createIngestionFilter(svc, {
-    integration: "adversus",
-    triggeredBy: "weekly-lead-closure-report",
-  });
-  const probe = gdprFilter.filter(
-    { data: { status: "x", lastContactedBy: "x", updated: "x" } },
-    "lead_meta",
-  ) as { data?: Record<string, unknown> };
-  const allowed = Object.keys(probe.data ?? {});
-  await gdprFilter.flush();
-  for (const field of ["status", "lastContactedBy", "updated"]) {
-    if (!allowed.includes(field)) {
-      throw new Error(`Indtagsfilteret blokerer feltet ${field} — rapporten er standset`);
+  const sources: { integration: string; fields: string[] }[] = [
+    { integration: "adversus", fields: ["status", "lastContactedBy", "updated"] },
+    { integration: "enreach", fields: ENREACH_FIELDS },
+  ];
+  for (const source of sources) {
+    const gdprFilter = await createIngestionFilter(svc, {
+      integration: source.integration,
+      triggeredBy: "weekly-lead-closure-report",
+    });
+    const sample: Record<string, unknown> = {};
+    for (const f of source.fields) sample[f] = "x";
+    const probe = gdprFilter.filter({ data: sample }, "lead_meta") as {
+      data?: Record<string, unknown>;
+    };
+    const allowed = Object.keys(probe.data ?? {});
+    await gdprFilter.flush();
+    for (const field of source.fields) {
+      if (!allowed.includes(field)) {
+        throw new Error(
+          `Indtagsfilteret blokerer feltet ${field} (${source.integration}) — rapporten er standset`,
+        );
+      }
     }
   }
 }
@@ -552,7 +755,7 @@ async function finishAndMail(
 
   let mailQueued = false;
   if (state.sendMail && config.recipient && !(await alreadyMailedToday(svc))) {
-    const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll());
+    const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll(svc));
     const { error } = await svc.from("scheduled_emails").insert({
       recipient_email: config.recipient,
       subject: mail.subject,
@@ -683,17 +886,26 @@ Deno.serve(async (req) => {
     const nextAccountIndex = ACCOUNTS.findIndex((a) => a.key === state.account) + 1;
     if (nextAccountIndex < ACCOUNTS.length) {
       const nextAccount = ACCOUNTS[nextAccountIndex].key;
-      await chainNext({ ...state, account: nextAccount, campaignIndex: 0, page: 1 });
+      // Kørselsrækken oprettes FØR næste bid sættes i gang, så biddet kan finde
+      // og opdatere den.
       await svc.from("weekly_lead_closure_runs").insert({
         account: nextAccount,
         weeks_covered: state.weeks.length,
         triggered_by: state.triggeredBy,
       });
+      await chainNext({ ...state, account: nextAccount, campaignIndex: 0, page: 1 });
       return json(200, { stage: "kører", nextAccount });
     }
 
     const finished = await finishAndMail(svc, config, state);
-    return json(200, { stage: "færdig", weeks: state.weeks, ...finished });
+    return json(200, {
+      stage: "færdig",
+      weeks: state.weeks,
+      account: state.account,
+      scanned: chunk.scanned,
+      campaignCount: chunk.campaignCount,
+      ...finished,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[weekly-lead-closure-report]", message);
