@@ -79,6 +79,8 @@ export default function WeeklyLeadClosureReport() {
   const addRecipient = useAddClosureRecipient();
   const toggleRecipient = useToggleClosureRecipient();
   const removeRecipient = useRemoveClosureRecipient();
+  const sendMailNow = useSendWeeklyLeadClosureMailNow();
+  const activeRecipients = recipients.filter((r) => r.is_active).length;
 
   const handleAddRecipient = () => {
     const email = newRecipient.trim().toLowerCase();
@@ -174,6 +176,19 @@ export default function WeeklyLeadClosureReport() {
         },
       },
     );
+  };
+
+  const handleSendMailNow = () => {
+    sendMailNow.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(
+          "Ugens tal hentes nu, og mailen sendes til alle aktive modtagere når kørslen er færdig",
+        );
+      },
+      onError: (error: unknown) => {
+        toast.error(error instanceof Error ? error.message : "Kunne ikke sende mailen");
+      },
+    });
   };
 
   return (
