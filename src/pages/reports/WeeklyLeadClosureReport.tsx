@@ -311,8 +311,14 @@ export default function WeeklyLeadClosureReport() {
                   <TableRow>
                     <TableHead>Rapportlinje</TableHead>
                     <TableHead className="text-right">Antal lukkede emner</TableHead>
+                    <TableHead className="text-right">Lukkede ja/nej</TableHead>
                     <TableHead className="text-right">Antal bookede møder</TableHead>
                     <TableHead className="text-right">Mødebook hitrate</TableHead>
+                    {excludedStatuses.map((s) => (
+                      <TableHead key={s.status} className="text-right">
+                        {s.label}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -320,17 +326,31 @@ export default function WeeklyLeadClosureReport() {
                     <TableRow key={row.reportLine}>
                       <TableCell>{row.reportLine}</TableCell>
                       <TableCell className="text-right">{row.closed}</TableCell>
+                      <TableCell className="text-right">{row.decided}</TableCell>
                       <TableCell className="text-right">{row.booked}</TableCell>
-                      <TableCell className="text-right">{hitrate(row.booked, row.closed)}</TableCell>
+                      <TableCell className="text-right">
+                        {hitrate(row.booked, row.decided)}
+                      </TableCell>
+                      {excludedStatuses.map((s) => (
+                        <TableCell key={s.status} className="text-right">
+                          {row.extras[s.status] ?? 0}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                   <TableRow className="font-semibold">
                     <TableCell>Tryg i alt</TableCell>
                     <TableCell className="text-right">{totals.closed}</TableCell>
+                    <TableCell className="text-right">{totals.decided}</TableCell>
                     <TableCell className="text-right">{totals.booked}</TableCell>
                     <TableCell className="text-right">
-                      {hitrate(totals.booked, totals.closed)}
+                      {hitrate(totals.booked, totals.decided)}
                     </TableCell>
+                    {excludedStatuses.map((s) => (
+                      <TableCell key={s.status} className="text-right">
+                        {totals.extras[s.status] ?? 0}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 </TableBody>
               </Table>
