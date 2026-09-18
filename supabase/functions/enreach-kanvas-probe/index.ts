@@ -104,17 +104,26 @@ Deno.serve(async (req) => {
       const statuses = new Map<string, number>();
       const userFields = new Map<string, number>();
       const campaignValues = new Map<string, number>();
+      const pick = (v: unknown): string => {
+        if (v === null || v === undefined || v === "") return "(mangler)";
+        if (typeof v === "object") {
+          const o = v as Record<string, unknown>;
+          return String(o.id ?? o.uniqueId ?? o.name ?? JSON.stringify(Object.keys(o)));
+        }
+        return String(v);
+      };
       for (const lead of leads) {
         for (const k of Object.keys(lead)) fieldNames.add(k);
-        const closure = String(lead.LeadClosure ?? lead.leadClosure ?? lead.Closure ?? "(mangler)");
-        closures.set(closure, (closures.get(closure) ?? 0) + 1);
-        const status = String(lead.Status ?? lead.status ?? "(mangler)");
+        campaignValues.set(pick(lead.campaign), (campaignValues.get(pick(lead.campaign)) ?? 0) + 1);
+        const status = pick(lead.status);
         statuses.set(status, (statuses.get(status) ?? 0) + 1);
-        const camp = String(lead.Campaign ?? lead.campaign ?? lead.CampaignId ?? "(mangler)");
-        campaignValues.set(camp, (campaignValues.get(camp) ?? 0) + 1);
-        for (const k of ["User", "user", "UserName", "userName", "Agent", "agent", "ProcessedBy", "LastUser"]) {
+        if (status === "UserProcessed") {
+          const closure = pick(lead.closure);
+          closures.set(closure, (closures.get(closure) ?? 0) + 1);
+        }
+        for (const k of ["lastModifiedByUser", "firstProcessedByUser", "ownerUser"]) {
           if (lead[k] !== undefined && lead[k] !== null && lead[k] !== "") {
-            userFields.set(k, (userFields.get(k) ?? 0) + 1);
+            userFields.set(`${k}:${typeof lead[k]}`, (userFields.get(`${k}:${typeof lead[k]}`) ?? 0) + 1);
           }
         }
       }
@@ -126,8 +135,9 @@ Deno.serve(async (req) => {
         leads: leads.length,
         closures: Object.fromEntries(closures),
         statuses: Object.fromEntries(statuses),
-        campaignValues: Object.fromEntries(campaignValues),
+        campaignValues: Object.fromEntries([...campaignValues.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15)),
         userFieldsPresent: Object.fromEntries(userFields),
+        sampleUserValue: leads.length ? pick((leads[0] as Record<string, unknown>).lastModifiedByUser) : null,
       });
       break; // én kampagne er nok til kortlægningen
     }
