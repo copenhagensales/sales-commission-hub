@@ -529,9 +529,13 @@ function MemberCard({
             <SectionLabel>Ugens faste forløb</SectionLabel>
             <span
               className="text-[12px] font-extrabold"
-              style={{ color: d.doneThisWeek === 2 ? "#0f5a38" : AMBER_TEXT }}
+              style={{ color: d.sessionsThisWeek >= 1 ? "#0f5a38" : AMBER_TEXT }}
             >
-              {d.doneThisWeek === 2 ? "Ugen er klaret" : `${d.doneThisWeek} af 2 holdt`}
+              {d.sessionsThisWeek >= 1
+                ? d.sessionsThisWeek > 1
+                  ? `Ugen er klaret · ${d.sessionsThisWeek} sessioner`
+                  : "Ugen er klaret"
+                : "0 af 1 holdt"}
             </span>
           </div>
 
@@ -542,19 +546,22 @@ function MemberCard({
           ) : (
             <div className="mt-3 space-y-2">
               <ProgramRow
-                kind="coaching"
-                done={member.has_coaching}
+                sessions={d.sessionsThisWeek}
                 member={member}
-                missedListen={d.missedListen}
-                onOpen={() => onOpen(member, "coaching", member.has_coaching)}
+                missedWeeks={d.missedWeeks}
+                onOpen={() => onOpen(member, "coaching", d.sessionsThisWeek > 0)}
               />
-              <ProgramRow
-                kind="listen"
-                done={member.has_listen}
-                member={member}
-                missedListen={d.missedListen}
-                onOpen={() => onOpen(member, "listen", member.has_listen)}
-              />
+              {d.sessionsThisWeek > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onOpen(member, "coaching", true)}
+                  className="flex w-full items-center gap-2 rounded-[13px] border border-dashed px-[15px] py-[11px] text-left text-[13px] font-bold"
+                  style={{ borderColor: "#c3ccc8", color: "#0f5a38", background: "#ffffff" }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Tilføj ekstra session i uge {member.iso_week}
+                </button>
+              )}
               {!member.week_required && (
                 <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
                   {member.weekly_program_active
