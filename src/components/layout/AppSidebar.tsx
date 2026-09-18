@@ -1046,6 +1046,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     Omsætning per opgave
                   </NavLink>
                 )}
+                {p.canView("menu_reports_weekly_lead_closure") && (
+                  <NavLink to="/reports/weekly-lead-closure" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/weekly-lead-closure" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Mødebook-rapport (Tryg)
+                  </NavLink>
+                )}
                 {p.canViewPulseSurvey && (
                   <NavLink to="/pulse-survey-results" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1420,15 +1429,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <PencilLine className="h-4 w-4" />
                     Tryg - Ret salg
-                  </NavLink>
-                )}
-                {p.canView("menu_reports_weekly_lead_closure") && (
-                  <NavLink to="/reports/weekly-lead-closure" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/weekly-lead-closure" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Mødebook-rapport (Tryg)
                   </NavLink>
                 )}
               </CollapsibleContent>
