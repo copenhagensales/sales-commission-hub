@@ -315,7 +315,7 @@ interface Config {
   lines: string[];
   mapping: Map<string, { reportLine: string | null; name: string | null }>;
   campaignNames: Map<string, string>;
-  recipient: string | null;
+  recipients: string[];
 }
 
 function mapKey(account: string, campaignId: string) {
@@ -377,7 +377,13 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
     lines: ((lines.data ?? []) as Record<string, unknown>[]).map((r) => safeString(r.report_line)),
     mapping,
     campaignNames,
-    recipient: ((settings.data ?? [])[0] as { recipient_email?: string } | undefined)?.recipient_email ?? null,
+    recipients: [
+      ...new Set(
+        ((settings.data ?? []) as { recipient_email?: string }[])
+          .map((r) => safeString(r.recipient_email).trim().toLowerCase())
+          .filter((mail) => mail.length > 0),
+      ),
+    ],
   };
 }
 
@@ -754,16 +760,19 @@ async function finishAndMail(
     .map((week) => ({ weekStart: week, rows: rows.filter((r) => r.week_start === week) }));
 
   let mailQueued = false;
-  if (state.sendMail && config.recipient && !(await alreadyMailedToday(svc))) {
+  if (state.sendMail && config.recipients.length > 0 && !(await alreadyMailedToday(svc))) {
     const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll(svc));
-    const { error } = await svc.from("scheduled_emails").insert({
-      recipient_email: config.recipient,
-      subject: mail.subject,
-      content: mail.html,
-      template_key: "weekly_lead_closure_report",
-      scheduled_at: new Date().toISOString(),
-      status: "pending",
-    });
+    const scheduledAt = new Date().toISOString();
+    const { error } = await svc.from("scheduled_emails").insert(
+      config.recipients.map((recipient) => ({
+        recipient_email: recipient,
+        subject: mail.subject,
+        content: mail.html,
+        template_key: "weekly_lead_closure_report",
+        scheduled_at: scheduledAt,
+        status: "pending",
+      })),
+    );
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
   }

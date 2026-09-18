@@ -20,14 +20,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, Loader2, Play, TableProperties } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Play, TableProperties, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import {
+  useAddClosureRecipient,
   useLeadClosingStatuses,
+  useRemoveClosureRecipient,
   useRunWeeklyLeadClosureReport,
+  useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
+  useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
   useWeeklyLeadClosureStats,
   useWeeklyLeadReportLines,
@@ -59,6 +64,7 @@ export default function WeeklyLeadClosureReport() {
   const [selectedWeek, setSelectedWeek] = useState<string>("");
   const [sendMail, setSendMail] = useState(false);
   const [weeks, setWeeks] = useState("1");
+  const [newRecipient, setNewRecipient] = useState("");
 
   const { data: lines = [] } = useWeeklyLeadReportLines();
   const { data: mapping = [], isLoading: mappingLoading } = useWeeklyLeadCampaignMap();
@@ -67,6 +73,30 @@ export default function WeeklyLeadClosureReport() {
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
   const updateMapping = useUpdateCampaignMapping();
   const runReport = useRunWeeklyLeadClosureReport();
+  const { data: recipients = [], isLoading: recipientsLoading } =
+    useWeeklyLeadClosureRecipients();
+  const addRecipient = useAddClosureRecipient();
+  const toggleRecipient = useToggleClosureRecipient();
+  const removeRecipient = useRemoveClosureRecipient();
+
+  const handleAddRecipient = () => {
+    const email = newRecipient.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Indtast en gyldig mailadresse");
+      return;
+    }
+    if (recipients.some((r) => r.recipient_email.toLowerCase() === email)) {
+      toast.error("Modtageren er allerede tilføjet");
+      return;
+    }
+    addRecipient.mutate(email, {
+      onSuccess: () => {
+        setNewRecipient("");
+        toast.success("Modtager tilføjet");
+      },
+      onError: (error: Error) => toast.error(error.message),
+    });
+  };
 
   const closingStatuses = useMemo(
     () => statuses.filter((s) => s.is_closing).map((s) => s.status),
@@ -255,6 +285,93 @@ export default function WeeklyLeadClosureReport() {
                   )
                   .join(", ")}
               </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Mail className="h-4 w-4" />
+              Modtagere af mandagsmailen
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recipientsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Henter modtagere…
+              </div>
+            ) : recipients.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Der er ingen modtagere. Mailen sendes ikke, før mindst én er tilføjet.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mailadresse</TableHead>
+                    <TableHead className="text-right">Modtager mailen</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recipients.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.recipient_email}</TableCell>
+                      <TableCell className="text-right">
+                        <Switch
+                          checked={row.is_active}
+                          disabled={!isSuperadmin || toggleRecipient.isPending}
+                          onCheckedChange={(checked) =>
+                            toggleRecipient.mutate(
+                              { id: row.id, isActive: checked },
+                              { onError: (error: Error) => toast.error(error.message) },
+                            )
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isSuperadmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={removeRecipient.isPending}
+                            onClick={() =>
+                              removeRecipient.mutate(row.id, {
+                                onSuccess: () => toast.success("Modtager fjernet"),
+                                onError: (error: Error) => toast.error(error.message),
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {isSuperadmin && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="email"
+                  placeholder="navn@copenhagensales.dk"
+                  className="w-[280px]"
+                  value={newRecipient}
+                  onChange={(e) => setNewRecipient(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddRecipient();
+                  }}
+                />
+                <Button
+                  variant="secondary"
+                  onClick={handleAddRecipient}
+                  disabled={addRecipient.isPending}
+                >
+                  Tilføj modtager
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
