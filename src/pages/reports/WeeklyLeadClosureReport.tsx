@@ -64,6 +64,7 @@ export default function WeeklyLeadClosureReport() {
   const [selectedWeek, setSelectedWeek] = useState<string>("");
   const [sendMail, setSendMail] = useState(false);
   const [weeks, setWeeks] = useState("1");
+  const [newRecipient, setNewRecipient] = useState("");
 
   const { data: lines = [] } = useWeeklyLeadReportLines();
   const { data: mapping = [], isLoading: mappingLoading } = useWeeklyLeadCampaignMap();
@@ -72,6 +73,30 @@ export default function WeeklyLeadClosureReport() {
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
   const updateMapping = useUpdateCampaignMapping();
   const runReport = useRunWeeklyLeadClosureReport();
+  const { data: recipients = [], isLoading: recipientsLoading } =
+    useWeeklyLeadClosureRecipients();
+  const addRecipient = useAddClosureRecipient();
+  const toggleRecipient = useToggleClosureRecipient();
+  const removeRecipient = useRemoveClosureRecipient();
+
+  const handleAddRecipient = () => {
+    const email = newRecipient.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Indtast en gyldig mailadresse");
+      return;
+    }
+    if (recipients.some((r) => r.recipient_email.toLowerCase() === email)) {
+      toast.error("Modtageren er allerede tilføjet");
+      return;
+    }
+    addRecipient.mutate(email, {
+      onSuccess: () => {
+        setNewRecipient("");
+        toast.success("Modtager tilføjet");
+      },
+      onError: (error: Error) => toast.error(error.message),
+    });
+  };
 
   const closingStatuses = useMemo(
     () => statuses.filter((s) => s.is_closing).map((s) => s.status),
