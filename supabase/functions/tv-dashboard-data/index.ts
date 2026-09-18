@@ -2869,14 +2869,18 @@ async function handleMonthlyGoal(
   }
 }
 
-// Eesy FM Månedsmål-board: salgslinjer på Eesy FM + sælgere udledt af salgenes agent_email
-// (Eesy FM-teamet har ingen medlemmer — sælgerne ligger på Fieldmarketing-teamet).
-// Mål læses fra board_monthly_goals. Voice-filteret (fravalg af 5G Internet) sker i frontend.
+// Månedsmål-boards med voice-salg (Eesy FM og Eesy TM): salgslinjer på klienten
+// + sælgere udledt af salgenes agent_email (Eesy-teamene har ikke selv medlemmer).
+// Mål læses fra board_monthly_goals. Voice-filteret (fravalg af 5G internet) sker i frontend.
 const EESY_FM_CLIENT_ID_EF = "9a92ea4c-6404-4b58-be08-065e7552d552";
 const EESY_FM_BOARD_KEY_EF = "eesy-fm-monthly-goal";
+const EESY_TM_CLIENT_ID_EF = "81993a7b-ff24-46b8-8ffb-37a83138ddba";
+const EESY_TM_BOARD_KEY_EF = "eesy-tm-monthly-goal";
 
-async function handleEesyFmMonthlyGoal(
+async function handleVoiceMonthlyGoal(
   supabase: any,
+  clientId: string,
+  boardKey: string,
   startIso: string,
   endIso: string,
   monthKey: string,
@@ -2886,8 +2890,8 @@ async function handleEesyFmMonthlyGoal(
   try {
     const warnings: string[] = [];
 
-    // 1. Salgslinjer på Eesy FM i perioden
-    const items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate: string | null }[] = [];
+    // 1. Salgslinjer på klienten i perioden
+    const items: { agentEmail: string | null; productId: string | null; productName: string | null; quantity: number; saleDate: string | null }[] = [];
     const saleEmails = new Set<string>();
     try {
       const pageSize = 1000;
@@ -2896,9 +2900,9 @@ async function handleEesyFmMonthlyGoal(
         const { data, error } = await supabase
           .from("sales")
           .select(
-            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
+            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id, products(name))",
           )
-          .eq("client_campaigns.client_id", EESY_FM_CLIENT_ID_EF)
+          .eq("client_campaigns.client_id", clientId)
           .gte("sale_datetime", startIso)
           .lte("sale_datetime", endIso)
           .range(from, from + pageSize - 1);
