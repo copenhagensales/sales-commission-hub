@@ -223,6 +223,7 @@ export const PowerdagBoard = lazyPage(() => import("@/pages/dashboards/PowerdagB
 export const TdcMonthlyGoalBoard = lazyPage(() => import("@/pages/dashboards/TdcMonthlyGoalBoard"));
 export const RelatelMonthlyGoalBoard = lazyPage(() => import("@/pages/dashboards/RelatelMonthlyGoalBoard"));
 export const EesyFmMonthlyGoalBoard = lazyPage(() => import("@/pages/dashboards/EesyFmMonthlyGoalBoard"));
+export const EesyTmMonthlyGoalBoard = lazyPage(() => import("@/pages/dashboards/EesyTmMonthlyGoalBoard"));
 export const PowerdagInput = lazyPage(() => import("@/pages/dashboards/PowerdagInput"));
 export const PowerdagAdmin = lazyPage(() => import("@/pages/dashboards/PowerdagAdmin"));
 

@@ -84,7 +84,8 @@ export function useSaveBoardMonthlyGoals(boardKey: string, monthKey: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["board-monthly-goals", boardKey, monthKey] });
-      queryClient.invalidateQueries({ queryKey: ["eesy-fm-monthly-goal"] });
+      // Boardets egen query bruger board-nøglen som prefix
+      queryClient.invalidateQueries({ queryKey: [boardKey] });
     },
   });
 }
