@@ -17398,6 +17398,18 @@ export type Database = {
       }
       gdpr_run_campaign_sales_cleanup: { Args: never; Returns: Json }
       gdpr_run_dialer_calls_cleanup: { Args: never; Returns: Json }
+      gdpr_strip_blocked_fields_backfill: {
+        Args: {
+          p_after_id?: string
+          p_batch_size?: number
+          p_triggered_by?: string
+        }
+        Returns: Json
+      }
+      gdpr_strip_blocked_jsonb: {
+        Args: { p_norm: Json; p_raw: Json }
+        Returns: Json
+      }
       gdpr_strip_freetext_sales: {
         Args: { p_days?: number; p_dry_run?: boolean }
         Returns: Json
