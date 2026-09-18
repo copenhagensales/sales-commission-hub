@@ -62,6 +62,8 @@ export interface WeeklyLeadClosureMailInput {
   weekNumber: number;
   lines: LineTotals[];
   statusKeys: { status: string; label: string }[];
+  /** Lukkede statusser der vises som egne kolonner uden at tælle i hitraten. */
+  excludedStatuses: { status: string; label: string }[];
   statusRows: StatusTotals[];
   sellers: SellerTotals[];
   previousWeeks: WeekTotals[];
@@ -106,19 +108,29 @@ function section(title: string, subtitle: string, tableHtml: string): string {
     </div>`;
 }
 
-function lineTable(lines: LineTotals[]): string {
+function lineTable(lines: LineTotals[], excluded: { status: string; label: string }[]): string {
   const totalClosed = lines.reduce((s, l) => s + l.closed, 0);
+  const totalDecided = lines.reduce((s, l) => s + l.decided, 0);
   const totalBooked = lines.reduce((s, l) => s + l.booked, 0);
   const rows = lines
     .map(
       (l) =>
-        `<tr>${td(l.reportLine)}${td(String(l.closed), "right")}${td(String(l.booked), "right")}${td(pct(l.booked, l.closed), "right")}</tr>`,
+        `<tr>${td(l.reportLine)}${td(String(l.closed), "right")}${td(String(l.decided), "right")}${td(String(l.booked), "right")}${td(pct(l.booked, l.decided), "right")}${excluded
+          .map((e) => td(String(l.extras[e.status] ?? 0), "right"))
+          .join("")}</tr>`,
+    )
+    .join("");
+  const totalExtras = excluded
+    .map((e) =>
+      td(String(lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", true),
     )
     .join("");
   return `
-    <thead><tr>${th("Rapportlinje")}${th("Antal lukkede emner", "right")}${th("Antal bookede møder", "right")}${th("Mødebook hitrate", "right")}</tr></thead>
+    <thead><tr>${th("Rapportlinje")}${th("Antal lukkede emner", "right")}${th("Lukkede ja/nej", "right")}${th("Antal bookede møder", "right")}${th("Mødebook hitrate", "right")}${excluded
+      .map((e) => th(e.label, "right"))
+      .join("")}</tr></thead>
     <tbody>${rows}
-      <tr>${td("Tryg i alt", "left", true)}${td(String(totalClosed), "right", true)}${td(String(totalBooked), "right", true)}${td(pct(totalBooked, totalClosed), "right", true)}</tr>
+      <tr>${td("Tryg i alt", "left", true)}${td(String(totalClosed), "right", true)}${td(String(totalDecided), "right", true)}${td(String(totalBooked), "right", true)}${td(pct(totalBooked, totalDecided), "right", true)}${totalExtras}</tr>
     </tbody>`;
 }
 
