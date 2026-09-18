@@ -492,6 +492,8 @@ async function run(svc: SupabaseClient) {
     newSaleIds.push(saleId);
   }
 
+  await gdprFilter.flush();
+
   // Let the existing pricing engine apply the Mødetype rules.
   let rematch: unknown = null;
   if (newSaleIds.length > 0) {
