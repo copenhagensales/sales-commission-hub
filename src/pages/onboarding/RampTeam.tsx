@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Loader2, Check, X } from "lucide-react";
+import { Loader2, Check, X, Plus } from "lucide-react";
 import {
   RAMP_WEEKLY_ABSENCE,
   RAMP_WEEKLY_COACHING,
@@ -73,12 +73,14 @@ function isoWeekOf(date: Date): { year: number; week: number } {
 
 interface Derived {
   gap: number;
-  doneThisWeek: number;
-  missedListen: number;
+  /** Antal 1-1 sessioner holdt i den indevaerende uge (kravet er 1). */
+  sessionsThisWeek: number;
+  /** Sammenhaengende uger bagud helt uden en session. */
+  missedWeeks: number;
   trend: "up" | "down" | "flat" | "unknown";
   urgency: number;
   stripColor: string;
-  weekActions: Map<string, { coaching: boolean; listen: boolean; absence: boolean }>;
+  weekActions: Map<string, { sessions: number; absence: boolean }>;
   feedbackLog: RampAction[];
 }
 
@@ -87,23 +89,26 @@ function weekKey(year: number, week: number) {
 }
 
 function derive(member: RampTeamMember): Derived {
-  const weekActions = new Map<string, { coaching: boolean; listen: boolean; absence: boolean }>();
+  const weekActions = new Map<string, { sessions: number; absence: boolean }>();
   for (const action of member.actions) {
     const { year, week } = isoWeekOf(new Date(action.performed_at));
     const key = weekKey(year, week);
-    const entry = weekActions.get(key) ?? { coaching: false, listen: false, absence: false };
-    if (action.action_type === RAMP_WEEKLY_COACHING) entry.coaching = true;
-    if (action.action_type === RAMP_WEEKLY_LISTEN) entry.listen = true;
+    const entry = weekActions.get(key) ?? { sessions: 0, absence: false };
+    if (action.action_type === RAMP_WEEKLY_COACHING || action.action_type === RAMP_WEEKLY_LISTEN) {
+      entry.sessions += 1;
+    }
     if (action.action_type === RAMP_WEEKLY_ABSENCE) entry.absence = true;
     weekActions.set(key, entry);
   }
 
   const gap = member.p25 === null ? 0 : Math.max(0, Math.round(member.p25 - member.cum_sales));
-  const doneThisWeek = (member.has_coaching ? 1 : 0) + (member.has_listen ? 1 : 0);
+  const countedThisWeek = weekActions.get(weekKey(member.iso_year, member.iso_week))?.sessions ?? 0;
+  const sessionsThisWeek =
+    member.has_coaching || member.has_listen ? Math.max(1, countedThisWeek) : countedThisWeek;
 
-  // Sammenhaengende uger bagud uden et lyt (den aktuelle uge taelles med).
+  // Sammenhaengende uger bagud uden en session (den aktuelle uge taelles med).
   // Uger foer ordningens startdato taeller ikke som manglende.
-  let missedListen = 0;
+  let missedWeeks = 0;
   if (member.weekly_program_active && member.weekly_program_start_date) {
     const start = isoWeekOf(new Date(`${member.weekly_program_start_date}T00:00:00`));
     const startRank = start.year * 100 + start.week;
@@ -112,8 +117,8 @@ function derive(member: RampTeamMember): Derived {
       if (w.iso_year * 100 + w.iso_week < startRank) break;
       const entry = weekActions.get(weekKey(w.iso_year, w.iso_week));
       if (entry?.absence) break;
-      if (entry?.listen) break;
-      missedListen += 1;
+      if ((entry?.sessions ?? 0) > 0) break;
+      missedWeeks += 1;
     }
   }
 
@@ -125,15 +130,15 @@ function derive(member: RampTeamMember): Derived {
   }
 
   const urgency =
-    (missedListen >= 2 ? 100 : 0) +
-    (member.week_required ? (2 - doneThisWeek) * 20 : 0) +
+    (missedWeeks >= 2 ? 100 : 0) +
+    (member.week_required && sessionsThisWeek === 0 ? 40 : 0) +
     gap * 3 +
     (trend === "down" ? 10 : 0);
 
   return {
     gap,
-    doneThisWeek,
-    missedListen,
+    sessionsThisWeek,
+    missedWeeks,
     trend,
     urgency,
     stripColor: gap >= 4 ? RED : AMBER_STRIP,
@@ -143,7 +148,6 @@ function derive(member: RampTeamMember): Derived {
 }
 
 function priorityBand(member: RampTeamMember, d: Derived) {
-  const missingKind = member.has_coaching ? KIND_LABEL.listen : KIND_LABEL.coaching;
   if (member.has_absence) {
     return {
       tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
@@ -152,28 +156,20 @@ function priorityBand(member: RampTeamMember, d: Derived) {
       sub: "Ugen er lukket — forløbet genoptages næste uge.",
     };
   }
-  if (d.missedListen >= 2) {
+  if (d.missedWeeks >= 2) {
     return {
       tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
       mark: "!",
-      title: `Lyt mangler — ${d.missedListen} uger i træk`,
-      sub: "Sæt et lyt i kalenderen i dag",
+      title: `Session mangler — ${d.missedWeeks} uger i træk`,
+      sub: "Sæt en 1-1 session i kalenderen i dag",
     };
   }
-  if (member.week_required && d.doneThisWeek === 0) {
+  if (member.week_required && d.sessionsThisWeek === 0) {
     return {
       tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
       mark: "!",
-      title: `Begge forløb mangler i uge ${member.iso_week}`,
-      sub: "Coaching og lyt skal holdes denne uge",
-    };
-  }
-  if (member.week_required && d.doneThisWeek === 1) {
-    return {
-      tone: { bg: "#fdf2e3", icon: AMBER_TEXT, text: "#7a4e11" },
-      mark: "!",
-      title: `${missingKind} mangler i uge ${member.iso_week}`,
-      sub: "Ét forløb tilbage før ugen er lukket",
+      title: `Ugens 1-1 session mangler i uge ${member.iso_week}`,
+      sub: "Der skal holdes mindst én session denne uge",
     };
   }
   if (!member.week_required && !member.weekly_program_active) {
@@ -300,22 +296,23 @@ function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor:
 }
 
 function ProgramRow({
-  kind,
-  done,
+  sessions,
   member,
-  missedListen,
+  missedWeeks,
   onOpen,
 }: {
-  kind: SessionKind;
-  done: boolean;
+  sessions: number;
   member: RampTeamMember;
-  missedListen: number;
+  missedWeeks: number;
   onOpen: () => void;
 }) {
+  const done = sessions > 0;
   const status = done
-    ? `Holdt i uge ${member.iso_week}`
-    : kind === "listen" && missedListen >= 2
-      ? `Mangler ${missedListen} uger i træk`
+    ? sessions > 1
+      ? `Holdt i uge ${member.iso_week} · ${sessions} sessioner`
+      : `Holdt i uge ${member.iso_week}`
+    : missedWeeks >= 2
+      ? `Mangler ${missedWeeks} uger i træk`
       : "Skal holdes denne uge";
 
   return (
@@ -339,7 +336,7 @@ function ProgramRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-          {KIND_LABEL[kind]}
+          1-1 session
         </span>
         <span className="mt-px block text-[12px] font-semibold" style={{ color: "#57635e" }}>
           {status}
@@ -361,17 +358,13 @@ function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
       <div className="flex flex-1 gap-1">
         {member.weeks.map((w) => {
           const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
-          const count = (entry?.coaching ? 1 : 0) + (entry?.listen ? 1 : 0);
-          const color = entry?.absence
-            ? "#e7eeeb"
-            : count === 2
-              ? GREEN
-              : count === 1
-                ? AMBER
-                : "#e3908b";
+          const count = entry?.sessions ?? 0;
+          const color = entry?.absence ? "#e7eeeb" : count >= 1 ? GREEN : "#e3908b";
           const label = entry?.absence
             ? `Uge ${w.iso_week}: fravær hele ugen`
-            : `Uge ${w.iso_week}: ${count} af 2 forløb holdt`;
+            : count === 1
+              ? `Uge ${w.iso_week}: 1 session holdt`
+              : `Uge ${w.iso_week}: ${count} sessioner holdt`;
           return (
             <span
               key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
@@ -389,7 +382,7 @@ function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
 
 function effectLine(member: RampTeamMember, d: Derived): { text: string; color: string } {
   const coachingWeeks = member.weeks.filter(
-    (w) => d.weekActions.get(weekKey(w.iso_year, w.iso_week))?.coaching,
+    (w) => (d.weekActions.get(weekKey(w.iso_year, w.iso_week))?.sessions ?? 0) > 0,
   ).length;
   if (coachingWeeks < 2 || member.weeks.length < 2) {
     return { text: "For få forløb til at måle effekt endnu", color: "#57635e" };
@@ -536,9 +529,13 @@ function MemberCard({
             <SectionLabel>Ugens faste forløb</SectionLabel>
             <span
               className="text-[12px] font-extrabold"
-              style={{ color: d.doneThisWeek === 2 ? "#0f5a38" : AMBER_TEXT }}
+              style={{ color: d.sessionsThisWeek >= 1 ? "#0f5a38" : AMBER_TEXT }}
             >
-              {d.doneThisWeek === 2 ? "Ugen er klaret" : `${d.doneThisWeek} af 2 holdt`}
+              {d.sessionsThisWeek >= 1
+                ? d.sessionsThisWeek > 1
+                  ? `Ugen er klaret · ${d.sessionsThisWeek} sessioner`
+                  : "Ugen er klaret"
+                : "0 af 1 holdt"}
             </span>
           </div>
 
@@ -549,19 +546,22 @@ function MemberCard({
           ) : (
             <div className="mt-3 space-y-2">
               <ProgramRow
-                kind="coaching"
-                done={member.has_coaching}
+                sessions={d.sessionsThisWeek}
                 member={member}
-                missedListen={d.missedListen}
-                onOpen={() => onOpen(member, "coaching", member.has_coaching)}
+                missedWeeks={d.missedWeeks}
+                onOpen={() => onOpen(member, "coaching", d.sessionsThisWeek > 0)}
               />
-              <ProgramRow
-                kind="listen"
-                done={member.has_listen}
-                member={member}
-                missedListen={d.missedListen}
-                onOpen={() => onOpen(member, "listen", member.has_listen)}
-              />
+              {d.sessionsThisWeek > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onOpen(member, "coaching", true)}
+                  className="flex w-full items-center gap-2 rounded-[13px] border border-dashed px-[15px] py-[11px] text-left text-[13px] font-bold"
+                  style={{ borderColor: "#c3ccc8", color: "#0f5a38", background: "#ffffff" }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Tilføj ekstra session i uge {member.iso_week}
+                </button>
+              )}
               {!member.week_required && (
                 <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
                   {member.weekly_program_active
@@ -914,7 +914,7 @@ export default function RampTeam() {
   const missingList = useMemo(
     () =>
       allList.filter(
-        (m) => m.week_required && !m.has_absence && (!m.has_coaching || !m.has_listen),
+        (m) => m.week_required && !m.has_absence && !m.has_coaching && !m.has_listen,
       ),
     [allList],
   );
@@ -1050,7 +1050,7 @@ export default function RampTeam() {
                     ? `Starter ${programStartLabel}`
                     : "Ordningen er ikke trådt i kraft endnu"
                   : counts.missing > 0
-                    ? "Coaching eller lyt mangler stadig"
+                    ? "Ugens 1-1 session mangler stadig"
                     : "Alle forløb er afviklet",
                 extraColor: !programActive
                   ? "#57635e"
@@ -1167,8 +1167,9 @@ export default function RampTeam() {
                       : "Alle nye i opstart"}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Alle nye får 1-1 coaching og 1-1 lyt hver uge i de første 40 arbejdsdage — også
-                  dem der ligger flot.
+                  Alle nye får mindst én 1-1 session med feedback hver uge i de første 40
+                  arbejdsdage — også dem der ligger flot. Der kan tilføjes flere sessioner efter
+                  behov.
                 </p>
               </div>
               <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>

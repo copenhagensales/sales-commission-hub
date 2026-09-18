@@ -63,12 +63,7 @@ function buildContent(payload: RecipientPayload, week: number): string {
     .slice()
     .sort((a, b) => a.day_no - b.day_no)
     .map((s) => {
-      const missing = [
-        s.missing_coaching ? "1-1 coaching" : null,
-        s.missing_listen ? "1-1 lyt" : null,
-      ]
-        .filter(Boolean)
-        .join(" og ");
+      const missing = "1-1 session";
       return `
         <tr>
           <td style="padding:8px 12px;border-bottom:1px solid #e7eeeb;">${escapeHtml(s.employee_name)}</td>
@@ -86,9 +81,8 @@ function buildContent(payload: RecipientPayload, week: number): string {
 
   return `
     ${intro}
-    <p>Alle i deres første 40 arbejdsdage skal have både en 1-1 coaching og en 1-1 lyt med
-    feedback hver uge. Mandag til torsdag er den normale periode — <strong>I har i dag til at
-    nå det.</strong></p>
+    <p>Alle i deres første 40 arbejdsdage skal have mindst én 1-1 session med feedback hver uge.
+    Mandag til torsdag er den normale periode — <strong>I har i dag til at nå det.</strong></p>
     <table style="border-collapse:collapse;width:100%;font-size:14px;color:#1b1f1d;">
       <thead>
         <tr style="text-align:left;background:#e7f4ed;">
