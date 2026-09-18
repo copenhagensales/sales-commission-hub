@@ -1358,6 +1358,61 @@ export type Database = {
         }
         Relationships: []
       }
+      board_monthly_goals: {
+        Row: {
+          board_key: string
+          created_at: string
+          created_by: string | null
+          employee_id: string | null
+          id: string
+          month_key: string
+          target_amount: number
+          updated_at: string
+        }
+        Insert: {
+          board_key: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          month_key: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          board_key?: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          month_key?: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_monthly_goals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_monthly_goals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_monthly_goals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking: {
         Row: {
           booked_days: number[] | null

@@ -340,6 +340,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (action === "eesy-fm-monthly-goal") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const monthKey = url.searchParams.get("monthKey") || "";
+      if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+        return new Response(JSON.stringify({ error: "Ugyldig monthKey" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const cacheKey = `eesy-fm-monthly-goal-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleEesyFmMonthlyGoal(supabase, start, end, monthKey, corsHeaders, cacheKey);
+    }
+
+
+
     // Første sælger der når sit individuelle månedsmål — låses permanent i DB
     if (action === "monthly-goal-first-achiever") {
       return await handleMonthlyGoalFirstAchiever(supabase, req, corsHeaders);
@@ -2808,6 +2830,169 @@ async function handleMonthlyGoal(
     });
   }
 }
+
+// Eesy FM Månedsmål-board: salgslinjer på Eesy FM + sælgere udledt af salgenes agent_email
+// (Eesy FM-teamet har ingen medlemmer — sælgerne ligger på Fieldmarketing-teamet).
+// Mål læses fra board_monthly_goals. Voice-filteret (fravalg af 5G Internet) sker i frontend.
+const EESY_FM_CLIENT_ID_EF = "9a92ea4c-6404-4b58-be08-065e7552d552";
+const EESY_FM_BOARD_KEY_EF = "eesy-fm-monthly-goal";
+
+async function handleEesyFmMonthlyGoal(
+  supabase: any,
+  startIso: string,
+  endIso: string,
+  monthKey: string,
+  corsHeaders: Record<string, string>,
+  cacheKey?: string,
+) {
+  try {
+    const warnings: string[] = [];
+
+    // 1. Salgslinjer på Eesy FM i perioden
+    const items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate: string | null }[] = [];
+    const saleEmails = new Set<string>();
+    try {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("sales")
+          .select(
+            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
+          )
+          .eq("client_campaigns.client_id", EESY_FM_CLIENT_ID_EF)
+          .gte("sale_datetime", startIso)
+          .lte("sale_datetime", endIso)
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data as any[]) {
+          const status = row.validation_status;
+          if (status === "cancelled" || status === "rejected") continue;
+          const saleDate = row.sale_datetime
+            ? new Date(row.sale_datetime).toLocaleDateString("en-CA", { timeZone: "Europe/Copenhagen" })
+            : null;
+          const email = row.agent_email ? String(row.agent_email).toLowerCase() : null;
+          if (email) saleEmails.add(email);
+          for (const item of row.sale_items || []) {
+            items.push({
+              agentEmail: email,
+              productId: item.product_id ?? null,
+              quantity: Number(item.quantity ?? 1),
+              saleDate,
+            });
+          }
+        }
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+    } catch (e: any) {
+      warnings.push(`Salgsdata: ${e?.message || "ukendt fejl"}`);
+    }
+
+    // 2. Mål for måneden
+    let goals: { employeeId: string | null; target: number }[] = [];
+    try {
+      const { data, error } = await supabase
+        .from("board_monthly_goals")
+        .select("employee_id, target_amount")
+        .eq("board_key", EESY_FM_BOARD_KEY_EF)
+        .eq("month_key", monthKey);
+      if (error) throw error;
+      goals = (data || []).map((g: any) => ({
+        employeeId: g.employee_id ?? null,
+        target: Number(g.target_amount ?? 0),
+      }));
+    } catch (e: any) {
+      warnings.push(`Mål: ${e?.message || "ukendt fejl"}`);
+    }
+
+    // 3. Sælgere: dem med salg i perioden + dem der har fået et mål
+    let sellers: any[] = [];
+    try {
+      const employeeIds = new Set<string>(
+        goals.map((g) => g.employeeId).filter((id): id is string => Boolean(id)),
+      );
+
+      if (saleEmails.size > 0) {
+        const emailList = Array.from(saleEmails);
+        const { data: agentRows, error: agentError } = await supabase
+          .from("agents")
+          .select("id, email, employee_agent_mapping(employee_id)")
+          .in("email", emailList);
+        if (agentError) throw agentError;
+        for (const a of (agentRows || []) as any[]) {
+          for (const m of a.employee_agent_mapping || []) {
+            if (m.employee_id) employeeIds.add(m.employee_id);
+          }
+        }
+
+        const { data: byWorkEmail, error: workEmailError } = await supabase
+          .from("employee_master_data")
+          .select("id")
+          .in("work_email", emailList);
+        if (workEmailError) throw workEmailError;
+        for (const e of (byWorkEmail || []) as any[]) employeeIds.add(e.id);
+      }
+
+      if (employeeIds.size > 0) {
+        const ids = Array.from(employeeIds);
+        const { data, error } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, work_email")
+          .in("id", ids);
+        if (error) throw error;
+
+        const emailsByEmployee = new Map<string, Set<string>>();
+        const { data: mappings, error: mapError } = await supabase
+          .from("employee_agent_mapping")
+          .select("employee_id, agents(email)")
+          .in("employee_id", ids);
+        if (mapError) throw mapError;
+        for (const m of (mappings || []) as any[]) {
+          const email = m.agents?.email ? String(m.agents.email).toLowerCase() : null;
+          if (!email || !m.employee_id) continue;
+          if (!emailsByEmployee.has(m.employee_id)) emailsByEmployee.set(m.employee_id, new Set());
+          emailsByEmployee.get(m.employee_id)!.add(email);
+        }
+
+        sellers = (data || []).map((e: any) => {
+          const emails = new Set<string>(emailsByEmployee.get(e.id) ?? []);
+          if (e.work_email) emails.add(String(e.work_email).toLowerCase());
+          return {
+            id: e.id,
+            firstName: e.first_name,
+            lastName: e.last_name,
+            workEmail: e.work_email,
+            emails: Array.from(emails),
+          };
+        });
+      }
+    } catch (e: any) {
+      warnings.push(`Sælgerliste: ${e?.message || "ukendt fejl"}`);
+    }
+
+    const payload = {
+      sellers,
+      items,
+      goals,
+      warning: warnings.length > 0 ? warnings.join(" · ") : undefined,
+    };
+
+    if (cacheKey) setCache(cacheKey, payload);
+    return new Response(JSON.stringify(payload), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    console.error("[handleEesyFmMonthlyGoal] error:", err);
+    return new Response(JSON.stringify({ error: err?.message || "unknown" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
+
+
 
 // ============= MÅNEDSMÅL: FØRSTE MÅLOPNÅER =============
 // Låser permanent hvilken sælger der først nåede sit individuelle månedsmål.
