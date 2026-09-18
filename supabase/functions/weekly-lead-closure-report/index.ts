@@ -604,6 +604,19 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
+    // Planen kører 05:00 og 06:00 UTC mandag, så mailen rammer 07:00 dansk tid
+    // både sommer og vinter. Kun den kørsel der er kl. 7 i Danmark fortsætter.
+    if (!auth.userId && !body.account && !body.triggered_by) {
+      const hour = Number(
+        new Intl.DateTimeFormat("da-DK", {
+          timeZone: "Europe/Copenhagen",
+          hour: "2-digit",
+          hour12: false,
+        }).format(new Date()),
+      );
+      if (hour !== 7) return json(200, { stage: "sprunget over", danskTime: hour });
+    }
+
     const config = await loadConfig(svc);
     if (config.lines.length === 0) throw new Error("Rapportlinjerne mangler i opsætningen");
     await assertFieldsAllowed(svc);
