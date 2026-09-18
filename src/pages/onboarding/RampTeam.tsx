@@ -336,7 +336,7 @@ function ProgramRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-          {KIND_LABEL[kind]}
+          1-1 session
         </span>
         <span className="mt-px block text-[12px] font-semibold" style={{ color: "#57635e" }}>
           {status}
