@@ -392,6 +392,13 @@ async function run(svc: SupabaseClient) {
   const agents = await syncUsers(svc, auth);
   const { emailByAdversusId, mapped, unmapped } = await mapAgentsToEmployees(svc, agents);
 
+  // GDPR: alt der skrives til sales.raw_payload går gennem det databasedrevne
+  // indtagsfilter — samme regler og samme feltregister som webhook-indgangen.
+  const gdprFilter = await createIngestionFilter(svc, {
+    integration: "adversus",
+    triggeredBy: "lederne-sync",
+  });
+
   const rawLeads = await fetchLeadsSince(auth, watermark);
   const newCampaigns: string[] = [];
   let newWatermark = watermark;
