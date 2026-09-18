@@ -73,30 +73,46 @@ Deno.serve(async (req) => {
     const out: Record<string, unknown> = { baseUrl, modifiedFrom, campaigns: [] };
     const fieldNames = new Set<string>();
 
+    const variants = (id: string) => ({
+      campaigns_only: `${baseUrl}/simpleleads?Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
+      projects_star_campaigns: `${baseUrl}/simpleleads?Projects=*&Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
+      campaign_singular: `${baseUrl}/simpleleads?Campaign=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
+      projects_star_only: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`,
+    });
+
     for (const row of mapRows ?? []) {
       const id = String(row.adversus_campaign_id);
-      const url =
-        `${baseUrl}/simpleleads?Campaigns=${encodeURIComponent(id)}&ModifiedFrom=${modifiedFrom}&PageSize=${pageSize}`;
-      const res = await fetch(url, { headers });
-      if (!res.ok) {
-        (out.campaigns as unknown[]).push({
-          campaignId: id,
-          name: row.adversus_campaign_name,
-          httpStatus: res.status,
-        });
-        continue;
+      const attempts: Record<string, unknown> = {};
+      let leads: Record<string, unknown>[] = [];
+      let usedVariant: string | null = null;
+      for (const [variant, url] of Object.entries(variants(id))) {
+        const res = await fetch(url, { headers });
+        if (!res.ok) {
+          attempts[variant] = { httpStatus: res.status, error: (await res.text()).slice(0, 200) };
+          continue;
+        }
+        const parsed = asArray(await res.json());
+        attempts[variant] = { httpStatus: 200, leads: parsed.length };
+        if (!usedVariant && parsed.length > 0) {
+          usedVariant = variant;
+          leads = parsed;
+        }
+        if (variant === "projects_star_only") break;
       }
-      const leads = asArray(await res.json());
+
       const closures = new Map<string, number>();
       const statuses = new Map<string, number>();
       const userFields = new Map<string, number>();
+      const campaignValues = new Map<string, number>();
       for (const lead of leads) {
         for (const k of Object.keys(lead)) fieldNames.add(k);
         const closure = String(lead.LeadClosure ?? lead.leadClosure ?? lead.Closure ?? "(mangler)");
         closures.set(closure, (closures.get(closure) ?? 0) + 1);
         const status = String(lead.Status ?? lead.status ?? "(mangler)");
         statuses.set(status, (statuses.get(status) ?? 0) + 1);
-        for (const k of ["User", "user", "UserName", "userName", "Agent", "agent", "ProcessedBy"]) {
+        const camp = String(lead.Campaign ?? lead.campaign ?? lead.CampaignId ?? "(mangler)");
+        campaignValues.set(camp, (campaignValues.get(camp) ?? 0) + 1);
+        for (const k of ["User", "user", "UserName", "userName", "Agent", "agent", "ProcessedBy", "LastUser"]) {
           if (lead[k] !== undefined && lead[k] !== null && lead[k] !== "") {
             userFields.set(k, (userFields.get(k) ?? 0) + 1);
           }
@@ -105,12 +121,15 @@ Deno.serve(async (req) => {
       (out.campaigns as unknown[]).push({
         campaignId: id,
         name: row.adversus_campaign_name,
-        httpStatus: 200,
+        attempts,
+        usedVariant,
         leads: leads.length,
         closures: Object.fromEntries(closures),
         statuses: Object.fromEntries(statuses),
+        campaignValues: Object.fromEntries(campaignValues),
         userFieldsPresent: Object.fromEntries(userFields),
       });
+      break; // én kampagne er nok til kortlægningen
     }
 
     out.fieldNames = [...fieldNames].sort();
