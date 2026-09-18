@@ -47,6 +47,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     permissionKey: "menu_dashboard_tdc_monthly_goal"
   },
   {
+    slug: "eesy-fm-monthly-goal",
+    name: "Eesy FM Månedsmål",
+    path: "/dashboards/eesy-fm-monthly-goal",
+    description: "Eesy FM månedsmål – voice-salg, fælles og individuelle progressbarer",
+    permissionKey: "menu_dashboard_eesy_fm_monthly_goal"
+  },
+  {
     slug: "relatel-monthly-goal",
     name: "Relatel Månedsmål",
     path: "/dashboards/relatel-monthly-goal",
