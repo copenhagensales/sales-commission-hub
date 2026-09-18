@@ -20,14 +20,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, Loader2, Play, TableProperties } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Play, TableProperties, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import {
+  useAddClosureRecipient,
   useLeadClosingStatuses,
+  useRemoveClosureRecipient,
   useRunWeeklyLeadClosureReport,
+  useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
+  useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
   useWeeklyLeadClosureStats,
   useWeeklyLeadReportLines,
