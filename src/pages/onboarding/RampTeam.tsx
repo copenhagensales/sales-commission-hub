@@ -382,7 +382,7 @@ function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
 
 function effectLine(member: RampTeamMember, d: Derived): { text: string; color: string } {
   const coachingWeeks = member.weeks.filter(
-    (w) => d.weekActions.get(weekKey(w.iso_year, w.iso_week))?.coaching,
+    (w) => (d.weekActions.get(weekKey(w.iso_year, w.iso_week))?.sessions ?? 0) > 0,
   ).length;
   if (coachingWeeks < 2 || member.weeks.length < 2) {
     return { text: "For få forløb til at måle effekt endnu", color: "#57635e" };
