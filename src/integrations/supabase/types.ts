@@ -18547,6 +18547,7 @@ export type Database = {
         Args: { p_reason?: string; p_sale_id: string }
         Returns: Json
       }
+      weekly_lead_closure_add: { Args: { _rows: Json }; Returns: number }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
