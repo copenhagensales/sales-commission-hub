@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { getPublicUrl } from "@/lib/getPublicUrl";
+import { CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "assistant_team_leader" | "other";
 
@@ -926,9 +927,9 @@ export function SendContractDialog({
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
             <div
-              className="contract-paper contract-body max-w-none border rounded-sm ring-1 ring-neutral-200 px-6 md:px-10 py-10 bg-white text-neutral-800 max-h-[60vh] overflow-y-auto"
+              className={`contract-paper contract-body ${CONTRACT_PROSE_SIGN_CLASSES} max-w-none rounded-sm ring-1 ring-neutral-200 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_18px_50px_-18px_rgba(15,23,42,0.25)] px-8 md:px-12 py-12 bg-white`}
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
             />
           </div>
