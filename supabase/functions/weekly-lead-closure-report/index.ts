@@ -550,38 +550,7 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as {
       weeks?: number;
       send_mail?: boolean;
-      probe?: string;
     };
-    if (body.probe) {
-      // Midlertidig måling: afklarer om Adversus understøtter datofilter, så vi
-      // ikke skal hente hele kampagnens historik. Returnerer kun antal og status.
-      const a = authHeader(ACCOUNTS[0]);
-      const out: Record<string, unknown> = {};
-      const cid = Number(body.probe);
-      const variants: Record<string, unknown>[] = [
-        { campaignId: { $eq: cid }, updated: { $gte: "2026-09-08 00:00:00" } },
-        { campaignId: { $eq: cid }, updated: { $gt: "2026-09-08" } },
-        { campaignId: { $eq: cid }, lastContactedTime: { $gte: "2026-09-08 00:00:00" } },
-        { campaignId: { $eq: cid }, lastModifiedTime: { $gte: "2026-09-08 00:00:00" } },
-        { campaignId: { $eq: cid }, status: { $eq: "success" } },
-      ];
-      for (let i = 0; i < variants.length; i++) {
-        try {
-          const data = asArray(
-            await getJson(
-              `/leads?filters=${encodeURIComponent(JSON.stringify(variants[i]))}&pageSize=1000&page=1`,
-              a,
-            ),
-            "leads",
-            "data",
-          );
-          out[`variant${i}`] = data.length;
-        } catch (e) {
-          out[`variant${i}`] = e instanceof Error ? e.message : String(e);
-        }
-      }
-      return json(200, out);
-    }
     const svc = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
