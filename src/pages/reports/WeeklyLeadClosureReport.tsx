@@ -106,6 +106,24 @@ export default function WeeklyLeadClosureReport() {
     [statuses],
   );
 
+  /** Statusser der er lukkede, men ikke må tælle i mødebook-hitraten. */
+  const excludedStatuses = useMemo(
+    () =>
+      statuses
+        .filter((s) => s.is_closing && s.counts_in_hitrate === false)
+        .map((s) => ({ status: s.status, label: s.label_da || s.status }))
+        .sort((a, b) => a.label.localeCompare(b.label, "da")),
+    [statuses],
+  );
+
+  const hitrateStatuses = useMemo(
+    () =>
+      statuses
+        .filter((s) => s.is_closing && s.counts_in_hitrate !== false)
+        .map((s) => s.status),
+    [statuses],
+  );
+
   const availableWeeks = useMemo(
     () => [...new Set(stats.map((s) => s.week_start))].sort().reverse(),
     [stats],
@@ -120,23 +138,32 @@ export default function WeeklyLeadClosureReport() {
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
       const rows = weekRows.filter((r) => r.report_line === line.report_line);
-      const closed = rows
-        .filter((r) => closingStatuses.includes(r.status))
-        .reduce((sum, r) => sum + r.lead_count, 0);
-      const booked = rows
-        .filter((r) => r.status === "success")
-        .reduce((sum, r) => sum + r.lead_count, 0);
-      return { reportLine: line.report_line, closed, booked };
+      const sum = (predicate: (status: string) => boolean) =>
+        rows.filter((r) => predicate(r.status)).reduce((total, r) => total + r.lead_count, 0);
+      const extras: Record<string, number> = {};
+      for (const s of excludedStatuses) extras[s.status] = sum((status) => status === s.status);
+      return {
+        reportLine: line.report_line,
+        closed: sum((status) => closingStatuses.includes(status)),
+        decided: sum((status) => hitrateStatuses.includes(status)),
+        booked: sum((status) => status === "success"),
+        extras,
+      };
     });
-  }, [lines, weekRows, closingStatuses]);
+  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses]);
 
-  const totals = useMemo(
-    () => ({
+  const totals = useMemo(() => {
+    const extras: Record<string, number> = {};
+    for (const s of excludedStatuses) {
+      extras[s.status] = lineTotals.reduce((sum, l) => sum + (l.extras[s.status] ?? 0), 0);
+    }
+    return {
       closed: lineTotals.reduce((s, l) => s + l.closed, 0),
+      decided: lineTotals.reduce((s, l) => s + l.decided, 0),
       booked: lineTotals.reduce((s, l) => s + l.booked, 0),
-    }),
-    [lineTotals],
-  );
+      extras,
+    };
+  }, [lineTotals, excludedStatuses]);
 
   const unmapped = useMemo(() => {
     const out = new Map<string, { account: string; campaignId: string; closed: number }>();
