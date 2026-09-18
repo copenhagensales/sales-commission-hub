@@ -410,7 +410,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     </div>
 
     ${statCards}
-    ${table1}${table2}${table3}${table4}${notesHtml}
+    ${table1}${table2}${table4}${notesHtml}
 
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
