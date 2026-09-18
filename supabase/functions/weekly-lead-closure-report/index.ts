@@ -315,7 +315,7 @@ interface Config {
   lines: string[];
   mapping: Map<string, { reportLine: string | null; name: string | null }>;
   campaignNames: Map<string, string>;
-  recipient: string | null;
+  recipients: string[];
 }
 
 function mapKey(account: string, campaignId: string) {
@@ -377,7 +377,13 @@ async function loadConfig(svc: SupabaseClient): Promise<Config> {
     lines: ((lines.data ?? []) as Record<string, unknown>[]).map((r) => safeString(r.report_line)),
     mapping,
     campaignNames,
-    recipient: ((settings.data ?? [])[0] as { recipient_email?: string } | undefined)?.recipient_email ?? null,
+    recipients: [
+      ...new Set(
+        ((settings.data ?? []) as { recipient_email?: string }[])
+          .map((r) => safeString(r.recipient_email).trim().toLowerCase())
+          .filter((mail) => mail.length > 0),
+      ),
+    ],
   };
 }
 
