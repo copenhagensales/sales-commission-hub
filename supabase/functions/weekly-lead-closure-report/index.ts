@@ -106,15 +106,27 @@ function targetWeeks(weeks: number): string[] {
 // ---------------------------------------------------------------------------
 // Adversus
 // ---------------------------------------------------------------------------
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Henter fra Adversus med venlig genforsøg ved hastighedsgrænse (429) og
+ * midlertidige serverfejl. Kun status logges — aldrig svarkroppen, som kan
+ * indeholde lead-data.
+ */
 async function getJson(path: string, auth: string): Promise<unknown> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: auth, "Content-Type": "application/json" },
-  });
-  if (!res.ok) {
-    // Kun status logges — aldrig svarkroppen, som kan indeholde lead-data.
-    throw new Error(`Adversus ${path.split("?")[0]} svarede ${res.status}`);
+  const delays = [1000, 3000, 7000, 15000];
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: { Authorization: auth, "Content-Type": "application/json" },
+    });
+    if (res.ok) return await res.json();
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt >= delays.length) {
+      throw new Error(`Adversus ${path.split("?")[0]} svarede ${res.status}`);
+    }
+    const header = Number(res.headers.get("retry-after"));
+    await sleep(Number.isFinite(header) && header > 0 ? header * 1000 : delays[attempt]);
   }
-  return await res.json();
 }
 
 /** Vores egne Adversus-brugere. E-mailen bruges kun til domænefilteret. */
@@ -486,8 +498,12 @@ interface ChunkState {
   triggeredBy: string;
 }
 
-/** Sætter næste bid i gang uden at vente på den (kæden kører videre selv). */
-function chainNext(state: ChunkState): void {
+/**
+ * Sætter næste bid i gang. Kaldet afsendes og afbrydes derefter bevidst, så
+ * denne kørsel kan svare med det samme uden at vente på hele kæden. Svaret fra
+ * den næste bid bruges ikke — kæden logger selv i weekly_lead_closure_runs.
+ */
+async function chainNext(state: ChunkState): Promise<void> {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/weekly-lead-closure-report`;
   const body = JSON.stringify({
     weeks_list: state.weeks,
@@ -497,14 +513,22 @@ function chainNext(state: ChunkState): void {
     send_mail: state.sendMail,
     triggered_by: state.triggeredBy,
   });
-  fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-    },
-    body,
-  }).catch((e) => console.error("[weekly-lead-closure-report] kæde fejlede", String(e)));
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body,
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch (e) {
+    // TimeoutError er forventet: bidden er afsendt og kører videre selv.
+    if (!(e instanceof DOMException) && !(e instanceof Error && e.name === "TimeoutError")) {
+      console.error("[weekly-lead-closure-report] kæde fejlede", String(e));
+    }
+  }
 }
 
 async function finishAndMail(
@@ -580,6 +604,19 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
+    // Planen kører 05:00 og 06:00 UTC mandag, så mailen rammer 07:00 dansk tid
+    // både sommer og vinter. Kun den kørsel der er kl. 7 i Danmark fortsætter.
+    if (!auth.userId && !body.account && !body.triggered_by) {
+      const hour = Number(
+        new Intl.DateTimeFormat("da-DK", {
+          timeZone: "Europe/Copenhagen",
+          hour: "2-digit",
+          hour12: false,
+        }).format(new Date()),
+      );
+      if (hour !== 7) return json(200, { stage: "sprunget over", danskTime: hour });
+    }
+
     const config = await loadConfig(svc);
     if (config.lines.length === 0) throw new Error("Rapportlinjerne mangler i opsætningen");
     await assertFieldsAllowed(svc);
@@ -631,11 +668,11 @@ Deno.serve(async (req) => {
     // Næste bid: flere sider → samme kampagne, ellers næste kampagne, ellers
     // næste konto, ellers færdig (mail).
     if (chunk.nextPage) {
-      chainNext({ ...state, page: chunk.nextPage });
+      await chainNext({ ...state, page: chunk.nextPage });
       return json(200, { stage: "kører", account: state.account, page: chunk.nextPage });
     }
     if (state.campaignIndex + 1 < chunk.campaignCount) {
-      chainNext({ ...state, campaignIndex: state.campaignIndex + 1, page: 1 });
+      await chainNext({ ...state, campaignIndex: state.campaignIndex + 1, page: 1 });
       return json(200, {
         stage: "kører",
         account: state.account,
@@ -646,7 +683,7 @@ Deno.serve(async (req) => {
     const nextAccountIndex = ACCOUNTS.findIndex((a) => a.key === state.account) + 1;
     if (nextAccountIndex < ACCOUNTS.length) {
       const nextAccount = ACCOUNTS[nextAccountIndex].key;
-      chainNext({ ...state, account: nextAccount, campaignIndex: 0, page: 1 });
+      await chainNext({ ...state, account: nextAccount, campaignIndex: 0, page: 1 });
       await svc.from("weekly_lead_closure_runs").insert({
         account: nextAccount,
         weeks_covered: state.weeks.length,
@@ -660,6 +697,30 @@ Deno.serve(async (req) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[weekly-lead-closure-report]", message);
+    // Kæden kører i baggrunden, så fejlen skrives på kørselsrækken — ellers
+    // stopper rapporten uden spor.
+    try {
+      const svc = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { auth: { autoRefreshToken: false, persistSession: false } },
+      );
+      const { data: openRun } = await svc
+        .from("weekly_lead_closure_runs")
+        .select("id")
+        .is("finished_at", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (openRun) {
+        await svc
+          .from("weekly_lead_closure_runs")
+          .update({ error: message, finished_at: new Date().toISOString() })
+          .eq("id", (openRun as { id: string }).id);
+      }
+    } catch {
+      // Logning må aldrig skjule den oprindelige fejl.
+    }
     return json(500, { error: message });
   }
 });
