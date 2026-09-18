@@ -12,6 +12,7 @@
 //     than the stored watermark is fetched or written.
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
+import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
 
 const BASE_URL = "https://api.adversus.io/v1";
 const OUR_DOMAIN = "@copenhagensales.dk";
@@ -449,7 +450,8 @@ async function run(svc: SupabaseClient) {
       newCampaigns,
     );
     const agent = agents.get(lead.lastContactedBy)!;
-    const payload = buildRawPayload(lead);
+    const payload = gdprFilter.filter(buildRawPayload(lead));
+    gdprFilter.countSale();
     const row = {
       adversus_external_id: externalId,
       source: SOURCE,
