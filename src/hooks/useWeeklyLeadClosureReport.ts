@@ -125,3 +125,63 @@ export function useRunWeeklyLeadClosureReport() {
     },
   });
 }
+
+export type ClosureRecipientRow =
+  Database["public"]["Tables"]["weekly_lead_closure_settings"]["Row"];
+
+const RECIPIENTS_KEY = ["weekly-lead-closure", "recipients"] as const;
+
+export function useWeeklyLeadClosureRecipients() {
+  return useQuery({
+    queryKey: RECIPIENTS_KEY,
+    queryFn: async (): Promise<ClosureRecipientRow[]> => {
+      const { data, error } = await supabase
+        .from("weekly_lead_closure_settings")
+        .select("*")
+        .order("recipient_email");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useAddClosureRecipient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await supabase
+        .from("weekly_lead_closure_settings")
+        .insert({ recipient_email: email.trim().toLowerCase(), is_active: true });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RECIPIENTS_KEY }),
+  });
+}
+
+export function useToggleClosureRecipient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from("weekly_lead_closure_settings")
+        .update({ is_active: input.isActive })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RECIPIENTS_KEY }),
+  });
+}
+
+export function useRemoveClosureRecipient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("weekly_lead_closure_settings")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RECIPIENTS_KEY }),
+  });
+}
