@@ -760,16 +760,19 @@ async function finishAndMail(
     .map((week) => ({ weekStart: week, rows: rows.filter((r) => r.week_start === week) }));
 
   let mailQueued = false;
-  if (state.sendMail && config.recipient && !(await alreadyMailedToday(svc))) {
+  if (state.sendMail && config.recipients.length > 0 && !(await alreadyMailedToday(svc))) {
     const mail = buildMail(latest, latestRows, previous, config, await sellerNamesForAll(svc));
-    const { error } = await svc.from("scheduled_emails").insert({
-      recipient_email: config.recipient,
-      subject: mail.subject,
-      content: mail.html,
-      template_key: "weekly_lead_closure_report",
-      scheduled_at: new Date().toISOString(),
-      status: "pending",
-    });
+    const scheduledAt = new Date().toISOString();
+    const { error } = await svc.from("scheduled_emails").insert(
+      config.recipients.map((recipient) => ({
+        recipient_email: recipient,
+        subject: mail.subject,
+        content: mail.html,
+        template_key: "weekly_lead_closure_report",
+        scheduled_at: scheduledAt,
+        status: "pending",
+      })),
+    );
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
   }
