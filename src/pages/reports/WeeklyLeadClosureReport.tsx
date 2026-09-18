@@ -29,6 +29,7 @@ import {
   useLeadClosingStatuses,
   useRemoveClosureRecipient,
   useRunWeeklyLeadClosureReport,
+  useSendWeeklyLeadClosureMailNow,
   useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
@@ -210,6 +211,23 @@ export default function WeeklyLeadClosureReport() {
                   <Play className="mr-2 h-4 w-4" />
                 )}
                 Kør nu
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleSendMailNow}
+                disabled={sendMailNow.isPending || activeRecipients === 0}
+                title={
+                  activeRecipients === 0
+                    ? "Tilføj mindst én aktiv modtager først"
+                    : "Sender tallene for den igangværende uge"
+                }
+              >
+                {sendMailNow.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                Send mail nu
               </Button>
             </div>
           )}
