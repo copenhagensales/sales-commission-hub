@@ -112,12 +112,18 @@ describe("ukendte felter", () => {
 });
 
 describe("telefonflaget", () => {
-  it("beholder telefonfelter når phone_filter_enabled=false", () => {
+  it("beholder ubesluttede telefonfelter når phone_filter_enabled=false", () => {
+    expect(isPhoneField("Ukendt mobilnummer")).toBe(true);
+    const { data } = run({ masterData: [{ label: "Ukendt mobilnummer", value: "12345678" }] }, "raw_payload", false);
+    expect((data.masterData as { label: string }[]).map((i) => i.label)).toEqual([
+      "Ukendt mobilnummer",
+    ]);
+  });
+
+  it("fjerner telefonfelter der er besluttet BLOKER, også når flaget er slået fra", () => {
     expect(isPhoneField("Telefonnummer")).toBe(true);
     const { data } = run({ masterData: [{ label: "Telefonnummer", value: "12345678" }] }, "raw_payload", false);
-    expect((data.masterData as { label: string }[]).map((i) => i.label)).toEqual([
-      "Telefonnummer",
-    ]);
+    expect(data.masterData).toEqual([]);
   });
 
   it("fjerner telefonfelter når phone_filter_enabled=true", () => {
