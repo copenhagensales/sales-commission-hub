@@ -299,7 +299,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
         })}
         ${statCard({
           label: "Mødebook-hitrate",
-          value: pct(totalBooked, totalDecided),
+          value: pct1(totalBooked, totalDecided),
           note: "bookede / lukkede ja/nej",
           dark: true,
         })}
