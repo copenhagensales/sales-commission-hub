@@ -42,9 +42,10 @@ import {
 const NO_LINE = "__none__";
 const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Lederne" };
 
-function hitrate(booked: number, closed: number): string {
-  if (!closed) return "–";
-  return `${(Math.round((booked / closed) * 1000) / 10).toString().replace(".", ",")} %`;
+/** Procent med altid én decimal, så kolonnen flugter. */
+function hitrate(part: number, whole: number): string {
+  if (!whole) return "–";
+  return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
 function weekLabel(weekStart: string): string {
