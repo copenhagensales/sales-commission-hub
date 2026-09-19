@@ -385,6 +385,12 @@ export default function WeeklyLeadClosureReport() {
                 </TableBody>
               </Table>
             )}
+            {idleLines.length > 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {idleLines.length} {idleLines.length === 1 ? "linje" : "linjer"} uden aktivitet:{" "}
+                {idleLines.join(", ")}
+              </p>
+            )}
             {unmapped.length > 0 && (
               <p className="mt-4 text-sm text-muted-foreground">
                 Ikke mappet:{" "}
