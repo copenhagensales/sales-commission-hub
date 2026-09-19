@@ -9,7 +9,7 @@
  * hitrate-bjælker og en forklarende fodnote.
  */
 
-import { escapeHtml, pct } from "./quality-mail.ts";
+import { escapeHtml } from "./quality-mail.ts";
 
 const BRAND = {
   pageBg: "#eaf0f1",
