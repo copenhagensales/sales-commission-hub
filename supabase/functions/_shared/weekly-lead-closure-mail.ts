@@ -311,10 +311,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
       </tr>
     </table>`;
 
-  const table1 = section(
+  const table1 = lineSection(
     "Tabel 1 — Trygs skabelon",
     `Pr. rapportlinje, uge ${input.weekNumber}. Hitrate = bookede møder ÷ lukkede ja/nej.`,
-    lineTable(input.lines, input.excludedStatuses),
+    input.lines,
+    input.excludedStatuses,
   );
 
   const statusHead = `<thead><tr>${th("Rapportlinje")}${input.statusKeys
