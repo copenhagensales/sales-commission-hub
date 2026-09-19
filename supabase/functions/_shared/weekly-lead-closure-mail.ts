@@ -357,10 +357,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   const table4 = input.previousWeeks.length
     ? input.previousWeeks
         .map((w) =>
-          section(
+          lineSection(
             `Tabel 4 — uge ${w.weekNumber}`,
             weekRange(w.weekStart),
-            lineTable(w.lines, input.excludedStatuses),
+            w.lines,
+            input.excludedStatuses,
           ),
         )
         .join("")
