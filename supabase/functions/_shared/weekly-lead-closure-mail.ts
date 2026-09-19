@@ -119,29 +119,12 @@ function nf(value: number): string {
   return new Intl.NumberFormat("da-DK").format(value);
 }
 
-function ratio(part: number, whole: number): number {
-  if (!whole) return 0;
-  return Math.max(0, Math.min(1, part / whole));
+/** Procent med altid én decimal, dansk format. Deles ikke med kvalitetsmodulet. */
+function pct1(part: number, whole: number): string {
+  if (!whole) return "–";
+  return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
-/** Slank hitrate-bjælke i mailvenlig tabelform. */
-function bar(part: number, whole: number, onDark = false): string {
-  const filled = Math.round(ratio(part, whole) * 100);
-  const empty = 100 - filled;
-  const track = onDark ? "#343841" : BRAND.track;
-  const cells: string[] = [];
-  if (filled > 0) {
-    cells.push(
-      `<td width="${filled}%" style="background:${BRAND.accent};border-radius:4px;font-size:0;line-height:6px;height:6px;">&nbsp;</td>`,
-    );
-  }
-  if (empty > 0) {
-    cells.push(
-      `<td width="${empty}%" style="background:${track};border-radius:4px;font-size:0;line-height:6px;height:6px;">&nbsp;</td>`,
-    );
-  }
-  return `<table role="presentation" width="110" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:2px 0;width:110px;"><tr>${cells.join("")}</tr></table>`;
-}
 
 function th(text: string, align = "left"): string {
   return `<th style="text-align:${align};font-size:10px;font-weight:700;letter-spacing:1.2px;color:${BRAND.muted};text-transform:uppercase;padding:14px 12px;border-bottom:1px solid ${BRAND.cellBorder};white-space:nowrap;">${escapeHtml(text)}</th>`;
