@@ -309,49 +309,71 @@ export default function WeeklyLeadClosureReport() {
             ) : (
               <Table>
                 <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead colSpan={2} />
+                    {excludedStatuses.length > 0 && (
+                      <TableHead
+                        colSpan={excludedStatuses.length}
+                        className="text-center text-[10px] uppercase tracking-wider"
+                      >
+                        Frasorteret
+                      </TableHead>
+                    )}
+                    <TableHead colSpan={3} className="text-center text-[10px] uppercase tracking-wider">
+                      Kvalificeret
+                    </TableHead>
+                    <TableHead />
+                  </TableRow>
                   <TableRow>
                     <TableHead>Rapportlinje</TableHead>
-                    <TableHead className="text-right">Antal lukkede emner</TableHead>
-                    <TableHead className="text-right">Lukkede ja/nej</TableHead>
-                    <TableHead className="text-right">Antal bookede møder</TableHead>
-                    <TableHead className="text-right">Mødebook hitrate</TableHead>
+                    <TableHead className="text-right">Lukkede</TableHead>
                     {excludedStatuses.map((s) => (
                       <TableHead key={s.status} className="text-right">
                         {s.label}
                       </TableHead>
                     ))}
+                    <TableHead className="text-right">Ja/nej</TableHead>
+                    <TableHead className="text-right">Ja/nej-andel</TableHead>
+                    <TableHead className="text-right">Bookede</TableHead>
+                    <TableHead className="text-right">Hitrate</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lineTotals.map((row) => (
+                  {activeLineTotals.map((row) => (
                     <TableRow key={row.reportLine}>
-                      <TableCell>{row.reportLine}</TableCell>
+                      <TableCell className="font-medium">{row.reportLine}</TableCell>
                       <TableCell className="text-right">{row.closed}</TableCell>
-                      <TableCell className="text-right">{row.decided}</TableCell>
-                      <TableCell className="text-right">{row.booked}</TableCell>
-                      <TableCell className="text-right">
-                        {hitrate(row.booked, row.decided)}
-                      </TableCell>
                       {excludedStatuses.map((s) => (
                         <TableCell key={s.status} className="text-right">
                           {row.extras[s.status] ?? 0}
                         </TableCell>
                       ))}
+                      <TableCell className="text-right">{row.decided}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {hitrate(row.decided, row.closed)}
+                      </TableCell>
+                      <TableCell className="text-right">{row.booked}</TableCell>
+                      <TableCell className="text-right font-semibold text-emerald-600">
+                        {hitrate(row.booked, row.decided)}
+                      </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="font-semibold">
                     <TableCell>Tryg i alt</TableCell>
                     <TableCell className="text-right">{totals.closed}</TableCell>
-                    <TableCell className="text-right">{totals.decided}</TableCell>
-                    <TableCell className="text-right">{totals.booked}</TableCell>
-                    <TableCell className="text-right">
-                      {hitrate(totals.booked, totals.decided)}
-                    </TableCell>
                     {excludedStatuses.map((s) => (
                       <TableCell key={s.status} className="text-right">
                         {totals.extras[s.status] ?? 0}
                       </TableCell>
                     ))}
+                    <TableCell className="text-right">{totals.decided}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {hitrate(totals.decided, totals.closed)}
+                    </TableCell>
+                    <TableCell className="text-right">{totals.booked}</TableCell>
+                    <TableCell className="text-right text-emerald-600">
+                      {hitrate(totals.booked, totals.decided)}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
