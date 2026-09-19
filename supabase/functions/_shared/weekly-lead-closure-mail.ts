@@ -196,55 +196,78 @@ function statCard(options: {
   </td>`;
 }
 
-function lineTable(lines: LineTotals[], excluded: { status: string; label: string }[]): string {
-  const totalClosed = lines.reduce((s, l) => s + l.closed, 0);
-  const totalDecided = lines.reduce((s, l) => s + l.decided, 0);
-  const totalBooked = lines.reduce((s, l) => s + l.booked, 0);
+/**
+ * Tragt fra venstre mod højre: lukkede → frasorteret → kvalificeret → hitrate.
+ * Linjer uden aktivitet udelades og nævnes i en note under tabellen.
+ */
+function lineSection(
+  title: string,
+  subtitle: string,
+  lines: LineTotals[],
+  excluded: { status: string; label: string }[],
+): string {
+  const active = lines.filter((l) => l.closed > 0);
+  const idle = lines.filter((l) => l.closed === 0);
 
-  const rows = lines
-    .map((l) => {
-      const dim = l.closed === 0;
-      return `<tr>${td(l.reportLine, "left", { bold: true, dim })}${td(nf(l.closed), "right", { dim })}${td(
-        nf(l.decided),
-        "right",
-        { dim },
-      )}${td(nf(l.booked), "right", { dim })}${rawTd(bar(l.booked, l.decided), "left")}${td(
-        pct(l.booked, l.decided),
-        "right",
-        { bold: true, accent: !dim, dim },
-      )}${excluded.map((e) => td(nf(l.extras[e.status] ?? 0), "right", { dim })).join("")}</tr>`;
-    })
+  const totalClosed = active.reduce((s, l) => s + l.closed, 0);
+  const totalDecided = active.reduce((s, l) => s + l.decided, 0);
+  const totalBooked = active.reduce((s, l) => s + l.booked, 0);
+
+  const head = `<thead>
+    <tr>${groupTh("", 2, "left")}${excluded.length ? groupTh("Frasorteret", excluded.length) : ""}${groupTh("Kvalificeret", 3)}${groupTh("", 1)}</tr>
+    <tr>${th("Rapportlinje")}${th("Lukkede", "right")}${excluded
+      .map((e) => th(e.label, "right"))
+      .join("")}${th("Ja/nej", "right")}${th("Ja/nej-andel", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}</tr>
+  </thead>`;
+
+  const rows = active
+    .map(
+      (l) =>
+        `<tr>${td(l.reportLine, "left", { bold: true })}${td(nf(l.closed), "right")}${excluded
+          .map((e) => td(nf(l.extras[e.status] ?? 0), "right"))
+          .join("")}${td(nf(l.decided), "right")}${td(pct1(l.decided, l.closed), "right", {
+          dim: true,
+        })}${td(nf(l.booked), "right")}${td(pct1(l.booked, l.decided), "right", {
+          bold: true,
+          accent: true,
+        })}</tr>`,
+    )
     .join("");
 
   const totalExtras = excluded
     .map((e) =>
-      td(nf(lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
+      td(nf(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
         bold: true,
         onDark: true,
       }),
     )
     .join("");
 
-  return `
-    <thead><tr>${th("Rapportlinje")}${th("Lukkede", "right")}${th("Ja/nej", "right")}${th("Bookede", "right")}${th("")}${th(
-      "Hitrate",
-      "right",
-    )}${excluded.map((e) => th(e.label, "right")).join("")}</tr></thead>
-    <tbody>${rows}
-      <tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", { bold: true, onDark: true })}${td(
-        nf(totalClosed),
-        "right",
-        { bold: true, onDark: true },
-      )}${td(nf(totalDecided), "right", { bold: true, onDark: true })}${td(nf(totalBooked), "right", {
-        bold: true,
-        onDark: true,
-      })}${rawTd(bar(totalBooked, totalDecided, true), "left", true)}${td(pct(totalBooked, totalDecided), "right", {
-        bold: true,
-        accent: true,
-        onDark: true,
-      })}${totalExtras}</tr>
-    </tbody>`;
+  const totalRow = `<tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", {
+    bold: true,
+    onDark: true,
+  })}${td(nf(totalClosed), "right", { bold: true, onDark: true })}${totalExtras}${td(
+    nf(totalDecided),
+    "right",
+    { bold: true, onDark: true },
+  )}${td(pct1(totalDecided, totalClosed), "right", { onDark: true })}${td(nf(totalBooked), "right", {
+    bold: true,
+    onDark: true,
+  })}${td(pct1(totalBooked, totalDecided), "right", { bold: true, accent: true, onDark: true })}</tr>`;
+
+  const body = rows
+    ? `<tbody>${rows}${totalRow}</tbody>`
+    : `<tbody><tr>${td("Ingen lukkede emner i perioden.", "left", { dim: true })}</tr></tbody>`;
+
+  const note = idle.length
+    ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${idle.length} ${
+        idle.length === 1 ? "linje" : "linjer"
+      } uden aktivitet: ${escapeHtml(idle.map((l) => l.reportLine).join(", "))}</div>`
+    : "";
+
+  return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(`${head}${body}`)}${note}</div>`;
 }
+
 
 export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   subject: string;
