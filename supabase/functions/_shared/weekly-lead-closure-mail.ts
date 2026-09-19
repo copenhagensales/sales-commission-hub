@@ -9,7 +9,7 @@
  * hitrate-bjælker og en forklarende fodnote.
  */
 
-import { escapeHtml, pct } from "./quality-mail.ts";
+import { escapeHtml } from "./quality-mail.ts";
 
 const BRAND = {
   pageBg: "#eaf0f1",
@@ -119,29 +119,12 @@ function nf(value: number): string {
   return new Intl.NumberFormat("da-DK").format(value);
 }
 
-function ratio(part: number, whole: number): number {
-  if (!whole) return 0;
-  return Math.max(0, Math.min(1, part / whole));
+/** Procent med altid én decimal, dansk format. Deles ikke med kvalitetsmodulet. */
+function pct1(part: number, whole: number): string {
+  if (!whole) return "–";
+  return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
-/** Slank hitrate-bjælke i mailvenlig tabelform. */
-function bar(part: number, whole: number, onDark = false): string {
-  const filled = Math.round(ratio(part, whole) * 100);
-  const empty = 100 - filled;
-  const track = onDark ? "#343841" : BRAND.track;
-  const cells: string[] = [];
-  if (filled > 0) {
-    cells.push(
-      `<td width="${filled}%" style="background:${BRAND.accent};border-radius:4px;font-size:0;line-height:6px;height:6px;">&nbsp;</td>`,
-    );
-  }
-  if (empty > 0) {
-    cells.push(
-      `<td width="${empty}%" style="background:${track};border-radius:4px;font-size:0;line-height:6px;height:6px;">&nbsp;</td>`,
-    );
-  }
-  return `<table role="presentation" width="110" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:2px 0;width:110px;"><tr>${cells.join("")}</tr></table>`;
-}
 
 function th(text: string, align = "left"): string {
   return `<th style="text-align:${align};font-size:10px;font-weight:700;letter-spacing:1.2px;color:${BRAND.muted};text-transform:uppercase;padding:14px 12px;border-bottom:1px solid ${BRAND.cellBorder};white-space:nowrap;">${escapeHtml(text)}</th>`;
@@ -165,10 +148,14 @@ function td(
   return `<td style="text-align:${align};font-size:14px;color:${color};padding:14px 12px;border-bottom:${border};font-weight:${opts.bold ? 700 : 500};white-space:nowrap;">${escapeHtml(text)}</td>`;
 }
 
-function rawTd(html: string, align = "left", onDark = false): string {
-  const border = onDark ? "none" : `1px solid ${BRAND.cellBorder}`;
-  return `<td style="text-align:${align};padding:14px 12px;border-bottom:${border};">${html}</td>`;
+/** Gruppeoverskrift over flere kolonner. */
+function groupTh(text: string, span: number, align = "center"): string {
+  const label = text
+    ? `<span style="display:inline-block;background:${BRAND.pageBg};color:${BRAND.muted};font-size:9px;font-weight:800;letter-spacing:1.2px;padding:4px 8px;border-radius:6px;text-transform:uppercase;">${escapeHtml(text)}</span>`
+    : "&nbsp;";
+  return `<th colspan="${span}" style="text-align:${align};padding:12px 12px 0;font-weight:400;">${label}</th>`;
 }
+
 
 function sectionTitle(title: string, subtitle: string): string {
   return `
@@ -209,55 +196,78 @@ function statCard(options: {
   </td>`;
 }
 
-function lineTable(lines: LineTotals[], excluded: { status: string; label: string }[]): string {
-  const totalClosed = lines.reduce((s, l) => s + l.closed, 0);
-  const totalDecided = lines.reduce((s, l) => s + l.decided, 0);
-  const totalBooked = lines.reduce((s, l) => s + l.booked, 0);
+/**
+ * Tragt fra venstre mod højre: lukkede → frasorteret → kvalificeret → hitrate.
+ * Linjer uden aktivitet udelades og nævnes i en note under tabellen.
+ */
+function lineSection(
+  title: string,
+  subtitle: string,
+  lines: LineTotals[],
+  excluded: { status: string; label: string }[],
+): string {
+  const active = lines.filter((l) => l.closed > 0);
+  const idle = lines.filter((l) => l.closed === 0);
 
-  const rows = lines
-    .map((l) => {
-      const dim = l.closed === 0;
-      return `<tr>${td(l.reportLine, "left", { bold: true, dim })}${td(nf(l.closed), "right", { dim })}${td(
-        nf(l.decided),
-        "right",
-        { dim },
-      )}${td(nf(l.booked), "right", { dim })}${rawTd(bar(l.booked, l.decided), "left")}${td(
-        pct(l.booked, l.decided),
-        "right",
-        { bold: true, accent: !dim, dim },
-      )}${excluded.map((e) => td(nf(l.extras[e.status] ?? 0), "right", { dim })).join("")}</tr>`;
-    })
+  const totalClosed = active.reduce((s, l) => s + l.closed, 0);
+  const totalDecided = active.reduce((s, l) => s + l.decided, 0);
+  const totalBooked = active.reduce((s, l) => s + l.booked, 0);
+
+  const head = `<thead>
+    <tr>${groupTh("", 2, "left")}${excluded.length ? groupTh("Frasorteret", excluded.length) : ""}${groupTh("Kvalificeret", 3)}${groupTh("", 1)}</tr>
+    <tr>${th("Rapportlinje")}${th("Lukkede", "right")}${excluded
+      .map((e) => th(e.label, "right"))
+      .join("")}${th("Ja/nej", "right")}${th("Ja/nej-andel", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}</tr>
+  </thead>`;
+
+  const rows = active
+    .map(
+      (l) =>
+        `<tr>${td(l.reportLine, "left", { bold: true })}${td(nf(l.closed), "right")}${excluded
+          .map((e) => td(nf(l.extras[e.status] ?? 0), "right"))
+          .join("")}${td(nf(l.decided), "right")}${td(pct1(l.decided, l.closed), "right", {
+          dim: true,
+        })}${td(nf(l.booked), "right")}${td(pct1(l.booked, l.decided), "right", {
+          bold: true,
+          accent: true,
+        })}</tr>`,
+    )
     .join("");
 
   const totalExtras = excluded
     .map((e) =>
-      td(nf(lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
+      td(nf(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
         bold: true,
         onDark: true,
       }),
     )
     .join("");
 
-  return `
-    <thead><tr>${th("Rapportlinje")}${th("Lukkede", "right")}${th("Ja/nej", "right")}${th("Bookede", "right")}${th("")}${th(
-      "Hitrate",
-      "right",
-    )}${excluded.map((e) => th(e.label, "right")).join("")}</tr></thead>
-    <tbody>${rows}
-      <tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", { bold: true, onDark: true })}${td(
-        nf(totalClosed),
-        "right",
-        { bold: true, onDark: true },
-      )}${td(nf(totalDecided), "right", { bold: true, onDark: true })}${td(nf(totalBooked), "right", {
-        bold: true,
-        onDark: true,
-      })}${rawTd(bar(totalBooked, totalDecided, true), "left", true)}${td(pct(totalBooked, totalDecided), "right", {
-        bold: true,
-        accent: true,
-        onDark: true,
-      })}${totalExtras}</tr>
-    </tbody>`;
+  const totalRow = `<tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", {
+    bold: true,
+    onDark: true,
+  })}${td(nf(totalClosed), "right", { bold: true, onDark: true })}${totalExtras}${td(
+    nf(totalDecided),
+    "right",
+    { bold: true, onDark: true },
+  )}${td(pct1(totalDecided, totalClosed), "right", { onDark: true })}${td(nf(totalBooked), "right", {
+    bold: true,
+    onDark: true,
+  })}${td(pct1(totalBooked, totalDecided), "right", { bold: true, accent: true, onDark: true })}</tr>`;
+
+  const body = rows
+    ? `<tbody>${rows}${totalRow}</tbody>`
+    : `<tbody><tr>${td("Ingen lukkede emner i perioden.", "left", { dim: true })}</tr></tbody>`;
+
+  const note = idle.length
+    ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${idle.length} ${
+        idle.length === 1 ? "linje" : "linjer"
+      } uden aktivitet: ${escapeHtml(idle.map((l) => l.reportLine).join(", "))}</div>`
+    : "";
+
+  return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(`${head}${body}`)}${note}</div>`;
 }
+
 
 export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   subject: string;
@@ -289,7 +299,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
         })}
         ${statCard({
           label: "Mødebook-hitrate",
-          value: pct(totalBooked, totalDecided),
+          value: pct1(totalBooked, totalDecided),
           note: "bookede / lukkede ja/nej",
           dark: true,
         })}
@@ -301,10 +311,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
       </tr>
     </table>`;
 
-  const table1 = section(
+  const table1 = lineSection(
     "Tabel 1 — Trygs skabelon",
     `Pr. rapportlinje, uge ${input.weekNumber}. Hitrate = bookede møder ÷ lukkede ja/nej.`,
-    lineTable(input.lines, input.excludedStatuses),
+    input.lines,
+    input.excludedStatuses,
   );
 
   const statusHead = `<thead><tr>${th("Rapportlinje")}${input.statusKeys
@@ -346,10 +357,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   const table4 = input.previousWeeks.length
     ? input.previousWeeks
         .map((w) =>
-          section(
+          lineSection(
             `Tabel 4 — uge ${w.weekNumber}`,
             weekRange(w.weekStart),
-            lineTable(w.lines, input.excludedStatuses),
+            w.lines,
+            input.excludedStatuses,
           ),
         )
         .join("")
@@ -415,9 +427,10 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
       <div style="font-size:13px;color:${BRAND.text};line-height:1.7;">
-        <strong>Lukkede emner</strong> er alle emner afsluttet i ugen, uanset status.
-        <strong>Lukkede ja/nej</strong> er de emner, hvor kunden reelt er nået og har svaret ja eller nej —
-        ${escapeHtml(legendExtras)} er trukket ud. <strong>Hitrate</strong> er bookede møder delt med lukkede ja/nej.
+        Tabellen læses fra venstre mod højre: <strong>Lukkede</strong> er alle emner afsluttet i ugen.
+        Derefter falder ${escapeHtml(legendExtras)} fra, og tilbage står <strong>Ja/nej</strong> — emnerne hvor kunden
+        reelt er nået og har svaret. <strong>Ja/nej-andel</strong> er ja/nej i procent af lukkede og viser, hvor stor en
+        del af emnerne der kunne bruges. <strong>Hitrate</strong> er bookede møder delt med lukkede ja/nej.
       </div>
     </div>
 
