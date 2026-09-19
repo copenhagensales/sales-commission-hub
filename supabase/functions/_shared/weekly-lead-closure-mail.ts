@@ -427,9 +427,10 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
       <div style="font-size:13px;color:${BRAND.text};line-height:1.7;">
-        <strong>Lukkede emner</strong> er alle emner afsluttet i ugen, uanset status.
-        <strong>Lukkede ja/nej</strong> er de emner, hvor kunden reelt er nået og har svaret ja eller nej —
-        ${escapeHtml(legendExtras)} er trukket ud. <strong>Hitrate</strong> er bookede møder delt med lukkede ja/nej.
+        Tabellen læses fra venstre mod højre: <strong>Lukkede</strong> er alle emner afsluttet i ugen.
+        Derefter falder ${escapeHtml(legendExtras)} fra, og tilbage står <strong>Ja/nej</strong> — emnerne hvor kunden
+        reelt er nået og har svaret. <strong>Ja/nej-andel</strong> er ja/nej i procent af lukkede og viser, hvor stor en
+        del af emnerne der kunne bruges. <strong>Hitrate</strong> er bookede møder delt med lukkede ja/nej.
       </div>
     </div>
 
