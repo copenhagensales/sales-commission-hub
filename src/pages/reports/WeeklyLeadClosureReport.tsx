@@ -153,6 +153,13 @@ export default function WeeklyLeadClosureReport() {
     });
   }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses]);
 
+  /** Linjer med aktivitet vises; linjer uden nævnes i en note under tabellen. */
+  const activeLineTotals = useMemo(() => lineTotals.filter((l) => l.closed > 0), [lineTotals]);
+  const idleLines = useMemo(
+    () => lineTotals.filter((l) => l.closed === 0).map((l) => l.reportLine),
+    [lineTotals],
+  );
+
   const totals = useMemo(() => {
     const extras: Record<string, number> = {};
     for (const s of excludedStatuses) {
