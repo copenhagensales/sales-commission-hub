@@ -148,10 +148,14 @@ function td(
   return `<td style="text-align:${align};font-size:14px;color:${color};padding:14px 12px;border-bottom:${border};font-weight:${opts.bold ? 700 : 500};white-space:nowrap;">${escapeHtml(text)}</td>`;
 }
 
-function rawTd(html: string, align = "left", onDark = false): string {
-  const border = onDark ? "none" : `1px solid ${BRAND.cellBorder}`;
-  return `<td style="text-align:${align};padding:14px 12px;border-bottom:${border};">${html}</td>`;
+/** Gruppeoverskrift over flere kolonner. */
+function groupTh(text: string, span: number, align = "center"): string {
+  const label = text
+    ? `<span style="display:inline-block;background:${BRAND.pageBg};color:${BRAND.muted};font-size:9px;font-weight:800;letter-spacing:1.2px;padding:4px 8px;border-radius:6px;text-transform:uppercase;">${escapeHtml(text)}</span>`
+    : "&nbsp;";
+  return `<th colspan="${span}" style="text-align:${align};padding:12px 12px 0;font-weight:400;">${label}</th>`;
 }
+
 
 function sectionTitle(title: string, subtitle: string): string {
   return `
