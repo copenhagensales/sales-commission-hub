@@ -127,7 +127,17 @@ export async function computeDailySales(
     ? { date: comparisonRow.date, quantity: comparisonRow.quantity }
     : null;
 
-  return { totalQuantity, saleCount, products, trend, comparison };
+  // Måned til dato: samme datasæt, afgrænset til rapportdagens måned.
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthRows = totals.filter((t) => t.date >= monthStart && t.date <= date);
+  const monthToDate: DailySalesMonthToDate = {
+    start: monthStart,
+    quantity: monthRows.reduce((sum, t) => sum + t.quantity, 0),
+    saleCount: monthRows.reduce((sum, t) => sum + t.saleCount, 0),
+    activeDays: monthRows.length,
+  };
+
+  return { totalQuantity, saleCount, products, trend, comparison, monthToDate };
 }
 
 /**
