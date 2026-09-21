@@ -178,16 +178,22 @@ async function syncCampaignNames(
       (r) => safeString((r as { account: string }).account) === account.key,
     );
     if (targets.length === 0) continue;
-    const campaigns = asArray(
-      await getJson("/campaigns?pageSize=1000", authHeader(account)),
-      "campaigns",
-      "data",
-    );
     const names = new Map<string, string>();
-    for (const c of campaigns) {
-      const id = safeString(c.id ?? c.campaignId);
-      const name = safeString(c.name ?? c.campaignName);
-      if (id && name) names.set(id, name);
+    // Nogle konti giver ikke adgang til kampagnelisten. Da springes kontoen over.
+    try {
+      const campaigns = asArray(
+        await getJson("/campaigns?pageSize=1000", authHeader(account)),
+        "campaigns",
+        "data",
+      );
+      for (const c of campaigns) {
+        const id = safeString(c.id ?? c.campaignId);
+        const name = safeString(c.name ?? c.campaignName);
+        if (id && name) names.set(id, name);
+      }
+    } catch (error) {
+      console.error(`Kampagnenavne kunne ikke hentes for ${account.key}`, error);
+      continue;
     }
     for (const row of targets) {
       const r = row as { id: string; adversus_campaign_id: string };
