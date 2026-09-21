@@ -33,6 +33,7 @@ import {
   useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
+  useWeeklyLeadCallStats,
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
   useWeeklyLeadClosureStats,
@@ -42,6 +43,14 @@ import {
 
 const NO_LINE = "__none__";
 const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Lederne" };
+
+/** Aggregerede opkaldstal pr. rapportlinje. */
+type CallTotals = {
+  attempts: number;
+  answered: number;
+  leadsDialed: number;
+  leadsAnswered: number;
+};
 
 /** Procent med altid én decimal, så kolonnen flugter. */
 function hitrate(part: number, whole: number): string {
