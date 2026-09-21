@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, Loader2, Mail, Play, TableProperties, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  Mail,
+  Play,
+  TableProperties,
+  Trash2,
+} from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
@@ -44,6 +58,35 @@ import {
 const NO_LINE = "__none__";
 const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Lederne" };
 
+/** Status der vises som "Ugyldige leads" i hovedtabellen. */
+const INVALID_STATUS = "invalid";
+
+/** Tærskler for farvemarkering — justér her. */
+const INVALID_WARN_PCT = 5;
+const INVALID_ALERT_PCT = 15;
+const CONTACT_WARN_PCT = 40;
+const SMALL_BASE_DECIDED = 50;
+
+/** Visuel gruppering af rækkerne (ingen tal, ingen beregning). */
+const COLD_CANVAS_LINES = ["Kanvas"];
+
+const MONTHS_DA = [
+  "januar",
+  "februar",
+  "marts",
+  "april",
+  "maj",
+  "juni",
+  "juli",
+  "august",
+  "september",
+  "oktober",
+  "november",
+  "december",
+];
+
+type PeriodMode = "week" | "month" | "ytd";
+
 /** Aggregerede opkaldstal pr. rapportlinje. */
 type CallTotals = {
   attempts: number;
@@ -52,16 +95,25 @@ type CallTotals = {
   leadsAnswered: number;
 };
 
-/** Procent med altid én decimal, så kolonnen flugter. */
-function hitrate(part: number, whole: number): string {
-  if (!whole) return "–";
-  return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
+const numberFmt = new Intl.NumberFormat("da-DK");
+
+function formatCount(value: number): string {
+  return numberFmt.format(value);
 }
 
-/** Frasorteret vises som andel af lukkede med antallet i parentes. */
-function sharePlusCount(count: number, whole: number): string {
-  if (!whole) return `${count} stk`;
-  return `${hitrate(count, whole)} (${count} stk)`;
+function pctValue(part: number, whole: number): number | null {
+  if (!whole) return null;
+  return (part / whole) * 100;
+}
+
+function formatPct(value: number | null): string {
+  if (value === null) return "–";
+  return `${value.toFixed(1).replace(".", ",")} %`;
+}
+
+/** Procent med altid én decimal, så kolonnen flugter. */
+function hitrate(part: number, whole: number): string {
+  return formatPct(pctValue(part, whole));
 }
 
 function weekLabel(weekStart: string): string {
@@ -77,9 +129,33 @@ function weekLabel(weekStart: string): string {
   return `Uge ${week}`;
 }
 
+/** "15.–21. september 2026" ud fra mandagsdatoen. */
+function weekRangeLabel(weekStart: string): string {
+  if (!weekStart) return "";
+  const start = new Date(`${weekStart}T00:00:00Z`);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  const startPart =
+    start.getUTCMonth() === end.getUTCMonth()
+      ? `${start.getUTCDate()}.`
+      : `${start.getUTCDate()}. ${MONTHS_DA[start.getUTCMonth()]}`;
+  return `${startPart}–${end.getUTCDate()}. ${MONTHS_DA[end.getUTCMonth()]} ${end.getUTCFullYear()}`;
+}
+
+/** Vises hvor opkaldsdata endnu ikke er koblet på kampagnen. */
+function MissingCallsChip() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
+      opkaldsdata mangler
+    </span>
+  );
+}
+
 export default function WeeklyLeadClosureReport() {
   const { isSuperadmin } = useIsSuperadmin();
   const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const [period, setPeriod] = useState<PeriodMode>("week");
+  const [showDetails, setShowDetails] = useState(false);
   const [sendMail, setSendMail] = useState(false);
   const [weeks, setWeeks] = useState("1");
   const [newRecipient, setNewRecipient] = useState("");
@@ -137,6 +213,12 @@ export default function WeeklyLeadClosureReport() {
     [statuses],
   );
 
+  /** Frasorterede statusser ud over "Ugyldige leads" vises i detaljesektionen. */
+  const detailStatuses = useMemo(
+    () => excludedStatuses.filter((s) => s.status !== INVALID_STATUS),
+    [excludedStatuses],
+  );
+
   const hitrateStatuses = useMemo(
     () =>
       statuses
@@ -151,19 +233,47 @@ export default function WeeklyLeadClosureReport() {
   );
   const activeWeek = selectedWeek || availableWeeks[0] || "";
 
+  /**
+   * Uger der indgår i den valgte periode. Samme rækker og samme beregninger —
+   * kun datointervallet er bredere.
+   */
+  const periodWeeks = useMemo(() => {
+    if (!activeWeek) return [] as string[];
+    if (period === "week") return [activeWeek];
+    if (period === "month") {
+      return availableWeeks.filter(
+        (w) => w.slice(0, 7) === activeWeek.slice(0, 7) && w <= activeWeek,
+      );
+    }
+    return availableWeeks.filter(
+      (w) => w.slice(0, 4) === activeWeek.slice(0, 4) && w <= activeWeek,
+    );
+  }, [period, activeWeek, availableWeeks]);
+
   const weekRows = useMemo(
-    () => stats.filter((s) => s.week_start === activeWeek),
-    [stats, activeWeek],
+    () => stats.filter((s) => periodWeeks.includes(s.week_start)),
+    [stats, periodWeeks],
   );
 
-  /** Opkaldstal pr. rapportlinje for den valgte uge. */
+  const periodLabel = useMemo(() => {
+    if (!activeWeek) return "";
+    if (period === "week") return `${weekLabel(activeWeek)} · ${weekRangeLabel(activeWeek)}`;
+    const year = activeWeek.slice(0, 4);
+    if (period === "month") {
+      const month = MONTHS_DA[Number(activeWeek.slice(5, 7)) - 1] ?? "";
+      return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${year}`;
+    }
+    return `År til dato ${year}`;
+  }, [period, activeWeek]);
+
+  /** Opkaldstal pr. rapportlinje for den valgte periode. */
   const callsByLine = useMemo(() => {
     const lineFor = new Map(
       mapping.map((m) => [`${m.account}|${m.adversus_campaign_id}`, m.report_line]),
     );
     const out = new Map<string, CallTotals>();
     for (const row of callStats) {
-      if (row.week_start !== activeWeek) continue;
+      if (!periodWeeks.includes(row.week_start)) continue;
       const line = lineFor.get(`${row.account}|${row.campaign_id}`);
       if (!line) continue;
       const entry = out.get(line) ??
@@ -175,7 +285,7 @@ export default function WeeklyLeadClosureReport() {
       out.set(line, entry);
     }
     return out;
-  }, [callStats, mapping, activeWeek]);
+  }, [callStats, mapping, periodWeeks]);
 
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
@@ -208,24 +318,6 @@ export default function WeeklyLeadClosureReport() {
     [activeLineTotals],
   );
 
-  const totals = useMemo(() => {
-    const extras: Record<string, number> = {};
-    for (const s of excludedStatuses) {
-      extras[s.status] = lineTotals.reduce((sum, l) => sum + (l.extras[s.status] ?? 0), 0);
-    }
-    const callSum = (pick: (c: CallTotals) => number) =>
-      lineTotals.reduce((s, l) => s + (l.calls ? pick(l.calls) : 0), 0);
-    return {
-      closed: lineTotals.reduce((s, l) => s + l.closed, 0),
-      decided: lineTotals.reduce((s, l) => s + l.decided, 0),
-      booked: lineTotals.reduce((s, l) => s + l.booked, 0),
-      extras,
-      attempts: callSum((c) => c.attempts),
-      answered: callSum((c) => c.answered),
-      leadsDialed: callSum((c) => c.leadsDialed),
-      leadsAnswered: callSum((c) => c.leadsAnswered),
-    };
-  }, [lineTotals, excludedStatuses]);
 
   const unmapped = useMemo(() => {
     const out = new Map<string, { account: string; campaignId: string; closed: number }>();
@@ -278,66 +370,25 @@ export default function WeeklyLeadClosureReport() {
   return (
     <MainLayout>
       <div className="space-y-6 p-4 md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Kampagneoversigt Tryg</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Tryg – ugerapport</h1>
             <p className="text-sm text-muted-foreground">
-              Lukkede emner, bookede møder og hitrate pr. uge. Sendes automatisk mandag kl. 07.00.
+              {periodLabel ? `${periodLabel} · ` : ""}Resultater pr. kampagne
             </p>
           </div>
-          {isSuperadmin && (
-            <div className="flex flex-wrap items-center gap-3">
-              <Select value={weeks} onValueChange={setWeeks}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Sidste uge</SelectItem>
-                  <SelectItem value="5">Seneste 5 uger</SelectItem>
-                  <SelectItem value="8">Seneste 8 uger</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-2">
-                <Switch id="send-mail" checked={sendMail} onCheckedChange={setSendMail} />
-                <Label htmlFor="send-mail" className="text-sm">
-                  Send mail
-                </Label>
-              </div>
-              <Button onClick={handleRun} disabled={runReport.isPending}>
-                {runReport.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="mr-2 h-4 w-4" />
-                )}
-                Kør nu
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSendMailNow}
-                disabled={sendMailNow.isPending || activeRecipients === 0}
-                title={
-                  activeRecipients === 0
-                    ? "Tilføj mindst én aktiv modtager først"
-                    : "Sender tallene for den igangværende uge"
-                }
-              >
-                {sendMailNow.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="mr-2 h-4 w-4" />
-                )}
-                Send mail nu
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TableProperties className="h-4 w-4" />
-              Trygs skabelon
-            </CardTitle>
+          <div className="flex flex-wrap items-center gap-3">
+            <ToggleGroup
+              type="single"
+              value={period}
+              onValueChange={(value) => value && setPeriod(value as PeriodMode)}
+              variant="outline"
+              size="sm"
+            >
+              <ToggleGroupItem value="week">Uge</ToggleGroupItem>
+              <ToggleGroupItem value="month">Måned</ToggleGroupItem>
+              <ToggleGroupItem value="ytd">År til dato</ToggleGroupItem>
+            </ToggleGroup>
             {availableWeeks.length > 0 && (
               <Select value={activeWeek} onValueChange={setSelectedWeek}>
                 <SelectTrigger className="w-[190px]">
@@ -352,6 +403,61 @@ export default function WeeklyLeadClosureReport() {
                 </SelectContent>
               </Select>
             )}
+          </div>
+        </div>
+
+        {isSuperadmin && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={weeks} onValueChange={setWeeks}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Sidste uge</SelectItem>
+                <SelectItem value="5">Seneste 5 uger</SelectItem>
+                <SelectItem value="8">Seneste 8 uger</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <Switch id="send-mail" checked={sendMail} onCheckedChange={setSendMail} />
+              <Label htmlFor="send-mail" className="text-sm">
+                Send mail
+              </Label>
+            </div>
+            <Button onClick={handleRun} disabled={runReport.isPending}>
+              {runReport.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              Kør nu
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSendMailNow}
+              disabled={sendMailNow.isPending || activeRecipients === 0}
+              title={
+                activeRecipients === 0
+                  ? "Tilføj mindst én aktiv modtager først"
+                  : "Sender tallene for den igangværende uge"
+              }
+            >
+              {sendMailNow.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="mr-2 h-4 w-4" />
+              )}
+              Send mail nu
+            </Button>
+          </div>
+        )}
+
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TableProperties className="h-4 w-4" />
+              Resultater pr. kampagne
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {statsLoading ? (
@@ -363,107 +469,239 @@ export default function WeeklyLeadClosureReport() {
                 Der er endnu ingen tal. Kør rapporten for at hente ugerne.
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead colSpan={2} />
-                    {excludedStatuses.length > 0 && (
-                      <TableHead
-                        colSpan={excludedStatuses.length}
-                        className="text-center text-[10px] uppercase tracking-wider"
-                      >
-                        Frasorteret
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Kampagne
                       </TableHead>
-                    )}
-                    <TableHead colSpan={3} className="text-center text-[10px] uppercase tracking-wider">
-                      Kvalificeret
-                    </TableHead>
-                    <TableHead />
-                    <TableHead colSpan={2} className="text-center text-[10px] uppercase tracking-wider">
-                      Opkald
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead>Rapportlinje</TableHead>
-                    <TableHead className="text-right">Lukkede</TableHead>
-                    {excludedStatuses.map((s) => (
-                      <TableHead key={s.status} className="text-right">
-                        {s.label}
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Leads behandlet
                       </TableHead>
-                    ))}
-                    <TableHead className="text-right">Ja/nej</TableHead>
-                    <TableHead className="text-right">Ja/nej-andel</TableHead>
-                    <TableHead className="text-right">Bookede</TableHead>
-                    <TableHead className="text-right">Hitrate</TableHead>
-                    <TableHead className="text-right">Svarprocent</TableHead>
-                    <TableHead className="text-right">Kontaktandel</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeLineTotals.map((row) => (
-                    <TableRow key={row.reportLine}>
-                      <TableCell className="font-medium">{row.reportLine}</TableCell>
-                      <TableCell className="text-right">{row.closed}</TableCell>
-                      {excludedStatuses.map((s) => (
-                        <TableCell key={s.status} className="text-right">
-                          {sharePlusCount(row.extras[s.status] ?? 0, row.closed)}
-                        </TableCell>
-                      ))}
-                      <TableCell className="text-right">{row.decided}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {hitrate(row.decided, row.closed)}
-                      </TableCell>
-                      <TableCell className="text-right">{row.booked}</TableCell>
-                      <TableCell className="text-right font-semibold text-emerald-600">
-                        {hitrate(row.booked, row.decided)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.calls ? hitrate(row.calls.answered, row.calls.attempts) : "–"}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.calls ? hitrate(row.calls.leadsAnswered, row.calls.leadsDialed) : "–"}
-                      </TableCell>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Kontaktandel
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Ugyldige leads
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Kvalificerede samtaler
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Bookede
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Hitrate
+                      </TableHead>
                     </TableRow>
-                  ))}
-                  <TableRow className="font-semibold">
-                    <TableCell>Tryg i alt</TableCell>
-                    <TableCell className="text-right">{totals.closed}</TableCell>
-                    {excludedStatuses.map((s) => (
-                      <TableCell key={s.status} className="text-right">
-                        {sharePlusCount(totals.extras[s.status] ?? 0, totals.closed)}
-                      </TableCell>
-                    ))}
-                    <TableCell className="text-right">{totals.decided}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {hitrate(totals.decided, totals.closed)}
-                    </TableCell>
-                    <TableCell className="text-right">{totals.booked}</TableCell>
-                    <TableCell className="text-right text-emerald-600">
-                      {hitrate(totals.booked, totals.decided)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {hitrate(totals.answered, totals.attempts)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {hitrate(totals.leadsAnswered, totals.leadsDialed)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            )}
-            {!statsLoading && availableWeeks.length > 0 && idleLines.length > 0 && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                {idleLines.length} {idleLines.length === 1 ? "linje" : "linjer"} uden aktivitet:{" "}
-                {idleLines.join(", ")}
-              </p>
+                  </TableHeader>
+                  <TableBody>
+                    {[
+                      {
+                        title: "Partnersegmenter (Trygs medlemslister)",
+                        rows: activeLineTotals.filter(
+                          (r) => !COLD_CANVAS_LINES.includes(r.reportLine),
+                        ),
+                      },
+                      {
+                        title: "Kold kanvas",
+                        rows: activeLineTotals.filter((r) =>
+                          COLD_CANVAS_LINES.includes(r.reportLine),
+                        ),
+                      },
+                    ]
+                      .filter((group) => group.rows.length > 0)
+                      .map((group) => (
+                        <Fragment key={group.title}>
+                          <TableRow className="hover:bg-transparent">
+                            <TableCell
+                              colSpan={7}
+                              className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                            >
+                              {group.title}
+                            </TableCell>
+                          </TableRow>
+                          {group.rows.map((row) => {
+                            const invalid = row.extras[INVALID_STATUS] ?? 0;
+                            const invalidPct = pctValue(invalid, row.closed);
+                            const contactPct = row.calls
+                              ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
+                              : null;
+                            const hitPct = pctValue(row.booked, row.decided);
+                            const smallBase = row.decided < SMALL_BASE_DECIDED;
+                            return (
+                              <TableRow key={row.reportLine}>
+                                <TableCell className="text-sm font-medium">
+                                  {row.reportLine}
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {formatCount(row.closed)}
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {!row.calls ? (
+                                    <MissingCallsChip />
+                                  ) : contactPct !== null &&
+                                    contactPct < CONTACT_WARN_PCT ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-amber-300 bg-amber-50 tabular-nums text-amber-700"
+                                    >
+                                      {formatPct(contactPct)}
+                                    </Badge>
+                                  ) : (
+                                    formatPct(contactPct)
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {invalidPct !== null && invalidPct > INVALID_ALERT_PCT ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-red-300 bg-red-50 tabular-nums text-red-700"
+                                    >
+                                      {formatPct(invalidPct)}
+                                    </Badge>
+                                  ) : invalidPct !== null && invalidPct >= INVALID_WARN_PCT ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-amber-300 bg-amber-50 tabular-nums text-amber-700"
+                                    >
+                                      {formatPct(invalidPct)}
+                                    </Badge>
+                                  ) : (
+                                    <span>{formatPct(invalidPct)}</span>
+                                  )}
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({formatCount(invalid)})
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {formatCount(row.decided)}
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {formatCount(row.booked)}
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap text-right text-sm">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          smallBase
+                                            ? "bg-muted-foreground/50"
+                                            : "bg-emerald-500"
+                                        }`}
+                                        style={{
+                                          width: `${Math.min(100, Math.max(0, hitPct ?? 0))}%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <span
+                                      className={`whitespace-nowrap tabular-nums ${
+                                        smallBase
+                                          ? "text-muted-foreground"
+                                          : "font-semibold text-emerald-600"
+                                      }`}
+                                    >
+                                      {formatPct(hitPct)}
+                                    </span>
+                                    {smallBase && (
+                                      <span className="whitespace-nowrap text-xs text-muted-foreground">
+                                        lille grundlag
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </Fragment>
+                      ))}
+                  </TableBody>
+                </Table>
+
+                <Collapsible open={showDetails} onOpenChange={setShowDetails}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="mt-3 text-sm">
+                      <ChevronDown
+                        className={`mr-2 h-4 w-4 transition-transform ${
+                          showDetails ? "rotate-180" : ""
+                        }`}
+                      />
+                      Vis detaljer
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <Table className="mt-2">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                            Kampagne
+                          </TableHead>
+                          {detailStatuses.map((s) => (
+                            <TableHead
+                              key={s.status}
+                              className="text-right text-xs uppercase tracking-wider text-muted-foreground"
+                            >
+                              {s.label}
+                            </TableHead>
+                          ))}
+                          <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                            Ja/nej-andel
+                          </TableHead>
+                          <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                            Svarprocent
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {activeLineTotals.map((row) => (
+                          <TableRow key={row.reportLine}>
+                            <TableCell className="text-sm font-medium">
+                              {row.reportLine}
+                            </TableCell>
+                            {detailStatuses.map((s) => (
+                              <TableCell
+                                key={s.status}
+                                className="text-right text-sm tabular-nums"
+                              >
+                                {formatPct(pctValue(row.extras[s.status] ?? 0, row.closed))}
+                                <span className="ml-1 text-muted-foreground">
+                                  ({formatCount(row.extras[s.status] ?? 0)})
+                                </span>
+                              </TableCell>
+                            ))}
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {hitrate(row.decided, row.closed)}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {row.calls ? (
+                                hitrate(row.calls.answered, row.calls.attempts)
+                              ) : (
+                                <MissingCallsChip />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CollapsibleContent>
+                </Collapsible>
+              </>
             )}
             {!statsLoading && linesWithoutCalls.length > 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
+                er koblet på.
+              </p>
+            )}
+            {!statsLoading && availableWeeks.length > 0 && idleLines.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Opkaldstal mangler for: {linesWithoutCalls.join(", ")}
+                {idleLines.length} {idleLines.length === 1 ? "kampagne" : "kampagner"} uden
+                aktivitet i perioden: {idleLines.join(", ")}
               </p>
             )}
             {unmapped.length > 0 && (
-              <p className="mt-4 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Ikke mappet:{" "}
                 {unmapped
                   .map(
@@ -473,6 +711,34 @@ export default function WeeklyLeadClosureReport() {
                   .join(", ")}
               </p>
             )}
+
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground md:grid-cols-4">
+              <div>
+                <p className="font-medium text-foreground">Leads behandlet</p>
+                <p>Leads fra jeres lister, som vi har færdigbehandlet i perioden.</p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Kontaktandel</p>
+                <p>
+                  Andel af leads, hvor vi fik en person i røret. Lav andel peger typisk på
+                  leadkvalitet eller forkerte numre.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Ugyldige leads</p>
+                <p>
+                  Forkert nummer, allerede kunde, afgået m.m. Markeres gult over{" "}
+                  {INVALID_WARN_PCT} % og rødt over {INVALID_ALERT_PCT} %.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Hitrate</p>
+                <p>
+                  Bookede i procent af kvalificerede samtaler. Vises gråt ved under{" "}
+                  {SMALL_BASE_DECIDED} samtaler, hvor tallet svinger meget.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
