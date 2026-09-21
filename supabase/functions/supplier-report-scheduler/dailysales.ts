@@ -154,6 +154,13 @@ export async function runDailySales(
     dateOverride?: string;
     subscriptionId?: string;
     testEmail?: string;
+    /**
+     * Bevidst gensendelse af en dag der allerede er sendt. Dubletspærringen
+     * (UNIQUE subscription_id + period_start) bevares — den eksisterende
+     * udsendelsesrække genbruges og får nyt sent_at, så historikken viser at
+     * mailen er sendt igen i stedet for at blive slettet.
+     */
+    resend?: boolean;
   },
 ): Promise<DailySalesResult[]> {
   const results: DailySalesResult[] = [];
