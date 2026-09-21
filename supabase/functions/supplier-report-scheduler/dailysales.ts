@@ -154,6 +154,13 @@ export async function runDailySales(
     dateOverride?: string;
     subscriptionId?: string;
     testEmail?: string;
+    /**
+     * Bevidst gensendelse af en dag der allerede er sendt. Dubletspærringen
+     * (UNIQUE subscription_id + period_start) bevares — den eksisterende
+     * udsendelsesrække genbruges og får nyt sent_at, så historikken viser at
+     * mailen er sendt igen i stedet for at blive slettet.
+     */
+    resend?: boolean;
   },
 ): Promise<DailySalesResult[]> {
   const results: DailySalesResult[] = [];
@@ -229,29 +236,43 @@ export async function runDailySales(
     }
 
     // UNIQUE (subscription_id, period_start) sikrer at en dag kun sendes én gang.
-    const { data: inserted, error: insertError } = await svc
-      .from("supplier_report_dispatches")
-      .insert({
-        subscription_id: sub.id,
-        period_start: date,
-        period_end: date,
-        status: data.totalQuantity === 0 ? "skipped" : "approved",
-        error_message:
-          data.totalQuantity === 0
-            ? `Ingen salg for ${clientName} den ${date} - intet er sendt til kunden.`
-            : null,
-      })
-      .select("id")
-      .maybeSingle();
+    let dispatchId: string | null = null;
+    if (opts.resend) {
+      const { data: existing } = await svc
+        .from("supplier_report_dispatches")
+        .select("id")
+        .eq("subscription_id", sub.id)
+        .eq("period_start", date)
+        .maybeSingle();
+      dispatchId = (existing as { id: string } | null)?.id ?? null;
+    }
 
-    if (insertError || !inserted) {
-      results.push({
-        ...base,
-        ...data,
-        action: "already_handled",
-        detail: insertError?.message ?? "udsendelsen findes allerede",
-      });
-      continue;
+    if (!dispatchId) {
+      const { data: inserted, error: insertError } = await svc
+        .from("supplier_report_dispatches")
+        .insert({
+          subscription_id: sub.id,
+          period_start: date,
+          period_end: date,
+          status: data.totalQuantity === 0 ? "skipped" : "approved",
+          error_message:
+            data.totalQuantity === 0
+              ? `Ingen salg for ${clientName} den ${date} - intet er sendt til kunden.`
+              : null,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (insertError || !inserted) {
+        results.push({
+          ...base,
+          ...data,
+          action: "already_handled",
+          detail: insertError?.message ?? "udsendelsen findes allerede",
+        });
+        continue;
+      }
+      dispatchId = (inserted as { id: string }).id;
     }
 
     // Nul salg: ingen kundemail og ingen intern advarsel (det er normalt).
@@ -269,7 +290,7 @@ export async function runDailySales(
       await svc
         .from("supplier_report_dispatches")
         .update({ status: "failed", error_message: msg })
-        .eq("id", inserted.id);
+        .eq("id", dispatchId);
       results.push({ ...base, ...data, action: "already_handled", detail: msg });
       continue;
     }
@@ -282,7 +303,7 @@ export async function runDailySales(
         sent_to: [recipient, ...cc],
         error_message: null,
       })
-      .eq("id", inserted.id);
+      .eq("id", dispatchId);
     await svc
       .from("supplier_report_subscriptions")
       .update({ last_run_at: new Date().toISOString() })

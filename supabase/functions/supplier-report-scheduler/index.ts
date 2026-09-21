@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
         dateOverride: (body.sale_date as string) || undefined,
         subscriptionId: (body.subscription_id as string) || undefined,
         testEmail: (body.test_email as string) || undefined,
+        resend: body.resend === true,
       });
       return new Response(JSON.stringify({ success: true, mode, results }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
