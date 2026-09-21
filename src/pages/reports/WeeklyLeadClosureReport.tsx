@@ -732,6 +732,10 @@ export default function WeeklyLeadClosureReport() {
                 </p>
               </div>
               <div>
+                <p className="font-medium text-foreground">Ukvalificerede</p>
+                <p>Samtaler hvor kunden ikke opfyldte kriterierne for et møde.</p>
+              </div>
+              <div>
                 <p className="font-medium text-foreground">Hitrate</p>
                 <p>
                   Bookede i procent af kvalificerede samtaler. Vises gråt ved under{" "}
