@@ -258,7 +258,7 @@ function lineSection(
     .map(
       (l) =>
         `<tr>${td(l.reportLine, "left", { bold: true })}${td(nf(l.closed), "right")}${excluded
-          .map((e) => td(nf(l.extras[e.status] ?? 0), "right"))
+          .map((e) => td(sharePlusCount(l.extras[e.status] ?? 0, l.closed), "right"))
           .join("")}${td(nf(l.decided), "right")}${td(pct1(l.decided, l.closed), "right", {
           dim: true,
         })}${td(nf(l.booked), "right")}${td(pct1(l.booked, l.decided), "right", {
