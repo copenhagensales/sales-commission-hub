@@ -1076,6 +1076,41 @@ export function buildClientDailySalesEmail(params: {
     },
   ];
 
+  if (monthToDate) {
+    const avg = monthToDate.activeDays > 0
+      ? monthToDate.quantity / monthToDate.activeDays
+      : 0;
+    const mtdItems: ListItem[] = [
+      {
+        name: "Salg i alt",
+        variant: null,
+        value: fmtInt(monthToDate.quantity),
+      },
+      {
+        name: "Dage med salg",
+        variant: null,
+        value: fmtInt(monthToDate.activeDays),
+      },
+      {
+        name: "Gennemsnit pr. dag med salg",
+        variant: null,
+        value: avg.toFixed(1).replace(".", ","),
+      },
+    ];
+    sections.push({
+      label: `Måned til dato (${monthLabel})`,
+      html: `${listTable(mtdItems, 80)}
+        <div style="padding-top:18px;">${
+        bodyText(
+          esc(
+            `Perioden er ${dateShort(monthToDate.start)} til ${dateShort(date)}.`,
+          ),
+        )
+      }</div>`,
+    });
+  }
+
+
   if (trend.length > 0) {
     const points: BarPoint[] = trend.map((t, i) => ({
       label: dateShort(t.date),
