@@ -67,7 +67,9 @@ export interface DailySalesData {
   products: DailySalesProductRow[];
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
+  monthToDate: DailySalesMonthToDate;
 }
+
 
 /**
  * Beregner gårsdagens salg for én kunde.
