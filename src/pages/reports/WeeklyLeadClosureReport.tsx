@@ -400,7 +400,7 @@ export default function WeeklyLeadClosureReport() {
                       <TableCell className="text-right">{row.closed}</TableCell>
                       {excludedStatuses.map((s) => (
                         <TableCell key={s.status} className="text-right">
-                          {row.extras[s.status] ?? 0}
+                          {sharePlusCount(row.extras[s.status] ?? 0, row.closed)}
                         </TableCell>
                       ))}
                       <TableCell className="text-right">{row.decided}</TableCell>
