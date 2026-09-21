@@ -274,7 +274,7 @@ function lineSection(
 
   const totalExtras = excluded
     .map((e) =>
-      td(nf(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
+      td(sharePlusCount(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0), totalClosed), "right", {
         bold: true,
         onDark: true,
       }),
