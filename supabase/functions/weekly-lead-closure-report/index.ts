@@ -994,7 +994,7 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status";
+      action?: "status" | "sync_campaign_names";
       run_ids?: string[];
     };
 
@@ -1006,6 +1006,10 @@ Deno.serve(async (req) => {
       return json(200, {
         summaries: summaries.map(({ failed: _failed, ...summary }) => summary),
       });
+    }
+
+    if (body.action === "sync_campaign_names") {
+      return json(200, { campaigns: await syncCampaignNames(svc) });
     }
 
     // Planen kører 05:00 og 06:00 UTC mandag, så mailen rammer 07:00 dansk tid
