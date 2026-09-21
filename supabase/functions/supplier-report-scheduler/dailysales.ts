@@ -290,7 +290,7 @@ export async function runDailySales(
       await svc
         .from("supplier_report_dispatches")
         .update({ status: "failed", error_message: msg })
-        .eq("id", inserted.id);
+        .eq("id", dispatchId);
       results.push({ ...base, ...data, action: "already_handled", detail: msg });
       continue;
     }
@@ -303,7 +303,7 @@ export async function runDailySales(
         sent_to: [recipient, ...cc],
         error_message: null,
       })
-      .eq("id", inserted.id);
+      .eq("id", dispatchId);
     await svc
       .from("supplier_report_subscriptions")
       .update({ last_run_at: new Date().toISOString() })
