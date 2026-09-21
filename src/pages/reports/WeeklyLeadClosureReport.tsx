@@ -64,6 +64,13 @@ const INVALID_STATUS = "invalid";
 /** Status der vises som "Ukvalificerede" i hovedtabellen. */
 const UNQUALIFIED_STATUS = "unqualified";
 
+/** Egen nøgle for Max Call Reach — står uden for tragten. */
+const MCR_STATUS = "max_call_reach";
+
+/** Loftet af opkaldsforsøg der udløser Max Call Reach (samme som i hentningen). */
+const MAX_CALL_ATTEMPTS = 5;
+
+
 /** Tærskler for farvemarkering — justér her. */
 const INVALID_WARN_PCT = 5;
 const INVALID_ALERT_PCT = 15;
@@ -153,6 +160,16 @@ function MissingCallsChip() {
     </span>
   );
 }
+
+/** Vises hvor kilden ikke leverer forsøgsantal (Enreach). */
+function NotAvailableChip() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
+      ikke tilgængeligt
+    </span>
+  );
+}
+
 
 export default function WeeklyLeadClosureReport() {
   const { isSuperadmin } = useIsSuperadmin();
@@ -293,6 +310,19 @@ export default function WeeklyLeadClosureReport() {
     return out;
   }, [callStats, mapping, periodWeeks]);
 
+  /**
+   * Linjer hvor forsøgsantal kan opgøres. Enreach leverer det ikke, så linjer
+   * der udelukkende kommer fra Enreach viser "ikke tilgængeligt".
+   */
+  const mcrAvailableLines = useMemo(() => {
+    const out = new Set<string>();
+    for (const m of mapping) {
+      if (!m.report_line || m.account === "enreach") continue;
+      out.add(m.report_line);
+    }
+    return out;
+  }, [mapping]);
+
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
       const rows = weekRows.filter((r) => r.report_line === line.report_line);
@@ -307,13 +337,24 @@ export default function WeeklyLeadClosureReport() {
         booked: sum((status) => status === "success"),
         extras,
         calls: callsByLine.get(line.report_line) ?? null,
+        // Max Call Reach står uden for tragten og påvirker ingen af tallene ovenfor.
+        mcr: sum((status) => status === MCR_STATUS),
+        mcrAvailable: mcrAvailableLines.has(line.report_line),
       };
     });
-  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses, callsByLine]);
+  }, [
+    lines,
+    weekRows,
+    closingStatuses,
+    hitrateStatuses,
+    excludedStatuses,
+    callsByLine,
+    mcrAvailableLines,
+  ]);
 
   /** Linjer med aktivitet vises; linjer uden nævnes i en note under tabellen. */
-  const hasActivity = (l: { closed: number; calls: CallTotals | null }) =>
-    l.closed > 0 || (l.calls?.attempts ?? 0) > 0;
+  const hasActivity = (l: { closed: number; calls: CallTotals | null; mcr: number }) =>
+    l.closed > 0 || (l.calls?.attempts ?? 0) > 0 || l.mcr > 0;
   const activeLineTotals = useMemo(() => lineTotals.filter(hasActivity), [lineTotals]);
   const idleLines = useMemo(
     () => lineTotals.filter((l) => !hasActivity(l)).map((l) => l.reportLine),
@@ -323,6 +364,11 @@ export default function WeeklyLeadClosureReport() {
     () => activeLineTotals.filter((l) => !l.calls).map((l) => l.reportLine),
     [activeLineTotals],
   );
+  const linesWithoutMcr = useMemo(
+    () => activeLineTotals.filter((l) => !l.mcrAvailable).map((l) => l.reportLine),
+    [activeLineTotals],
+  );
+
 
 
   const unmapped = useMemo(() => {
@@ -503,6 +549,10 @@ export default function WeeklyLeadClosureReport() {
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Hitrate
                       </TableHead>
+                      <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Max Call Reach
+                      </TableHead>
+
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -525,7 +575,7 @@ export default function WeeklyLeadClosureReport() {
                         <Fragment key={group.title}>
                           <TableRow className="hover:bg-transparent">
                             <TableCell
-                              colSpan={8}
+                              colSpan={9}
                               className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
                             >
                               {group.title}
@@ -628,6 +678,19 @@ export default function WeeklyLeadClosureReport() {
                                     )}
                                   </div>
                                 </TableCell>
+                                <TableCell className="border-l pl-4 text-right text-sm tabular-nums">
+                                  {!row.mcrAvailable ? (
+                                    <NotAvailableChip />
+                                  ) : (
+                                    <>
+                                      <span>{formatCount(row.mcr)}</span>
+                                      <span className="ml-1 text-muted-foreground">
+                                        ({formatPct(pctValue(row.mcr, row.closed + row.mcr))})
+                                      </span>
+                                    </>
+                                  )}
+                                </TableCell>
+
                               </TableRow>
                             );
                           })}
@@ -711,6 +774,13 @@ export default function WeeklyLeadClosureReport() {
                 er koblet på.
               </p>
             )}
+            {!statsLoading && linesWithoutMcr.length > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Max Call Reach kan ikke opgøres for {linesWithoutMcr.join(", ")}, da forsøgsantal
+                ikke leveres.
+              </p>
+            )}
+
             {!statsLoading && availableWeeks.length > 0 && idleLines.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
                 {idleLines.length} {idleLines.length === 1 ? "kampagne" : "kampagner"} uden
@@ -759,7 +829,15 @@ export default function WeeklyLeadClosureReport() {
                   {SMALL_BASE_DECIDED} samtaler, hvor tallet svinger meget.
                 </p>
               </div>
+              <div>
+                <p className="font-medium text-foreground">Max Call Reach</p>
+                <p>
+                  Leads dialeren har lukket efter {MAX_CALL_ATTEMPTS} opkaldsforsøg uden kontakt.
+                  Tæller ikke med i Leads behandlet eller hitrate.
+                </p>
+              </div>
             </div>
+
           </CardContent>
         </Card>
 

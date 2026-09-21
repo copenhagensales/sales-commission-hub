@@ -209,7 +209,32 @@ async function syncCampaignNames(
   return updated;
 }
 
-type LeadFacts = { status: string; user: string; day: string };
+type LeadFacts = {
+  status: string;
+  user: string;
+  day: string;
+  attempts: number;
+  active: boolean;
+};
+
+/**
+ * Max Call Reach: emner dialeren selv lukker efter loftet af opkaldsforsøg uden
+ * kontakt. Adversus har ingen status for det, så det udledes. Loftet er ens på
+ * alle kampagner og justeres her.
+ */
+const MAX_CALL_ATTEMPTS = 5;
+
+/** Egen nøgle i weekly_lead_closure_stats, så MCR kan aggregeres som statusser. */
+const MCR_STATUS = "max_call_reach";
+
+/** Et emne er Max Call Reach når dialeren har opgivet det efter loftet. */
+function isMaxCallReach(lead: LeadFacts): boolean {
+  return (
+    lead.status === "automaticRedial" &&
+    lead.active === false &&
+    lead.attempts >= MAX_CALL_ATTEMPTS
+  );
+}
 
 /**
  * Henter én kampagnes emner med kampagnefilter og sender dem videre side for
@@ -244,12 +269,15 @@ async function streamCampaignPages(
         status: safeString(lead.status),
         user: safeString(lead.lastContactedBy),
         day: copenhagenDay(safeString(lead.updated)),
+        attempts: Number(lead.contactAttempts ?? 0) || 0,
+        active: lead.active === true,
       });
     }
     if (batch.length < PAGE_SIZE) return { scanned, nextPage: null };
   }
   return { scanned, nextPage: page };
 }
+
 
 // ---------------------------------------------------------------------------
 // Opkaldsforsøg (besvarelse). Kun tal gemmes — aldrig numre eller navne.
@@ -819,17 +847,97 @@ async function processTask(
       if (!lead.day) return;
       const week = mondayOf(lead.day);
       if (!weekSet.has(week)) return;
+      // Max Call Reach er lukket af dialeren, ikke af en sælger, og tælles
+      // derfor uden sælgerfilter og under sin egen nøgle.
+      if (isMaxCallReach(lead)) {
+        const mcrKey = `${week}|${job.account}|${job.campaignId}||${MCR_STATUS}`;
+        counts.set(mcrKey, (counts.get(mcrKey) ?? 0) + 1);
+        return;
+      }
       if (!users.has(lead.user)) return; // kun vores egne sælgere
       const status = lead.status || UNKNOWN_BUCKET;
       const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     },
+
   );
 
   await saveCounts(svc, config, counts);
 
   return { scanned, nextPage };
 }
+
+/**
+ * Bagudfyldning af Max Call Reach for ÉN Adversus-kampagne over flere uger.
+ * Med write=false gemmes intet — tallene returneres kun (tørkørsel).
+ * Enreach leverer ikke forsøgsantal og scannes derfor ikke.
+ */
+async function scanMaxCallReach(
+  svc: SupabaseClient,
+  config: Config,
+  account: AccountKey,
+  campaignId: string,
+  weeks: string[],
+  write: boolean,
+): Promise<{ scanned: number; counts: Record<string, number>; diag: Record<string, number> }> {
+  const acc = ACCOUNTS.find((candidate) => candidate.key === account);
+  if (!acc || acc.kind !== "adversus") {
+    throw new Error(`Max Call Reach kan kun opgøres på Adversus-konti (${account})`);
+  }
+  const auth = authHeader(acc);
+  const weekSet = new Set(weeks);
+  const counts = new Map<string, number>();
+  // Kun aggregerede kontroltal — ingen emnedata.
+  const diag = {
+    inWeeks: 0,
+    autoRedial: 0,
+    autoRedialInactive: 0,
+    attemptsAtLeastMax: 0,
+    activeFalse: 0,
+    autoRedialAtLeastMax: 0,
+  };
+  let scanned = 0;
+  let page: number | null = 1;
+  while (page !== null) {
+    const result = await streamCampaignPages(auth, campaignId, page, (lead) => {
+      if (!lead.day) return;
+      const week = mondayOf(lead.day);
+      if (!weekSet.has(week)) return;
+      diag.inWeeks++;
+      if (lead.status === "automaticRedial") {
+        diag.autoRedial++;
+        if (!lead.active) diag.autoRedialInactive++;
+      }
+      if (lead.attempts >= MAX_CALL_ATTEMPTS) diag.attemptsAtLeastMax++;
+      if (!lead.active) diag.activeFalse++;
+      if (lead.status === "automaticRedial" && lead.attempts >= MAX_CALL_ATTEMPTS) {
+        diag.autoRedialAtLeastMax++;
+      }
+      if (!isMaxCallReach(lead)) return;
+      const key = `${week}|${account}|${campaignId}||${MCR_STATUS}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    scanned += result.scanned;
+    page = result.nextPage;
+  }
+
+
+  if (write) {
+    await svc
+      .from("weekly_lead_closure_stats")
+      .delete()
+      .eq("account", account)
+      .eq("adversus_campaign_id", campaignId)
+      .eq("status", MCR_STATUS)
+      .in("week_start", weeks);
+    await saveCounts(svc, config, counts);
+  }
+
+  const byWeek: Record<string, number> = {};
+  for (const [key, value] of counts) byWeek[key.split("|")[0]] = value;
+  return { scanned, counts: byWeek, diag };
+}
+
 
 /** Navne til mailens sælgertabel. Enreach-referencer er sælgerens mail. */
 async function sellerNamesForAll(svc: SupabaseClient): Promise<Map<string, string>> {
@@ -1016,7 +1124,7 @@ async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
     {
       integration: "adversus",
       container: "lead_meta",
-      fields: ["status", "lastContactedBy", "updated"],
+      fields: ["status", "lastContactedBy", "updated", "contactAttempts", "active"],
     },
     { integration: "enreach", container: "lead_meta", fields: ENREACH_FIELDS },
     { integration: "adversus", container: "call_meta", fields: ADVERSUS_CALL_FIELDS },
@@ -1284,8 +1392,11 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status" | "sync_campaign_names";
+      action?: "status" | "sync_campaign_names" | "mcr_scan";
       run_ids?: string[];
+      account?: AccountKey;
+      campaign_id?: string;
+      write?: boolean;
     };
 
     if (body.action === "status") {
@@ -1301,6 +1412,27 @@ Deno.serve(async (req) => {
     if (body.action === "sync_campaign_names") {
       return json(200, { campaigns: await syncCampaignNames(svc) });
     }
+
+    // Bagudfyldning af Max Call Reach pr. kampagne. write=false er tørkørsel.
+    if (body.action === "mcr_scan") {
+      const config = await loadConfig(svc);
+      await assertFieldsAllowed(svc);
+      const result = await scanMaxCallReach(
+        svc,
+        config,
+        body.account ?? "main",
+        body.campaign_id ?? "",
+        body.weeks_list ?? [],
+        body.write === true,
+      );
+      return json(200, {
+        account: body.account ?? "main",
+        campaignId: body.campaign_id ?? "",
+        write: body.write === true,
+        ...result,
+      });
+    }
+
 
     // Planen kører 05:00 og 06:00 UTC mandag, så mailen rammer 07:00 dansk tid
     // både sommer og vinter. Kun den kørsel der er kl. 7 i Danmark fortsætter.
