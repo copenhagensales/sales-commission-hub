@@ -492,6 +492,9 @@ export default function WeeklyLeadClosureReport() {
                         Ugyldige leads
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Ukvalificerede
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Kvalificerede samtaler
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
