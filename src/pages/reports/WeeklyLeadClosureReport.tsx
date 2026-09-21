@@ -61,6 +61,9 @@ const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Le
 /** Status der vises som "Ugyldige leads" i hovedtabellen. */
 const INVALID_STATUS = "invalid";
 
+/** Status der vises som "Ukvalificerede" i hovedtabellen. */
+const UNQUALIFIED_STATUS = "unqualified";
+
 /** Tærskler for farvemarkering — justér her. */
 const INVALID_WARN_PCT = 5;
 const INVALID_ALERT_PCT = 15;
