@@ -33,6 +33,7 @@ import {
   useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
+  useWeeklyLeadCallStats,
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
   useWeeklyLeadClosureStats,
@@ -42,6 +43,14 @@ import {
 
 const NO_LINE = "__none__";
 const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Lederne" };
+
+/** Aggregerede opkaldstal pr. rapportlinje. */
+type CallTotals = {
+  attempts: number;
+  answered: number;
+  leadsDialed: number;
+  leadsAnswered: number;
+};
 
 /** Procent med altid én decimal, så kolonnen flugter. */
 function hitrate(part: number, whole: number): string {
@@ -73,6 +82,7 @@ export default function WeeklyLeadClosureReport() {
   const { data: mapping = [], isLoading: mappingLoading } = useWeeklyLeadCampaignMap();
   const { data: statuses = [] } = useLeadClosingStatuses();
   const { data: stats = [], isLoading: statsLoading } = useWeeklyLeadClosureStats();
+  const { data: callStats = [] } = useWeeklyLeadCallStats();
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
   const { data: taskSummaries = [] } = useWeeklyLeadClosureTaskSummaries(
     runs.map((run) => run.id),
@@ -140,6 +150,27 @@ export default function WeeklyLeadClosureReport() {
     [stats, activeWeek],
   );
 
+  /** Opkaldstal pr. rapportlinje for den valgte uge. */
+  const callsByLine = useMemo(() => {
+    const lineFor = new Map(
+      mapping.map((m) => [`${m.account}|${m.adversus_campaign_id}`, m.report_line]),
+    );
+    const out = new Map<string, CallTotals>();
+    for (const row of callStats) {
+      if (row.week_start !== activeWeek) continue;
+      const line = lineFor.get(`${row.account}|${row.campaign_id}`);
+      if (!line) continue;
+      const entry = out.get(line) ??
+        { attempts: 0, answered: 0, leadsDialed: 0, leadsAnswered: 0 };
+      entry.attempts += row.attempts;
+      entry.answered += row.answered;
+      entry.leadsDialed += row.leads_dialed;
+      entry.leadsAnswered += row.leads_answered;
+      out.set(line, entry);
+    }
+    return out;
+  }, [callStats, mapping, activeWeek]);
+
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
       const rows = weekRows.filter((r) => r.report_line === line.report_line);
@@ -153,15 +184,22 @@ export default function WeeklyLeadClosureReport() {
         decided: sum((status) => hitrateStatuses.includes(status)),
         booked: sum((status) => status === "success"),
         extras,
+        calls: callsByLine.get(line.report_line) ?? null,
       };
     });
-  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses]);
+  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses, callsByLine]);
 
   /** Linjer med aktivitet vises; linjer uden nævnes i en note under tabellen. */
-  const activeLineTotals = useMemo(() => lineTotals.filter((l) => l.closed > 0), [lineTotals]);
+  const hasActivity = (l: { closed: number; calls: CallTotals | null }) =>
+    l.closed > 0 || (l.calls?.attempts ?? 0) > 0;
+  const activeLineTotals = useMemo(() => lineTotals.filter(hasActivity), [lineTotals]);
   const idleLines = useMemo(
-    () => lineTotals.filter((l) => l.closed === 0).map((l) => l.reportLine),
+    () => lineTotals.filter((l) => !hasActivity(l)).map((l) => l.reportLine),
     [lineTotals],
+  );
+  const linesWithoutCalls = useMemo(
+    () => activeLineTotals.filter((l) => !l.calls).map((l) => l.reportLine),
+    [activeLineTotals],
   );
 
   const totals = useMemo(() => {
@@ -169,11 +207,17 @@ export default function WeeklyLeadClosureReport() {
     for (const s of excludedStatuses) {
       extras[s.status] = lineTotals.reduce((sum, l) => sum + (l.extras[s.status] ?? 0), 0);
     }
+    const callSum = (pick: (c: CallTotals) => number) =>
+      lineTotals.reduce((s, l) => s + (l.calls ? pick(l.calls) : 0), 0);
     return {
       closed: lineTotals.reduce((s, l) => s + l.closed, 0),
       decided: lineTotals.reduce((s, l) => s + l.decided, 0),
       booked: lineTotals.reduce((s, l) => s + l.booked, 0),
       extras,
+      attempts: callSum((c) => c.attempts),
+      answered: callSum((c) => c.answered),
+      leadsDialed: callSum((c) => c.leadsDialed),
+      leadsAnswered: callSum((c) => c.leadsAnswered),
     };
   }, [lineTotals, excludedStatuses]);
 
@@ -329,6 +373,9 @@ export default function WeeklyLeadClosureReport() {
                       Kvalificeret
                     </TableHead>
                     <TableHead />
+                    <TableHead colSpan={2} className="text-center text-[10px] uppercase tracking-wider">
+                      Opkald
+                    </TableHead>
                   </TableRow>
                   <TableRow>
                     <TableHead>Rapportlinje</TableHead>
@@ -342,6 +389,8 @@ export default function WeeklyLeadClosureReport() {
                     <TableHead className="text-right">Ja/nej-andel</TableHead>
                     <TableHead className="text-right">Bookede</TableHead>
                     <TableHead className="text-right">Hitrate</TableHead>
+                    <TableHead className="text-right">Svarprocent</TableHead>
+                    <TableHead className="text-right">Kontaktandel</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -362,6 +411,12 @@ export default function WeeklyLeadClosureReport() {
                       <TableCell className="text-right font-semibold text-emerald-600">
                         {hitrate(row.booked, row.decided)}
                       </TableCell>
+                      <TableCell className="text-right">
+                        {row.calls ? hitrate(row.calls.answered, row.calls.attempts) : "–"}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.calls ? hitrate(row.calls.leadsAnswered, row.calls.leadsDialed) : "–"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="font-semibold">
@@ -380,6 +435,12 @@ export default function WeeklyLeadClosureReport() {
                     <TableCell className="text-right text-emerald-600">
                       {hitrate(totals.booked, totals.decided)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {hitrate(totals.answered, totals.attempts)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {hitrate(totals.leadsAnswered, totals.leadsDialed)}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -388,6 +449,11 @@ export default function WeeklyLeadClosureReport() {
               <p className="mt-3 text-sm text-muted-foreground">
                 {idleLines.length} {idleLines.length === 1 ? "linje" : "linjer"} uden aktivitet:{" "}
                 {idleLines.join(", ")}
+              </p>
+            )}
+            {!statsLoading && linesWithoutCalls.length > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Opkaldstal mangler for: {linesWithoutCalls.join(", ")}
               </p>
             )}
             {unmapped.length > 0 && (

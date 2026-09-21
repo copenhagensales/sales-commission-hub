@@ -7,6 +7,7 @@ export type CampaignMapRow = Database["public"]["Tables"]["weekly_lead_report_ca
 export type ClosingStatusRow = Database["public"]["Tables"]["lead_closing_statuses"]["Row"];
 export type ClosureStatRow = Database["public"]["Tables"]["weekly_lead_closure_stats"]["Row"];
 export type ClosureRunRow = Database["public"]["Tables"]["weekly_lead_closure_runs"]["Row"];
+export type CallStatRow = Database["public"]["Tables"]["weekly_lead_call_stats"]["Row"];
 
 export type ClosureTaskSummary = {
   runId: string;
@@ -76,6 +77,23 @@ export function useWeeklyLeadClosureStats() {
     },
   });
 }
+
+export function useWeeklyLeadCallStats() {
+  return useQuery({
+    queryKey: ["weekly-lead-closure", "call-stats"],
+    queryFn: async (): Promise<CallStatRow[]> => {
+      const { data, error } = await supabase
+        .from("weekly_lead_call_stats")
+        .select("*")
+        .order("week_start", { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+
 
 export function useWeeklyLeadClosureRuns() {
   return useQuery({
