@@ -75,6 +75,13 @@ export interface WeeklyLeadClosureMailInput {
   previousWeeks: WeekTotals[];
   unknownStatuses: { status: string; count: number }[];
   unmapped: UnmappedCampaign[];
+  /** Kampagner der fejlede i kørslen — vises nederst i mailen. */
+  notScanned?: {
+    account: string;
+    campaignId: string;
+    campaignName: string | null;
+    error: string | null;
+  }[];
 }
 
 export function isoWeekNumber(dateIso: string): number {
@@ -383,6 +390,18 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
       `<strong>Ukendte statusser:</strong> ${input.unknownStatuses
         .map((s) => `${escapeHtml(s.status)} (${nf(s.count)})`)
         .join(", ")} — tilføj dem i statusopsætningen, hvis de skal tælle som lukkede.`,
+    );
+  }
+  // Fejlede kampagner nævnes eksplicit, så tabellen aldrig ser komplet ud,
+  // når den ikke er.
+  if (input.notScanned?.length) {
+    notes.push(
+      `<strong>Ikke scannet:</strong> ${input.notScanned
+        .map(
+          (u) =>
+            `${escapeHtml(u.campaignName ?? u.campaignId)} (${escapeHtml(u.account)}/${escapeHtml(u.campaignId)}): ${escapeHtml(u.error ?? "ukendt fejl")}`,
+        )
+        .join("; ")} — tallene herunder mangler disse kampagner.`,
     );
   }
   const notesHtml = notes.length

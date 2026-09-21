@@ -193,16 +193,11 @@ export default function WeeklyLeadClosureReport() {
       { weeks: Number(weeks), sendMail },
       {
         onSuccess: (data) => {
-          const scanned = data.accounts.reduce((s, a) => s + a.leadsScanned, 0);
-          const failed = data.accounts.filter((a) => a.error);
+          // Kørslen arbejder sig gennem en kø i baggrunden — status ses i
+          // kørselsloggen nedenfor.
           toast.success(
-            `Kørsel færdig: ${scanned} emner gennemgået${data.mailQueued ? ", mail lagt i kø" : ""}`,
+            `Kørsel startet: ${data.jobs ?? 0} kampagner i kø. Følg status i kørselsloggen.`,
           );
-          if (failed.length) {
-            toast.warning(
-              `Fejl på: ${failed.map((f) => `${ACCOUNT_LABEL[f.account] ?? f.account} (${f.error})`).join(", ")}`,
-            );
-          }
         },
         onError: (error: unknown) => {
           toast.error(

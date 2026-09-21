@@ -17072,6 +17072,65 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_lead_closure_jobs: {
+        Row: {
+          account: string
+          attempts: number
+          campaign_id: string
+          created_at: string
+          error: string | null
+          id: string
+          leads_scanned: number
+          next_page: number
+          run_id: string
+          status: string
+          updated_at: string
+          week_end: string | null
+          week_start: string | null
+          weeks: Json
+        }
+        Insert: {
+          account: string
+          attempts?: number
+          campaign_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          leads_scanned?: number
+          next_page?: number
+          run_id: string
+          status?: string
+          updated_at?: string
+          week_end?: string | null
+          week_start?: string | null
+          weeks?: Json
+        }
+        Update: {
+          account?: string
+          attempts?: number
+          campaign_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          leads_scanned?: number
+          next_page?: number
+          run_id?: string
+          status?: string
+          updated_at?: string
+          week_end?: string | null
+          week_start?: string | null
+          weeks?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_lead_closure_jobs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_lead_closure_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weekly_lead_closure_runs: {
         Row: {
           account: string | null
@@ -18554,6 +18613,31 @@ export type Database = {
         Returns: Json
       }
       weekly_lead_closure_add: { Args: { _rows: Json }; Returns: number }
+      weekly_lead_closure_take_job: {
+        Args: { _run_id: string }
+        Returns: {
+          account: string
+          attempts: number
+          campaign_id: string
+          created_at: string
+          error: string | null
+          id: string
+          leads_scanned: number
+          next_page: number
+          run_id: string
+          status: string
+          updated_at: string
+          week_end: string | null
+          week_start: string | null
+          weeks: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "weekly_lead_closure_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"

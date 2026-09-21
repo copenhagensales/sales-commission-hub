@@ -105,6 +105,11 @@ export function useUpdateCampaignMapping() {
   });
 }
 
+/**
+ * Starter kørslen og vender tilbage med det samme. Selve arbejdet ligger i en
+ * jobkø (ét kald pr. kampagne), så kørslen fortsætter i baggrunden og logges i
+ * weekly_lead_closure_runs.
+ */
 export function useRunWeeklyLeadClosureReport() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -113,11 +118,7 @@ export function useRunWeeklyLeadClosureReport() {
         body: { weeks: input.weeks, send_mail: input.sendMail },
       });
       if (error) throw error;
-      return data as {
-        weeks: string[];
-        accounts: { account: string; campaigns: number; leadsScanned: number; error?: string }[];
-        mailQueued: boolean;
-      };
+      return data as { stage?: string; runId?: string; weeks: string[]; jobs?: number };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: STATS_KEY });
