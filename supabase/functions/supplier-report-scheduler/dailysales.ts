@@ -5,6 +5,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import {
   buildClientDailySalesEmail,
+  type DailySalesMonthToDate,
   type DailySalesProductRow,
   type DailySalesTrendPoint,
 } from "../_shared/supplier-report-mail.ts";
