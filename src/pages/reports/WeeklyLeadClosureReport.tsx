@@ -218,7 +218,10 @@ export default function WeeklyLeadClosureReport() {
 
   /** Frasorterede statusser ud over "Ugyldige leads" vises i detaljesektionen. */
   const detailStatuses = useMemo(
-    () => excludedStatuses.filter((s) => s.status !== INVALID_STATUS),
+    () =>
+      excludedStatuses.filter(
+        (s) => s.status !== INVALID_STATUS && s.status !== UNQUALIFIED_STATUS,
+      ),
     [excludedStatuses],
   );
 
