@@ -373,6 +373,9 @@ export default function WeeklyLeadClosureReport() {
                       Kvalificeret
                     </TableHead>
                     <TableHead />
+                    <TableHead colSpan={2} className="text-center text-[10px] uppercase tracking-wider">
+                      Opkald
+                    </TableHead>
                   </TableRow>
                   <TableRow>
                     <TableHead>Rapportlinje</TableHead>
@@ -386,6 +389,8 @@ export default function WeeklyLeadClosureReport() {
                     <TableHead className="text-right">Ja/nej-andel</TableHead>
                     <TableHead className="text-right">Bookede</TableHead>
                     <TableHead className="text-right">Hitrate</TableHead>
+                    <TableHead className="text-right">Svarprocent</TableHead>
+                    <TableHead className="text-right">Kontaktandel</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -406,6 +411,12 @@ export default function WeeklyLeadClosureReport() {
                       <TableCell className="text-right font-semibold text-emerald-600">
                         {hitrate(row.booked, row.decided)}
                       </TableCell>
+                      <TableCell className="text-right">
+                        {row.calls ? hitrate(row.calls.answered, row.calls.attempts) : "–"}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.calls ? hitrate(row.calls.leadsAnswered, row.calls.leadsDialed) : "–"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="font-semibold">
@@ -424,6 +435,12 @@ export default function WeeklyLeadClosureReport() {
                     <TableCell className="text-right text-emerald-600">
                       {hitrate(totals.booked, totals.decided)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {hitrate(totals.answered, totals.attempts)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {hitrate(totals.leadsAnswered, totals.leadsDialed)}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -432,6 +449,11 @@ export default function WeeklyLeadClosureReport() {
               <p className="mt-3 text-sm text-muted-foreground">
                 {idleLines.length} {idleLines.length === 1 ? "linje" : "linjer"} uden aktivitet:{" "}
                 {idleLines.join(", ")}
+              </p>
+            )}
+            {!statsLoading && linesWithoutCalls.length > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Opkaldstal mangler for: {linesWithoutCalls.join(", ")}
               </p>
             )}
             {unmapped.length > 0 && (
