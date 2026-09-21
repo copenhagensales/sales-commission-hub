@@ -145,6 +145,14 @@ function pct1(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
+/** Frasorteret vises som andel af lukkede med antallet i parentes. */
+function sharePlusCount(count: number, whole: number): string {
+  if (!whole) return `${nf(count)} stk`;
+  return `${pct1(count, whole)} (${nf(count)} stk)`;
+}
+
+
+
 
 function th(text: string, align = "left"): string {
   return `<th style="text-align:${align};font-size:10px;font-weight:700;letter-spacing:1.2px;color:${BRAND.muted};text-transform:uppercase;padding:14px 12px;border-bottom:1px solid ${BRAND.cellBorder};white-space:nowrap;">${escapeHtml(text)}</th>`;
