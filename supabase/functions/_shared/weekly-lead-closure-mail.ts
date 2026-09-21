@@ -145,6 +145,14 @@ function pct1(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
+/** Frasorteret vises som andel af lukkede med antallet i parentes. */
+function sharePlusCount(count: number, whole: number): string {
+  if (!whole) return `${nf(count)} stk`;
+  return `${pct1(count, whole)} (${nf(count)} stk)`;
+}
+
+
+
 
 function th(text: string, align = "left"): string {
   return `<th style="text-align:${align};font-size:10px;font-weight:700;letter-spacing:1.2px;color:${BRAND.muted};text-transform:uppercase;padding:14px 12px;border-bottom:1px solid ${BRAND.cellBorder};white-space:nowrap;">${escapeHtml(text)}</th>`;
@@ -250,7 +258,7 @@ function lineSection(
     .map(
       (l) =>
         `<tr>${td(l.reportLine, "left", { bold: true })}${td(nf(l.closed), "right")}${excluded
-          .map((e) => td(nf(l.extras[e.status] ?? 0), "right"))
+          .map((e) => td(sharePlusCount(l.extras[e.status] ?? 0, l.closed), "right"))
           .join("")}${td(nf(l.decided), "right")}${td(pct1(l.decided, l.closed), "right", {
           dim: true,
         })}${td(nf(l.booked), "right")}${td(pct1(l.booked, l.decided), "right", {
@@ -266,7 +274,7 @@ function lineSection(
 
   const totalExtras = excluded
     .map((e) =>
-      td(nf(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0)), "right", {
+      td(sharePlusCount(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0), totalClosed), "right", {
         bold: true,
         onDark: true,
       }),

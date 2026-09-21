@@ -58,6 +58,12 @@ function hitrate(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
+/** Frasorteret vises som andel af lukkede med antallet i parentes. */
+function sharePlusCount(count: number, whole: number): string {
+  if (!whole) return `${count} stk`;
+  return `${hitrate(count, whole)} (${count} stk)`;
+}
+
 function weekLabel(weekStart: string): string {
   const d = new Date(`${weekStart}T00:00:00Z`);
   const day = (d.getUTCDay() + 6) % 7;
@@ -400,7 +406,7 @@ export default function WeeklyLeadClosureReport() {
                       <TableCell className="text-right">{row.closed}</TableCell>
                       {excludedStatuses.map((s) => (
                         <TableCell key={s.status} className="text-right">
-                          {row.extras[s.status] ?? 0}
+                          {sharePlusCount(row.extras[s.status] ?? 0, row.closed)}
                         </TableCell>
                       ))}
                       <TableCell className="text-right">{row.decided}</TableCell>
@@ -424,7 +430,7 @@ export default function WeeklyLeadClosureReport() {
                     <TableCell className="text-right">{totals.closed}</TableCell>
                     {excludedStatuses.map((s) => (
                       <TableCell key={s.status} className="text-right">
-                        {totals.extras[s.status] ?? 0}
+                        {sharePlusCount(totals.extras[s.status] ?? 0, totals.closed)}
                       </TableCell>
                     ))}
                     <TableCell className="text-right">{totals.decided}</TableCell>
