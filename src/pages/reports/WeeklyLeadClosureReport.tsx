@@ -576,6 +576,12 @@ export default function WeeklyLeadClosureReport() {
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
+                                  <span>{formatPct(unqualifiedPct)}</span>
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({formatCount(unqualified)})
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
                                   {formatCount(row.decided)}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
