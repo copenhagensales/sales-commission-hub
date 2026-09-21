@@ -1183,6 +1183,12 @@ export function buildClientDailySalesEmail(params: {
     `Salg i alt: ${totalQuantity}`,
   ];
   if (saleCount !== totalQuantity) textLines.push(`Fordelt på ${saleCount} salg.`);
+  if (monthToDate) {
+    textLines.push(
+      "",
+      `Måned til dato (${monthLabel}): ${monthToDate.quantity} salg på ${monthToDate.activeDays} dage med salg.`,
+    );
+  }
   textLines.push("", "Fordeling pr. produkt:");
   for (const p of sorted) textLines.push(`  ${p.productName}: ${p.quantity}`);
   if (trend.length > 0) {
