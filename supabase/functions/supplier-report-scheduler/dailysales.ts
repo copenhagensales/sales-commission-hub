@@ -236,29 +236,43 @@ export async function runDailySales(
     }
 
     // UNIQUE (subscription_id, period_start) sikrer at en dag kun sendes én gang.
-    const { data: inserted, error: insertError } = await svc
-      .from("supplier_report_dispatches")
-      .insert({
-        subscription_id: sub.id,
-        period_start: date,
-        period_end: date,
-        status: data.totalQuantity === 0 ? "skipped" : "approved",
-        error_message:
-          data.totalQuantity === 0
-            ? `Ingen salg for ${clientName} den ${date} - intet er sendt til kunden.`
-            : null,
-      })
-      .select("id")
-      .maybeSingle();
+    let dispatchId: string | null = null;
+    if (opts.resend) {
+      const { data: existing } = await svc
+        .from("supplier_report_dispatches")
+        .select("id")
+        .eq("subscription_id", sub.id)
+        .eq("period_start", date)
+        .maybeSingle();
+      dispatchId = (existing as { id: string } | null)?.id ?? null;
+    }
 
-    if (insertError || !inserted) {
-      results.push({
-        ...base,
-        ...data,
-        action: "already_handled",
-        detail: insertError?.message ?? "udsendelsen findes allerede",
-      });
-      continue;
+    if (!dispatchId) {
+      const { data: inserted, error: insertError } = await svc
+        .from("supplier_report_dispatches")
+        .insert({
+          subscription_id: sub.id,
+          period_start: date,
+          period_end: date,
+          status: data.totalQuantity === 0 ? "skipped" : "approved",
+          error_message:
+            data.totalQuantity === 0
+              ? `Ingen salg for ${clientName} den ${date} - intet er sendt til kunden.`
+              : null,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (insertError || !inserted) {
+        results.push({
+          ...base,
+          ...data,
+          action: "already_handled",
+          detail: insertError?.message ?? "udsendelsen findes allerede",
+        });
+        continue;
+      }
+      dispatchId = (inserted as { id: string }).id;
     }
 
     // Nul salg: ingen kundemail og ingen intern advarsel (det er normalt).
