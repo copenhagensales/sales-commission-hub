@@ -82,6 +82,7 @@ export default function WeeklyLeadClosureReport() {
   const { data: mapping = [], isLoading: mappingLoading } = useWeeklyLeadCampaignMap();
   const { data: statuses = [] } = useLeadClosingStatuses();
   const { data: stats = [], isLoading: statsLoading } = useWeeklyLeadClosureStats();
+  const { data: callStats = [] } = useWeeklyLeadCallStats();
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
   const { data: taskSummaries = [] } = useWeeklyLeadClosureTaskSummaries(
     runs.map((run) => run.id),
