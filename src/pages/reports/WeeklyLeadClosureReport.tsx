@@ -61,6 +61,9 @@ const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Le
 /** Status der vises som "Ugyldige leads" i hovedtabellen. */
 const INVALID_STATUS = "invalid";
 
+/** Status der vises som "Ukvalificerede" i hovedtabellen. */
+const UNQUALIFIED_STATUS = "unqualified";
+
 /** Tærskler for farvemarkering — justér her. */
 const INVALID_WARN_PCT = 5;
 const INVALID_ALERT_PCT = 15;
@@ -215,7 +218,10 @@ export default function WeeklyLeadClosureReport() {
 
   /** Frasorterede statusser ud over "Ugyldige leads" vises i detaljesektionen. */
   const detailStatuses = useMemo(
-    () => excludedStatuses.filter((s) => s.status !== INVALID_STATUS),
+    () =>
+      excludedStatuses.filter(
+        (s) => s.status !== INVALID_STATUS && s.status !== UNQUALIFIED_STATUS,
+      ),
     [excludedStatuses],
   );
 
@@ -486,6 +492,9 @@ export default function WeeklyLeadClosureReport() {
                         Ugyldige leads
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Ukvalificerede
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Kvalificerede samtaler
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
@@ -516,7 +525,7 @@ export default function WeeklyLeadClosureReport() {
                         <Fragment key={group.title}>
                           <TableRow className="hover:bg-transparent">
                             <TableCell
-                              colSpan={7}
+                              colSpan={8}
                               className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
                             >
                               {group.title}
@@ -525,6 +534,8 @@ export default function WeeklyLeadClosureReport() {
                           {group.rows.map((row) => {
                             const invalid = row.extras[INVALID_STATUS] ?? 0;
                             const invalidPct = pctValue(invalid, row.closed);
+                            const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
+                            const unqualifiedPct = pctValue(unqualified, row.closed);
                             const contactPct = row.calls
                               ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
                               : null;
@@ -573,6 +584,12 @@ export default function WeeklyLeadClosureReport() {
                                   )}
                                   <span className="ml-1 text-muted-foreground">
                                     ({formatCount(invalid)})
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  <span>{formatPct(unqualifiedPct)}</span>
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({formatCount(unqualified)})
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
@@ -712,7 +729,7 @@ export default function WeeklyLeadClosureReport() {
               </p>
             )}
 
-            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground md:grid-cols-4">
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <div>
                 <p className="font-medium text-foreground">Leads behandlet</p>
                 <p>Leads fra jeres lister, som vi har færdigbehandlet i perioden.</p>
@@ -730,6 +747,10 @@ export default function WeeklyLeadClosureReport() {
                   Forkert nummer, allerede kunde, afgået m.m. Markeres gult over{" "}
                   {INVALID_WARN_PCT} % og rødt over {INVALID_ALERT_PCT} %.
                 </p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Ukvalificerede</p>
+                <p>Samtaler hvor kunden ikke opfyldte kriterierne for et møde.</p>
               </div>
               <div>
                 <p className="font-medium text-foreground">Hitrate</p>
