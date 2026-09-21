@@ -50,6 +50,7 @@ export interface DailySalesResult {
   products: DailySalesProductRow[];
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
+  monthToDate: DailySalesMonthToDate;
   action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail";
   detail?: string;
 }
