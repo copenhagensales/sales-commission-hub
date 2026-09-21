@@ -1036,9 +1036,16 @@ export function buildClientDailySalesEmail(params: {
   products: DailySalesProductRow[];
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
+  monthToDate?: DailySalesMonthToDate | null;
 }): { subject: string; html: string; text: string } {
   const { clientName, date, totalQuantity, saleCount, products, trend, comparison } =
     params;
+  const monthToDate = params.monthToDate ?? null;
+  const monthLabel = new Intl.DateTimeFormat("da-DK", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
 
   const dateLabel = new Intl.DateTimeFormat("da-DK", {
     weekday: "long",
