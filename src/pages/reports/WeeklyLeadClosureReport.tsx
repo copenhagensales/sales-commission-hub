@@ -525,6 +525,8 @@ export default function WeeklyLeadClosureReport() {
                           {group.rows.map((row) => {
                             const invalid = row.extras[INVALID_STATUS] ?? 0;
                             const invalidPct = pctValue(invalid, row.closed);
+                            const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
+                            const unqualifiedPct = pctValue(unqualified, row.closed);
                             const contactPct = row.calls
                               ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
                               : null;
