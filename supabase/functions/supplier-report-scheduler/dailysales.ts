@@ -5,6 +5,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import {
   buildClientDailySalesEmail,
+  type DailySalesMonthToDate,
   type DailySalesProductRow,
   type DailySalesTrendPoint,
 } from "../_shared/supplier-report-mail.ts";
@@ -49,6 +50,7 @@ export interface DailySalesResult {
   products: DailySalesProductRow[];
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
+  monthToDate: DailySalesMonthToDate;
   action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail";
   detail?: string;
 }
@@ -65,7 +67,9 @@ export interface DailySalesData {
   products: DailySalesProductRow[];
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
+  monthToDate: DailySalesMonthToDate;
 }
+
 
 /**
  * Beregner gårsdagens salg for én kunde.
@@ -123,7 +127,17 @@ export async function computeDailySales(
     ? { date: comparisonRow.date, quantity: comparisonRow.quantity }
     : null;
 
-  return { totalQuantity, saleCount, products, trend, comparison };
+  // Måned til dato: samme datasæt, afgrænset til rapportdagens måned.
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthRows = totals.filter((t) => t.date >= monthStart && t.date <= date);
+  const monthToDate: DailySalesMonthToDate = {
+    start: monthStart,
+    quantity: monthRows.reduce((sum, t) => sum + t.quantity, 0),
+    saleCount: monthRows.reduce((sum, t) => sum + t.saleCount, 0),
+    activeDays: monthRows.length,
+  };
+
+  return { totalQuantity, saleCount, products, trend, comparison, monthToDate };
 }
 
 /**
@@ -174,6 +188,12 @@ export async function runDailySales(
         products: [],
         trend: [],
         comparison: null,
+        monthToDate: {
+          start: `${date.slice(0, 7)}-01`,
+          quantity: 0,
+          saleCount: 0,
+          activeDays: 0,
+        },
         action: "not_due",
         detail: !isDue ? "ikke sendetidspunkt" : !sub.is_active ? "inaktiv" : "ingen modtager",
       });

@@ -1001,6 +1001,17 @@ export interface DailySalesTrendPoint {
   quantity: number;
 }
 
+/**
+ * Måned til dato for den måned rapportdagen ligger i.
+ * Beregnes generisk pr. kunde - ingen kundespecifik logik.
+ */
+export interface DailySalesMonthToDate {
+  start: string; // yyyy-mm-01
+  quantity: number;
+  saleCount: number;
+  activeDays: number;
+}
+
 const DAY_SHORT = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
 
 function dayLabel(iso: string): string {
@@ -1025,9 +1036,16 @@ export function buildClientDailySalesEmail(params: {
   products: DailySalesProductRow[];
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
+  monthToDate?: DailySalesMonthToDate | null;
 }): { subject: string; html: string; text: string } {
   const { clientName, date, totalQuantity, saleCount, products, trend, comparison } =
     params;
+  const monthToDate = params.monthToDate ?? null;
+  const monthLabel = new Intl.DateTimeFormat("da-DK", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
 
   const dateLabel = new Intl.DateTimeFormat("da-DK", {
     weekday: "long",
@@ -1057,6 +1075,41 @@ export function buildClientDailySalesEmail(params: {
           : bodyText("Der er ingen registrerede salg på dagen."),
     },
   ];
+
+  if (monthToDate) {
+    const avg = monthToDate.activeDays > 0
+      ? monthToDate.quantity / monthToDate.activeDays
+      : 0;
+    const mtdItems: ListItem[] = [
+      {
+        name: "Salg i alt",
+        variant: null,
+        value: fmtInt(monthToDate.quantity),
+      },
+      {
+        name: "Dage med salg",
+        variant: null,
+        value: fmtInt(monthToDate.activeDays),
+      },
+      {
+        name: "Gennemsnit pr. dag med salg",
+        variant: null,
+        value: avg.toFixed(1).replace(".", ","),
+      },
+    ];
+    sections.push({
+      label: `Måned til dato (${monthLabel})`,
+      html: `${listTable(mtdItems, 80)}
+        <div style="padding-top:18px;">${
+        bodyText(
+          esc(
+            `Perioden er ${dateShort(monthToDate.start)} til ${dateShort(date)}.`,
+          ),
+        )
+      }</div>`,
+    });
+  }
+
 
   if (trend.length > 0) {
     const points: BarPoint[] = trend.map((t, i) => ({
@@ -1130,6 +1183,12 @@ export function buildClientDailySalesEmail(params: {
     `Salg i alt: ${totalQuantity}`,
   ];
   if (saleCount !== totalQuantity) textLines.push(`Fordelt på ${saleCount} salg.`);
+  if (monthToDate) {
+    textLines.push(
+      "",
+      `Måned til dato (${monthLabel}): ${monthToDate.quantity} salg på ${monthToDate.activeDays} dage med salg.`,
+    );
+  }
   textLines.push("", "Fordeling pr. produkt:");
   for (const p of sorted) textLines.push(`  ${p.productName}: ${p.quantity}`);
   if (trend.length > 0) {
