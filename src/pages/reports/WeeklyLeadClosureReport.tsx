@@ -430,7 +430,7 @@ export default function WeeklyLeadClosureReport() {
                     <TableCell className="text-right">{totals.closed}</TableCell>
                     {excludedStatuses.map((s) => (
                       <TableCell key={s.status} className="text-right">
-                        {totals.extras[s.status] ?? 0}
+                        {sharePlusCount(totals.extras[s.status] ?? 0, totals.closed)}
                       </TableCell>
                     ))}
                     <TableCell className="text-right">{totals.decided}</TableCell>
