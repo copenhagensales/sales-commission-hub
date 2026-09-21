@@ -458,29 +458,29 @@ async function saveCounts(
 }
 
 /**
- * Ét job for Enreach: ÉN uge. Enreach kan afgrænse på ændringstidspunkt, så uge
- * for uge er nok — til gengæld ignoreres kampagnefilteret, og derfor grupperes
- * svaret selv på de mappede kampagner.
+ * Én Enreach-task: ÉN kampagne + ÉN uge. API'et ignorerer kampagnefilteret,
+ * så ugens svar filtreres lokalt til taskens kampagne.
  */
-async function processEnreachJob(
+async function processEnreachTask(
   svc: SupabaseClient,
   config: Config,
+  campaignId: string,
   weekStart: string,
 ): Promise<{ scanned: number; nextPage: number | null }> {
-  const wanted = new Set(campaignsFor("enreach", config).map((c) => c.id));
-  if (!weekStart || wanted.size === 0) return { scanned: 0, nextPage: null };
+  if (!weekStart || !campaignId) return { scanned: 0, nextPage: null };
 
-  // Nulstil ugens Enreach-tal, så genkørsler ikke lægger oveni.
+  // Nulstil kun taskens kampagne og uge, så parallelle tasks ikke påvirkes.
   await svc
     .from("weekly_lead_closure_stats")
     .delete()
     .eq("account", "enreach")
+    .eq("adversus_campaign_id", campaignId)
     .eq("week_start", weekStart);
 
   const access = await enreachAccess(svc);
   const counts = new Map<string, number>();
   const scanned = await streamEnreachWeek(access, weekStart, (lead) => {
-    if (!wanted.has(lead.campaignId)) return;
+    if (lead.campaignId !== campaignId) return;
     if (!lead.day || mondayOf(lead.day) !== weekStart) return;
     if (!lead.user.endsWith(OUR_DOMAIN)) return; // kun vores egne sælgere
     // Kun emner der faktisk er afsluttet af en sælger tælles med. Emner uden
@@ -493,28 +493,26 @@ async function processEnreachJob(
 
   await saveCounts(svc, config, counts);
   // Kun tal logges — aldrig lead-data.
-  console.log(
-    `[weekly-lead-closure-report] enreach uge=${weekStart} hentet=${scanned} kampagner=${wanted.size} grupper=${counts.size}`,
-  );
   return { scanned, nextPage: null };
 }
 
 /**
- * Ét job: ÉN konto + ÉN kampagne, op til PAGES_PER_CHUNK sider pr. kald.
+ * Én task: ÉN konto + ÉN kampagne + ÉN uge, op til PAGES_PER_CHUNK sider pr. kald.
  *
  * Adversus understøtter ikke datofilter på /leads (afprøvet: HTTP 400), så hele
  * kampagnens emner skal læses. Store kampagner deles derfor i sider, og jobbet
  * lægges tilbage i køen med næste sidetal. Rækkerne for kampagnen nulstilles på
  * første side, så gentagne kørsler er idempotente.
  */
-async function processJob(
+async function processTask(
   svc: SupabaseClient,
   config: Config,
   job: { account: AccountKey; campaignId: string; weeks: string[]; nextPage: number },
 ): Promise<{ scanned: number; nextPage: number | null }> {
-  const account = ACCOUNTS.find((a) => a.key === job.account)!;
+  const account = ACCOUNTS.find((candidate) => candidate.key === job.account);
+  if (!account) throw new Error(`Ukendt konto: ${job.account}`);
   if (account.kind === "enreach") {
-    return await processEnreachJob(svc, config, job.campaignId.replace(/^\*:/, ""));
+    return await processEnreachTask(svc, config, job.campaignId, job.weeks[0] ?? "");
   }
 
   const auth = authHeader(account);
@@ -608,7 +606,7 @@ function buildMail(
   previous: { weekStart: string; rows: StatRow[] }[],
   config: Config,
   sellerNames: Map<string, string>,
-  notScanned: FailedJob[],
+  notScanned: FailedTask[],
 ) {
   const statusKeys = [...config.closing].map((status) => ({
     status,
@@ -727,7 +725,7 @@ async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
   }
 }
 
-/** Fælles tilstand for én kørsel. Selve arbejdet står i jobkøen. */
+/** Fælles tilstand for én kørsel. Selve arbejdet står i taskkøen. */
 interface RunState {
   runId: string;
   weeks: string[];
@@ -739,12 +737,12 @@ interface RunState {
 
 const MAX_ATTEMPTS = 3;
 
-type JobRow = {
+type TaskRow = {
   id: string;
   run_id: string;
   account: AccountKey;
   campaign_id: string;
-  weeks: string[] | null;
+  week_start: string;
   status: string;
   attempts: number;
   next_page: number;
@@ -752,7 +750,12 @@ type JobRow = {
   error: string | null;
 };
 
-type FailedJob = { account: string; campaign_id: string; error: string | null };
+type FailedTask = {
+  account: string;
+  campaign_id: string;
+  week_start: string;
+  error: string | null;
+};
 
 /**
  * Sætter næste kald i gang. Kaldet afsendes og afbrydes derefter bevidst, så
@@ -785,45 +788,31 @@ async function chainNext(state: RunState): Promise<void> {
   }
 }
 
-/** Fylder køen med ét job pr. kampagne pr. konto (Enreach: ét job pr. uge). */
-async function enqueueJobs(
+/** Fylder køen med én task pr. konto, kampagne og uge. */
+async function enqueueTasks(
   svc: SupabaseClient,
   config: Config,
   runId: string,
   weeks: string[],
 ): Promise<number> {
-  const jobs: Record<string, unknown>[] = [];
+  const tasks: Record<string, unknown>[] = [];
   for (const account of ACCOUNTS) {
-    if (account.kind === "enreach") {
-      // Enreach ignorerer kampagnefilteret: én uge pr. job, grupperet i koden.
-      if (campaignsFor("enreach", config).length === 0) continue;
+    for (const campaign of campaignsFor(account.key, config)) {
       for (const week of weeks) {
-        jobs.push({
+        tasks.push({
           run_id: runId,
           account: account.key,
-          campaign_id: `*:${week}`,
-          weeks: [week],
+          campaign_id: campaign.id,
           week_start: week,
           week_end: addDays(week, 6),
         });
       }
-      continue;
-    }
-    for (const campaign of campaignsFor(account.key, config)) {
-      jobs.push({
-        run_id: runId,
-        account: account.key,
-        campaign_id: campaign.id,
-        weeks,
-        week_start: weeks[0],
-        week_end: addDays(weeks[weeks.length - 1], 6),
-      });
     }
   }
-  if (jobs.length === 0) return 0;
-  const { error } = await svc.from("weekly_lead_closure_jobs").insert(jobs);
-  if (error) throw new Error(`Kunne ikke oprette jobkøen: ${error.message}`);
-  return jobs.length;
+  if (tasks.length === 0) return 0;
+  const { error } = await svc.from("weekly_lead_closure_tasks").insert(tasks);
+  if (error) throw new Error(`Kunne ikke oprette taskkøen: ${error.message}`);
+  return tasks.length;
 }
 
 async function flushMailQueue(): Promise<void> {
@@ -847,7 +836,7 @@ async function finishAndMail(
   svc: SupabaseClient,
   config: Config,
   state: RunState,
-  failed: FailedJob[],
+  failed: FailedTask[],
 ): Promise<{ mailQueued: boolean; statusBreakdown: Record<string, Record<string, number>> }> {
   const weeks = state.weeks;
   const { data: stored } = await svc
@@ -915,16 +904,16 @@ async function finishAndMail(
   return { mailQueued, statusBreakdown };
 }
 
-/** Tæller jobbene i en kørsel, så køen kan afgøre om den er tom. */
-async function jobSummary(
+/** Tæller tasks i en kørsel, så køen kan afgøre om den er tom. */
+async function taskSummary(
   svc: SupabaseClient,
   runId: string,
-): Promise<{ pending: number; running: number; done: number; error: number; failed: FailedJob[] }> {
+): Promise<{ pending: number; running: number; done: number; error: number; failed: FailedTask[] }> {
   const { data } = await svc
-    .from("weekly_lead_closure_jobs")
-    .select("account, campaign_id, status, error")
+    .from("weekly_lead_closure_tasks")
+    .select("account, campaign_id, week_start, status, error")
     .eq("run_id", runId);
-  const rows = (data ?? []) as (FailedJob & { status: string })[];
+  const rows = (data ?? []) as (FailedTask & { status: string })[];
   return {
     pending: rows.filter((r) => r.status === "pending").length,
     running: rows.filter((r) => r.status === "running").length,
@@ -932,7 +921,12 @@ async function jobSummary(
     error: rows.filter((r) => r.status === "error").length,
     failed: rows
       .filter((r) => r.status === "error")
-      .map((r) => ({ account: r.account, campaign_id: r.campaign_id, error: r.error })),
+      .map((r) => ({
+        account: r.account,
+        campaign_id: r.campaign_id,
+        week_start: r.week_start,
+        error: r.error,
+      })),
   };
 }
 
@@ -958,7 +952,19 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
+      action?: "status";
+      run_ids?: string[];
     };
+
+    if (body.action === "status") {
+      const runIds = (body.run_ids ?? []).slice(0, 20);
+      const summaries = await Promise.all(
+        runIds.map(async (runId) => ({ runId, ...(await taskSummary(svc, runId)) })),
+      );
+      return json(200, {
+        summaries: summaries.map(({ failed: _failed, ...summary }) => summary),
+      });
+    }
 
     // Planen kører 05:00 og 06:00 UTC mandag, så mailen rammer 07:00 dansk tid
     // både sommer og vinter. Kun den kørsel der er kl. 7 i Danmark fortsætter.
@@ -1007,12 +1013,12 @@ Deno.serve(async (req) => {
         forceMail: body.force_mail === true,
         triggeredBy,
       };
-      const jobs = await enqueueJobs(svc, config, runId, weeks);
+      const tasks = await enqueueTasks(svc, config, runId, weeks);
       await chainNext(state);
-      return json(200, { stage: "startet", runId, weeks, jobs });
+      return json(200, { stage: "startet", runId, weeks, tasks });
     }
 
-    // ---- Arbejder: tag næste job, udfør det, og kald videre. ----
+    // ---- Arbejder: tag næste task, udfør den, og kald videre. ----
     const state: RunState = {
       runId: body.run_id,
       weeks,
@@ -1022,19 +1028,19 @@ Deno.serve(async (req) => {
     };
     activeRunId = state.runId;
 
-    const { data: takenRaw, error: takeError } = await svc.rpc("weekly_lead_closure_take_job", {
+    const { data: takenRaw, error: takeError } = await svc.rpc("weekly_lead_closure_take_task", {
       _run_id: state.runId,
     });
-    if (takeError) throw new Error(`Kunne ikke tage næste job: ${takeError.message}`);
-    const job = (takenRaw as JobRow | null) ?? null;
+    if (takeError) throw new Error(`Kunne ikke tage næste task: ${takeError.message}`);
+    const task = (takenRaw as TaskRow | null) ?? null;
 
-    if (!job?.id) {
-      const summary = await jobSummary(svc, state.runId);
+    if (!task?.id) {
+      const summary = await taskSummary(svc, state.runId);
       if (summary.pending > 0 || summary.running > 0) {
         // Et andet kald arbejder stadig; denne kæde stopper her.
         return json(200, { stage: "venter", ...summary, failed: undefined });
       }
-      // Alle jobs er done/error: afslut kørslen én gang.
+      // Alle tasks er done/error: afslut kørslen én gang.
       const { data: claimed } = await svc
         .from("weekly_lead_closure_runs")
         .update({ campaigns_scanned: summary.done })
@@ -1047,32 +1053,32 @@ Deno.serve(async (req) => {
       return json(200, {
         stage: "færdig",
         weeks,
-        jobsDone: summary.done,
-        jobsError: summary.error,
+        tasksDone: summary.done,
+        tasksError: summary.error,
         notScanned: summary.failed,
         ...finished,
       });
     }
 
-    const jobWeeks = Array.isArray(job.weeks) ? job.weeks.map(String) : weeks;
+    const taskWeeks = [task.week_start];
     try {
-      const { scanned, nextPage } = await processJob(svc, config, {
-        account: job.account,
-        campaignId: job.campaign_id,
-        weeks: jobWeeks,
-        nextPage: job.next_page,
+      const { scanned, nextPage } = await processTask(svc, config, {
+        account: task.account,
+        campaignId: task.campaign_id,
+        weeks: taskWeeks,
+        nextPage: task.next_page,
       });
       await svc
-        .from("weekly_lead_closure_jobs")
+        .from("weekly_lead_closure_tasks")
         .update({
-          // Flere sider: jobbet tilbage i køen med næste sidetal.
+          // Flere sider: tasken tilbage i køen med næste sidetal.
           status: nextPage ? "pending" : "done",
-          next_page: nextPage ?? job.next_page,
-          leads_scanned: (job.leads_scanned ?? 0) + scanned,
+          next_page: nextPage ?? task.next_page,
+          leads_scanned: (task.leads_scanned ?? 0) + scanned,
           error: null,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", job.id);
+        .eq("id", task.id);
       const { data: runRow } = await svc
         .from("weekly_lead_closure_runs")
         .select("leads_scanned")
@@ -1085,31 +1091,33 @@ Deno.serve(async (req) => {
       await chainNext(state);
       return json(200, {
         stage: "kører",
-        account: job.account,
-        campaignId: job.campaign_id,
+        account: task.account,
+        campaignId: task.campaign_id,
+        weekStart: task.week_start,
         scanned,
         nextPage,
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      const giveUp = job.attempts >= MAX_ATTEMPTS;
+      const giveUp = task.attempts >= MAX_ATTEMPTS;
       console.error(
-        `[weekly-lead-closure-report] job fejlede konto=${job.account} kampagne=${job.campaign_id} forsøg=${job.attempts}: ${message}`,
+        `[weekly-lead-closure-report] task fejlede konto=${task.account} kampagne=${task.campaign_id} uge=${task.week_start} forsøg=${task.attempts}: ${message}`,
       );
       await svc
-        .from("weekly_lead_closure_jobs")
+        .from("weekly_lead_closure_tasks")
         .update({
           status: giveUp ? "error" : "pending",
           error: message,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", job.id);
+        .eq("id", task.id);
       await chainNext(state);
       return json(200, {
-        stage: giveUp ? "job opgivet" : "job forsøges igen",
-        account: job.account,
-        campaignId: job.campaign_id,
-        attempts: job.attempts,
+        stage: giveUp ? "task opgivet" : "task forsøges igen",
+        account: task.account,
+        campaignId: task.campaign_id,
+        weekStart: task.week_start,
+        attempts: task.attempts,
       });
     }
   } catch (e) {

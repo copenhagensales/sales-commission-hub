@@ -36,6 +36,7 @@ import {
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
   useWeeklyLeadClosureStats,
+  useWeeklyLeadClosureTaskSummaries,
   useWeeklyLeadReportLines,
 } from "@/hooks/useWeeklyLeadClosureReport";
 
@@ -73,6 +74,9 @@ export default function WeeklyLeadClosureReport() {
   const { data: statuses = [] } = useLeadClosingStatuses();
   const { data: stats = [], isLoading: statsLoading } = useWeeklyLeadClosureStats();
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
+  const { data: taskSummaries = [] } = useWeeklyLeadClosureTaskSummaries(
+    runs.map((run) => run.id),
+  );
   const updateMapping = useUpdateCampaignMapping();
   const runReport = useRunWeeklyLeadClosureReport();
   const { data: recipients = [], isLoading: recipientsLoading } =
@@ -196,7 +200,7 @@ export default function WeeklyLeadClosureReport() {
           // Kørslen arbejder sig gennem en kø i baggrunden — status ses i
           // kørselsloggen nedenfor.
           toast.success(
-            `Kørsel startet: ${data.jobs ?? 0} kampagner i kø. Følg status i kørselsloggen.`,
+            `Kørsel startet: ${data.tasks ?? 0} tasks i kø. Følg status i kørselsloggen.`,
           );
         },
         onError: (error: unknown) => {
@@ -594,13 +598,17 @@ export default function WeeklyLeadClosureReport() {
                   <TableRow>
                     <TableHead>Tidspunkt</TableHead>
                     <TableHead>Konto</TableHead>
-                    <TableHead className="text-right">Kampagner</TableHead>
+                    <TableHead className="text-right">Færdige</TableHead>
+                    <TableHead className="text-right">Afventer</TableHead>
+                    <TableHead className="text-right">Fejl</TableHead>
                     <TableHead className="text-right">Emner</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runs.map((run) => (
+                  {runs.map((run) => {
+                    const progress = taskSummaries.find((summary) => summary.runId === run.id);
+                    return (
                     <TableRow key={run.id}>
                       <TableCell>
                         {new Date(run.started_at).toLocaleString("da-DK", {
@@ -616,17 +624,24 @@ export default function WeeklyLeadClosureReport() {
                           ? "Mail"
                           : (ACCOUNT_LABEL[run.account ?? ""] ?? run.account ?? "–")}
                       </TableCell>
-                      <TableCell className="text-right">{run.campaigns_scanned}</TableCell>
+                      <TableCell className="text-right">{progress?.done ?? run.campaigns_scanned}</TableCell>
+                      <TableCell className="text-right">
+                        {(progress?.pending ?? 0) + (progress?.running ?? 0)}
+                      </TableCell>
+                      <TableCell className="text-right">{progress?.error ?? 0}</TableCell>
                       <TableCell className="text-right">{run.leads_scanned}</TableCell>
                       <TableCell>
-                        {run.error ? (
+                        {run.finished_at === null ? (
+                          <span className="text-muted-foreground">Kører</span>
+                        ) : run.error ? (
                           <span className="text-destructive">{run.error}</span>
                         ) : (
                           "OK"
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>

@@ -17233,6 +17233,65 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_lead_closure_tasks: {
+        Row: {
+          account: string
+          attempts: number
+          campaign_id: string
+          claimed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          leads_scanned: number
+          next_page: number
+          run_id: string
+          status: string
+          updated_at: string
+          week_end: string
+          week_start: string
+        }
+        Insert: {
+          account: string
+          attempts?: number
+          campaign_id: string
+          claimed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          leads_scanned?: number
+          next_page?: number
+          run_id: string
+          status?: string
+          updated_at?: string
+          week_end: string
+          week_start: string
+        }
+        Update: {
+          account?: string
+          attempts?: number
+          campaign_id?: string
+          claimed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          leads_scanned?: number
+          next_page?: number
+          run_id?: string
+          status?: string
+          updated_at?: string
+          week_end?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_lead_closure_tasks_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_lead_closure_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weekly_lead_report_campaign_map: {
         Row: {
           account: string
@@ -18634,6 +18693,31 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "weekly_lead_closure_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      weekly_lead_closure_take_task: {
+        Args: { _run_id: string }
+        Returns: {
+          account: string
+          attempts: number
+          campaign_id: string
+          claimed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          leads_scanned: number
+          next_page: number
+          run_id: string
+          status: string
+          updated_at: string
+          week_end: string
+          week_start: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "weekly_lead_closure_tasks"
           isOneToOne: true
           isSetofReturn: false
         }

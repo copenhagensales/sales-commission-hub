@@ -8,6 +8,14 @@ export type ClosingStatusRow = Database["public"]["Tables"]["lead_closing_status
 export type ClosureStatRow = Database["public"]["Tables"]["weekly_lead_closure_stats"]["Row"];
 export type ClosureRunRow = Database["public"]["Tables"]["weekly_lead_closure_runs"]["Row"];
 
+export type ClosureTaskSummary = {
+  runId: string;
+  pending: number;
+  running: number;
+  done: number;
+  error: number;
+};
+
 const MAPPING_KEY = ["weekly-lead-closure", "campaign-map"] as const;
 const STATS_KEY = ["weekly-lead-closure", "stats"] as const;
 
@@ -81,6 +89,23 @@ export function useWeeklyLeadClosureRuns() {
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: (query) =>
+      query.state.data?.some((run) => run.finished_at === null) ? 3_000 : false,
+  });
+}
+
+export function useWeeklyLeadClosureTaskSummaries(runIds: string[]) {
+  return useQuery({
+    queryKey: ["weekly-lead-closure", "task-summaries", runIds],
+    enabled: runIds.length > 0,
+    queryFn: async (): Promise<ClosureTaskSummary[]> => {
+      const { data, error } = await supabase.functions.invoke("weekly-lead-closure-report", {
+        body: { action: "status", run_ids: runIds },
+      });
+      if (error) throw error;
+      return (data?.summaries ?? []) as ClosureTaskSummary[];
+    },
+    refetchInterval: 3_000,
   });
 }
 
@@ -107,7 +132,7 @@ export function useUpdateCampaignMapping() {
 
 /**
  * Starter kørslen og vender tilbage med det samme. Selve arbejdet ligger i en
- * jobkø (ét kald pr. kampagne), så kørslen fortsætter i baggrunden og logges i
+ * taskkø (ét kald pr. kampagne og uge), så kørslen fortsætter i baggrunden og logges i
  * weekly_lead_closure_runs.
  */
 export function useRunWeeklyLeadClosureReport() {
@@ -118,11 +143,12 @@ export function useRunWeeklyLeadClosureReport() {
         body: { weeks: input.weeks, send_mail: input.sendMail },
       });
       if (error) throw error;
-      return data as { stage?: string; runId?: string; weeks: string[]; jobs?: number };
+      return data as { stage?: string; runId?: string; weeks: string[]; tasks?: number };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: STATS_KEY });
       queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "runs"] });
+      queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "task-summaries"] });
     },
   });
 }
@@ -144,6 +170,7 @@ export function useSendWeeklyLeadClosureMailNow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: STATS_KEY });
       queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "runs"] });
+      queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "task-summaries"] });
     },
   });
 }
