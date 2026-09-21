@@ -161,6 +161,54 @@ async function ourUsers(auth: string): Promise<Map<string, string>> {
   return ours;
 }
 
+/**
+ * Henter kampagnernes rigtige navne fra Adversus og opdaterer navnekolonnen i
+ * mappingtabellen. Kun id og navn læses — ingen lead-data.
+ */
+async function syncCampaignNames(
+  svc: SupabaseClient,
+): Promise<{ account: AccountKey; campaignId: string; name: string }[]> {
+  const { data: rows } = await svc
+    .from("weekly_lead_report_campaign_map")
+    .select("id, account, adversus_campaign_id");
+  const updated: { account: AccountKey; campaignId: string; name: string }[] = [];
+
+  for (const account of ACCOUNTS.filter((a) => a.kind === "adversus")) {
+    const targets = (rows ?? []).filter(
+      (r) => safeString((r as { account: string }).account) === account.key,
+    );
+    if (targets.length === 0) continue;
+    const names = new Map<string, string>();
+    // Nogle konti giver ikke adgang til kampagnelisten. Da springes kontoen over.
+    try {
+      const campaigns = asArray(
+        await getJson("/campaigns?pageSize=1000", authHeader(account)),
+        "campaigns",
+        "data",
+      );
+      for (const c of campaigns) {
+        const id = safeString(c.id ?? c.campaignId);
+        const name = safeString(c.name ?? c.campaignName);
+        if (id && name) names.set(id, name);
+      }
+    } catch (error) {
+      console.error(`Kampagnenavne kunne ikke hentes for ${account.key}`, error);
+      continue;
+    }
+    for (const row of targets) {
+      const r = row as { id: string; adversus_campaign_id: string };
+      const name = names.get(safeString(r.adversus_campaign_id));
+      if (!name) continue;
+      await svc
+        .from("weekly_lead_report_campaign_map")
+        .update({ adversus_campaign_name: name })
+        .eq("id", r.id);
+      updated.push({ account: account.key, campaignId: r.adversus_campaign_id, name });
+    }
+  }
+  return updated;
+}
+
 type LeadFacts = { status: string; user: string; day: string };
 
 /**
@@ -952,7 +1000,7 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status";
+      action?: "status" | "sync_campaign_names";
       run_ids?: string[];
     };
 
@@ -964,6 +1012,10 @@ Deno.serve(async (req) => {
       return json(200, {
         summaries: summaries.map(({ failed: _failed, ...summary }) => summary),
       });
+    }
+
+    if (body.action === "sync_campaign_names") {
+      return json(200, { campaigns: await syncCampaignNames(svc) });
     }
 
     // Planen kører 05:00 og 06:00 UTC mandag, så mailen rammer 07:00 dansk tid
