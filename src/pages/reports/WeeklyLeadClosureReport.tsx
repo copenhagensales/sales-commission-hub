@@ -712,7 +712,7 @@ export default function WeeklyLeadClosureReport() {
               </p>
             )}
 
-            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground md:grid-cols-4">
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <div>
                 <p className="font-medium text-foreground">Leads behandlet</p>
                 <p>Leads fra jeres lister, som vi har færdigbehandlet i perioden.</p>
