@@ -58,6 +58,12 @@ function hitrate(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
+/** Frasorteret vises som andel af lukkede med antallet i parentes. */
+function sharePlusCount(count: number, whole: number): string {
+  if (!whole) return `${count} stk`;
+  return `${hitrate(count, whole)} (${count} stk)`;
+}
+
 function weekLabel(weekStart: string): string {
   const d = new Date(`${weekStart}T00:00:00Z`);
   const day = (d.getUTCDay() + 6) % 7;
