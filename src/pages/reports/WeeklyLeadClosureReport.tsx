@@ -140,6 +140,27 @@ export default function WeeklyLeadClosureReport() {
     [stats, activeWeek],
   );
 
+  /** Opkaldstal pr. rapportlinje for den valgte uge. */
+  const callsByLine = useMemo(() => {
+    const lineFor = new Map(
+      mapping.map((m) => [`${m.account}|${m.adversus_campaign_id}`, m.report_line]),
+    );
+    const out = new Map<string, CallTotals>();
+    for (const row of callStats) {
+      if (row.week_start !== activeWeek) continue;
+      const line = lineFor.get(`${row.account}|${row.campaign_id}`);
+      if (!line) continue;
+      const entry = out.get(line) ??
+        { attempts: 0, answered: 0, leadsDialed: 0, leadsAnswered: 0 };
+      entry.attempts += row.attempts;
+      entry.answered += row.answered;
+      entry.leadsDialed += row.leads_dialed;
+      entry.leadsAnswered += row.leads_answered;
+      out.set(line, entry);
+    }
+    return out;
+  }, [callStats, mapping, activeWeek]);
+
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
       const rows = weekRows.filter((r) => r.report_line === line.report_line);
@@ -153,15 +174,22 @@ export default function WeeklyLeadClosureReport() {
         decided: sum((status) => hitrateStatuses.includes(status)),
         booked: sum((status) => status === "success"),
         extras,
+        calls: callsByLine.get(line.report_line) ?? null,
       };
     });
-  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses]);
+  }, [lines, weekRows, closingStatuses, hitrateStatuses, excludedStatuses, callsByLine]);
 
   /** Linjer med aktivitet vises; linjer uden nævnes i en note under tabellen. */
-  const activeLineTotals = useMemo(() => lineTotals.filter((l) => l.closed > 0), [lineTotals]);
+  const hasActivity = (l: { closed: number; calls: CallTotals | null }) =>
+    l.closed > 0 || (l.calls?.attempts ?? 0) > 0;
+  const activeLineTotals = useMemo(() => lineTotals.filter(hasActivity), [lineTotals]);
   const idleLines = useMemo(
-    () => lineTotals.filter((l) => l.closed === 0).map((l) => l.reportLine),
+    () => lineTotals.filter((l) => !hasActivity(l)).map((l) => l.reportLine),
     [lineTotals],
+  );
+  const linesWithoutCalls = useMemo(
+    () => activeLineTotals.filter((l) => !l.calls).map((l) => l.reportLine),
+    [activeLineTotals],
   );
 
   const totals = useMemo(() => {
@@ -169,11 +197,17 @@ export default function WeeklyLeadClosureReport() {
     for (const s of excludedStatuses) {
       extras[s.status] = lineTotals.reduce((sum, l) => sum + (l.extras[s.status] ?? 0), 0);
     }
+    const callSum = (pick: (c: CallTotals) => number) =>
+      lineTotals.reduce((s, l) => s + (l.calls ? pick(l.calls) : 0), 0);
     return {
       closed: lineTotals.reduce((s, l) => s + l.closed, 0),
       decided: lineTotals.reduce((s, l) => s + l.decided, 0),
       booked: lineTotals.reduce((s, l) => s + l.booked, 0),
       extras,
+      attempts: callSum((c) => c.attempts),
+      answered: callSum((c) => c.answered),
+      leadsDialed: callSum((c) => c.leadsDialed),
+      leadsAnswered: callSum((c) => c.leadsAnswered),
     };
   }, [lineTotals, excludedStatuses]);
 

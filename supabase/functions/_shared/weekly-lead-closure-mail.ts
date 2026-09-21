@@ -25,6 +25,17 @@ const BRAND = {
   accent: "#25c26a",
 };
 
+export interface CallTotalsView {
+  /** Opkaldsforsøg i perioden. */
+  attempts: number;
+  /** Besvarede opkald. */
+  answered: number;
+  /** Emner der er ringet til. */
+  leadsDialed: number;
+  /** Emner vi har talt med. */
+  leadsAnswered: number;
+}
+
 export interface LineTotals {
   reportLine: string;
   /** Alle afsluttende statusser. */
@@ -34,6 +45,8 @@ export interface LineTotals {
   booked: number;
   /** Lukkede statusser der vises for sig og holdes ude af hitraten. */
   extras: Record<string, number>;
+  /** Opkaldstal for linjen. null når kilden ikke leverer opkald. */
+  calls?: CallTotalsView | null;
 }
 
 export interface StatusTotals {
@@ -213,18 +226,24 @@ function lineSection(
   lines: LineTotals[],
   excluded: { status: string; label: string }[],
 ): string {
-  const active = lines.filter((l) => l.closed > 0);
-  const idle = lines.filter((l) => l.closed === 0);
+  const active = lines.filter((l) => l.closed > 0 || (l.calls?.attempts ?? 0) > 0);
+  const idle = lines.filter((l) => !(l.closed > 0 || (l.calls?.attempts ?? 0) > 0));
 
   const totalClosed = active.reduce((s, l) => s + l.closed, 0);
   const totalDecided = active.reduce((s, l) => s + l.decided, 0);
   const totalBooked = active.reduce((s, l) => s + l.booked, 0);
+  const callSum = (pick: (c: CallTotalsView) => number) =>
+    active.reduce((s, l) => s + (l.calls ? pick(l.calls) : 0), 0);
+  const totalAttempts = callSum((c) => c.attempts);
+  const totalAnswered = callSum((c) => c.answered);
+  const totalDialed = callSum((c) => c.leadsDialed);
+  const totalTalked = callSum((c) => c.leadsAnswered);
 
   const head = `<thead>
-    <tr>${groupTh("", 2, "left")}${excluded.length ? groupTh("Frasorteret", excluded.length) : ""}${groupTh("Kvalificeret", 3)}${groupTh("", 1)}</tr>
+    <tr>${groupTh("", 2, "left")}${excluded.length ? groupTh("Frasorteret", excluded.length) : ""}${groupTh("Kvalificeret", 3)}${groupTh("", 1)}${groupTh("Opkald", 2)}</tr>
     <tr>${th("Rapportlinje")}${th("Lukkede", "right")}${excluded
       .map((e) => th(e.label, "right"))
-      .join("")}${th("Ja/nej", "right")}${th("Ja/nej-andel", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}</tr>
+      .join("")}${th("Ja/nej", "right")}${th("Ja/nej-andel", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}${th("Svarprocent", "right")}${th("Kontaktandel", "right")}</tr>
   </thead>`;
 
   const rows = active
@@ -237,7 +256,11 @@ function lineSection(
         })}${td(nf(l.booked), "right")}${td(pct1(l.booked, l.decided), "right", {
           bold: true,
           accent: true,
-        })}</tr>`,
+        })}${td(l.calls ? pct1(l.calls.answered, l.calls.attempts) : "–", "right")}${td(
+          l.calls ? pct1(l.calls.leadsAnswered, l.calls.leadsDialed) : "–",
+          "right",
+          { dim: true },
+        )}</tr>`,
     )
     .join("");
 
@@ -260,16 +283,30 @@ function lineSection(
   )}${td(pct1(totalDecided, totalClosed), "right", { onDark: true })}${td(nf(totalBooked), "right", {
     bold: true,
     onDark: true,
-  })}${td(pct1(totalBooked, totalDecided), "right", { bold: true, accent: true, onDark: true })}</tr>`;
+  })}${td(pct1(totalBooked, totalDecided), "right", { bold: true, accent: true, onDark: true })}${td(
+    pct1(totalAnswered, totalAttempts),
+    "right",
+    { bold: true, onDark: true },
+  )}${td(pct1(totalTalked, totalDialed), "right", { onDark: true })}</tr>`;
 
   const body = rows
     ? `<tbody>${rows}${totalRow}</tbody>`
     : `<tbody><tr>${td("Ingen lukkede emner i perioden.", "left", { dim: true })}</tr></tbody>`;
 
-  const note = idle.length
-    ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${idle.length} ${
-        idle.length === 1 ? "linje" : "linjer"
-      } uden aktivitet: ${escapeHtml(idle.map((l) => l.reportLine).join(", "))}</div>`
+  const missingCalls = active.filter((l) => !l.calls).map((l) => l.reportLine);
+  const notes = [
+    idle.length
+      ? `${idle.length} ${idle.length === 1 ? "linje" : "linjer"} uden aktivitet: ${
+        escapeHtml(idle.map((l) => l.reportLine).join(", "))
+      }`
+      : "",
+    missingCalls.length
+      ? `Opkaldstal mangler for: ${escapeHtml(missingCalls.join(", "))}`
+      : "",
+  ].filter((n) => n.length > 0);
+
+  const note = notes.length
+    ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${notes.join("<br />")}</div>`
     : "";
 
   return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(`${head}${body}`)}${note}</div>`;

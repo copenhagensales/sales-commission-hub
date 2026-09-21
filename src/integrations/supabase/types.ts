@@ -17072,6 +17072,45 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_lead_call_stats: {
+        Row: {
+          account: string
+          answered: number
+          attempts: number
+          campaign_id: string
+          created_at: string
+          id: string
+          leads_answered: number
+          leads_dialed: number
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          account: string
+          answered?: number
+          attempts?: number
+          campaign_id: string
+          created_at?: string
+          id?: string
+          leads_answered?: number
+          leads_dialed?: number
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          account?: string
+          answered?: number
+          attempts?: number
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          leads_answered?: number
+          leads_dialed?: number
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       weekly_lead_closure_jobs: {
         Row: {
           account: string
@@ -17237,6 +17276,7 @@ export type Database = {
         Row: {
           account: string
           attempts: number
+          calls_done: boolean
           campaign_id: string
           claimed_at: string | null
           created_at: string
@@ -17253,6 +17293,7 @@ export type Database = {
         Insert: {
           account: string
           attempts?: number
+          calls_done?: boolean
           campaign_id: string
           claimed_at?: string | null
           created_at?: string
@@ -17269,6 +17310,7 @@ export type Database = {
         Update: {
           account?: string
           attempts?: number
+          calls_done?: boolean
           campaign_id?: string
           claimed_at?: string | null
           created_at?: string
@@ -18671,6 +18713,18 @@ export type Database = {
         Args: { p_reason?: string; p_sale_id: string }
         Returns: Json
       }
+      weekly_lead_call_stats_set: {
+        Args: {
+          _account: string
+          _answered: number
+          _attempts: number
+          _campaign_id: string
+          _leads_answered: number
+          _leads_dialed: number
+          _week_start: string
+        }
+        Returns: undefined
+      }
       weekly_lead_closure_add: { Args: { _rows: Json }; Returns: number }
       weekly_lead_closure_take_job: {
         Args: { _run_id: string }
@@ -18702,6 +18756,7 @@ export type Database = {
         Returns: {
           account: string
           attempts: number
+          calls_done: boolean
           campaign_id: string
           claimed_at: string | null
           created_at: string

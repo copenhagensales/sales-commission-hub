@@ -252,6 +252,88 @@ async function streamCampaignPages(
 }
 
 // ---------------------------------------------------------------------------
+// Opkaldsforsøg (besvarelse). Kun tal gemmes — aldrig numre eller navne.
+// ---------------------------------------------------------------------------
+/** Felter der læses fra opkaldsdata pr. kilde. */
+const ADVERSUS_CALL_FIELDS = [
+  "campaignId",
+  "disposition",
+  "hangupCause",
+  "insertedTime",
+  "contactId",
+];
+const ENREACH_CALL_FIELDS = ["campaign", "connected", "endCause", "StartTime", "uniqueLeadId"];
+
+const CALL_MAX_PAGES = 60;
+
+type CallTotals = {
+  attempts: number;
+  answered: number;
+  leadsDialed: number;
+  leadsAnswered: number;
+};
+
+/** Et opkald tæller besvaret når dialeren melder det besvaret. */
+function isAnsweredCall(disposition: string, hangupCause: string): boolean {
+  const d = `${disposition} ${hangupCause}`.toLowerCase();
+  return (
+    d.includes("answered") ||
+    d.includes("success") ||
+    d.includes("connected") ||
+    d.includes("sale") ||
+    disposition.trim().toLowerCase() === "answer"
+  );
+}
+
+/**
+ * Henter én kampagnes opkaldsforsøg for én uge fra Adversus /cdr. Tidsfilteret
+ * sættes bredt i UTC og strammes derefter til dansk kalenderuge pr. opkald.
+ */
+async function fetchAdversusCallTotals(
+  auth: string,
+  campaignId: string,
+  weekStart: string,
+): Promise<CallTotals> {
+  const numeric = /^\d+$/.test(campaignId);
+  const filters = JSON.stringify({
+    campaignId: { $eq: numeric ? Number(campaignId) : campaignId },
+    insertedTime: { $gt: `${addDays(weekStart, -1)}T00:00:00Z`, $lt: `${addDays(weekStart, 8)}T00:00:00Z` },
+  });
+  const dialed = new Set<string>();
+  const answeredLeads = new Set<string>();
+  let attempts = 0;
+  let answered = 0;
+  for (let page = 0; page < CALL_MAX_PAGES; page++) {
+    const batch = asArray(
+      await getJson(
+        `/cdr?filters=${encodeURIComponent(filters)}&pageSize=${PAGE_SIZE}&page=${page}`,
+        auth,
+      ),
+      "calls",
+      "cdr",
+      "cdrs",
+      "data",
+      "results",
+    );
+    for (const call of batch) {
+      const day = copenhagenDay(safeString(call.insertedTime ?? call.startTime));
+      if (!day || mondayOf(day) !== weekStart) continue;
+      attempts++;
+      const leadId = safeString(call.contactId ?? call.leadId);
+      if (leadId) dialed.add(leadId);
+      if (isAnsweredCall(safeString(call.disposition), safeString(call.hangupCause))) {
+        answered++;
+        if (leadId) answeredLeads.add(leadId);
+      }
+    }
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return { attempts, answered, leadsDialed: dialed.size, leadsAnswered: answeredLeads.size };
+}
+
+
+
+// ---------------------------------------------------------------------------
 // Enreach (Kanvas)
 // ---------------------------------------------------------------------------
 /** Felter der læses fra Enreach. Intet fra data/closureData. */
@@ -351,6 +433,114 @@ async function streamEnreachWeek(
   }
   return scanned;
 }
+
+/** Afdelingskoder opkald hentes for i Enreach (kun kode — ingen persondata). */
+async function enreachCallOrgCodes(svc: SupabaseClient): Promise<string[]> {
+  const { data } = await svc
+    .from("dialer_integrations")
+    .select("calls_org_codes")
+    .eq("name", ENREACH_INTEGRATION)
+    .eq("provider", "enreach")
+    .maybeSingle();
+  const codes = ((data as { calls_org_codes?: string[] } | null)?.calls_org_codes ?? [])
+    .map((c) => safeString(c))
+    .filter((c) => c.length > 0);
+  return codes;
+}
+
+const ENREACH_CALL_LIMIT = 5000;
+
+/** Henter én tidsblok opkald fra Enreach. Kun de aftalte felter læses. */
+async function enreachCallChunk(
+  access: EnreachAccess,
+  orgCode: string,
+  startTime: string,
+  timeSpan: string,
+): Promise<Record<string, unknown>[]> {
+  const url = `${access.baseUrl}/calls?OrgCode=${encodeURIComponent(orgCode)}` +
+    `&StartTime=${encodeURIComponent(startTime)}&TimeSpan=${encodeURIComponent(timeSpan)}` +
+    `&Limit=${ENREACH_CALL_LIMIT}`;
+  const delays = [1000, 3000, 7000];
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { headers: access.headers });
+    if (res.ok) return asArray(await res.json(), "Results", "results", "calls", "data");
+    if (res.status < 500 || attempt >= delays.length) {
+      throw new Error(`Enreach calls svarede ${res.status}`);
+    }
+    await sleep(delays[attempt]);
+  }
+}
+
+/** Kampagnekoden på et Enreach-opkald. */
+function enreachCallCampaign(call: Record<string, unknown>): string {
+  const campaign = call.campaign ?? call.Campaign;
+  if (campaign && typeof campaign === "object") {
+    const c = campaign as Record<string, unknown>;
+    for (const k of ["uniqueId", "UniqueId", "code", "Code", "id", "Id"]) {
+      const candidate = safeString(c[k]);
+      if (candidate.startsWith("CAMP")) return candidate;
+    }
+    return safeString(c.uniqueId ?? c.id ?? c.code);
+  }
+  return safeString(campaign ?? call.CampaignId);
+}
+
+/**
+ * Henter én uges opkald for én Enreach-kampagne. Ugen hentes dag for dag;
+ * rammer en dag grænsen på antal opkald, deles dagen i to-timers blokke.
+ */
+async function fetchEnreachCallTotals(
+  access: EnreachAccess,
+  orgCodes: string[],
+  campaignId: string,
+  weekStart: string,
+): Promise<CallTotals> {
+  const seen = new Set<string>();
+  const dialed = new Set<string>();
+  const answeredLeads = new Set<string>();
+  let attempts = 0;
+  let answered = 0;
+
+  const consume = (calls: Record<string, unknown>[]) => {
+    for (const call of calls) {
+      const id = safeString(call.uniqueId ?? call.UniqueId ?? call.Id ?? call.id);
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      if (enreachCallCampaign(call) !== campaignId) continue;
+      const day = copenhagenDay(safeString(call.StartTime ?? call.startTime));
+      if (!day || mondayOf(day) !== weekStart) continue;
+      attempts++;
+      const leadId = safeString(call.uniqueLeadId ?? call.LeadUniqueId ?? call.LeadId);
+      if (leadId) dialed.add(leadId);
+      const cause = safeString(call.endCause ?? call.Result).toLowerCase();
+      const connected = call.connected === true || call.Connected === true;
+      if (connected || cause.includes("answer") && !cause.includes("noanswer") && !cause.includes("no answer")) {
+        answered++;
+        if (leadId) answeredLeads.add(leadId);
+      }
+    }
+  };
+
+  for (const orgCode of orgCodes) {
+    for (let d = 0; d < 7; d++) {
+      const day = addDays(weekStart, d);
+      const dayCalls = await enreachCallChunk(access, orgCode, `${day}T00:00:00Z`, "PT24H");
+      if (dayCalls.length < ENREACH_CALL_LIMIT) {
+        consume(dayCalls);
+        continue;
+      }
+      // Dagen ramte grænsen: hentes i to-timers blokke, så intet tabes.
+      for (let hour = 0; hour < 24; hour += 2) {
+        const start = `${day}T${String(hour).padStart(2, "0")}:00:00Z`;
+        consume(await enreachCallChunk(access, orgCode, start, "PT2H"));
+      }
+    }
+  }
+
+  return { attempts, answered, leadsDialed: dialed.size, leadsAnswered: answeredLeads.size };
+}
+
+
 
 // ---------------------------------------------------------------------------
 // Opsætning
@@ -506,6 +696,49 @@ async function saveCounts(
 }
 
 /**
+ * Opkaldsdelen for én task: ÉN konto + ÉN kampagne + ÉN uge. Fejler kilden,
+ * fortsætter emnedelen uændret og linjen viser "–" i stedet for et forkert tal.
+ */
+async function processCalls(
+  svc: SupabaseClient,
+  job: { account: AccountKey; campaignId: string; weekStart: string },
+): Promise<CallTotals | null> {
+  const account = ACCOUNTS.find((candidate) => candidate.key === job.account);
+  if (!account || !job.weekStart || !job.campaignId) return null;
+  try {
+    const totals = account.kind === "enreach"
+      ? await fetchEnreachCallTotals(
+        await enreachAccess(svc),
+        await enreachCallOrgCodes(svc),
+        job.campaignId,
+        job.weekStart,
+      )
+      : await fetchAdversusCallTotals(authHeader(account), job.campaignId, job.weekStart);
+    const { error } = await svc.rpc("weekly_lead_call_stats_set", {
+      _week_start: job.weekStart,
+      _account: job.account,
+      _campaign_id: job.campaignId,
+      _attempts: totals.attempts,
+      _answered: totals.answered,
+      _leads_dialed: totals.leadsDialed,
+      _leads_answered: totals.leadsAnswered,
+    });
+    if (error) throw new Error(error.message);
+    return totals;
+  } catch (e) {
+    // Kun kilde, konto, kampagne og uge logges — aldrig opkaldsdata.
+    console.error(
+      `[weekly-lead-closure-report] opkaldstal mangler konto=${job.account} kampagne=${job.campaignId} uge=${job.weekStart}: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    );
+    return null;
+  }
+}
+
+
+
+/**
  * Én Enreach-task: ÉN kampagne + ÉN uge. API'et ignorerer kampagnefilteret,
  * så ugens svar filtreres lokalt til taskens kampagne.
  */
@@ -631,7 +864,37 @@ type StatRow = {
   lead_count: number;
 };
 
-function lineTotals(rows: StatRow[], config: Config): LineTotals[] {
+type CallStatRow = {
+  week_start: string;
+  account: string;
+  campaign_id: string;
+  attempts: number;
+  answered: number;
+  leads_dialed: number;
+  leads_answered: number;
+};
+
+/** Opkaldstal pr. rapportlinje. Linjer uden opkaldsrækker får null ("–"). */
+function callsByLine(
+  callRows: CallStatRow[],
+  config: Config,
+): Map<string, CallTotals> {
+  const out = new Map<string, CallTotals>();
+  for (const r of callRows) {
+    const line = config.mapping.get(mapKey(r.account, r.campaign_id))?.reportLine;
+    if (!line) continue;
+    const entry = out.get(line) ?? { attempts: 0, answered: 0, leadsDialed: 0, leadsAnswered: 0 };
+    entry.attempts += r.attempts;
+    entry.answered += r.answered;
+    entry.leadsDialed += r.leads_dialed;
+    entry.leadsAnswered += r.leads_answered;
+    out.set(line, entry);
+  }
+  return out;
+}
+
+function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): LineTotals[] {
+  const calls = callsByLine(callRows, config);
   return config.lines.map((reportLine) => {
     const mine = rows.filter((r) => r.report_line === reportLine);
     const sum = (predicate: (status: string) => boolean) =>
@@ -644,6 +907,7 @@ function lineTotals(rows: StatRow[], config: Config): LineTotals[] {
       decided: sum((status) => config.hitrate.has(status)),
       booked: sum((status) => status === BOOKED_STATUS),
       extras,
+      calls: calls.get(reportLine) ?? null,
     };
   });
 }
@@ -651,10 +915,11 @@ function lineTotals(rows: StatRow[], config: Config): LineTotals[] {
 function buildMail(
   weekStart: string,
   rows: StatRow[],
-  previous: { weekStart: string; rows: StatRow[] }[],
+  previous: { weekStart: string; rows: StatRow[]; callRows: CallStatRow[] }[],
   config: Config,
   sellerNames: Map<string, string>,
   notScanned: FailedTask[],
+  callRows: CallStatRow[],
 ) {
   const statusKeys = [...config.closing].map((status) => ({
     status,
@@ -707,13 +972,13 @@ function buildMail(
   const previousWeeks: WeekTotals[] = previous.map((p) => ({
     weekStart: p.weekStart,
     weekNumber: isoWeekNumber(p.weekStart),
-    lines: lineTotals(p.rows, config),
+    lines: lineTotals(p.rows, config, p.callRows),
   }));
 
   return buildWeeklyLeadClosureMail({
     weekStart,
     weekNumber: isoWeekNumber(weekStart),
-    lines: lineTotals(rows, config),
+    lines: lineTotals(rows, config, callRows),
     statusKeys,
     excludedStatuses: config.excluded,
     statusRows,
@@ -747,9 +1012,15 @@ async function alreadyMailedToday(svc: SupabaseClient): Promise<boolean> {
 
 /** GDPR: indtagsfilteret skal tillade præcis de felter vi læser — pr. kilde. */
 async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
-  const sources: { integration: string; fields: string[] }[] = [
-    { integration: "adversus", fields: ["status", "lastContactedBy", "updated"] },
-    { integration: "enreach", fields: ENREACH_FIELDS },
+  const sources: { integration: string; container: string; fields: string[] }[] = [
+    {
+      integration: "adversus",
+      container: "lead_meta",
+      fields: ["status", "lastContactedBy", "updated"],
+    },
+    { integration: "enreach", container: "lead_meta", fields: ENREACH_FIELDS },
+    { integration: "adversus", container: "call_meta", fields: ADVERSUS_CALL_FIELDS },
+    { integration: "enreach", container: "call_meta", fields: ENREACH_CALL_FIELDS },
   ];
   for (const source of sources) {
     const gdprFilter = await createIngestionFilter(svc, {
@@ -758,7 +1029,7 @@ async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
     });
     const sample: Record<string, unknown> = {};
     for (const f of source.fields) sample[f] = "x";
-    const probe = gdprFilter.filter({ data: sample }, "lead_meta") as {
+    const probe = gdprFilter.filter({ data: sample }, source.container) as {
       data?: Record<string, unknown>;
     };
     const allowed = Object.keys(probe.data ?? {});
@@ -796,6 +1067,7 @@ type TaskRow = {
   next_page: number;
   leads_scanned: number;
   error: string | null;
+  calls_done: boolean;
 };
 
 type FailedTask = {
@@ -893,12 +1165,23 @@ async function finishAndMail(
     .in("week_start", weeks);
   const rows = (stored ?? []) as StatRow[];
 
+  const { data: storedCalls } = await svc
+    .from("weekly_lead_call_stats")
+    .select("week_start, account, campaign_id, attempts, answered, leads_dialed, leads_answered")
+    .in("week_start", weeks);
+  const callRows = (storedCalls ?? []) as CallStatRow[];
+
   const latest = weeks[weeks.length - 1];
   const latestRows = rows.filter((r) => r.week_start === latest);
+  const latestCalls = callRows.filter((r) => r.week_start === latest);
   const previous = weeks
     .slice(Math.max(0, weeks.length - 5), weeks.length - 1)
     .reverse()
-    .map((week) => ({ weekStart: week, rows: rows.filter((r) => r.week_start === week) }));
+    .map((week) => ({
+      weekStart: week,
+      rows: rows.filter((r) => r.week_start === week),
+      callRows: callRows.filter((r) => r.week_start === week),
+    }));
 
   let mailQueued = false;
   if (
@@ -913,6 +1196,7 @@ async function finishAndMail(
       config,
       await sellerNamesForAll(svc),
       failed,
+      latestCalls,
     );
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
@@ -1114,6 +1398,32 @@ Deno.serve(async (req) => {
 
     const taskWeeks = [task.week_start];
     try {
+      // next_page = 0 betyder at emnerne er hentet, og opkaldsdelen mangler.
+      if (task.next_page === 0 && !task.calls_done) {
+        const calls = await processCalls(svc, {
+          account: task.account,
+          campaignId: task.campaign_id,
+          weekStart: task.week_start,
+        });
+        await svc
+          .from("weekly_lead_closure_tasks")
+          .update({
+            status: "done",
+            calls_done: true,
+            error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", task.id);
+        await chainNext(state);
+        return json(200, {
+          stage: "opkald hentet",
+          account: task.account,
+          campaignId: task.campaign_id,
+          weekStart: task.week_start,
+          callsFound: calls !== null,
+        });
+      }
+
       const { scanned, nextPage } = await processTask(svc, config, {
         account: task.account,
         campaignId: task.campaign_id,
@@ -1124,8 +1434,9 @@ Deno.serve(async (req) => {
         .from("weekly_lead_closure_tasks")
         .update({
           // Flere sider: tasken tilbage i køen med næste sidetal.
-          status: nextPage ? "pending" : "done",
-          next_page: nextPage ?? task.next_page,
+          // Emnerne færdige: tasken tilbage i køen til opkaldsdelen (side 0).
+          status: "pending",
+          next_page: nextPage ?? 0,
           leads_scanned: (task.leads_scanned ?? 0) + scanned,
           error: null,
           updated_at: new Date().toISOString(),

@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.weekly_lead_call_stats_set(date, text, text, integer, integer, integer, integer) FROM anon, authenticated;
