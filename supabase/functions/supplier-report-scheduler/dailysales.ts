@@ -188,6 +188,12 @@ export async function runDailySales(
         products: [],
         trend: [],
         comparison: null,
+        monthToDate: {
+          start: `${date.slice(0, 7)}-01`,
+          quantity: 0,
+          saleCount: 0,
+          activeDays: 0,
+        },
         action: "not_due",
         detail: !isDue ? "ikke sendetidspunkt" : !sub.is_active ? "inaktiv" : "ingen modtager",
       });
