@@ -1001,6 +1001,17 @@ export interface DailySalesTrendPoint {
   quantity: number;
 }
 
+/**
+ * Måned til dato for den måned rapportdagen ligger i.
+ * Beregnes generisk pr. kunde - ingen kundespecifik logik.
+ */
+export interface DailySalesMonthToDate {
+  start: string; // yyyy-mm-01
+  quantity: number;
+  saleCount: number;
+  activeDays: number;
+}
+
 const DAY_SHORT = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
 
 function dayLabel(iso: string): string {
