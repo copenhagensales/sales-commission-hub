@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useCurrentEmployee } from "@/hooks/useShiftPlanning";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
-import { fetchAllRows, fetchAllRowsCursor } from "@/utils/supabasePagination";
+import { fetchAllRows } from "@/utils/supabasePagination";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
