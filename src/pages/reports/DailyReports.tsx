@@ -806,28 +806,6 @@ export default function DailyReports() {
         }
       });
 
-      // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
-      // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as dashboards)
-      const rawFmSalesData = await fetchAllRows<{
-        id: string; agent_name: string; sale_datetime: string;
-        fm_seller_id: string | null; fm_client_id: string | null; fm_product_name: string | null;
-        client_campaign_id: string | null;
-        sale_items: Array<{ quantity: number; mapped_commission: number; mapped_revenue: number; product_id: string | null; products: { name: string; counts_as_sale: boolean } | null }> | null;
-      }>(
-        "sales",
-        "id, agent_name, sale_datetime, fm_seller_id:raw_payload->>fm_seller_id, fm_client_id:raw_payload->>fm_client_id, fm_product_name:raw_payload->>fm_product_name, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))",
-        (q) => {
-          let query = q.eq("source", "fieldmarketing")
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`);
-          // Kundefilter lagt i databasen i stedet for i browseren
-          if (selectedClients.length > 0) {
-            query = query.in("raw_payload->>fm_client_id", selectedClients);
-          }
-          return query;
-        },
-        { orderBy: "sale_datetime", ascending: false }
-      );
 
       // Filter by employeeIds using fm_seller_id
       const fmSalesData = (rawFmSalesData || []).filter(sale =>
