@@ -57,20 +57,19 @@ import {
 const NO_LINE = "__none__";
 const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Lederne" };
 
-/** Status der vises som "Ugyldige leads" i hovedtabellen. */
+/** Status for ugyldige emner (forkert nummer, allerede kunde m.m.). */
 const INVALID_STATUS = "invalid";
 
 /** Status der vises som "Ukvalificerede" i hovedtabellen. */
 const UNQUALIFIED_STATUS = "unqualified";
 
-/** Egen nøgle for Max Call Reach — står uden for tragten. */
+/** Egen nøgle for Max Call Reach — indgår i "Ikke kontaktbare". */
 const MCR_STATUS = "max_call_reach";
 
 
 /** Tærskler for farvemarkering — justér her. */
-const INVALID_WARN_PCT = 5;
-const INVALID_ALERT_PCT = 15;
-const CONTACT_WARN_PCT = 40;
+const UNREACHABLE_WARN_PCT = 25;
+const UNREACHABLE_ALERT_PCT = 40;
 const SMALL_BASE_DECIDED = 50;
 
 /** Visuel gruppering af rækkerne (ingen tal, ingen beregning). */
@@ -157,12 +156,13 @@ function MissingCallsChip() {
   );
 }
 
-/** Vises hvor dialeren lukker emner som ugyldige uden egen markering. */
-function InInvalidChip() {
+/** Antal stort, andel af emner lukket i lille gråt under. Ét format i hele tragten. */
+function FunnelCell({ count, pct }: { count: number; pct: number | null }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
-      i ugyldige
-    </span>
+    <div className="whitespace-nowrap text-right tabular-nums">
+      <div className="text-sm">{formatCount(count)}</div>
+      <div className="text-xs text-muted-foreground">{formatPct(pct)}</div>
+    </div>
   );
 }
 
