@@ -910,10 +910,9 @@ export default function DailyReports() {
             : [];
 
           // Fieldmarketing sales via raw_payload->>'fm_seller_id' (now uses sale_datetime)
-          const empFmSales = (fmSalesData || []).filter((s: any) => {
+          const empFmSales = (fmSalesData || []).filter((s) => {
             const saleDate = s.sale_datetime;
-            const sellerId = (s.raw_payload as any)?.fm_seller_id;
-            return sellerId === empId && saleDate >= dayStart && saleDate <= dayEnd;
+            return s.fm_seller_id === empId && saleDate >= dayStart && saleDate <= dayEnd;
           });
 
           // Count regular sales using sale_items with counts_as_sale (same as KPI)
