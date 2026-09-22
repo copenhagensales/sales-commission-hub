@@ -78,6 +78,7 @@ import {
   CsTop20Dashboard,
   DashboardHome,
   FieldmarketingDashboardFull,
+  AseFmDashboard,
   CphSalesDashboard,
   DashboardSettings,
   DesignDashboard,
