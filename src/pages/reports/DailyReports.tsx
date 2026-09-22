@@ -578,27 +578,28 @@ export default function DailyReports() {
 
       if (filteredEmployees.length === 0) return [];
 
-      // Fetch absences
-      const { data: absences } = await supabase
-        .from("absence_request_v2")
-        .select("employee_id, type, start_date, end_date, status")
-        .in("employee_id", employeeIds)
-        .lte("start_date", endStr)
-        .gte("end_date", startStr)
-        .eq("status", "approved");
+      // Fravaer, timekilde og teamtilknytning er uafhaengige opslag og hentes samtidig.
+      // teamMembers bruger employee_team_attribution, saa fratraadte medarbejdere
+      // fortsat faar timer/vagt beregnet ud fra deres sidste kendte team.
+      const [absencesRes, hoursSourceMap, teamMembersRes] = await Promise.all([
+        supabase
+          .from("absence_request_v2")
+          .select("employee_id, type, start_date, end_date, status")
+          .in("employee_id", employeeIds)
+          .lte("start_date", endStr)
+          .gte("end_date", startStr)
+          .eq("status", "approved"),
+        useNewAssignmentsFlag
+          ? resolveHoursSourceBatch(employeeIds)
+          : Promise.resolve(null as Record<string, HoursSourceResult> | null),
+        supabase
+          .from("employee_team_attribution")
+          .select("employee_id, team_id, team_name")
+          .in("employee_id", employeeIds),
+      ]);
 
-      // Resolve hours source (new system vs legacy)
-      const hoursSourceMap = useNewAssignmentsFlag
-        ? await resolveHoursSourceBatch(employeeIds)
-        : null;
-
-      // Fetch team standard shift data.
-      // Bruger employee_team_attribution, saa fratraadte medarbejdere fortsat
-      // faar timer/vagt beregnet ud fra deres sidste kendte team.
-      const { data: teamMembers } = await supabase
-        .from("employee_team_attribution")
-        .select("employee_id, team_id, team_name")
-        .in("employee_id", employeeIds);
+      const absences = absencesRes.data;
+      const teamMembers = teamMembersRes.data;
 
       const teamIds = [...new Set(teamMembers?.map(tm => tm.team_id) || [])];
       
