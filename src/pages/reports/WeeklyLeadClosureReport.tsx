@@ -47,10 +47,9 @@ import {
   useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
-  useWeeklyLeadCallStats,
+  useWeeklyLeadClosureReportData,
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
-  useWeeklyLeadClosureStats,
   useWeeklyLeadClosureTaskSummaries,
   useWeeklyLeadReportLines,
 } from "@/hooks/useWeeklyLeadClosureReport";
@@ -180,8 +179,10 @@ export default function WeeklyLeadClosureReport() {
   const { data: lines = [] } = useWeeklyLeadReportLines();
   const { data: mapping = [], isLoading: mappingLoading } = useWeeklyLeadCampaignMap();
   const { data: statuses = [] } = useLeadClosingStatuses();
-  const { data: stats = [], isLoading: statsLoading } = useWeeklyLeadClosureStats();
-  const { data: callStats = [] } = useWeeklyLeadCallStats();
+  const { data: report, isLoading: statsLoading } = useWeeklyLeadClosureReportData(
+    period,
+    selectedWeek || null,
+  );
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
   const { data: taskSummaries = [] } = useWeeklyLeadClosureTaskSummaries(
     runs.map((run) => run.id),
@@ -247,33 +248,10 @@ export default function WeeklyLeadClosureReport() {
     [statuses],
   );
 
-  const availableWeeks = useMemo(
-    () => [...new Set(stats.map((s) => s.week_start))].sort().reverse(),
-    [stats],
-  );
+  const availableWeeks = report?.weeks ?? [];
   const activeWeek = selectedWeek || availableWeeks[0] || "";
+  const weekRows = report?.lines ?? [];
 
-  /**
-   * Uger der indgår i den valgte periode. Samme rækker og samme beregninger —
-   * kun datointervallet er bredere.
-   */
-  const periodWeeks = useMemo(() => {
-    if (!activeWeek) return [] as string[];
-    if (period === "week") return [activeWeek];
-    if (period === "month") {
-      return availableWeeks.filter(
-        (w) => w.slice(0, 7) === activeWeek.slice(0, 7) && w <= activeWeek,
-      );
-    }
-    return availableWeeks.filter(
-      (w) => w.slice(0, 4) === activeWeek.slice(0, 4) && w <= activeWeek,
-    );
-  }, [period, activeWeek, availableWeeks]);
-
-  const weekRows = useMemo(
-    () => stats.filter((s) => periodWeeks.includes(s.week_start)),
-    [stats, periodWeeks],
-  );
 
   const periodLabel = useMemo(() => {
     if (!activeWeek) return "";
@@ -286,40 +264,30 @@ export default function WeeklyLeadClosureReport() {
     return `År til dato ${year}`;
   }, [period, activeWeek]);
 
-  /** Opkaldstal pr. rapportlinje for den valgte periode. */
+  /** Opkaldstal pr. rapportlinje for den valgte periode (aggregeret i databasen). */
   const callsByLine = useMemo(() => {
-    const lineFor = new Map(
-      mapping.map((m) => [`${m.account}|${m.adversus_campaign_id}`, m.report_line]),
-    );
     const out = new Map<string, CallTotals>();
-    for (const row of callStats) {
-      if (!periodWeeks.includes(row.week_start)) continue;
-      const line = lineFor.get(`${row.account}|${row.campaign_id}`);
-      if (!line) continue;
-      const entry = out.get(line) ??
-        { attempts: 0, answered: 0, leadsDialed: 0, leadsAnswered: 0 };
-      entry.attempts += row.attempts;
-      entry.answered += row.answered;
-      entry.leadsDialed += row.leads_dialed;
-      entry.leadsAnswered += row.leads_answered;
-      out.set(line, entry);
+    for (const row of report?.calls ?? []) {
+      out.set(row.report_line, {
+        attempts: row.attempts,
+        answered: row.answered,
+        leadsDialed: row.leads_dialed,
+        leadsAnswered: row.leads_answered,
+      });
     }
     return out;
-  }, [callStats, mapping, periodWeeks]);
+  }, [report]);
+
 
   /**
    * Linjer hvor dialeren selv markerer emner lukket ved max opkaldsforsøg.
    * Kun Enreach gør det (status "Depleted"); Adversus har ingen markering, så
    * linjer uden en Enreach-kampagne viser "ikke tilgængeligt".
    */
-  const mcrAvailableLines = useMemo(() => {
-    const out = new Set<string>();
-    for (const m of mapping) {
-      if (!m.report_line || m.account !== "enreach") continue;
-      out.add(m.report_line);
-    }
-    return out;
-  }, [mapping]);
+  const mcrAvailableLines = useMemo(
+    () => new Set(report?.mcrLines ?? []),
+    [report],
+  );
 
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
@@ -379,16 +347,15 @@ export default function WeeklyLeadClosureReport() {
 
   const unmapped = useMemo(() => {
     const out = new Map<string, { account: string; campaignId: string; closed: number }>();
-    for (const row of weekRows) {
-      if (row.report_line) continue;
-      const key = `${row.account}|${row.adversus_campaign_id}`;
+    for (const row of report?.unmapped ?? []) {
+      const key = `${row.account}|${row.campaign_id}`;
       const entry =
-        out.get(key) ?? { account: row.account, campaignId: row.adversus_campaign_id, closed: 0 };
+        out.get(key) ?? { account: row.account, campaignId: row.campaign_id, closed: 0 };
       if (closingStatuses.includes(row.status)) entry.closed += row.lead_count;
       out.set(key, entry);
     }
     return [...out.values()].sort((a, b) => b.closed - a.closed);
-  }, [weekRows, closingStatuses]);
+  }, [report, closingStatuses]);
 
   const unconfirmed = mapping.filter((m) => !m.is_confirmed).length;
 

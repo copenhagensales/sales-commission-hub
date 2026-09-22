@@ -78,6 +78,68 @@ export function useWeeklyLeadClosureStats() {
   });
 }
 
+export type ClosurePeriodMode = "week" | "month" | "ytd";
+
+export type ClosureLineRow = { report_line: string; status: string; lead_count: number };
+export type ClosureUnmappedRow = {
+  account: string;
+  campaign_id: string;
+  status: string;
+  lead_count: number;
+};
+export type ClosureCallRow = {
+  report_line: string;
+  attempts: number;
+  answered: number;
+  leads_dialed: number;
+  leads_answered: number;
+};
+
+export type ClosureReportData = {
+  weeks: string[];
+  periodWeeks: string[];
+  lines: ClosureLineRow[];
+  unmapped: ClosureUnmappedRow[];
+  calls: ClosureCallRow[];
+  mcrLines: string[];
+};
+
+/**
+ * Henter rapportens tal i ét kald. Aggregeringen sker i databasen
+ * (get_weekly_lead_closure_report), så frontend kun laver visning og andele.
+ */
+export function useWeeklyLeadClosureReportData(
+  period: ClosurePeriodMode,
+  anchorWeek: string | null,
+) {
+  return useQuery({
+    queryKey: ["weekly-lead-closure", "report", period, anchorWeek],
+    queryFn: async (): Promise<ClosureReportData> => {
+      const { data, error } = await supabase.rpc("get_weekly_lead_closure_report", {
+        p_period: period,
+        p_anchor: anchorWeek,
+      });
+      if (error) throw error;
+      const payload = (data ?? {}) as {
+        weeks?: string[];
+        period_weeks?: string[];
+        lines?: ClosureLineRow[];
+        unmapped?: ClosureUnmappedRow[];
+        calls?: ClosureCallRow[];
+        mcr_lines?: string[];
+      };
+      return {
+        weeks: payload.weeks ?? [],
+        periodWeeks: payload.period_weeks ?? [],
+        lines: payload.lines ?? [],
+        unmapped: payload.unmapped ?? [],
+        calls: payload.calls ?? [],
+        mcrLines: payload.mcr_lines ?? [],
+      };
+    },
+  });
+}
+
 export function useWeeklyLeadCallStats() {
   return useQuery({
     queryKey: ["weekly-lead-closure", "call-stats"],

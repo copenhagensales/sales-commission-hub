@@ -18372,6 +18372,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["system_role"]
       }
+      get_weekly_lead_closure_report: {
+        Args: { p_anchor?: string; p_period?: string }
+        Returns: Json
+      }
       has_completed_pulse_survey: {
         Args: { _survey_id: string }
         Returns: boolean
