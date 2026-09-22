@@ -530,15 +530,36 @@ export default function WeeklyLeadClosureReport() {
               <>
                 <Table>
                   <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead colSpan={3} className="h-8" />
+                      <TableHead
+                        colSpan={3}
+                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                      >
+                        Frasorteret – ikke sælgerens ansvar
+                      </TableHead>
+                      <TableHead
+                        colSpan={3}
+                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                      >
+                        Sælger
+                      </TableHead>
+                      <TableHead className="h-8 border-l text-center text-xs uppercase tracking-wider text-muted-foreground">
+                        Kampagne
+                      </TableHead>
+                    </TableRow>
                     <TableRow>
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
                         Kampagne
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Leads behandlet
+                        Emner lukket
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Kontaktandel
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Max Call Reach
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Ugyldige leads
@@ -553,12 +574,11 @@ export default function WeeklyLeadClosureReport() {
                         Bookede
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Hitrate
+                        Sælgerhitrate
                       </TableHead>
                       <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Max Call Reach
+                        Emneudnyttelse
                       </TableHead>
-
                     </TableRow>
                   </TableHeader>
                   <TableBody>
