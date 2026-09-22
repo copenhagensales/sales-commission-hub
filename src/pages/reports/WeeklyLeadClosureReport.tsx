@@ -588,68 +588,51 @@ export default function WeeklyLeadClosureReport() {
                                 <TableCell className="text-sm font-medium">
                                   {row.reportLine}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
+                                <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">
                                   {formatCount(row.closedTotal)}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {!row.calls ? (
-                                    <MissingCallsChip />
-                                  ) : contactPct !== null &&
-                                    contactPct < CONTACT_WARN_PCT ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-amber-300 bg-amber-50 tabular-nums text-amber-700"
-                                    >
-                                      {formatPct(contactPct)}
-                                    </Badge>
+                                <TableCell className="text-right">
+                                  {unreachablePct !== null &&
+                                  unreachablePct > UNREACHABLE_ALERT_PCT ? (
+                                    <div className="flex justify-end">
+                                      <Badge
+                                        variant="outline"
+                                        className="flex-col items-end border-red-300 bg-red-50 tabular-nums text-red-700"
+                                      >
+                                        <span className="text-sm">
+                                          {formatCount(unreachable)}
+                                        </span>
+                                        <span className="text-xs">
+                                          {formatPct(unreachablePct)}
+                                        </span>
+                                      </Badge>
+                                    </div>
+                                  ) : unreachablePct !== null &&
+                                    unreachablePct >= UNREACHABLE_WARN_PCT ? (
+                                    <div className="flex justify-end">
+                                      <Badge
+                                        variant="outline"
+                                        className="flex-col items-end border-amber-300 bg-amber-50 tabular-nums text-amber-700"
+                                      >
+                                        <span className="text-sm">
+                                          {formatCount(unreachable)}
+                                        </span>
+                                        <span className="text-xs">
+                                          {formatPct(unreachablePct)}
+                                        </span>
+                                      </Badge>
+                                    </div>
                                   ) : (
-                                    formatPct(contactPct)
+                                    <FunnelCell count={unreachable} pct={unreachablePct} />
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {!row.mcrAvailable ? (
-                                    <InInvalidChip />
-                                  ) : (
-                                    <>
-                                      <span>{formatCount(row.mcr)}</span>
-                                      <span className="ml-1 text-muted-foreground">
-                                        ({formatPct(pctValue(row.mcr, row.closedTotal))})
-                                      </span>
-                                    </>
-                                  )}
+                                <TableCell className="text-right">
+                                  <FunnelCell count={unqualified} pct={unqualifiedPct} />
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {invalidPct !== null && invalidPct > INVALID_ALERT_PCT ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-red-300 bg-red-50 tabular-nums text-red-700"
-                                    >
-                                      {formatPct(invalidPct)}
-                                    </Badge>
-                                  ) : invalidPct !== null && invalidPct >= INVALID_WARN_PCT ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-amber-300 bg-amber-50 tabular-nums text-amber-700"
-                                    >
-                                      {formatPct(invalidPct)}
-                                    </Badge>
-                                  ) : (
-                                    <span>{formatPct(invalidPct)}</span>
-                                  )}
-                                  <span className="ml-1 text-muted-foreground">
-                                    ({formatCount(invalid)})
-                                  </span>
+                                <TableCell className="border-l pl-4 text-right">
+                                  <FunnelCell count={row.decided} pct={decidedPct} />
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  <span>{formatPct(unqualifiedPct)}</span>
-                                  <span className="ml-1 text-muted-foreground">
-                                    ({formatCount(unqualified)})
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {formatCount(row.decided)}
-                                </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
+                                <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">
                                   {formatCount(row.booked)}
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap text-right text-sm">
