@@ -27,19 +27,11 @@ Beregningen bliver liggende, hvor den er. Vi gør kun hentningen billigere:
 
 Forventet effekt: fra 41,5 sekunder til anslået 8–15 sekunder. Ingen regel flyttes, ingen adgangsregel ændres, alle tal er de samme celler som før — derfor er risikoen lav, og en fejl er let at rulle tilbage.
 
-### Trin 3b — flyt opgørelsen til databasen (kun hvis 3a ikke er nok)
-
-Én databasefunktion, der returnerer én række pr. medarbejder pr. dag, med adgangstjek svarende til det siden bruger i dag. Samme metode som Tryg-rapporten, der gik fra 7,5 sekunder til under 0,3.
-
-Krav før den må tages i brug:
-
-- Skyggedrift: begge udgaver kører side om side, og hver medarbejders timer, salg, provision og omsætning skal være identiske for tre søgninger — i dag, seneste uge og 15. aug.–14. sep. for Eesy FM.
-- Først når afstemningen er godkendt, slås den nye udgave til, og den gamle kode slettes i samme ombæring, så der ikke efterlades to sandheder.
+Hvis 3a ikke er nok, vender jeg tilbage med et selvstændigt forslag — intet af det ligger i denne godkendelse.
 
 ## Teknisk
 
 - Fil: `src/pages/reports/DailyReports.tsx`. Trin 3a ændrer kun rækkefølgen og omfanget af opslagene i `reportData`-useQuery (linje 399 og frem) og i `fetchEmployeesWithClientActivity` (linje 28-72): uafhængige opslag samles i `Promise.all`, `fetchAllRows` får `pageSize: 1000`, og select-listerne skæres ned til de felter der læses.
 - `get_distinct_agent_emails_for_client` kaldes i dag én gang pr. valgt kunde (linje 49); det samles til ét kald pr. søgning.
-- Trin 3b: ny `SECURITY DEFINER`-funktion, fx `get_daily_report(p_start, p_end, p_employee_ids, p_client_ids)`, med adgangstjek svarende til `scopeReportsDaily`, plus indeks på de felter der filtreres. Ingen skrivning, ingen ændring i `sales`, `sale_items`, `shift`, `time_stamps` eller fraværstabellerne.
-- Ingen ændringer i lønberegning, prisregler, provision eller gemte tal i nogen af trinene.
-- Kontrol i begge trin: svartid måles på den faktiske side, og totaler pr. medarbejder sammenlignes mod databasen for de tre søgninger.
+- Ingen ændringer i databasen, i lønberegning, prisregler, provision eller gemte tal.
+- Kontrol: svartid måles på den faktiske side, og totaler pr. medarbejder (timer, salg, provision, omsætning) sammenlignes mod databasen for tre søgninger — i dag, seneste uge og 15. aug.–14. sep. for Eesy FM — og skal være identiske før og efter.
