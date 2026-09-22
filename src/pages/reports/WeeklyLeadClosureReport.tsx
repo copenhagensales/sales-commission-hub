@@ -158,11 +158,11 @@ function MissingCallsChip() {
   );
 }
 
-/** Vises hvor kilden ikke leverer forsøgsantal (Enreach). */
-function NotAvailableChip() {
+/** Vises hvor dialeren lukker emner som ugyldige uden egen markering. */
+function InInvalidChip() {
   return (
     <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
-      ikke tilgængeligt
+      i ugyldige
     </span>
   );
 }
@@ -328,16 +328,24 @@ export default function WeeklyLeadClosureReport() {
         rows.filter((r) => predicate(r.status)).reduce((total, r) => total + r.lead_count, 0);
       const extras: Record<string, number> = {};
       for (const s of excludedStatuses) extras[s.status] = sum((status) => status === s.status);
+      const closed = sum((status) => closingStatuses.includes(status));
+      // Max Call Reach står uden for tragten og påvirker ingen af tallene ovenfor.
+      const mcr = sum((status) => status === MCR_STATUS);
       return {
         reportLine: line.report_line,
-        closed: sum((status) => closingStatuses.includes(status)),
+        closed,
         decided: sum((status) => hitrateStatuses.includes(status)),
         booked: sum((status) => status === "success"),
         extras,
         calls: callsByLine.get(line.report_line) ?? null,
-        // Max Call Reach står uden for tragten og påvirker ingen af tallene ovenfor.
-        mcr: sum((status) => status === MCR_STATUS),
+        mcr,
         mcrAvailable: mcrAvailableLines.has(line.report_line),
+        /**
+         * Emner lukket i alt = sælgerbehandlede + dialerens egne lukninger.
+         * Hvor dialeren ikke markerer lukningen, ligger de allerede i invalid,
+         * og tallet er derfor komplet uden MCR-leddet (mcr = 0).
+         */
+        closedTotal: closed + mcr,
       };
     });
   }, [
@@ -522,15 +530,36 @@ export default function WeeklyLeadClosureReport() {
               <>
                 <Table>
                   <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead colSpan={3} className="h-8" />
+                      <TableHead
+                        colSpan={3}
+                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                      >
+                        Frasorteret – ikke sælgerens ansvar
+                      </TableHead>
+                      <TableHead
+                        colSpan={3}
+                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                      >
+                        Sælger
+                      </TableHead>
+                      <TableHead className="h-8 border-l text-center text-xs uppercase tracking-wider text-muted-foreground">
+                        Kampagne
+                      </TableHead>
+                    </TableRow>
                     <TableRow>
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
                         Kampagne
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Leads behandlet
+                        Emner lukket
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Kontaktandel
+                      </TableHead>
+                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                        Max Call Reach
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Ugyldige leads
@@ -545,12 +574,11 @@ export default function WeeklyLeadClosureReport() {
                         Bookede
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Hitrate
+                        Sælgerhitrate
                       </TableHead>
                       <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Max Call Reach
+                        Emneudnyttelse
                       </TableHead>
-
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -573,7 +601,7 @@ export default function WeeklyLeadClosureReport() {
                         <Fragment key={group.title}>
                           <TableRow className="hover:bg-transparent">
                             <TableCell
-                              colSpan={9}
+                              colSpan={10}
                               className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
                             >
                               {group.title}
@@ -581,13 +609,14 @@ export default function WeeklyLeadClosureReport() {
                           </TableRow>
                           {group.rows.map((row) => {
                             const invalid = row.extras[INVALID_STATUS] ?? 0;
-                            const invalidPct = pctValue(invalid, row.closed);
+                            const invalidPct = pctValue(invalid, row.closedTotal);
                             const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
-                            const unqualifiedPct = pctValue(unqualified, row.closed);
+                            const unqualifiedPct = pctValue(unqualified, row.closedTotal);
                             const contactPct = row.calls
                               ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
                               : null;
                             const hitPct = pctValue(row.booked, row.decided);
+                            const usagePct = pctValue(row.booked, row.closedTotal);
                             const smallBase = row.decided < SMALL_BASE_DECIDED;
                             return (
                               <TableRow key={row.reportLine}>
@@ -595,7 +624,7 @@ export default function WeeklyLeadClosureReport() {
                                   {row.reportLine}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
-                                  {formatCount(row.closed)}
+                                  {formatCount(row.closedTotal)}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
                                   {!row.calls ? (
@@ -610,6 +639,18 @@ export default function WeeklyLeadClosureReport() {
                                     </Badge>
                                   ) : (
                                     formatPct(contactPct)
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {!row.mcrAvailable ? (
+                                    <InInvalidChip />
+                                  ) : (
+                                    <>
+                                      <span>{formatCount(row.mcr)}</span>
+                                      <span className="ml-1 text-muted-foreground">
+                                        ({formatPct(pctValue(row.mcr, row.closedTotal))})
+                                      </span>
+                                    </>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
@@ -676,19 +717,9 @@ export default function WeeklyLeadClosureReport() {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell className="border-l pl-4 text-right text-sm tabular-nums">
-                                  {!row.mcrAvailable ? (
-                                    <NotAvailableChip />
-                                  ) : (
-                                    <>
-                                      <span>{formatCount(row.mcr)}</span>
-                                      <span className="ml-1 text-muted-foreground">
-                                        ({formatPct(pctValue(row.mcr, row.closed + row.mcr))})
-                                      </span>
-                                    </>
-                                  )}
+                                <TableCell className="border-l pl-4 text-right text-sm font-semibold tabular-nums">
+                                  {formatPct(usagePct)}
                                 </TableCell>
-
                               </TableRow>
                             );
                           })}
@@ -766,16 +797,18 @@ export default function WeeklyLeadClosureReport() {
                 </Collapsible>
               </>
             )}
-            {!statsLoading && linesWithoutCalls.length > 0 && (
+            {!statsLoading && linesWithoutMcr.length > 0 && (
               <p className="mt-3 text-sm text-muted-foreground">
-                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
-                er koblet på.
+                På {linesWithoutMcr.join(", ")} lukker dialeren emner ved max kontaktforsøg som
+                Ugyldige uden egen markering. Ugyldige omfatter derfor både leads med fejl og
+                emner lukket af dialeren, og fordelingen kan ikke vises, før Adversus markerer
+                lukningen.
               </p>
             )}
-            {!statsLoading && linesWithoutMcr.length > 0 && (
+            {!statsLoading && linesWithoutCalls.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Max Call Reach kan ikke opgøres for {linesWithoutMcr.join(", ")}, da Adversus ikke
-                markerer emner lukket ved max forsøg.
+                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
+                er koblet på.
               </p>
             )}
 
@@ -797,10 +830,10 @@ export default function WeeklyLeadClosureReport() {
               </p>
             )}
 
-            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
               <div>
-                <p className="font-medium text-foreground">Leads behandlet</p>
-                <p>Leads fra jeres lister, som vi har færdigbehandlet i perioden.</p>
+                <p className="font-medium text-foreground">Emner lukket</p>
+                <p>Alle emner afsluttet i perioden – af en sælger eller af dialeren.</p>
               </div>
               <div>
                 <p className="font-medium text-foreground">Kontaktandel</p>
@@ -810,32 +843,33 @@ export default function WeeklyLeadClosureReport() {
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Ugyldige leads</p>
+                <p className="font-medium text-foreground">Frasorteret</p>
                 <p>
-                  Forkert nummer, allerede kunde, afgået m.m. Markeres gult over{" "}
-                  {INVALID_WARN_PCT} % og rødt over {INVALID_ALERT_PCT} %.
+                  Emner der aldrig blev til en kvalificeret samtale – lukket af dialeren ved max
+                  forsøg, ugyldige (forkert nummer, allerede kunde m.m.) eller ukvalificerede
+                  (opfyldte ikke kriterierne for et møde). Ikke sælgerens ansvar.
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Ukvalificerede</p>
-                <p>Samtaler hvor kunden ikke opfyldte kriterierne for et møde.</p>
+                <p className="font-medium text-foreground">Kvalificerede samtaler</p>
+                <p>Samtaler hvor kunden tog stilling – ja eller nej til et møde.</p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Hitrate</p>
+                <p className="font-medium text-foreground">Sælgerhitrate</p>
                 <p>
-                  Bookede i procent af kvalificerede samtaler. Vises gråt ved under{" "}
-                  {SMALL_BASE_DECIDED} samtaler, hvor tallet svinger meget.
+                  Bookede møder i procent af kvalificerede samtaler. Måler sælgerne. Vises gråt ved
+                  under {SMALL_BASE_DECIDED} samtaler.
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Max Call Reach</p>
+                <p className="font-medium text-foreground">Emneudnyttelse</p>
                 <p>
-                  Leads dialeren selv har lukket, fordi loftet af opkaldsforsøg er nået. Tallet er
-                  dialerens egen markering (Enreach: status Depleted). Tæller ikke med i Leads
-                  behandlet eller hitrate.
+                  Bookede møder i procent af alle lukkede emner. Måler hvad kampagnen får ud af de
+                  leverede leads.
                 </p>
               </div>
             </div>
+
 
           </CardContent>
         </Card>
