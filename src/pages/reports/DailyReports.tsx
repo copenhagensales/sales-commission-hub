@@ -408,16 +408,25 @@ export default function DailyReports() {
       // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
       if (selectedClients.length > 0) {
-        // First, fetch all sales for these clients in the date range to get agent emails (paginated).
-        // Sorteres paa sale_datetime (indekseret) i stedet for created_at.
-        const salesForClient = await fetchAllRows<{ agent_email: string }>(
-          "sales", "agent_email, client_campaigns!inner(client_id)",
-          (q) => q
-            .in("client_campaigns.client_id", selectedClients)
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`),
-          { orderBy: "sale_datetime", ascending: false }
-        );
+        // Begge saelgeropslag er uafhaengige og hentes samtidig med markoer-paginering.
+        const [salesForClient, fmSellersForClient] = await Promise.all([
+          fetchAllRowsCursor<{ id: string; agent_email: string }>(
+            "sales", "id, agent_email, client_campaigns!inner(client_id)",
+            (q) => q
+              .in("client_campaigns.client_id", selectedClients)
+              .gte("sale_datetime", `${startStr}T00:00:00`)
+              .lte("sale_datetime", `${endStr}T23:59:59`),
+            { pageSize: 1000 }
+          ),
+          fetchAllRowsCursor<{ id: string; fm_seller_id: string | null }>(
+            "sales", "id, fm_seller_id:raw_payload->>fm_seller_id",
+            (q) => q.eq("source", "fieldmarketing")
+              .gte("sale_datetime", `${startStr}T00:00:00`)
+              .lte("sale_datetime", `${endStr}T23:59:59`)
+              .in("raw_payload->>fm_client_id", selectedClients),
+            { pageSize: 1000 }
+          ),
+        ]);
 
         // Get unique agent emails from these sales
         const agentEmails = [...new Set(
@@ -425,16 +434,6 @@ export default function DailyReports() {
             .map((s: any) => s.agent_email?.toLowerCase())
             .filter(Boolean)
         )] as string[];
-
-        // ALSO fetch seller_ids for these clients (kunde filtreres i databasen)
-        const fmSellersForClient = await fetchAllRows<{ fm_seller_id: string | null }>(
-          "sales", "fm_seller_id:raw_payload->>fm_seller_id",
-          (q) => q.eq("source", "fieldmarketing")
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`)
-            .in("raw_payload->>fm_client_id", selectedClients),
-          { orderBy: "sale_datetime", ascending: false }
-        );
 
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
