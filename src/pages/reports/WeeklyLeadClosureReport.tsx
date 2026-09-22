@@ -67,9 +67,6 @@ const UNQUALIFIED_STATUS = "unqualified";
 /** Egen nøgle for Max Call Reach — står uden for tragten. */
 const MCR_STATUS = "max_call_reach";
 
-/** Loftet af opkaldsforsøg der udløser Max Call Reach (samme som i hentningen). */
-const MAX_CALL_ATTEMPTS = 5;
-
 
 /** Tærskler for farvemarkering — justér her. */
 const INVALID_WARN_PCT = 5;
@@ -311,13 +308,14 @@ export default function WeeklyLeadClosureReport() {
   }, [callStats, mapping, periodWeeks]);
 
   /**
-   * Linjer hvor forsøgsantal kan opgøres. Enreach leverer det ikke, så linjer
-   * der udelukkende kommer fra Enreach viser "ikke tilgængeligt".
+   * Linjer hvor dialeren selv markerer emner lukket ved max opkaldsforsøg.
+   * Kun Enreach gør det (status "Depleted"); Adversus har ingen markering, så
+   * linjer uden en Enreach-kampagne viser "ikke tilgængeligt".
    */
   const mcrAvailableLines = useMemo(() => {
     const out = new Set<string>();
     for (const m of mapping) {
-      if (!m.report_line || m.account === "enreach") continue;
+      if (!m.report_line || m.account !== "enreach") continue;
       out.add(m.report_line);
     }
     return out;
@@ -776,8 +774,8 @@ export default function WeeklyLeadClosureReport() {
             )}
             {!statsLoading && linesWithoutMcr.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Max Call Reach kan ikke opgøres for {linesWithoutMcr.join(", ")}, da forsøgsantal
-                ikke leveres.
+                Max Call Reach kan ikke opgøres for {linesWithoutMcr.join(", ")}, da Adversus ikke
+                markerer emner lukket ved max forsøg.
               </p>
             )}
 
@@ -832,8 +830,9 @@ export default function WeeklyLeadClosureReport() {
               <div>
                 <p className="font-medium text-foreground">Max Call Reach</p>
                 <p>
-                  Leads dialeren har lukket efter {MAX_CALL_ATTEMPTS} opkaldsforsøg uden kontakt.
-                  Tæller ikke med i Leads behandlet eller hitrate.
+                  Leads dialeren selv har lukket, fordi loftet af opkaldsforsøg er nået. Tallet er
+                  dialerens egen markering (Enreach: status Depleted). Tæller ikke med i Leads
+                  behandlet eller hitrate.
                 </p>
               </div>
             </div>
