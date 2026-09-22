@@ -830,10 +830,10 @@ export default function WeeklyLeadClosureReport() {
               </p>
             )}
 
-            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
               <div>
-                <p className="font-medium text-foreground">Leads behandlet</p>
-                <p>Leads fra jeres lister, som vi har færdigbehandlet i perioden.</p>
+                <p className="font-medium text-foreground">Emner lukket</p>
+                <p>Alle emner afsluttet i perioden – af en sælger eller af dialeren.</p>
               </div>
               <div>
                 <p className="font-medium text-foreground">Kontaktandel</p>
@@ -843,32 +843,33 @@ export default function WeeklyLeadClosureReport() {
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Ugyldige leads</p>
+                <p className="font-medium text-foreground">Frasorteret</p>
                 <p>
-                  Forkert nummer, allerede kunde, afgået m.m. Markeres gult over{" "}
-                  {INVALID_WARN_PCT} % og rødt over {INVALID_ALERT_PCT} %.
+                  Emner der aldrig blev til en kvalificeret samtale – lukket af dialeren ved max
+                  forsøg, ugyldige (forkert nummer, allerede kunde m.m.) eller ukvalificerede
+                  (opfyldte ikke kriterierne for et møde). Ikke sælgerens ansvar.
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Ukvalificerede</p>
-                <p>Samtaler hvor kunden ikke opfyldte kriterierne for et møde.</p>
+                <p className="font-medium text-foreground">Kvalificerede samtaler</p>
+                <p>Samtaler hvor kunden tog stilling – ja eller nej til et møde.</p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Hitrate</p>
+                <p className="font-medium text-foreground">Sælgerhitrate</p>
                 <p>
-                  Bookede i procent af kvalificerede samtaler. Vises gråt ved under{" "}
-                  {SMALL_BASE_DECIDED} samtaler, hvor tallet svinger meget.
+                  Bookede møder i procent af kvalificerede samtaler. Måler sælgerne. Vises gråt ved
+                  under {SMALL_BASE_DECIDED} samtaler.
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Max Call Reach</p>
+                <p className="font-medium text-foreground">Emneudnyttelse</p>
                 <p>
-                  Leads dialeren selv har lukket, fordi loftet af opkaldsforsøg er nået. Tallet er
-                  dialerens egen markering (Enreach: status Depleted). Tæller ikke med i Leads
-                  behandlet eller hitrate.
+                  Bookede møder i procent af alle lukkede emner. Måler hvad kampagnen får ud af de
+                  leverede leads.
                 </p>
               </div>
             </div>
+
 
           </CardContent>
         </Card>
