@@ -963,15 +963,14 @@ export default function DailyReports() {
 
           // Add fieldmarketing sales - sum mapped_commission/mapped_revenue from sale_items
           // (campaign-aware, same source as dashboards). One FM sale = 1 salg, regardless of items.
-          empFmSales.forEach((sale: any) => {
+          empFmSales.forEach((sale) => {
             salesCount += 1;
-            const rawPayload = sale.raw_payload as any;
             // FM sales have client_id in raw_payload
-            const clientId = rawPayload?.fm_client_id;
+            const clientId = sale.fm_client_id;
             if (clientId) {
               dayClientIds.add(clientId);
             }
-            const displayName = rawPayload?.fm_product_name || "Ukendt FM-produkt";
+            const displayName = sale.fm_product_name || "Ukendt FM-produkt";
             const productKey = `${displayName}|||Fieldmarketing`;
 
             const items = (sale.sale_items || []) as Array<any>;
