@@ -408,23 +408,23 @@ export default function DailyReports() {
       // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
       if (selectedClients.length > 0) {
-        // Begge saelgeropslag er uafhaengige og hentes samtidig med markoer-paginering.
+        // Begge saelgeropslag er uafhaengige og hentes samtidig.
         const [salesForClient, fmSellersForClient] = await Promise.all([
-          fetchAllRowsCursor<{ id: string; agent_email: string }>(
-            "sales", "id, agent_email, client_campaigns!inner(client_id)",
+          fetchAllRows<{ agent_email: string }>(
+            "sales", "agent_email, client_campaigns!inner(client_id)",
             (q) => q
               .in("client_campaigns.client_id", selectedClients)
               .gte("sale_datetime", `${startStr}T00:00:00`)
               .lte("sale_datetime", `${endStr}T23:59:59`),
-            { pageSize: 1000 }
+            { orderBy: "sale_datetime", ascending: false }
           ),
-          fetchAllRowsCursor<{ id: string; fm_seller_id: string | null }>(
-            "sales", "id, fm_seller_id:raw_payload->>fm_seller_id",
+          fetchAllRows<{ fm_seller_id: string | null }>(
+            "sales", "fm_seller_id:raw_payload->>fm_seller_id",
             (q) => q.eq("source", "fieldmarketing")
               .gte("sale_datetime", `${startStr}T00:00:00`)
               .lte("sale_datetime", `${endStr}T23:59:59`)
               .in("raw_payload->>fm_client_id", selectedClients),
-            { pageSize: 1000 }
+            { orderBy: "sale_datetime", ascending: false }
           ),
         ]);
 
