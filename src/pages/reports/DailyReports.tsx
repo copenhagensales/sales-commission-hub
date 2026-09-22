@@ -673,7 +673,7 @@ export default function DailyReports() {
         const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
 
         // Fejl maa ikke sluges: et delvist resultat skal ikke kunne vises som et rigtigt tal.
-        return fetchAllRowsCursor<any>(
+        return fetchAllRows<any>(
           "sales", selectClause,
           (q) => {
             let query = q
