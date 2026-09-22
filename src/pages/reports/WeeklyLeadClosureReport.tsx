@@ -158,12 +158,35 @@ function MissingCallsChip() {
   );
 }
 
+/** Kolonnebredder – bruges af både hovedtabellens hoved, grupper og rækker. */
+const REPORT_GRID =
+  "grid grid-cols-[minmax(150px,1.7fr)_0.9fr_1.15fr_1.1fr_1.25fr_0.8fr_1.5fr_1.05fr] items-center";
+
+type FunnelTone = "neutral" | "amber" | "red" | "green";
+
+const FUNNEL_TONE: Record<FunnelTone, string> = {
+  neutral: "bg-muted/40 text-foreground",
+  amber: "bg-amber-50 text-amber-700",
+  red: "bg-red-50 text-red-600",
+  green: "bg-emerald-50 text-emerald-700",
+};
+
 /** Antal stort, andel af emner lukket i lille gråt under. Ét format i hele tragten. */
-function FunnelCell({ count, pct }: { count: number; pct: number | null }) {
+function FunnelCell({
+  count,
+  pct,
+  tone = "neutral",
+}: {
+  count: number;
+  pct: number | null;
+  tone?: FunnelTone;
+}) {
   return (
-    <div className="whitespace-nowrap text-right tabular-nums">
-      <div className="text-sm">{formatCount(count)}</div>
-      <div className="text-xs text-muted-foreground">{formatPct(pct)}</div>
+    <div
+      className={`mx-1 whitespace-nowrap rounded-lg px-2 py-2 text-center tabular-nums ${FUNNEL_TONE[tone]}`}
+    >
+      <div className="text-base font-semibold">{formatCount(count)}</div>
+      <div className="text-xs opacity-80">{formatPct(pct)}</div>
     </div>
   );
 }
