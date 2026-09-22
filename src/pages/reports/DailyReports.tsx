@@ -408,13 +408,15 @@ export default function DailyReports() {
       // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
       if (selectedClients.length > 0) {
-        // First, fetch all sales for these clients in the date range to get agent emails (paginated)
+        // First, fetch all sales for these clients in the date range to get agent emails (paginated).
+        // Sorteres paa sale_datetime (indekseret) i stedet for created_at.
         const salesForClient = await fetchAllRows<{ agent_email: string }>(
           "sales", "agent_email, client_campaigns!inner(client_id)",
           (q) => q
             .in("client_campaigns.client_id", selectedClients)
             .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`)
+            .lte("sale_datetime", `${endStr}T23:59:59`),
+          { orderBy: "sale_datetime", ascending: false }
         );
 
         // Get unique agent emails from these sales
@@ -424,25 +426,21 @@ export default function DailyReports() {
             .filter(Boolean)
         )] as string[];
 
-        // ALSO fetch seller_ids from unified sales table for these clients
-        const fmSellersForClient = await fetchAllRows<{ raw_payload: any }>(
-          "sales", "raw_payload",
+        // ALSO fetch seller_ids for these clients (kunde filtreres i databasen)
+        const fmSellersForClient = await fetchAllRows<{ fm_seller_id: string | null }>(
+          "sales", "fm_seller_id:raw_payload->>fm_seller_id",
           (q) => q.eq("source", "fieldmarketing")
             .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`),
+            .lte("sale_datetime", `${endStr}T23:59:59`)
+            .in("raw_payload->>fm_client_id", selectedClients),
           { orderBy: "sale_datetime", ascending: false }
         );
 
-        const selectedClientSet = new Set(selectedClients);
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
-            .filter((s: any) => s.raw_payload?.fm_client_id && selectedClientSet.has(s.raw_payload.fm_client_id))
-            .map((s: any) => s.raw_payload?.fm_seller_id)
+            .map((s) => s.fm_seller_id)
             .filter(Boolean)
         )] as string[];
-
-        console.log("[DailyReport] Client sales agent emails:", agentEmails);
-        console.log("[DailyReport] FM seller IDs for clients:", fmEmployeeIds.length);
 
         if (agentEmails.length > 0) {
           // Find agents matching these emails
