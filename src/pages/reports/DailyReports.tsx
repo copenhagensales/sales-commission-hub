@@ -26,8 +26,14 @@ import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 // Helper function to fetch employees with activity on specific clients
-// Uses agent_email from sales, matches to agents, then maps to employees via employee_agent_mapping
-async function fetchEmployeesWithClientActivity(clientIds: string[]): Promise<string[]> {
+// Uses agent_email from sales, matches to agents, then maps to employees via employee_agent_mapping.
+// Field marketing-salg hentes kun for den valgte periode og kun med de to
+// noedvendige felter fra raw_payload, saa opslaget ikke skanner hele sales-tabellen.
+async function fetchEmployeesWithClientActivity(
+  clientIds: string[],
+  startStr: string,
+  endStr: string
+): Promise<string[]> {
   if (clientIds.length === 0) return [];
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -48,14 +54,17 @@ async function fetchEmployeesWithClientActivity(clientIds: string[]): Promise<st
     ),
   ];
 
-  // Get FM seller IDs for these clients from unified sales table (paginated)
-  const fmData = await fetchAllRows<{ raw_payload: { fm_seller_id: string; fm_client_id: string } }>(
-    "sales", "raw_payload",
-    (q) => q.eq("source", "fieldmarketing")
+  // Get FM seller IDs for these clients (periode + kunde filtreres i databasen)
+  const fmData = await fetchAllRows<{ fm_seller_id: string | null }>(
+    "sales", "fm_seller_id:raw_payload->>fm_seller_id",
+    (q) => q
+      .eq("source", "fieldmarketing")
+      .gte("sale_datetime", `${startStr}T00:00:00`)
+      .lte("sale_datetime", `${endStr}T23:59:59`)
+      .in("raw_payload->>fm_client_id", clientIds),
+    { orderBy: "sale_datetime", ascending: false }
   );
-  const clientIdSet = new Set(clientIds);
-  const fmDataFiltered = fmData.filter((d) => d.raw_payload?.fm_client_id && clientIdSet.has(d.raw_payload.fm_client_id));
-  const fmEmployeeIds = fmDataFiltered.map((s) => s.raw_payload?.fm_seller_id).filter(Boolean);
+  const fmEmployeeIds = fmData.map((s) => s.fm_seller_id).filter(Boolean) as string[];
 
   // Get all agent mappings with agent email info
   const mappingsRes = await fetch(
