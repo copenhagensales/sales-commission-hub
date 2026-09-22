@@ -386,6 +386,7 @@ export const routes: RouteConfig[] = [
   // Team Dashboards - access controlled at runtime via useRequireDashboardAccess hook
   { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "protected" },
   { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "protected" },
+  { path: "/dashboards/ase-fm", component: AseFmDashboard, access: "protected" },
   { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "protected" },
   { path: "/dashboards/tdc-monthly-goal", component: TdcMonthlyGoalBoard, access: "protected" },
   { path: "/dashboards/relatel-monthly-goal", component: RelatelMonthlyGoalBoard, access: "protected" },
