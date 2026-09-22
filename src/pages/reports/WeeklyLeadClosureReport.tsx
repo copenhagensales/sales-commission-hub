@@ -766,61 +766,74 @@ export default function WeeklyLeadClosureReport() {
                         ))}
                       </TableBody>
                     </Table>
+
+                    {linesWithoutCalls.length > 0 && (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før
+                        opkaldsdata er koblet på.
+                      </p>
+                    )}
+                    {unmapped.length > 0 && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Ikke mappet:{" "}
+                        {unmapped
+                          .map(
+                            (u) =>
+                              `${ACCOUNT_LABEL[u.account] ?? u.account}/${u.campaignId} (${u.closed} lukkede)`,
+                          )
+                          .join(", ")}
+                      </p>
+                    )}
+                    <div className="mt-4 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2">
+                      <div>
+                        <p className="font-medium text-foreground">Kontaktandel</p>
+                        <p>
+                          Andel af leads, hvor vi fik en person i røret. Lav andel peger typisk på
+                          leadkvalitet eller forkerte numre.
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">Max Call Reach</p>
+                        <p>
+                          Emner dialeren selv har lukket, fordi loftet af opkaldsforsøg er nået
+                          (Enreach: status Depleted). Adversus lukker dem som ugyldige uden egen
+                          markering, så opdelingen kan kun vises for Enreach-kampagner.
+                        </p>
+                      </div>
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               </>
             )}
-            {!statsLoading && linesWithoutMcr.length > 0 && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                På {linesWithoutMcr.join(", ")} lukker dialeren emner ved max kontaktforsøg som
-                Ugyldige uden egen markering. Ugyldige omfatter derfor både leads med fejl og
-                emner lukket af dialeren, og fordelingen kan ikke vises, før Adversus markerer
-                lukningen.
-              </p>
-            )}
-            {!statsLoading && linesWithoutCalls.length > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
-                er koblet på.
-              </p>
-            )}
-
+            <p className="mt-3 text-sm text-muted-foreground">
+              Ikke kontaktbare = forkert nummer, allerede kunde eller lukket af dialeren ved max
+              kontaktforsøg. Adversus skelner ikke mellem de to; Enreach gør – se detaljer.
+            </p>
             {!statsLoading && availableWeeks.length > 0 && idleLines.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
                 {idleLines.length} {idleLines.length === 1 ? "kampagne" : "kampagner"} uden
                 aktivitet i perioden: {idleLines.join(", ")}
               </p>
             )}
-            {unmapped.length > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ikke mappet:{" "}
-                {unmapped
-                  .map(
-                    (u) =>
-                      `${ACCOUNT_LABEL[u.account] ?? u.account}/${u.campaignId} (${u.closed} lukkede)`,
-                  )
-                  .join(", ")}
-              </p>
-            )}
 
-            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <div>
                 <p className="font-medium text-foreground">Emner lukket</p>
                 <p>Alle emner afsluttet i perioden – af en sælger eller af dialeren.</p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Kontaktandel</p>
+                <p className="font-medium text-foreground">Ikke kontaktbare</p>
                 <p>
-                  Andel af leads, hvor vi fik en person i røret. Lav andel peger typisk på
-                  leadkvalitet eller forkerte numre.
+                  Emner vi aldrig fik en samtale med – forkert nummer, allerede kunde eller lukket
+                  af dialeren ved max kontaktforsøg. Handler om listekvalitet, ikke om sælgerne
+                  eller Trygs kvalificeringskriterier.
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Frasorteret</p>
+                <p className="font-medium text-foreground">Ukvalificerede</p>
                 <p>
-                  Emner der aldrig blev til en kvalificeret samtale – lukket af dialeren ved max
-                  forsøg, ugyldige (forkert nummer, allerede kunde m.m.) eller ukvalificerede
-                  (opfyldte ikke kriterierne for et møde). Ikke sælgerens ansvar.
+                  Emner der opfyldte kriterierne for en samtale, men ikke for et møde. Ikke
+                  sælgerens ansvar.
                 </p>
               </div>
               <div>
