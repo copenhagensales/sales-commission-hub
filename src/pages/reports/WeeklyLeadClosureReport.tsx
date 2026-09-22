@@ -57,20 +57,19 @@ import {
 const NO_LINE = "__none__";
 const ACCOUNT_LABEL: Record<string, string> = { main: "Hovedkonto", lederne: "Lederne" };
 
-/** Status der vises som "Ugyldige leads" i hovedtabellen. */
+/** Status for ugyldige emner (forkert nummer, allerede kunde m.m.). */
 const INVALID_STATUS = "invalid";
 
 /** Status der vises som "Ukvalificerede" i hovedtabellen. */
 const UNQUALIFIED_STATUS = "unqualified";
 
-/** Egen nøgle for Max Call Reach — står uden for tragten. */
+/** Egen nøgle for Max Call Reach — indgår i "Ikke kontaktbare". */
 const MCR_STATUS = "max_call_reach";
 
 
 /** Tærskler for farvemarkering — justér her. */
-const INVALID_WARN_PCT = 5;
-const INVALID_ALERT_PCT = 15;
-const CONTACT_WARN_PCT = 40;
+const UNREACHABLE_WARN_PCT = 25;
+const UNREACHABLE_ALERT_PCT = 40;
 const SMALL_BASE_DECIDED = 50;
 
 /** Visuel gruppering af rækkerne (ingen tal, ingen beregning). */
@@ -157,12 +156,13 @@ function MissingCallsChip() {
   );
 }
 
-/** Vises hvor dialeren lukker emner som ugyldige uden egen markering. */
-function InInvalidChip() {
+/** Antal stort, andel af emner lukket i lille gråt under. Ét format i hele tragten. */
+function FunnelCell({ count, pct }: { count: number; pct: number | null }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
-      i ugyldige
-    </span>
+    <div className="whitespace-nowrap text-right tabular-nums">
+      <div className="text-sm">{formatCount(count)}</div>
+      <div className="text-xs text-muted-foreground">{formatPct(pct)}</div>
+    </div>
   );
 }
 
@@ -498,16 +498,16 @@ export default function WeeklyLeadClosureReport() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead colSpan={3} className="h-8" />
+                      <TableHead colSpan={2} className="h-8" />
                       <TableHead
-                        colSpan={3}
+                        colSpan={2}
                         className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
                       >
                         Frasorteret – ikke sælgerens ansvar
                       </TableHead>
                       <TableHead
                         colSpan={3}
-                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                        className="h-8 border-l text-center text-xs uppercase tracking-wider text-muted-foreground"
                       >
                         Sælger
                       </TableHead>
@@ -523,18 +523,12 @@ export default function WeeklyLeadClosureReport() {
                         Emner lukket
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Kontaktandel
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Max Call Reach
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Ugyldige leads
+                        Ikke kontaktbare
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Ukvalificerede
                       </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                      <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Kvalificerede samtaler
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
@@ -568,7 +562,7 @@ export default function WeeklyLeadClosureReport() {
                         <Fragment key={group.title}>
                           <TableRow className="hover:bg-transparent">
                             <TableCell
-                              colSpan={10}
+                              colSpan={8}
                               className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
                             >
                               {group.title}
@@ -576,12 +570,16 @@ export default function WeeklyLeadClosureReport() {
                           </TableRow>
                           {group.rows.map((row) => {
                             const invalid = row.extras[INVALID_STATUS] ?? 0;
-                            const invalidPct = pctValue(invalid, row.closedTotal);
+                            /**
+                             * Ikke kontaktbare = ugyldige + dialerens egne lukninger ved max
+                             * kontaktforsøg. På Adversus ligger lukningerne allerede i ugyldige
+                             * (mcr = 0), så begrebet er ens på tværs af systemer.
+                             */
+                            const unreachable = invalid + row.mcr;
+                            const unreachablePct = pctValue(unreachable, row.closedTotal);
                             const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
                             const unqualifiedPct = pctValue(unqualified, row.closedTotal);
-                            const contactPct = row.calls
-                              ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
-                              : null;
+                            const decidedPct = pctValue(row.decided, row.closedTotal);
                             const hitPct = pctValue(row.booked, row.decided);
                             const usagePct = pctValue(row.booked, row.closedTotal);
                             const smallBase = row.decided < SMALL_BASE_DECIDED;
@@ -590,68 +588,51 @@ export default function WeeklyLeadClosureReport() {
                                 <TableCell className="text-sm font-medium">
                                   {row.reportLine}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
+                                <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">
                                   {formatCount(row.closedTotal)}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {!row.calls ? (
-                                    <MissingCallsChip />
-                                  ) : contactPct !== null &&
-                                    contactPct < CONTACT_WARN_PCT ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-amber-300 bg-amber-50 tabular-nums text-amber-700"
-                                    >
-                                      {formatPct(contactPct)}
-                                    </Badge>
+                                <TableCell className="text-right">
+                                  {unreachablePct !== null &&
+                                  unreachablePct > UNREACHABLE_ALERT_PCT ? (
+                                    <div className="flex justify-end">
+                                      <Badge
+                                        variant="outline"
+                                        className="flex-col items-end border-red-300 bg-red-50 tabular-nums text-red-700"
+                                      >
+                                        <span className="text-sm">
+                                          {formatCount(unreachable)}
+                                        </span>
+                                        <span className="text-xs">
+                                          {formatPct(unreachablePct)}
+                                        </span>
+                                      </Badge>
+                                    </div>
+                                  ) : unreachablePct !== null &&
+                                    unreachablePct >= UNREACHABLE_WARN_PCT ? (
+                                    <div className="flex justify-end">
+                                      <Badge
+                                        variant="outline"
+                                        className="flex-col items-end border-amber-300 bg-amber-50 tabular-nums text-amber-700"
+                                      >
+                                        <span className="text-sm">
+                                          {formatCount(unreachable)}
+                                        </span>
+                                        <span className="text-xs">
+                                          {formatPct(unreachablePct)}
+                                        </span>
+                                      </Badge>
+                                    </div>
                                   ) : (
-                                    formatPct(contactPct)
+                                    <FunnelCell count={unreachable} pct={unreachablePct} />
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {!row.mcrAvailable ? (
-                                    <InInvalidChip />
-                                  ) : (
-                                    <>
-                                      <span>{formatCount(row.mcr)}</span>
-                                      <span className="ml-1 text-muted-foreground">
-                                        ({formatPct(pctValue(row.mcr, row.closedTotal))})
-                                      </span>
-                                    </>
-                                  )}
+                                <TableCell className="text-right">
+                                  <FunnelCell count={unqualified} pct={unqualifiedPct} />
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {invalidPct !== null && invalidPct > INVALID_ALERT_PCT ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-red-300 bg-red-50 tabular-nums text-red-700"
-                                    >
-                                      {formatPct(invalidPct)}
-                                    </Badge>
-                                  ) : invalidPct !== null && invalidPct >= INVALID_WARN_PCT ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-amber-300 bg-amber-50 tabular-nums text-amber-700"
-                                    >
-                                      {formatPct(invalidPct)}
-                                    </Badge>
-                                  ) : (
-                                    <span>{formatPct(invalidPct)}</span>
-                                  )}
-                                  <span className="ml-1 text-muted-foreground">
-                                    ({formatCount(invalid)})
-                                  </span>
+                                <TableCell className="border-l pl-4 text-right">
+                                  <FunnelCell count={row.decided} pct={decidedPct} />
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  <span>{formatPct(unqualifiedPct)}</span>
-                                  <span className="ml-1 text-muted-foreground">
-                                    ({formatCount(unqualified)})
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
-                                  {formatCount(row.decided)}
-                                </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums">
+                                <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">
                                   {formatCount(row.booked)}
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap text-right text-sm">
@@ -725,7 +706,13 @@ export default function WeeklyLeadClosureReport() {
                             Ja/nej-andel
                           </TableHead>
                           <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                            Kontaktandel
+                          </TableHead>
+                          <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                             Svarprocent
+                          </TableHead>
+                          <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                            Ikke kontaktbare – opdeling
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -751,75 +738,103 @@ export default function WeeklyLeadClosureReport() {
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums">
                               {row.calls ? (
+                                hitrate(row.calls.leadsAnswered, row.calls.leadsDialed)
+                              ) : (
+                                <MissingCallsChip />
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {row.calls ? (
                                 hitrate(row.calls.answered, row.calls.attempts)
                               ) : (
                                 <MissingCallsChip />
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {row.mcrAvailable ? (
+                                <span className="tabular-nums">
+                                  Max call {formatCount(row.mcr)} · forkert nummer{" "}
+                                  {formatCount(row.extras[INVALID_STATUS] ?? 0)}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  kan ikke opdeles (Adversus lukker max call som ugyldig)
+                                </span>
                               )}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+
+                    {linesWithoutCalls.length > 0 && (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før
+                        opkaldsdata er koblet på.
+                      </p>
+                    )}
+                    {unmapped.length > 0 && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Ikke mappet:{" "}
+                        {unmapped
+                          .map(
+                            (u) =>
+                              `${ACCOUNT_LABEL[u.account] ?? u.account}/${u.campaignId} (${u.closed} lukkede)`,
+                          )
+                          .join(", ")}
+                      </p>
+                    )}
+                    <div className="mt-4 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2">
+                      <div>
+                        <p className="font-medium text-foreground">Kontaktandel</p>
+                        <p>
+                          Andel af leads, hvor vi fik en person i røret. Lav andel peger typisk på
+                          leadkvalitet eller forkerte numre.
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">Max Call Reach</p>
+                        <p>
+                          Emner dialeren selv har lukket, fordi loftet af opkaldsforsøg er nået
+                          (Enreach: status Depleted). Adversus lukker dem som ugyldige uden egen
+                          markering, så opdelingen kan kun vises for Enreach-kampagner.
+                        </p>
+                      </div>
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               </>
             )}
-            {!statsLoading && linesWithoutMcr.length > 0 && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                På {linesWithoutMcr.join(", ")} lukker dialeren emner ved max kontaktforsøg som
-                Ugyldige uden egen markering. Ugyldige omfatter derfor både leads med fejl og
-                emner lukket af dialeren, og fordelingen kan ikke vises, før Adversus markerer
-                lukningen.
-              </p>
-            )}
-            {!statsLoading && linesWithoutCalls.length > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
-                er koblet på.
-              </p>
-            )}
-
+            <p className="mt-3 text-sm text-muted-foreground">
+              Ikke kontaktbare = forkert nummer, allerede kunde eller lukket af dialeren ved max
+              kontaktforsøg. Adversus skelner ikke mellem de to; Enreach gør – se detaljer.
+            </p>
             {!statsLoading && availableWeeks.length > 0 && idleLines.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
                 {idleLines.length} {idleLines.length === 1 ? "kampagne" : "kampagner"} uden
                 aktivitet i perioden: {idleLines.join(", ")}
               </p>
             )}
-            {unmapped.length > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ikke mappet:{" "}
-                {unmapped
-                  .map(
-                    (u) =>
-                      `${ACCOUNT_LABEL[u.account] ?? u.account}/${u.campaignId} (${u.closed} lukkede)`,
-                  )
-                  .join(", ")}
-              </p>
-            )}
 
-            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-6 grid gap-4 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <div>
                 <p className="font-medium text-foreground">Emner lukket</p>
                 <p>Alle emner afsluttet i perioden – af en sælger eller af dialeren.</p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Kontaktandel</p>
+                <p className="font-medium text-foreground">Ikke kontaktbare</p>
                 <p>
-                  Andel af leads, hvor vi fik en person i røret. Lav andel peger typisk på
-                  leadkvalitet eller forkerte numre.
+                  Emner vi aldrig fik en samtale med – forkert nummer, allerede kunde eller lukket
+                  af dialeren ved max kontaktforsøg. Handler om listekvalitet, ikke om sælgerne
+                  eller Trygs kvalificeringskriterier.
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Frasorteret</p>
+                <p className="font-medium text-foreground">Ukvalificerede</p>
                 <p>
-                  Emner der aldrig blev til en kvalificeret samtale – lukket af dialeren ved max
-                  forsøg, ugyldige (forkert nummer, allerede kunde m.m.) eller ukvalificerede
-                  (opfyldte ikke kriterierne for et møde). Ikke sælgerens ansvar.
+                  Emner der opfyldte kriterierne for en samtale, men ikke for et møde. Ikke
+                  sælgerens ansvar.
                 </p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Kvalificerede samtaler</p>
-                <p>Samtaler hvor kunden tog stilling – ja eller nej til et møde.</p>
               </div>
               <div>
                 <p className="font-medium text-foreground">Sælgerhitrate</p>
