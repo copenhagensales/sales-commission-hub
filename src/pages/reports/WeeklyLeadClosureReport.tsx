@@ -589,13 +589,14 @@ export default function WeeklyLeadClosureReport() {
                           </TableRow>
                           {group.rows.map((row) => {
                             const invalid = row.extras[INVALID_STATUS] ?? 0;
-                            const invalidPct = pctValue(invalid, row.closed);
+                            const invalidPct = pctValue(invalid, row.closedTotal);
                             const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
-                            const unqualifiedPct = pctValue(unqualified, row.closed);
+                            const unqualifiedPct = pctValue(unqualified, row.closedTotal);
                             const contactPct = row.calls
                               ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
                               : null;
                             const hitPct = pctValue(row.booked, row.decided);
+                            const usagePct = pctValue(row.booked, row.closedTotal);
                             const smallBase = row.decided < SMALL_BASE_DECIDED;
                             return (
                               <TableRow key={row.reportLine}>
@@ -603,7 +604,7 @@ export default function WeeklyLeadClosureReport() {
                                   {row.reportLine}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
-                                  {formatCount(row.closed)}
+                                  {formatCount(row.closedTotal)}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
                                   {!row.calls ? (
@@ -618,6 +619,18 @@ export default function WeeklyLeadClosureReport() {
                                     </Badge>
                                   ) : (
                                     formatPct(contactPct)
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right text-sm tabular-nums">
+                                  {!row.mcrAvailable ? (
+                                    <InInvalidChip />
+                                  ) : (
+                                    <>
+                                      <span>{formatCount(row.mcr)}</span>
+                                      <span className="ml-1 text-muted-foreground">
+                                        ({formatPct(pctValue(row.mcr, row.closedTotal))})
+                                      </span>
+                                    </>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums">
@@ -684,19 +697,9 @@ export default function WeeklyLeadClosureReport() {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell className="border-l pl-4 text-right text-sm tabular-nums">
-                                  {!row.mcrAvailable ? (
-                                    <NotAvailableChip />
-                                  ) : (
-                                    <>
-                                      <span>{formatCount(row.mcr)}</span>
-                                      <span className="ml-1 text-muted-foreground">
-                                        ({formatPct(pctValue(row.mcr, row.closed + row.mcr))})
-                                      </span>
-                                    </>
-                                  )}
+                                <TableCell className="border-l pl-4 text-right text-sm font-semibold tabular-nums">
+                                  {formatPct(usagePct)}
                                 </TableCell>
-
                               </TableRow>
                             );
                           })}
