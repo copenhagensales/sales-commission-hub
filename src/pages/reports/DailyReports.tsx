@@ -51,14 +51,14 @@ async function fetchEmployeesWithClientActivity(
     Promise.all(
       clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
     ),
-    fetchAllRowsCursor<{ id: string; fm_seller_id: string | null }>(
-      "sales", "id, fm_seller_id:raw_payload->>fm_seller_id",
+    fetchAllRows<{ fm_seller_id: string | null }>(
+      "sales", "fm_seller_id:raw_payload->>fm_seller_id",
       (q) => q
         .eq("source", "fieldmarketing")
         .gte("sale_datetime", `${startStr}T00:00:00`)
         .lte("sale_datetime", `${endStr}T23:59:59`)
         .in("raw_payload->>fm_client_id", clientIds),
-      { pageSize: 1000 }
+      { orderBy: "sale_datetime", ascending: false }
     ),
     fetch(
       `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
