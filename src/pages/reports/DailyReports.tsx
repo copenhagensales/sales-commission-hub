@@ -1429,6 +1429,17 @@ export default function DailyReports() {
                 <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mb-4" />
                 <p>Henter data...</p>
               </div>
+            ) : isReportError ? (
+              <div className="flex flex-col items-center justify-center h-[350px] text-center">
+                <AlertTriangle className="h-12 w-12 mb-4 text-destructive opacity-70" />
+                <p className="text-lg font-medium">Rapporten kunne ikke hentes</p>
+                <p className="text-sm mt-1 text-muted-foreground max-w-md">
+                  Søgningen blev afbrudt, før alle tal var hentet. Prøv igen, eller vælg en kortere periode.
+                </p>
+                <Button variant="outline" className="mt-4" onClick={() => fetchReport()}>
+                  Prøv igen
+                </Button>
+              </div>
             ) : reportData.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[350px] text-center text-muted-foreground">
                 <CalendarIcon className="h-16 w-16 mb-4 opacity-20" />
