@@ -706,7 +706,13 @@ export default function WeeklyLeadClosureReport() {
                             Ja/nej-andel
                           </TableHead>
                           <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                            Kontaktandel
+                          </TableHead>
+                          <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                             Svarprocent
+                          </TableHead>
+                          <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                            Ikke kontaktbare – opdeling
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -732,9 +738,28 @@ export default function WeeklyLeadClosureReport() {
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums">
                               {row.calls ? (
+                                hitrate(row.calls.leadsAnswered, row.calls.leadsDialed)
+                              ) : (
+                                <MissingCallsChip />
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {row.calls ? (
                                 hitrate(row.calls.answered, row.calls.attempts)
                               ) : (
                                 <MissingCallsChip />
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {row.mcrAvailable ? (
+                                <span className="tabular-nums">
+                                  Max call {formatCount(row.mcr)} · forkert nummer{" "}
+                                  {formatCount(row.extras[INVALID_STATUS] ?? 0)}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  kan ikke opdeles (Adversus lukker max call som ugyldig)
+                                </span>
                               )}
                             </TableCell>
                           </TableRow>
