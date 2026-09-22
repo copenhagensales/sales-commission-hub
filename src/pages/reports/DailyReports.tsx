@@ -710,7 +710,7 @@ export default function DailyReports() {
           }
           return query;
         },
-        { pageSize: 1000 }
+        { orderBy: "sale_datetime", ascending: false }
       );
 
       const [salesData, campaignMappingsRes, productPricingRulesRes, rawFmSalesData] = await Promise.all([
