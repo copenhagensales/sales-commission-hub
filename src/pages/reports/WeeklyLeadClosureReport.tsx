@@ -498,16 +498,16 @@ export default function WeeklyLeadClosureReport() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead colSpan={3} className="h-8" />
+                      <TableHead colSpan={2} className="h-8" />
                       <TableHead
-                        colSpan={3}
+                        colSpan={2}
                         className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
                       >
                         Frasorteret – ikke sælgerens ansvar
                       </TableHead>
                       <TableHead
                         colSpan={3}
-                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                        className="h-8 border-l text-center text-xs uppercase tracking-wider text-muted-foreground"
                       >
                         Sælger
                       </TableHead>
@@ -523,18 +523,12 @@ export default function WeeklyLeadClosureReport() {
                         Emner lukket
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Kontaktandel
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Max Call Reach
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Ugyldige leads
+                        Ikke kontaktbare
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Ukvalificerede
                       </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                      <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
                         Kvalificerede samtaler
                       </TableHead>
                       <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
