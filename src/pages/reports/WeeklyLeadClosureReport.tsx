@@ -837,10 +837,6 @@ export default function WeeklyLeadClosureReport() {
                 </p>
               </div>
               <div>
-                <p className="font-medium text-foreground">Kvalificerede samtaler</p>
-                <p>Samtaler hvor kunden tog stilling – ja eller nej til et møde.</p>
-              </div>
-              <div>
                 <p className="font-medium text-foreground">Sælgerhitrate</p>
                 <p>
                   Bookede møder i procent af kvalificerede samtaler. Måler sælgerne. Vises gråt ved
