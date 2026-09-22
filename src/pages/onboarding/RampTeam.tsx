@@ -611,6 +611,7 @@ function MemberCard({
                       {a.action_type}
                     </p>
                     <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                      {a.performed_by_name ? `Af ${a.performed_by_name} · ` : ""}
                       Sendt til {a.recipients.length} · uge {week}
                     </p>
                     <p
