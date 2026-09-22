@@ -44,34 +44,34 @@ async function fetchEmployeesWithClientActivity(
   const authToken = session?.access_token || supabaseKey;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
 
-  // Get unique agent emails for each client (RPC takes single id, so loop)
-  const agentEmailSets = await Promise.all(
-    clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
-  );
+  // De tre opslag er uafhaengige og hentes samtidig.
+  // FM-salg hentes med markoer-paginering (id) i stedet for OFFSET, saa dybe
+  // sider ikke bliver dyrere og dyrere for laengere perioder.
+  const [agentEmailSets, fmData, mappingsData] = await Promise.all([
+    Promise.all(
+      clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
+    ),
+    fetchAllRows<{ fm_seller_id: string | null }>(
+      "sales", "fm_seller_id:raw_payload->>fm_seller_id",
+      (q) => q
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`)
+        .in("raw_payload->>fm_client_id", clientIds),
+      { orderBy: "sale_datetime", ascending: false }
+    ),
+    fetch(
+      `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
+      { headers }
+    ).then((res) => res.json() as Promise<{ employee_id: string; agents: { email: string } | null }[]>),
+  ]);
+
   const agentEmails = [
     ...new Set(
       agentEmailSets.flatMap((res) => (res.data || []).map((r: any) => r.agent_email).filter(Boolean))
     ),
   ];
-
-  // Get FM seller IDs for these clients (periode + kunde filtreres i databasen)
-  const fmData = await fetchAllRows<{ fm_seller_id: string | null }>(
-    "sales", "fm_seller_id:raw_payload->>fm_seller_id",
-    (q) => q
-      .eq("source", "fieldmarketing")
-      .gte("sale_datetime", `${startStr}T00:00:00`)
-      .lte("sale_datetime", `${endStr}T23:59:59`)
-      .in("raw_payload->>fm_client_id", clientIds),
-    { orderBy: "sale_datetime", ascending: false }
-  );
   const fmEmployeeIds = fmData.map((s) => s.fm_seller_id).filter(Boolean) as string[];
-
-  // Get all agent mappings with agent email info
-  const mappingsRes = await fetch(
-    `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
-    { headers }
-  );
-  const mappingsData: { employee_id: string; agents: { email: string } | null }[] = await mappingsRes.json();
 
   const employeeIdsFromSales = mappingsData
     .filter((m) => m.agents?.email && agentEmails.includes(m.agents.email))
@@ -408,16 +408,25 @@ export default function DailyReports() {
       // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
       if (selectedClients.length > 0) {
-        // First, fetch all sales for these clients in the date range to get agent emails (paginated).
-        // Sorteres paa sale_datetime (indekseret) i stedet for created_at.
-        const salesForClient = await fetchAllRows<{ agent_email: string }>(
-          "sales", "agent_email, client_campaigns!inner(client_id)",
-          (q) => q
-            .in("client_campaigns.client_id", selectedClients)
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`),
-          { orderBy: "sale_datetime", ascending: false }
-        );
+        // Begge saelgeropslag er uafhaengige og hentes samtidig.
+        const [salesForClient, fmSellersForClient] = await Promise.all([
+          fetchAllRows<{ agent_email: string }>(
+            "sales", "agent_email, client_campaigns!inner(client_id)",
+            (q) => q
+              .in("client_campaigns.client_id", selectedClients)
+              .gte("sale_datetime", `${startStr}T00:00:00`)
+              .lte("sale_datetime", `${endStr}T23:59:59`),
+            { orderBy: "sale_datetime", ascending: false }
+          ),
+          fetchAllRows<{ fm_seller_id: string | null }>(
+            "sales", "fm_seller_id:raw_payload->>fm_seller_id",
+            (q) => q.eq("source", "fieldmarketing")
+              .gte("sale_datetime", `${startStr}T00:00:00`)
+              .lte("sale_datetime", `${endStr}T23:59:59`)
+              .in("raw_payload->>fm_client_id", selectedClients),
+            { orderBy: "sale_datetime", ascending: false }
+          ),
+        ]);
 
         // Get unique agent emails from these sales
         const agentEmails = [...new Set(
@@ -425,16 +434,6 @@ export default function DailyReports() {
             .map((s: any) => s.agent_email?.toLowerCase())
             .filter(Boolean)
         )] as string[];
-
-        // ALSO fetch seller_ids for these clients (kunde filtreres i databasen)
-        const fmSellersForClient = await fetchAllRows<{ fm_seller_id: string | null }>(
-          "sales", "fm_seller_id:raw_payload->>fm_seller_id",
-          (q) => q.eq("source", "fieldmarketing")
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`)
-            .in("raw_payload->>fm_client_id", selectedClients),
-          { orderBy: "sale_datetime", ascending: false }
-        );
 
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
@@ -579,27 +578,28 @@ export default function DailyReports() {
 
       if (filteredEmployees.length === 0) return [];
 
-      // Fetch absences
-      const { data: absences } = await supabase
-        .from("absence_request_v2")
-        .select("employee_id, type, start_date, end_date, status")
-        .in("employee_id", employeeIds)
-        .lte("start_date", endStr)
-        .gte("end_date", startStr)
-        .eq("status", "approved");
+      // Fravaer, timekilde og teamtilknytning er uafhaengige opslag og hentes samtidig.
+      // teamMembers bruger employee_team_attribution, saa fratraadte medarbejdere
+      // fortsat faar timer/vagt beregnet ud fra deres sidste kendte team.
+      const [absencesRes, hoursSourceMap, teamMembersRes] = await Promise.all([
+        supabase
+          .from("absence_request_v2")
+          .select("employee_id, type, start_date, end_date, status")
+          .in("employee_id", employeeIds)
+          .lte("start_date", endStr)
+          .gte("end_date", startStr)
+          .eq("status", "approved"),
+        useNewAssignmentsFlag
+          ? resolveHoursSourceBatch(employeeIds)
+          : Promise.resolve(null as Record<string, HoursSourceResult> | null),
+        supabase
+          .from("employee_team_attribution")
+          .select("employee_id, team_id, team_name")
+          .in("employee_id", employeeIds),
+      ]);
 
-      // Resolve hours source (new system vs legacy)
-      const hoursSourceMap = useNewAssignmentsFlag
-        ? await resolveHoursSourceBatch(employeeIds)
-        : null;
-
-      // Fetch team standard shift data.
-      // Bruger employee_team_attribution, saa fratraadte medarbejdere fortsat
-      // faar timer/vagt beregnet ud fra deres sidste kendte team.
-      const { data: teamMembers } = await supabase
-        .from("employee_team_attribution")
-        .select("employee_id, team_id, team_name")
-        .in("employee_id", employeeIds);
+      const absences = absencesRes.data;
+      const teamMembers = teamMembersRes.data;
 
       const teamIds = [...new Set(teamMembers?.map(tm => tm.team_id) || [])];
       
@@ -650,52 +650,85 @@ export default function DailyReports() {
         if (agent?.external_dialer_id) allAgentIdentifiers.push(agent.external_dialer_id);
       });
       const uniqueAgentIdentifiers = [...new Set(allAgentIdentifiers)];
-      
-      console.log("[DailyReport] Agent mappings found:", agentMappings?.length);
-      console.log("[DailyReport] Unique agent identifiers:", uniqueAgentIdentifiers);
 
       // Fetch sales with sale_items - same logic as KPI sales-count
       // Sales are linked to clients via client_campaign_id -> client_campaigns.client_id
       // Match on agent_email (contains email) rather than agent_name (contains full name)
       // Also fetch dialer_campaign_id for campaign override lookup
-      let salesData: any[] = [];
-      if (uniqueAgentIdentifiers.length > 0) {
+      // Opslaget forberedes her og hentes samtidig med kampagnemapping, prisregler
+      // og field marketing-salg, da de fire ikke afhaenger af hinanden.
+      const salesPromise: Promise<any[]> = (() => {
         // Get emails only from unique identifiers (filter out numeric external IDs)
         // Normalize to lowercase for case-insensitive matching
         const emailIdentifiers = uniqueAgentIdentifiers
           .filter(id => id.includes("@"))
           .map(e => e.toLowerCase());
-        
-        if (emailIdentifiers.length > 0) {
-          // Use fetchAllRows with dynamic !inner join for client filtering (paginated)
-          const joinType = selectedClients.length > 0 ? "!inner" : "";
-          const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`;
 
-          const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
+        if (emailIdentifiers.length === 0) return Promise.resolve([]);
 
-          // Fejl maa ikke sluges: et delvist resultat skal ikke kunne vises som et rigtigt tal.
-          salesData = await fetchAllRows(
-            "sales", selectClause,
-            (q) => {
-              let query = q
-                 .or(emailOrFilter)
-                 .neq("source", "fieldmarketing")
-                 .gte("sale_datetime", `${startStr}T00:00:00`)
-                .lte("sale_datetime", `${endStr}T23:59:59`);
-              if (selectedClients.length > 0) {
-                query = query.in("client_campaigns.client_id", selectedClients);
-              }
-              return query;
-            },
-            { orderBy: "sale_datetime", ascending: false }
-          );
-        }
-      }
-      
-      // Fetch campaign mappings to resolve dialer_campaign_id -> campaign_mapping_id
-      const { data: campaignMappings } = await supabase
-        .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_id, adversus_campaign_name");
+        // Dynamisk !inner join naar der filtreres paa kunde (pagineret)
+        const joinType = selectedClients.length > 0 ? "!inner" : "";
+        const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`;
+
+        const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
+
+        // Fejl maa ikke sluges: et delvist resultat skal ikke kunne vises som et rigtigt tal.
+        return fetchAllRows<any>(
+          "sales", selectClause,
+          (q) => {
+            let query = q
+              .or(emailOrFilter)
+              .neq("source", "fieldmarketing")
+              .gte("sale_datetime", `${startStr}T00:00:00`)
+              .lte("sale_datetime", `${endStr}T23:59:59`);
+            if (selectedClients.length > 0) {
+              query = query.in("client_campaigns.client_id", selectedClients);
+            }
+            return query;
+          },
+          { orderBy: "sale_datetime", ascending: false }
+        );
+      })();
+
+      // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
+      // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as dashboards)
+      const fmSalesPromise = fetchAllRows<{
+        id: string; agent_name: string; sale_datetime: string;
+        fm_seller_id: string | null; fm_client_id: string | null; fm_product_name: string | null;
+        client_campaign_id: string | null;
+        sale_items: Array<{ quantity: number; mapped_commission: number; mapped_revenue: number; product_id: string | null; products: { name: string; counts_as_sale: boolean } | null }> | null;
+      }>(
+        "sales",
+        "id, agent_name, sale_datetime, fm_seller_id:raw_payload->>fm_seller_id, fm_client_id:raw_payload->>fm_client_id, fm_product_name:raw_payload->>fm_product_name, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))",
+        (q) => {
+          let query = q.eq("source", "fieldmarketing")
+            .gte("sale_datetime", `${startStr}T00:00:00`)
+            .lte("sale_datetime", `${endStr}T23:59:59`);
+          // Kundefilter lagt i databasen i stedet for i browseren
+          if (selectedClients.length > 0) {
+            query = query.in("raw_payload->>fm_client_id", selectedClients);
+          }
+          return query;
+        },
+        { orderBy: "sale_datetime", ascending: false }
+      );
+
+      const [salesData, campaignMappingsRes, productPricingRulesRes, rawFmSalesData] = await Promise.all([
+        salesPromise,
+        // Fetch campaign mappings to resolve dialer_campaign_id -> campaign_mapping_id
+        supabase
+          .from("adversus_campaign_mappings")
+          .select("id, adversus_campaign_id, adversus_campaign_name"),
+        // Fetch product pricing rules (replaces product_campaign_overrides)
+        supabase
+          .from("product_pricing_rules")
+          .select("product_id, campaign_mapping_ids, campaign_match_mode, commission_dkk, revenue_dkk, priority, is_active")
+          .eq("is_active", true),
+        fmSalesPromise,
+      ]);
+
+      const campaignMappings = campaignMappingsRes.data;
+      const productPricingRules = productPricingRulesRes.data;
       
       const dialerCampaignToMappingId = new Map<string, string>();
       const dialerCampaignToName = new Map<string, string>();
@@ -708,11 +741,6 @@ export default function DailyReports() {
         }
       });
       
-      // Fetch product pricing rules (replaces product_campaign_overrides)
-      const { data: productPricingRules } = await supabase
-        .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, campaign_match_mode, commission_dkk, revenue_dkk, priority, is_active")
-        .eq("is_active", true);
       
       // Build a map for pricing rules lookup
       const pricingRulesMap = new Map<string, Array<{ 
@@ -773,28 +801,6 @@ export default function DailyReports() {
         }
       });
 
-      // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
-      // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as dashboards)
-      const rawFmSalesData = await fetchAllRows<{
-        id: string; agent_name: string; sale_datetime: string;
-        fm_seller_id: string | null; fm_client_id: string | null; fm_product_name: string | null;
-        client_campaign_id: string | null;
-        sale_items: Array<{ quantity: number; mapped_commission: number; mapped_revenue: number; product_id: string | null; products: { name: string; counts_as_sale: boolean } | null }> | null;
-      }>(
-        "sales",
-        "id, agent_name, sale_datetime, fm_seller_id:raw_payload->>fm_seller_id, fm_client_id:raw_payload->>fm_client_id, fm_product_name:raw_payload->>fm_product_name, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))",
-        (q) => {
-          let query = q.eq("source", "fieldmarketing")
-            .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`);
-          // Kundefilter lagt i databasen i stedet for i browseren
-          if (selectedClients.length > 0) {
-            query = query.in("raw_payload->>fm_client_id", selectedClients);
-          }
-          return query;
-        },
-        { orderBy: "sale_datetime", ascending: false }
-      );
 
       // Filter by employeeIds using fm_seller_id
       const fmSalesData = (rawFmSalesData || []).filter(sale =>
