@@ -26,8 +26,14 @@ import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 // Helper function to fetch employees with activity on specific clients
-// Uses agent_email from sales, matches to agents, then maps to employees via employee_agent_mapping
-async function fetchEmployeesWithClientActivity(clientIds: string[]): Promise<string[]> {
+// Uses agent_email from sales, matches to agents, then maps to employees via employee_agent_mapping.
+// Field marketing-salg hentes kun for den valgte periode og kun med de to
+// noedvendige felter fra raw_payload, saa opslaget ikke skanner hele sales-tabellen.
+async function fetchEmployeesWithClientActivity(
+  clientIds: string[],
+  startStr: string,
+  endStr: string
+): Promise<string[]> {
   if (clientIds.length === 0) return [];
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -48,14 +54,17 @@ async function fetchEmployeesWithClientActivity(clientIds: string[]): Promise<st
     ),
   ];
 
-  // Get FM seller IDs for these clients from unified sales table (paginated)
-  const fmData = await fetchAllRows<{ raw_payload: { fm_seller_id: string; fm_client_id: string } }>(
-    "sales", "raw_payload",
-    (q) => q.eq("source", "fieldmarketing")
+  // Get FM seller IDs for these clients (periode + kunde filtreres i databasen)
+  const fmData = await fetchAllRows<{ fm_seller_id: string | null }>(
+    "sales", "fm_seller_id:raw_payload->>fm_seller_id",
+    (q) => q
+      .eq("source", "fieldmarketing")
+      .gte("sale_datetime", `${startStr}T00:00:00`)
+      .lte("sale_datetime", `${endStr}T23:59:59`)
+      .in("raw_payload->>fm_client_id", clientIds),
+    { orderBy: "sale_datetime", ascending: false }
   );
-  const clientIdSet = new Set(clientIds);
-  const fmDataFiltered = fmData.filter((d) => d.raw_payload?.fm_client_id && clientIdSet.has(d.raw_payload.fm_client_id));
-  const fmEmployeeIds = fmDataFiltered.map((s) => s.raw_payload?.fm_seller_id).filter(Boolean);
+  const fmEmployeeIds = fmData.map((s) => s.fm_seller_id).filter(Boolean) as string[];
 
   // Get all agent mappings with agent email info
   const mappingsRes = await fetch(
@@ -287,8 +296,18 @@ export default function DailyReports() {
   });
 
   const { data: employeesWithClientActivity = [] } = useQuery({
-    queryKey: ["daily-report-employees-with-client-activity", selectedClients.sort().join(",")],
-    queryFn: () => fetchEmployeesWithClientActivity(selectedClients),
+    queryKey: [
+      "daily-report-employees-with-client-activity",
+      selectedClients.sort().join(","),
+      format(dateRange.start, "yyyy-MM-dd"),
+      format(dateRange.end, "yyyy-MM-dd"),
+    ],
+    queryFn: () =>
+      fetchEmployeesWithClientActivity(
+        selectedClients,
+        format(dateRange.start, "yyyy-MM-dd"),
+        format(dateRange.end, "yyyy-MM-dd")
+      ),
     enabled: selectedClients.length > 0,
   });
 
@@ -377,7 +396,7 @@ export default function DailyReports() {
   });
 
   // Fetch report data
-  const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
+  const { data: reportData = [], isLoading: isLoadingReport, isError: isReportError, refetch: fetchReport } = useQuery({
     queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeams.sort().join(","), selectedEmployees.sort().join(","), selectedClients.sort().join(","), selectedCampaigns.sort().join(","), employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id, useNewAssignmentsFlag],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
@@ -389,13 +408,15 @@ export default function DailyReports() {
       // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
       if (selectedClients.length > 0) {
-        // First, fetch all sales for these clients in the date range to get agent emails (paginated)
+        // First, fetch all sales for these clients in the date range to get agent emails (paginated).
+        // Sorteres paa sale_datetime (indekseret) i stedet for created_at.
         const salesForClient = await fetchAllRows<{ agent_email: string }>(
           "sales", "agent_email, client_campaigns!inner(client_id)",
           (q) => q
             .in("client_campaigns.client_id", selectedClients)
             .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`)
+            .lte("sale_datetime", `${endStr}T23:59:59`),
+          { orderBy: "sale_datetime", ascending: false }
         );
 
         // Get unique agent emails from these sales
@@ -405,25 +426,21 @@ export default function DailyReports() {
             .filter(Boolean)
         )] as string[];
 
-        // ALSO fetch seller_ids from unified sales table for these clients
-        const fmSellersForClient = await fetchAllRows<{ raw_payload: any }>(
-          "sales", "raw_payload",
+        // ALSO fetch seller_ids for these clients (kunde filtreres i databasen)
+        const fmSellersForClient = await fetchAllRows<{ fm_seller_id: string | null }>(
+          "sales", "fm_seller_id:raw_payload->>fm_seller_id",
           (q) => q.eq("source", "fieldmarketing")
             .gte("sale_datetime", `${startStr}T00:00:00`)
-            .lte("sale_datetime", `${endStr}T23:59:59`),
+            .lte("sale_datetime", `${endStr}T23:59:59`)
+            .in("raw_payload->>fm_client_id", selectedClients),
           { orderBy: "sale_datetime", ascending: false }
         );
 
-        const selectedClientSet = new Set(selectedClients);
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
-            .filter((s: any) => s.raw_payload?.fm_client_id && selectedClientSet.has(s.raw_payload.fm_client_id))
-            .map((s: any) => s.raw_payload?.fm_seller_id)
+            .map((s) => s.fm_seller_id)
             .filter(Boolean)
         )] as string[];
-
-        console.log("[DailyReport] Client sales agent emails:", agentEmails);
-        console.log("[DailyReport] FM seller IDs for clients:", fmEmployeeIds.length);
 
         if (agentEmails.length > 0) {
           // Find agents matching these emails
@@ -656,26 +673,22 @@ export default function DailyReports() {
 
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
 
-          try {
-            salesData = await fetchAllRows(
-              "sales", selectClause,
-              (q) => {
-                let query = q
-                   .or(emailOrFilter)
-                   .neq("source", "fieldmarketing")
-                   .gte("sale_datetime", `${startStr}T00:00:00`)
-                  .lte("sale_datetime", `${endStr}T23:59:59`);
-                if (selectedClients.length > 0) {
-                  query = query.in("client_campaigns.client_id", selectedClients);
-                }
-                return query;
+          // Fejl maa ikke sluges: et delvist resultat skal ikke kunne vises som et rigtigt tal.
+          salesData = await fetchAllRows(
+            "sales", selectClause,
+            (q) => {
+              let query = q
+                 .or(emailOrFilter)
+                 .neq("source", "fieldmarketing")
+                 .gte("sale_datetime", `${startStr}T00:00:00`)
+                .lte("sale_datetime", `${endStr}T23:59:59`);
+              if (selectedClients.length > 0) {
+                query = query.in("client_campaigns.client_id", selectedClients);
               }
-            );
-          } catch (err) {
-            console.error("[DailyReport] Sales fetch failed:", err);
-            salesData = [];
-          }
-          console.log("[DailyReport] Sales fetched:", salesData.length);
+              return query;
+            },
+            { orderBy: "sale_datetime", ascending: false }
+          );
         }
       }
       
@@ -764,29 +777,29 @@ export default function DailyReports() {
       // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as dashboards)
       const rawFmSalesData = await fetchAllRows<{
         id: string; agent_name: string; sale_datetime: string;
-        raw_payload: any; client_campaign_id: string | null;
+        fm_seller_id: string | null; fm_client_id: string | null; fm_product_name: string | null;
+        client_campaign_id: string | null;
         sale_items: Array<{ quantity: number; mapped_commission: number; mapped_revenue: number; product_id: string | null; products: { name: string; counts_as_sale: boolean } | null }> | null;
       }>(
         "sales",
-        "id, agent_name, sale_datetime, raw_payload, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))",
-        (q) => q.eq("source", "fieldmarketing")
-          .gte("sale_datetime", `${startStr}T00:00:00`)
-          .lte("sale_datetime", `${endStr}T23:59:59`),
+        "id, agent_name, sale_datetime, fm_seller_id:raw_payload->>fm_seller_id, fm_client_id:raw_payload->>fm_client_id, fm_product_name:raw_payload->>fm_product_name, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))",
+        (q) => {
+          let query = q.eq("source", "fieldmarketing")
+            .gte("sale_datetime", `${startStr}T00:00:00`)
+            .lte("sale_datetime", `${endStr}T23:59:59`);
+          // Kundefilter lagt i databasen i stedet for i browseren
+          if (selectedClients.length > 0) {
+            query = query.in("raw_payload->>fm_client_id", selectedClients);
+          }
+          return query;
+        },
         { orderBy: "sale_datetime", ascending: false }
       );
-      
-      // Filter by employeeIds using raw_payload fm_seller_id
-      const fmSalesData = (rawFmSalesData || []).filter(sale => {
-        const sellerId = (sale.raw_payload as any)?.fm_seller_id;
-        return sellerId && employeeIds.includes(sellerId);
-      }).filter(sale => {
-        // Filter by clients if selected
-        if (selectedClients.length > 0) {
-          const clientId = (sale.raw_payload as any)?.fm_client_id;
-          return clientId && selectedClients.includes(clientId);
-        }
-        return true;
-      });
+
+      // Filter by employeeIds using fm_seller_id
+      const fmSalesData = (rawFmSalesData || []).filter(sale =>
+        sale.fm_seller_id && employeeIds.includes(sale.fm_seller_id)
+      );
       
       console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
 
@@ -893,10 +906,9 @@ export default function DailyReports() {
             : [];
 
           // Fieldmarketing sales via raw_payload->>'fm_seller_id' (now uses sale_datetime)
-          const empFmSales = (fmSalesData || []).filter((s: any) => {
+          const empFmSales = (fmSalesData || []).filter((s) => {
             const saleDate = s.sale_datetime;
-            const sellerId = (s.raw_payload as any)?.fm_seller_id;
-            return sellerId === empId && saleDate >= dayStart && saleDate <= dayEnd;
+            return s.fm_seller_id === empId && saleDate >= dayStart && saleDate <= dayEnd;
           });
 
           // Count regular sales using sale_items with counts_as_sale (same as KPI)
@@ -947,15 +959,14 @@ export default function DailyReports() {
 
           // Add fieldmarketing sales - sum mapped_commission/mapped_revenue from sale_items
           // (campaign-aware, same source as dashboards). One FM sale = 1 salg, regardless of items.
-          empFmSales.forEach((sale: any) => {
+          empFmSales.forEach((sale) => {
             salesCount += 1;
-            const rawPayload = sale.raw_payload as any;
             // FM sales have client_id in raw_payload
-            const clientId = rawPayload?.fm_client_id;
+            const clientId = sale.fm_client_id;
             if (clientId) {
               dayClientIds.add(clientId);
             }
-            const displayName = rawPayload?.fm_product_name || "Ukendt FM-produkt";
+            const displayName = sale.fm_product_name || "Ukendt FM-produkt";
             const productKey = `${displayName}|||Fieldmarketing`;
 
             const items = (sale.sale_items || []) as Array<any>;
@@ -1417,6 +1428,17 @@ export default function DailyReports() {
               <div className="flex flex-col items-center justify-center h-[350px] text-center text-muted-foreground">
                 <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mb-4" />
                 <p>Henter data...</p>
+              </div>
+            ) : isReportError ? (
+              <div className="flex flex-col items-center justify-center h-[350px] text-center">
+                <AlertTriangle className="h-12 w-12 mb-4 text-destructive opacity-70" />
+                <p className="text-lg font-medium">Rapporten kunne ikke hentes</p>
+                <p className="text-sm mt-1 text-muted-foreground max-w-md">
+                  Søgningen blev afbrudt, før alle tal var hentet. Prøv igen, eller vælg en kortere periode.
+                </p>
+                <Button variant="outline" className="mt-4" onClick={() => fetchReport()}>
+                  Prøv igen
+                </Button>
               </div>
             ) : reportData.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[350px] text-center text-muted-foreground">
