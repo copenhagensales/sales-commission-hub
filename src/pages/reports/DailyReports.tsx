@@ -741,11 +741,6 @@ export default function DailyReports() {
         }
       });
       
-      // Fetch product pricing rules (replaces product_campaign_overrides)
-      const { data: productPricingRules } = await supabase
-        .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, campaign_match_mode, commission_dkk, revenue_dkk, priority, is_active")
-        .eq("is_active", true);
       
       // Build a map for pricing rules lookup
       const pricingRulesMap = new Map<string, Array<{ 
