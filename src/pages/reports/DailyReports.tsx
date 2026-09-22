@@ -296,8 +296,18 @@ export default function DailyReports() {
   });
 
   const { data: employeesWithClientActivity = [] } = useQuery({
-    queryKey: ["daily-report-employees-with-client-activity", selectedClients.sort().join(",")],
-    queryFn: () => fetchEmployeesWithClientActivity(selectedClients),
+    queryKey: [
+      "daily-report-employees-with-client-activity",
+      selectedClients.sort().join(","),
+      format(dateRange.start, "yyyy-MM-dd"),
+      format(dateRange.end, "yyyy-MM-dd"),
+    ],
+    queryFn: () =>
+      fetchEmployeesWithClientActivity(
+        selectedClients,
+        format(dateRange.start, "yyyy-MM-dd"),
+        format(dateRange.end, "yyyy-MM-dd")
+      ),
     enabled: selectedClients.length > 0,
   });
 
