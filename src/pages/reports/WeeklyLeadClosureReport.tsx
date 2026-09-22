@@ -158,11 +158,11 @@ function MissingCallsChip() {
   );
 }
 
-/** Vises hvor kilden ikke leverer forsøgsantal (Enreach). */
-function NotAvailableChip() {
+/** Vises hvor dialeren lukker emner som ugyldige uden egen markering. */
+function InInvalidChip() {
   return (
     <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
-      ikke tilgængeligt
+      i ugyldige
     </span>
   );
 }
