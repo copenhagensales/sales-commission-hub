@@ -673,26 +673,22 @@ export default function DailyReports() {
 
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
 
-          try {
-            salesData = await fetchAllRows(
-              "sales", selectClause,
-              (q) => {
-                let query = q
-                   .or(emailOrFilter)
-                   .neq("source", "fieldmarketing")
-                   .gte("sale_datetime", `${startStr}T00:00:00`)
-                  .lte("sale_datetime", `${endStr}T23:59:59`);
-                if (selectedClients.length > 0) {
-                  query = query.in("client_campaigns.client_id", selectedClients);
-                }
-                return query;
+          // Fejl maa ikke sluges: et delvist resultat skal ikke kunne vises som et rigtigt tal.
+          salesData = await fetchAllRows(
+            "sales", selectClause,
+            (q) => {
+              let query = q
+                 .or(emailOrFilter)
+                 .neq("source", "fieldmarketing")
+                 .gte("sale_datetime", `${startStr}T00:00:00`)
+                .lte("sale_datetime", `${endStr}T23:59:59`);
+              if (selectedClients.length > 0) {
+                query = query.in("client_campaigns.client_id", selectedClients);
               }
-            );
-          } catch (err) {
-            console.error("[DailyReport] Sales fetch failed:", err);
-            salesData = [];
-          }
-          console.log("[DailyReport] Sales fetched:", salesData.length);
+              return query;
+            },
+            { orderBy: "sale_datetime", ascending: false }
+          );
         }
       }
       
