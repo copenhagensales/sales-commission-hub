@@ -1190,7 +1190,15 @@ async function finishAndMail(
     .from("weekly_lead_closure_stats")
     .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, lead_count")
     .in("week_start", weeks);
-  const rows = (stored ?? []) as StatRow[];
+  /**
+   * Rapportlinjen slås altid op i mappingen, så en rettet mapping virker med
+   * det samme — også for uger der allerede er gemt. Den gemte kolonne bevares
+   * urørt som historisk spor.
+   */
+  const rows = ((stored ?? []) as StatRow[]).map((r) => ({
+    ...r,
+    report_line: config.mapping.get(mapKey(r.account, r.adversus_campaign_id))?.reportLine ?? null,
+  }));
 
   const { data: storedCalls } = await svc
     .from("weekly_lead_call_stats")
