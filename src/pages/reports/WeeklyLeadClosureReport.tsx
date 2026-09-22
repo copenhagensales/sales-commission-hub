@@ -562,7 +562,7 @@ export default function WeeklyLeadClosureReport() {
                         <Fragment key={group.title}>
                           <TableRow className="hover:bg-transparent">
                             <TableCell
-                              colSpan={10}
+                              colSpan={8}
                               className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
                             >
                               {group.title}
