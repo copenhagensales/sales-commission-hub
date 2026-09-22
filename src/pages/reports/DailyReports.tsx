@@ -692,7 +692,7 @@ export default function DailyReports() {
 
       // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
       // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as dashboards)
-      const fmSalesPromise = fetchAllRowsCursor<{
+      const fmSalesPromise = fetchAllRows<{
         id: string; agent_name: string; sale_datetime: string;
         fm_seller_id: string | null; fm_client_id: string | null; fm_product_name: string | null;
         client_campaign_id: string | null;
