@@ -20,6 +20,7 @@ export const CLIENT_IDS: Record<string, string> = {
   "Hiper": "a3ce329d-fc31-45e5-97fb-0c831fa7d93d",
   // FM (Fieldmarketing) clients
   "Eesy FM": "9a92ea4c-6404-4b58-be08-065e7552d552",
+  "ASE FM": "c17c758f-8739-4588-b62d-85b9a5f9b5d2",
 };
 
 

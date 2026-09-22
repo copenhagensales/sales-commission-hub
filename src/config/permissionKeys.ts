@@ -228,6 +228,7 @@ export const PERMISSION_KEYS = {
   menu_dashboard_settings: { label: 'Dashboard Indstillinger', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_cph_sales: { label: 'Dagsboard CPH Sales', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_fieldmarketing: { label: 'Fieldmarketing', section: 'dashboards', parent: 'menu_section_dashboards' },
+  menu_dashboard_ase_fm: { label: 'ASE FM', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_eesy_tm: { label: 'Eesy TM', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_tdc_erhverv: { label: 'TDC Erhverv', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_tdc_monthly_goal: { label: 'TDC Månedsmål', section: 'dashboards', parent: 'menu_section_dashboards' },

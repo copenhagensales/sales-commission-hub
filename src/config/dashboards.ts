@@ -25,6 +25,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     description: "Field sales performance og kampagne resultater",
     permissionKey: "menu_dashboard_fieldmarketing" 
   },
+  {
+    slug: "ase-fm",
+    name: "ASE FM",
+    path: "/dashboards/ase-fm",
+    description: "ASE FM dagsboard med salg og top performers",
+    permissionKey: "menu_dashboard_ase_fm"
+  },
   { 
     slug: "eesy-tm", 
     name: "Eesy TM", 
