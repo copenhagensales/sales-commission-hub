@@ -520,186 +520,169 @@ export default function WeeklyLeadClosureReport() {
               </p>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead colSpan={2} className="h-8" />
-                      <TableHead
-                        colSpan={2}
-                        className="h-8 text-center text-xs uppercase tracking-wider text-muted-foreground"
-                      >
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1000px]">
+                    <div
+                      className={`${REPORT_GRID} px-3 text-[11px] uppercase tracking-wider text-muted-foreground`}
+                    >
+                      <div />
+                      <div />
+                      <div className="col-span-2 text-center">
                         Frasorteret – ikke sælgerens ansvar
-                      </TableHead>
-                      <TableHead
-                        colSpan={3}
-                        className="h-8 border-l text-center text-xs uppercase tracking-wider text-muted-foreground"
-                      >
-                        Sælger
-                      </TableHead>
-                      <TableHead className="h-8 border-l text-center text-xs uppercase tracking-wider text-muted-foreground">
-                        Kampagne
-                      </TableHead>
-                    </TableRow>
-                    <TableRow>
-                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Kampagne
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Emner lukket
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Ikke kontaktbare
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Ukvalificerede
-                      </TableHead>
-                      <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Kvalificerede samtaler
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Bookede
-                      </TableHead>
-                      <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Sælgerhitrate
-                      </TableHead>
-                      <TableHead className="border-l pl-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
-                        Emneudnyttelse
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                      </div>
+                      <div className="col-span-3 text-center">Sælger</div>
+                      <div className="text-center">Kampagne</div>
+                    </div>
                     {[
                       {
                         title: "Partnersegmenter (Trygs medlemslister)",
+                        band: "bg-emerald-50/70",
+                        iconBg: "bg-emerald-600",
+                        icon: Users,
                         rows: activeLineTotals.filter(
                           (r) => !COLD_CANVAS_LINES.includes(r.reportLine),
                         ),
                       },
                       {
                         title: "Kold kanvas",
+                        band: "bg-sky-50/70",
+                        iconBg: "bg-sky-600",
+                        icon: Target,
                         rows: activeLineTotals.filter((r) =>
                           COLD_CANVAS_LINES.includes(r.reportLine),
                         ),
                       },
                     ]
                       .filter((group) => group.rows.length > 0)
-                      .map((group) => (
-                        <Fragment key={group.title}>
-                          <TableRow className="hover:bg-transparent">
-                            <TableCell
-                              colSpan={8}
-                              className="pt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                      .map((group) => {
+                        const GroupIcon = group.icon;
+                        return (
+                          <Fragment key={group.title}>
+                            <div
+                              className={`mt-4 flex items-center gap-3 rounded-lg px-3 py-2 ${group.band}`}
                             >
-                              {group.title}
-                            </TableCell>
-                          </TableRow>
-                          {group.rows.map((row) => {
-                            const invalid = row.extras[INVALID_STATUS] ?? 0;
-                            /**
-                             * Ikke kontaktbare = ugyldige + dialerens egne lukninger ved max
-                             * kontaktforsøg. På Adversus ligger lukningerne allerede i ugyldige
-                             * (mcr = 0), så begrebet er ens på tværs af systemer.
-                             */
-                            const unreachable = invalid + row.mcr;
-                            const unreachablePct = pctValue(unreachable, row.closedTotal);
-                            const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
-                            const unqualifiedPct = pctValue(unqualified, row.closedTotal);
-                            const decidedPct = pctValue(row.decided, row.closedTotal);
-                            const hitPct = pctValue(row.booked, row.decided);
-                            const usagePct = pctValue(row.booked, row.closedTotal);
-                            const smallBase = row.decided < SMALL_BASE_DECIDED;
-                            return (
-                              <TableRow key={row.reportLine}>
-                                <TableCell className="text-sm font-medium">
-                                  {row.reportLine}
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">
-                                  {formatCount(row.closedTotal)}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {unreachablePct !== null &&
-                                  unreachablePct > UNREACHABLE_ALERT_PCT ? (
-                                    <div className="flex justify-end">
-                                      <Badge
-                                        variant="outline"
-                                        className="flex-col items-end border-red-300 bg-red-50 tabular-nums text-red-700"
-                                      >
-                                        <span className="text-sm">
-                                          {formatCount(unreachable)}
-                                        </span>
-                                        <span className="text-xs">
-                                          {formatPct(unreachablePct)}
-                                        </span>
-                                      </Badge>
-                                    </div>
-                                  ) : unreachablePct !== null &&
-                                    unreachablePct >= UNREACHABLE_WARN_PCT ? (
-                                    <div className="flex justify-end">
-                                      <Badge
-                                        variant="outline"
-                                        className="flex-col items-end border-amber-300 bg-amber-50 tabular-nums text-amber-700"
-                                      >
-                                        <span className="text-sm">
-                                          {formatCount(unreachable)}
-                                        </span>
-                                        <span className="text-xs">
-                                          {formatPct(unreachablePct)}
-                                        </span>
-                                      </Badge>
-                                    </div>
-                                  ) : (
-                                    <FunnelCell count={unreachable} pct={unreachablePct} />
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
+                              <span
+                                className={`flex h-7 w-7 items-center justify-center rounded-full ${group.iconBg}`}
+                              >
+                                <GroupIcon className="h-4 w-4 text-white" />
+                              </span>
+                              <span className="text-sm font-semibold">{group.title}</span>
+                            </div>
+                            <div
+                              className={`${REPORT_GRID} px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground`}
+                            >
+                              <div>Kampagne</div>
+                              <div className="text-center">Emner lukket</div>
+                              <div className="text-center">Ikke kontaktbare</div>
+                              <div className="text-center">Ukvalificerede</div>
+                              <div className="text-center">Kvalificerede samtaler</div>
+                              <div className="text-center">Bookede</div>
+                              <div className="text-center">Sælgerhitrate</div>
+                              <div className="text-center">Emneudnyttelse</div>
+                            </div>
+                            {group.rows.map((row) => {
+                              const invalid = row.extras[INVALID_STATUS] ?? 0;
+                              /**
+                               * Ikke kontaktbare = ugyldige + dialerens egne lukninger ved max
+                               * kontaktforsøg. På Adversus ligger lukningerne allerede i ugyldige
+                               * (mcr = 0), så begrebet er ens på tværs af systemer.
+                               */
+                              const unreachable = invalid + row.mcr;
+                              const unreachablePct = pctValue(unreachable, row.closedTotal);
+                              const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
+                              const unqualifiedPct = pctValue(unqualified, row.closedTotal);
+                              const decidedPct = pctValue(row.decided, row.closedTotal);
+                              const hitPct = pctValue(row.booked, row.decided);
+                              const usagePct = pctValue(row.booked, row.closedTotal);
+                              const smallBase = row.decided < SMALL_BASE_DECIDED;
+                              const unreachableTone: FunnelTone =
+                                unreachablePct !== null && unreachablePct > UNREACHABLE_ALERT_PCT
+                                  ? "red"
+                                  : unreachablePct !== null &&
+                                      unreachablePct >= UNREACHABLE_WARN_PCT
+                                    ? "amber"
+                                    : "neutral";
+                              return (
+                                <div
+                                  key={row.reportLine}
+                                  className={`${REPORT_GRID} mb-2 rounded-xl border bg-card px-3 py-2 shadow-sm`}
+                                >
+                                  <div className="text-sm font-semibold">{row.reportLine}</div>
+                                  <div className="whitespace-nowrap text-center text-base font-semibold tabular-nums">
+                                    {formatCount(row.closedTotal)}
+                                  </div>
+                                  <FunnelCell
+                                    count={unreachable}
+                                    pct={unreachablePct}
+                                    tone={unreachableTone}
+                                  />
                                   <FunnelCell count={unqualified} pct={unqualifiedPct} />
-                                </TableCell>
-                                <TableCell className="border-l pl-4 text-right">
-                                  <FunnelCell count={row.decided} pct={decidedPct} />
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">
-                                  {formatCount(row.booked)}
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap text-right text-sm">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                                  <FunnelCell
+                                    count={row.decided}
+                                    pct={decidedPct}
+                                    tone="green"
+                                  />
+                                  <div className="whitespace-nowrap text-center text-sm tabular-nums">
+                                    {formatCount(row.booked)}
+                                  </div>
+                                  <div className="flex items-center justify-center gap-2 text-sm">
+                                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
                                       <div
                                         className={`h-full rounded-full ${
-                                          smallBase
-                                            ? "bg-muted-foreground/50"
-                                            : "bg-emerald-500"
+                                          smallBase ? "bg-muted-foreground/50" : "bg-emerald-500"
                                         }`}
                                         style={{
                                           width: `${Math.min(100, Math.max(0, hitPct ?? 0))}%`,
                                         }}
                                       />
                                     </div>
-                                    <span
-                                      className={`whitespace-nowrap tabular-nums ${
-                                        smallBase
-                                          ? "text-muted-foreground"
-                                          : "font-semibold text-emerald-600"
-                                      }`}
-                                    >
-                                      {formatPct(hitPct)}
-                                    </span>
-                                    {smallBase && (
-                                      <span className="whitespace-nowrap text-xs text-muted-foreground">
-                                        lille grundlag
-                                      </span>
-                                    )}
+                                    <div className="text-right">
+                                      <div
+                                        className={`whitespace-nowrap tabular-nums ${
+                                          smallBase
+                                            ? "text-muted-foreground"
+                                            : "font-semibold text-emerald-600"
+                                        }`}
+                                      >
+                                        {formatPct(hitPct)}
+                                      </div>
+                                      {smallBase && (
+                                        <div className="whitespace-nowrap text-xs text-muted-foreground">
+                                          lille grundlag
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </TableCell>
-                                <TableCell className="border-l pl-4 text-right text-sm font-semibold tabular-nums">
-                                  {formatPct(usagePct)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </Fragment>
-                      ))}
-                  </TableBody>
-                </Table>
+                                  <div className="whitespace-nowrap text-center text-base font-semibold tabular-nums">
+                                    {formatPct(usagePct)}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </Fragment>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    Kvalificerede samtaler
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                    Ikke kontaktbare
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                    Højt niveau (opmærksomhed)
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/60" />
+                    Lavt grundlag
+                  </span>
+                </div>
 
                 <Collapsible open={showDetails} onOpenChange={setShowDetails}>
                   <CollapsibleTrigger asChild>
