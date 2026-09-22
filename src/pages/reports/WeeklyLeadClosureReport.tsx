@@ -50,7 +50,6 @@ import {
   useWeeklyLeadClosureReportData,
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
-  useWeeklyLeadClosureStats,
   useWeeklyLeadClosureTaskSummaries,
   useWeeklyLeadReportLines,
 } from "@/hooks/useWeeklyLeadClosureReport";
@@ -352,16 +351,15 @@ export default function WeeklyLeadClosureReport() {
 
   const unmapped = useMemo(() => {
     const out = new Map<string, { account: string; campaignId: string; closed: number }>();
-    for (const row of weekRows) {
-      if (row.report_line) continue;
-      const key = `${row.account}|${row.adversus_campaign_id}`;
+    for (const row of report?.unmapped ?? []) {
+      const key = `${row.account}|${row.campaign_id}`;
       const entry =
-        out.get(key) ?? { account: row.account, campaignId: row.adversus_campaign_id, closed: 0 };
+        out.get(key) ?? { account: row.account, campaignId: row.campaign_id, closed: 0 };
       if (closingStatuses.includes(row.status)) entry.closed += row.lead_count;
       out.set(key, entry);
     }
     return [...out.values()].sort((a, b) => b.closed - a.closed);
-  }, [weekRows, closingStatuses]);
+  }, [report, closingStatuses]);
 
   const unconfirmed = mapping.filter((m) => !m.is_confirmed).length;
 
