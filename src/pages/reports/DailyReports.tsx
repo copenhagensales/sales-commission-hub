@@ -44,34 +44,34 @@ async function fetchEmployeesWithClientActivity(
   const authToken = session?.access_token || supabaseKey;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
 
-  // Get unique agent emails for each client (RPC takes single id, so loop)
-  const agentEmailSets = await Promise.all(
-    clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
-  );
+  // De tre opslag er uafhaengige og hentes samtidig.
+  // FM-salg hentes med markoer-paginering (id) i stedet for OFFSET, saa dybe
+  // sider ikke bliver dyrere og dyrere for laengere perioder.
+  const [agentEmailSets, fmData, mappingsData] = await Promise.all([
+    Promise.all(
+      clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
+    ),
+    fetchAllRowsCursor<{ id: string; fm_seller_id: string | null }>(
+      "sales", "id, fm_seller_id:raw_payload->>fm_seller_id",
+      (q) => q
+        .eq("source", "fieldmarketing")
+        .gte("sale_datetime", `${startStr}T00:00:00`)
+        .lte("sale_datetime", `${endStr}T23:59:59`)
+        .in("raw_payload->>fm_client_id", clientIds),
+      { pageSize: 1000 }
+    ),
+    fetch(
+      `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
+      { headers }
+    ).then((res) => res.json() as Promise<{ employee_id: string; agents: { email: string } | null }[]>),
+  ]);
+
   const agentEmails = [
     ...new Set(
       agentEmailSets.flatMap((res) => (res.data || []).map((r: any) => r.agent_email).filter(Boolean))
     ),
   ];
-
-  // Get FM seller IDs for these clients (periode + kunde filtreres i databasen)
-  const fmData = await fetchAllRows<{ fm_seller_id: string | null }>(
-    "sales", "fm_seller_id:raw_payload->>fm_seller_id",
-    (q) => q
-      .eq("source", "fieldmarketing")
-      .gte("sale_datetime", `${startStr}T00:00:00`)
-      .lte("sale_datetime", `${endStr}T23:59:59`)
-      .in("raw_payload->>fm_client_id", clientIds),
-    { orderBy: "sale_datetime", ascending: false }
-  );
   const fmEmployeeIds = fmData.map((s) => s.fm_seller_id).filter(Boolean) as string[];
-
-  // Get all agent mappings with agent email info
-  const mappingsRes = await fetch(
-    `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
-    { headers }
-  );
-  const mappingsData: { employee_id: string; agents: { email: string } | null }[] = await mappingsRes.json();
 
   const employeeIdsFromSales = mappingsData
     .filter((m) => m.agents?.email && agentEmails.includes(m.agents.email))
