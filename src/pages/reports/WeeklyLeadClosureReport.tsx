@@ -27,7 +27,9 @@ import {
   Mail,
   Play,
   TableProperties,
+  Target,
   Trash2,
+  Users,
 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
