@@ -328,16 +328,24 @@ export default function WeeklyLeadClosureReport() {
         rows.filter((r) => predicate(r.status)).reduce((total, r) => total + r.lead_count, 0);
       const extras: Record<string, number> = {};
       for (const s of excludedStatuses) extras[s.status] = sum((status) => status === s.status);
+      const closed = sum((status) => closingStatuses.includes(status));
+      // Max Call Reach står uden for tragten og påvirker ingen af tallene ovenfor.
+      const mcr = sum((status) => status === MCR_STATUS);
       return {
         reportLine: line.report_line,
-        closed: sum((status) => closingStatuses.includes(status)),
+        closed,
         decided: sum((status) => hitrateStatuses.includes(status)),
         booked: sum((status) => status === "success"),
         extras,
         calls: callsByLine.get(line.report_line) ?? null,
-        // Max Call Reach står uden for tragten og påvirker ingen af tallene ovenfor.
-        mcr: sum((status) => status === MCR_STATUS),
+        mcr,
         mcrAvailable: mcrAvailableLines.has(line.report_line),
+        /**
+         * Emner lukket i alt = sælgerbehandlede + dialerens egne lukninger.
+         * Hvor dialeren ikke markerer lukningen, ligger de allerede i invalid,
+         * og tallet er derfor komplet uden MCR-leddet (mcr = 0).
+         */
+        closedTotal: closed + mcr,
       };
     });
   }, [
