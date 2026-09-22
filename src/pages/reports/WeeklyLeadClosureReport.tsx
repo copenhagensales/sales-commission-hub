@@ -284,14 +284,10 @@ export default function WeeklyLeadClosureReport() {
    * Kun Enreach gør det (status "Depleted"); Adversus har ingen markering, så
    * linjer uden en Enreach-kampagne viser "ikke tilgængeligt".
    */
-  const mcrAvailableLines = useMemo(() => {
-    const out = new Set<string>();
-    for (const m of mapping) {
-      if (!m.report_line || m.account !== "enreach") continue;
-      out.add(m.report_line);
-    }
-    return out;
-  }, [mapping]);
+  const mcrAvailableLines = useMemo(
+    () => new Set(report?.mcrLines ?? []),
+    [report],
+  );
 
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
