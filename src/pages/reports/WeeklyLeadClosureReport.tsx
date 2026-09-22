@@ -797,16 +797,18 @@ export default function WeeklyLeadClosureReport() {
                 </Collapsible>
               </>
             )}
-            {!statsLoading && linesWithoutCalls.length > 0 && (
+            {!statsLoading && linesWithoutMcr.length > 0 && (
               <p className="mt-3 text-sm text-muted-foreground">
-                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
-                er koblet på.
+                På {linesWithoutMcr.join(", ")} lukker dialeren emner ved max kontaktforsøg som
+                Ugyldige uden egen markering. Ugyldige omfatter derfor både leads med fejl og
+                emner lukket af dialeren, og fordelingen kan ikke vises, før Adversus markerer
+                lukningen.
               </p>
             )}
-            {!statsLoading && linesWithoutMcr.length > 0 && (
+            {!statsLoading && linesWithoutCalls.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Max Call Reach kan ikke opgøres for {linesWithoutMcr.join(", ")}, da Adversus ikke
-                markerer emner lukket ved max forsøg.
+                Kontaktandel kan ikke opgøres for {linesWithoutCalls.join(", ")} før opkaldsdata
+                er koblet på.
               </p>
             )}
 
