@@ -570,12 +570,16 @@ export default function WeeklyLeadClosureReport() {
                           </TableRow>
                           {group.rows.map((row) => {
                             const invalid = row.extras[INVALID_STATUS] ?? 0;
-                            const invalidPct = pctValue(invalid, row.closedTotal);
+                            /**
+                             * Ikke kontaktbare = ugyldige + dialerens egne lukninger ved max
+                             * kontaktforsøg. På Adversus ligger lukningerne allerede i ugyldige
+                             * (mcr = 0), så begrebet er ens på tværs af systemer.
+                             */
+                            const unreachable = invalid + row.mcr;
+                            const unreachablePct = pctValue(unreachable, row.closedTotal);
                             const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
                             const unqualifiedPct = pctValue(unqualified, row.closedTotal);
-                            const contactPct = row.calls
-                              ? pctValue(row.calls.leadsAnswered, row.calls.leadsDialed)
-                              : null;
+                            const decidedPct = pctValue(row.decided, row.closedTotal);
                             const hitPct = pctValue(row.booked, row.decided);
                             const usagePct = pctValue(row.booked, row.closedTotal);
                             const smallBase = row.decided < SMALL_BASE_DECIDED;
