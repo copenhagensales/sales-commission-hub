@@ -47,7 +47,7 @@ import {
   useToggleClosureRecipient,
   useUpdateCampaignMapping,
   useWeeklyLeadCampaignMap,
-  useWeeklyLeadCallStats,
+  useWeeklyLeadClosureReportData,
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
   useWeeklyLeadClosureStats,
@@ -180,8 +180,10 @@ export default function WeeklyLeadClosureReport() {
   const { data: lines = [] } = useWeeklyLeadReportLines();
   const { data: mapping = [], isLoading: mappingLoading } = useWeeklyLeadCampaignMap();
   const { data: statuses = [] } = useLeadClosingStatuses();
-  const { data: stats = [], isLoading: statsLoading } = useWeeklyLeadClosureStats();
-  const { data: callStats = [] } = useWeeklyLeadCallStats();
+  const { data: report, isLoading: statsLoading } = useWeeklyLeadClosureReportData(
+    period,
+    selectedWeek || null,
+  );
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
   const { data: taskSummaries = [] } = useWeeklyLeadClosureTaskSummaries(
     runs.map((run) => run.id),
