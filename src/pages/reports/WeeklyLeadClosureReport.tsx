@@ -247,33 +247,10 @@ export default function WeeklyLeadClosureReport() {
     [statuses],
   );
 
-  const availableWeeks = useMemo(
-    () => [...new Set(stats.map((s) => s.week_start))].sort().reverse(),
-    [stats],
-  );
+  const availableWeeks = report?.weeks ?? [];
   const activeWeek = selectedWeek || availableWeeks[0] || "";
+  const weekRows = report?.lines ?? [];
 
-  /**
-   * Uger der indgår i den valgte periode. Samme rækker og samme beregninger —
-   * kun datointervallet er bredere.
-   */
-  const periodWeeks = useMemo(() => {
-    if (!activeWeek) return [] as string[];
-    if (period === "week") return [activeWeek];
-    if (period === "month") {
-      return availableWeeks.filter(
-        (w) => w.slice(0, 7) === activeWeek.slice(0, 7) && w <= activeWeek,
-      );
-    }
-    return availableWeeks.filter(
-      (w) => w.slice(0, 4) === activeWeek.slice(0, 4) && w <= activeWeek,
-    );
-  }, [period, activeWeek, availableWeeks]);
-
-  const weekRows = useMemo(
-    () => stats.filter((s) => periodWeeks.includes(s.week_start)),
-    [stats, periodWeeks],
-  );
 
   const periodLabel = useMemo(() => {
     if (!activeWeek) return "";
@@ -286,26 +263,20 @@ export default function WeeklyLeadClosureReport() {
     return `År til dato ${year}`;
   }, [period, activeWeek]);
 
-  /** Opkaldstal pr. rapportlinje for den valgte periode. */
+  /** Opkaldstal pr. rapportlinje for den valgte periode (aggregeret i databasen). */
   const callsByLine = useMemo(() => {
-    const lineFor = new Map(
-      mapping.map((m) => [`${m.account}|${m.adversus_campaign_id}`, m.report_line]),
-    );
     const out = new Map<string, CallTotals>();
-    for (const row of callStats) {
-      if (!periodWeeks.includes(row.week_start)) continue;
-      const line = lineFor.get(`${row.account}|${row.campaign_id}`);
-      if (!line) continue;
-      const entry = out.get(line) ??
-        { attempts: 0, answered: 0, leadsDialed: 0, leadsAnswered: 0 };
-      entry.attempts += row.attempts;
-      entry.answered += row.answered;
-      entry.leadsDialed += row.leads_dialed;
-      entry.leadsAnswered += row.leads_answered;
-      out.set(line, entry);
+    for (const row of report?.calls ?? []) {
+      out.set(row.report_line, {
+        attempts: row.attempts,
+        answered: row.answered,
+        leadsDialed: row.leads_dialed,
+        leadsAnswered: row.leads_answered,
+      });
     }
     return out;
-  }, [callStats, mapping, periodWeeks]);
+  }, [report]);
+
 
   /**
    * Linjer hvor dialeren selv markerer emner lukket ved max opkaldsforsøg.
