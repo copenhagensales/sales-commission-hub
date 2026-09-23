@@ -148,29 +148,41 @@ export function useUnitedSales(day: Date, enabled = true) {
         if (p.client_campaign_id) campaignByProduct.set(p.id, p.client_campaign_id);
       }
 
+      // Spor B-salg: dagens salg uden kunde på salget — produktets kampagne afgør
+      const { data: salesWithoutCampaign, error: noCampaignError } = await supabase
+        .from("sales")
+        .select(SALE_FIELDS)
+        .is("client_campaign_id", null)
+        .gte("sale_datetime", start)
+        .lte("sale_datetime", end);
+      if (noCampaignError) throw noCampaignError;
+
       const saleById = new Map<string, SaleRow>();
       for (const s of (salesByCampaign || []) as SaleRow[]) saleById.set(s.id, s);
+      const unmappedSaleIds = ((salesWithoutCampaign || []) as SaleRow[]).map(
+        (s) => s.id
+      );
+      const saleByIdUnmapped = new Map<string, SaleRow>(
+        ((salesWithoutCampaign || []) as SaleRow[]).map((s) => [s.id, s])
+      );
 
       const items = new Map<string, ItemRow>();
-      const saleIdChunks = chunk(Array.from(saleById.keys()));
-      const productIdChunks = chunk(Array.from(campaignByProduct.keys()));
-
-      const itemResults = await Promise.all([
-        ...saleIdChunks.map((ids) =>
+      const itemResults = await Promise.all(
+        chunk([...saleById.keys(), ...unmappedSaleIds]).map((ids) =>
           supabase.from("sale_items").select(ITEM_FIELDS).in("sale_id", ids)
-        ),
-        ...productIdChunks.map((ids) =>
-          supabase
-            .from("sale_items")
-            .select(`${ITEM_FIELDS}, sales!inner(sale_datetime)`)
-            .in("product_id", ids)
-            .gte("sales.sale_datetime", start)
-            .lte("sales.sale_datetime", end)
-        ),
-      ]);
+        )
+      );
       for (const res of itemResults) {
         if (res.error) throw res.error;
         for (const r of (res.data || []) as unknown as ItemRow[]) {
+          // Salg uden kunde tælles kun med hvis produktet hører til United
+          const belongsViaProduct =
+            r.product_id != null && campaignByProduct.has(r.product_id);
+          if (!saleById.has(r.sale_id) && !belongsViaProduct) continue;
+          if (!saleById.has(r.sale_id)) {
+            const s = saleByIdUnmapped.get(r.sale_id);
+            if (s) saleById.set(s.id, s);
+          }
           if (!items.has(r.id)) items.set(r.id, r);
         }
       }
