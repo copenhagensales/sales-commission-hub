@@ -972,6 +972,70 @@ export default function TrygEditSales() {
           </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog
+          open={!!unitedDeleteTarget}
+          onOpenChange={(open) => !open && setUnitedDeleteTarget(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Slet salget permanent?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    Salg fra{" "}
+                    <strong>{unitedDeleteTarget?.sellerName}</strong> kl.{" "}
+                    {unitedDeleteTarget
+                      ? format(new Date(unitedDeleteTarget.saleDatetime), "HH:mm")
+                      : ""}{" "}
+                    på <strong>{unitedDeleteTarget?.productName}</strong> (
+                    {unitedDeleteTarget?.clientName}).
+                  </p>
+                  <p>
+                    Følgende forsvinder fra boards, rapporter og løngrundlag:{" "}
+                    <strong>
+                      {(unitedDeleteTarget?.mappedCommission ?? 0).toLocaleString(
+                        "da-DK"
+                      )}{" "}
+                      kr provision
+                    </strong>{" "}
+                    og{" "}
+                    <strong>
+                      {(unitedDeleteTarget?.mappedRevenue ?? 0).toLocaleString(
+                        "da-DK"
+                      )}{" "}
+                      kr omsætning
+                    </strong>
+                    .
+                  </p>
+                  <p className="font-semibold text-destructive">
+                    Handlingen er permanent og kan ikke fortrydes.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteSale.isPending}>
+                Annuller
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteUnited();
+                }}
+                disabled={deleteSale.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSale.isPending ? "Sletter..." : "Ja, slet salget"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <UnitedEditSaleDialog
+          sale={unitedEditTarget}
+          onOpenChange={(open) => !open && setUnitedEditTarget(null)}
+        />
+
         <SendTrygMailDialog
           open={isMailOpen}
           onOpenChange={setIsMailOpen}
