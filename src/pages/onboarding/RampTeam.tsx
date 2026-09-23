@@ -10,7 +10,9 @@ import {
   useLogRampAction,
   useRampRiskStats,
   useRampFullTeam,
+  useRampFeedbackExclusions,
   useRampTeamOverview,
+  useSetRampFeedbackExclusion,
   useSendRampSessionFeedback,
   type RampAction,
   type RampFullTeamMember,
@@ -230,6 +232,65 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Knap der tager saelgeren ud af feedback-oversigten (kan altid aktiveres igen). */
+function ExcludeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border px-3 py-1 text-[12px] font-bold"
+      style={{ borderColor: "#e0e6e3", color: "#57635e", background: "#fff" }}
+    >
+      Skal ikke have feedback
+    </button>
+  );
+}
+
+/** Linje i bunden for en saelger der er sat paa pause. */
+function PausedRow({
+  member,
+  onActivate,
+  isPending,
+}: {
+  member: AnyMember;
+  onActivate: (member: AnyMember) => void;
+  isPending: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] bg-white px-5 py-3.5"
+      style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-[13px] font-extrabold"
+          style={{ background: "#f1f4f3", color: "#7b857f" }}
+        >
+          {getInitials(member.employee_name)}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[15px] font-extrabold" style={{ color: "#4a5651" }}>
+            {member.employee_name}
+          </p>
+          <p className="text-[12px] font-semibold" style={{ color: "#8b958f" }}>
+            {[member.team_name, member.campaign_name].filter(Boolean).join(" · ") ||
+              "Ingen feedback"}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => onActivate(member)}
+        className="rounded-full px-3.5 py-1.5 text-[12px] font-bold disabled:opacity-50"
+        style={{ background: "#e7f4ed", color: "#0f5a38" }}
+      >
+        Aktivér igen
+      </button>
+    </div>
+  );
+}
+
 function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor: string }) {
   const last = weeks[weeks.length - 1];
   const bandLow = last ? last.p25 : 0;
@@ -405,9 +466,11 @@ function effectLine(member: AnyMember, d: Derived): { text: string; color: strin
 function MemberCard({
   member,
   onOpen,
+  onExclude,
 }: {
   member: RampTeamMember;
   onOpen: (member: RampTeamMember, kind: SessionKind, done: boolean) => void;
+  onExclude: (member: RampTeamMember) => void;
 }) {
   const logAction = useLogRampAction();
   const d = derive(member);
@@ -465,6 +528,7 @@ function MemberCard({
                 {d.gap} under spændet
               </Pill>
             )}
+            <ExcludeButton onClick={() => onExclude(member)} />
           </div>
         </div>
 
@@ -688,9 +752,11 @@ function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
 function FullTeamMemberCard({
   member,
   onOpen,
+  onExclude,
 }: {
   member: RampFullTeamMember;
   onOpen: (member: RampFullTeamMember, kind: SessionKind, done: boolean) => void;
+  onExclude: (member: RampFullTeamMember) => void;
 }) {
   const logAction = useLogRampAction();
   const d = derive(member);
@@ -729,9 +795,12 @@ function FullTeamMemberCard({
               </p>
             </div>
           </div>
-          <Pill bg="#f1f4f3" color="#1b1f1d">
-            {weekSum} produkter på 6 uger
-          </Pill>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill bg="#f1f4f3" color="#1b1f1d">
+              {weekSum} produkter på 6 uger
+            </Pill>
+            <ExcludeButton onClick={() => onExclude(member)} />
+          </div>
         </div>
       </div>
 
@@ -1080,9 +1149,31 @@ function FeedbackDialog({
 
 export default function RampTeam() {
   const { data: canView, isLoading: accessLoading } = useCanViewRampTeam();
-  const { data: members = [], isLoading } = useRampTeamOverview();
-  const { data: fullTeam = [], isLoading: fullTeamLoading } = useRampFullTeam();
+  const { data: allMembers = [], isLoading } = useRampTeamOverview();
+  const { data: allFullTeam = [], isLoading: fullTeamLoading } = useRampFullTeam();
   const { data: stats = [] } = useRampRiskStats();
+  const { data: exclusions = [] } = useRampFeedbackExclusions();
+  const setExclusion = useSetRampFeedbackExclusion();
+
+  const excludedIds = useMemo(
+    () => new Set(exclusions.map((e) => e.employee_id)),
+    [exclusions],
+  );
+  const members = useMemo(
+    () => allMembers.filter((m) => !excludedIds.has(m.employee_id)),
+    [allMembers, excludedIds],
+  );
+  const fullTeam = useMemo(
+    () => allFullTeam.filter((m) => !excludedIds.has(m.employee_id)),
+    [allFullTeam, excludedIds],
+  );
+  const pausedList = useMemo(
+    () =>
+      ([...allMembers, ...allFullTeam] as AnyMember[])
+        .filter((m) => excludedIds.has(m.employee_id))
+        .sort((a, b) => a.employee_name.localeCompare(b.employee_name, "da")),
+    [allMembers, allFullTeam, excludedIds],
+  );
   const [filter, setFilter] = useState<FilterMode>("all");
   const [showEvidence, setShowEvidence] = useState(false);
   const [dialog, setDialog] = useState<{
@@ -1439,6 +1530,9 @@ export default function RampTeam() {
                   onOpen={(m, kind, done) =>
                     setDialog({ employeeId: m.employee_id, kind, done })
                   }
+                  onExclude={(m) =>
+                    setExclusion.mutate({ employeeId: m.employee_id, excluded: true })
+                  }
                 />
               ))
             )}
@@ -1489,10 +1583,40 @@ export default function RampTeam() {
                   onOpen={(m, kind, done) =>
                     setDialog({ employeeId: m.employee_id, kind, done })
                   }
+                  onExclude={(m) =>
+                    setExclusion.mutate({ employeeId: m.employee_id, excluded: true })
+                  }
                 />
               ))
             )}
           </section>
+
+          {pausedList.length > 0 && (
+            <section style={{ display: "grid", gap: 8 }}>
+              <div className="mt-1.5">
+                <p
+                  className="text-[19px] font-extrabold"
+                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
+                >
+                  Skal ikke have feedback · {pausedList.length}
+                </p>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                  Disse sælgere er taget ud af oversigten og tælles ikke med i manglende forløb. De
+                  kan aktiveres igen når som helst.
+                </p>
+              </div>
+              {pausedList.map((member) => (
+                <PausedRow
+                  key={member.employee_id}
+                  member={member}
+                  isPending={setExclusion.isPending}
+                  onActivate={(m) =>
+                    setExclusion.mutate({ employeeId: m.employee_id, excluded: false })
+                  }
+                />
+              ))}
+            </section>
+          )}
 
           <p className="pb-4 text-[12px]" style={{ color: "#57635e" }}>
             Forløbet kører indtil sælgeren er inde i det typiske spænd. Det er en samtale der

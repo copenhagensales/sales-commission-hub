@@ -146,6 +146,65 @@ export function useRampFullTeam() {
   });
 }
 
+export interface RampFeedbackExclusion {
+  employee_id: string;
+  reason: string | null;
+  created_at: string;
+}
+
+/** Saelgere der er sat paa pause for feedback (ligger nederst paa siden). */
+export function useRampFeedbackExclusions() {
+  return useQuery({
+    queryKey: ["ramp-feedback-exclusions"],
+    queryFn: async (): Promise<RampFeedbackExclusion[]> => {
+      const { data, error } = await supabase
+        .from("ramp_feedback_exclusion")
+        .select("employee_id, reason, created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useSetRampFeedbackExclusion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { employeeId: string; excluded: boolean; reason?: string | null }) => {
+      if (params.excluded) {
+        const excludedBy = await currentEmployeeId();
+        const { error } = await supabase.from("ramp_feedback_exclusion").upsert(
+          {
+            employee_id: params.employeeId,
+            reason: params.reason ?? null,
+            excluded_by: excludedBy,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "employee_id" },
+        );
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("ramp_feedback_exclusion")
+          .delete()
+          .eq("employee_id", params.employeeId);
+        if (error) throw error;
+      }
+      return params.excluded;
+    },
+    onSuccess: (excluded) => {
+      queryClient.invalidateQueries({ queryKey: ["ramp-feedback-exclusions"] });
+      toast.success(
+        excluded ? "Sælgeren får ikke feedback længere" : "Sælgeren er aktiveret igen",
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Kunne ikke opdatere sælgeren");
+    },
+  });
+}
+
 export function useRampRiskStats() {
   return useQuery({
     queryKey: ["ramp-risk-stats"],
