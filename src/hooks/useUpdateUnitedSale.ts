@@ -36,8 +36,12 @@ export function useUpdateUnitedSale() {
         sale_datetime?: string;
         agent_email?: string;
         agent_name?: null;
+        customer_phone?: string | null;
       } = {};
       if (input.saleDatetime) saleUpdate.sale_datetime = input.saleDatetime;
+      if (input.customerPhone !== undefined) {
+        saleUpdate.customer_phone = input.customerPhone;
+      }
       if (input.agentEmail) {
         saleUpdate.agent_email = input.agentEmail;
         // Navnet slås op via work_email — det gamle navn må ikke blive stående.
