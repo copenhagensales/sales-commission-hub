@@ -18188,6 +18188,7 @@ export type Database = {
       }
       get_quality_reviewer_stats: { Args: { p_date?: string }; Returns: Json }
       get_ramp_for_employee: { Args: { p_employee_id: string }; Returns: Json }
+      get_ramp_full_team: { Args: never; Returns: Json }
       get_ramp_risk_flags: { Args: never; Returns: Json }
       get_ramp_team_overview: { Args: never; Returns: Json }
       get_referrer_by_code: {
