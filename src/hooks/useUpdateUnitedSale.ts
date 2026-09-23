@@ -10,6 +10,8 @@ export interface UpdateUnitedSaleInput {
   agentEmail?: string;
   /** Nyt produkt på salgslinjen — udelades hvis uændret. */
   productId?: string;
+  /** Nyt telefonnummer på salget — udelades hvis uændret, null rydder feltet. */
+  customerPhone?: string | null;
 }
 
 const INVALIDATE_KEYS = [
@@ -34,8 +36,12 @@ export function useUpdateUnitedSale() {
         sale_datetime?: string;
         agent_email?: string;
         agent_name?: null;
+        customer_phone?: string | null;
       } = {};
       if (input.saleDatetime) saleUpdate.sale_datetime = input.saleDatetime;
+      if (input.customerPhone !== undefined) {
+        saleUpdate.customer_phone = input.customerPhone;
+      }
       if (input.agentEmail) {
         saleUpdate.agent_email = input.agentEmail;
         // Navnet slås op via work_email — det gamle navn må ikke blive stående.

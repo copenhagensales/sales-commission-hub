@@ -38,40 +38,50 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
   const { data: products } = useUnitedProductOptions(open);
   const update = useUpdateUnitedSale();
 
-  const [datetime, setDatetime] = useState("");
+  const [date, setDate] = useState("");
   const [agentEmail, setAgentEmail] = useState("");
   const [productId, setProductId] = useState("");
+  const [phone, setPhone] = useState("");
 
   useEffect(() => {
     if (!sale) return;
-    setDatetime(format(new Date(sale.saleDatetime), "yyyy-MM-dd'T'HH:mm"));
+    setDate(format(new Date(sale.saleDatetime), "yyyy-MM-dd"));
     setAgentEmail((sale.agentEmail || "").toLowerCase());
     setProductId(sale.productId || "");
+    setPhone(sale.customerPhone || "");
   }, [sale]);
 
   if (!sale) return null;
 
-  const originalDatetime = format(
-    new Date(sale.saleDatetime),
-    "yyyy-MM-dd'T'HH:mm"
-  );
+  const originalDate = format(new Date(sale.saleDatetime), "yyyy-MM-dd");
   const originalEmail = (sale.agentEmail || "").toLowerCase();
+  const originalPhone = sale.customerPhone || "";
   const productChanged = !!productId && productId !== (sale.productId || "");
+  const dateChanged = !!date && date !== originalDate;
+  const trimmedPhone = phone.trim();
+  const phoneChanged = trimmedPhone !== originalPhone;
   const hasChanges =
-    datetime !== originalDatetime || agentEmail !== originalEmail || productChanged;
+    dateChanged || agentEmail !== originalEmail || productChanged || phoneChanged;
+
+  /** Ny dato, men samme klokkeslæt som salget havde. */
+  const buildNewDatetime = () => {
+    const [y, m, d] = date.split("-").map(Number);
+    const original = new Date(sale.saleDatetime);
+    const next = new Date(original);
+    next.setFullYear(y, m - 1, d);
+    return next.toISOString();
+  };
 
   const handleSave = async () => {
     try {
       await update.mutateAsync({
         saleId: sale.saleId,
         saleItemId: sale.saleItemId,
-        saleDatetime:
-          datetime && datetime !== originalDatetime
-            ? new Date(datetime).toISOString()
-            : undefined,
+        saleDatetime: dateChanged ? buildNewDatetime() : undefined,
         agentEmail:
           agentEmail && agentEmail !== originalEmail ? agentEmail : undefined,
         productId: productChanged ? productId : undefined,
+        customerPhone: phoneChanged ? trimmedPhone || null : undefined,
       });
       toast.success(
         productChanged
@@ -99,14 +109,25 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="united-sale-datetime">Salgsdato og tid</Label>
+            <Label htmlFor="united-sale-date">Salgsdato</Label>
             <Input
-              id="united-sale-datetime"
-              type="datetime-local"
-              value={datetime}
-              onChange={(e) => setDatetime(e.target.value)}
+              id="united-sale-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="united-sale-phone">Telefonnummer</Label>
+            <Input
+              id="united-sale-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Intet nummer"
+            />
+          </div>
+
 
           <div className="space-y-2">
             <Label>Sælger</Label>
