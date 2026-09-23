@@ -79,6 +79,23 @@ export interface RampTeamMember {
   actions: RampAction[];
 }
 
+/** Ugepunkt for hele holdet: ingen norm, kun det raa antal produkter. */
+export interface RampFullWeekPoint {
+  week_no: number;
+  iso_year: number;
+  iso_week: number;
+  sales: number;
+}
+
+/**
+ * Hele holdet: alle aktive saelgere paa ramp-kampagnerne som IKKE laengere er
+ * i de foerste 40 arbejdsdage. Ingen norm og ingen risikoflag — kun tal og
+ * ugens faste forloeb.
+ */
+export interface RampFullTeamMember extends Omit<RampTeamMember, "weeks"> {
+  weeks: RampFullWeekPoint[];
+}
+
 export interface RampRiskStat {
   day_no: number;
   threshold_p25: number;
@@ -112,6 +129,18 @@ export function useRampTeamOverview() {
       const { data, error } = await supabase.rpc("get_ramp_team_overview");
       if (error) throw error;
       return (Array.isArray(data) ? data : []) as unknown as RampTeamMember[];
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useRampFullTeam() {
+  return useQuery({
+    queryKey: ["ramp-full-team"],
+    queryFn: async (): Promise<RampFullTeamMember[]> => {
+      const { data, error } = await supabase.rpc("get_ramp_full_team");
+      if (error) throw error;
+      return (Array.isArray(data) ? data : []) as unknown as RampFullTeamMember[];
     },
     staleTime: 60_000,
   });
@@ -174,6 +203,7 @@ export function useLogRampAction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ramp-team-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["ramp-full-team"] });
       toast.success("Handling registreret");
     },
     onError: (error: Error) => {
@@ -222,6 +252,7 @@ export function useSendRampSessionFeedback() {
     },
     onSuccess: (recipients) => {
       queryClient.invalidateQueries({ queryKey: ["ramp-team-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["ramp-full-team"] });
       toast.success(`Feedback sendt til ${recipients.length} modtagere`);
     },
     onError: (error: Error) => {
@@ -248,6 +279,7 @@ export function useCloseRampFlag() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ramp-team-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["ramp-full-team"] });
       toast.success("Flaget er lukket");
     },
     onError: (error: Error) => {

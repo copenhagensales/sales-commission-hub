@@ -9,9 +9,11 @@ import {
   useCanViewRampTeam,
   useLogRampAction,
   useRampRiskStats,
+  useRampFullTeam,
   useRampTeamOverview,
   useSendRampSessionFeedback,
   type RampAction,
+  type RampFullTeamMember,
   type RampTeamMember,
   type RampWeekPoint,
 } from "@/hooks/useRampTeam";
@@ -26,6 +28,8 @@ import { getInitials } from "@/utils/formatting";
  */
 
 type FilterMode = "all" | "danger" | "missing";
+/** Opstartere har en norm; hele holdet har ikke. Alt faelles arbejder paa begge. */
+type AnyMember = RampTeamMember | RampFullTeamMember;
 type SessionKind = "coaching" | "listen";
 
 const KIND_LABEL: Record<SessionKind, string> = {
@@ -88,7 +92,7 @@ function weekKey(year: number, week: number) {
   return `${year}-${week}`;
 }
 
-function derive(member: RampTeamMember): Derived {
+function derive(member: AnyMember): Derived {
   const weekActions = new Map<string, { sessions: number; absence: boolean }>();
   for (const action of member.actions) {
     const { year, week } = isoWeekOf(new Date(action.performed_at));
@@ -147,7 +151,7 @@ function derive(member: RampTeamMember): Derived {
   };
 }
 
-function priorityBand(member: RampTeamMember, d: Derived) {
+function priorityBand(member: AnyMember, d: Derived) {
   if (member.has_absence) {
     return {
       tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
@@ -302,7 +306,7 @@ function ProgramRow({
   onOpen,
 }: {
   sessions: number;
-  member: RampTeamMember;
+  member: AnyMember;
   missedWeeks: number;
   onOpen: () => void;
 }) {
@@ -346,7 +350,7 @@ function ProgramRow({
   );
 }
 
-function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
+function HistoryBars({ member, d }: { member: AnyMember; d: Derived }) {
   return (
     <div className="mt-3 flex items-center gap-2.5">
       <span
@@ -380,7 +384,7 @@ function HistoryBars({ member, d }: { member: RampTeamMember; d: Derived }) {
   );
 }
 
-function effectLine(member: RampTeamMember, d: Derived): { text: string; color: string } {
+function effectLine(member: AnyMember, d: Derived): { text: string; color: string } {
   const coachingWeeks = member.weeks.filter(
     (w) => (d.weekActions.get(weekKey(w.iso_year, w.iso_week))?.sessions ?? 0) > 0,
   ).length;
@@ -631,13 +635,219 @@ function MemberCard({
   );
 }
 
+/** Rene tal pr. uge uden norm — hele holdet maales ikke mod en kurve. */
+function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
+  const max = Math.max(1, ...weeks.map((w) => w.sales)) * 1.12;
+  const H = 72;
+
+  return (
+    <div>
+      <SectionLabel>Produkter pr. uge</SectionLabel>
+      <div className="mt-3.5 flex items-end gap-2" style={{ height: H }}>
+        {weeks.map((w) => (
+          <div
+            key={weekKey(w.iso_year, w.iso_week)}
+            className="flex flex-1 flex-col items-center gap-[5px]"
+          >
+            <span
+              className="text-[12px] font-extrabold tabular-nums"
+              style={{ color: "#57635e" }}
+            >
+              {w.sales}
+            </span>
+            <span
+              className="w-full"
+              style={{
+                height: Math.max(2, Math.round((w.sales / max) * H)),
+                background: w.sales > 0 ? GREEN : "#d7e2dd",
+                borderRadius: "5px 5px 0 0",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-2">
+        {weeks.map((w) => (
+          <span
+            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
+            className="flex-1 text-center text-[11px] font-bold tabular-nums"
+            style={{ color: "#57635e" }}
+          >
+            u{w.iso_week}
+          </span>
+        ))}
+      </div>
+      <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+        Ingen norm på hele holdet — tallene står som de er.
+      </p>
+    </div>
+  );
+}
+
+/** Kort for hele holdet: tal + ugens faste forloeb, ingen kurve og ingen flag. */
+function FullTeamMemberCard({
+  member,
+  onOpen,
+}: {
+  member: RampFullTeamMember;
+  onOpen: (member: RampFullTeamMember, kind: SessionKind, done: boolean) => void;
+}) {
+  const logAction = useLogRampAction();
+  const d = derive(member);
+  const weekSum = member.weeks.reduce((sum, w) => sum + w.sales, 0);
+
+  return (
+    <article
+      className="relative overflow-hidden rounded-[20px] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+    >
+      <span
+        className="absolute bottom-0 left-0 top-0 w-[5px]"
+        style={{ background: d.sessionsThisWeek >= 1 || member.has_absence ? GREEN : NEUTRAL }}
+      />
+
+      <div className="px-5 pt-5 sm:px-[26px]">
+        <div className="flex flex-wrap items-center justify-between gap-3.5">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[15px] font-extrabold"
+              style={{ background: "#f1f4f3", color: "#4a5651" }}
+            >
+              {getInitials(member.employee_name)}
+            </span>
+            <div className="min-w-0">
+              <p
+                className="text-[18px] font-extrabold leading-tight"
+                style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
+              >
+                {member.employee_name}
+              </p>
+              <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                {[member.team_name, `${member.day_no} arbejdsdage i alt`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+          </div>
+          <Pill bg="#f1f4f3" color="#1b1f1d">
+            {weekSum} produkter på 6 uger
+          </Pill>
+        </div>
+      </div>
+
+      <div
+        className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
+        style={{ borderColor: "#eef2f0" }}
+      >
+        <PlainWeeklyBars weeks={member.weeks} />
+
+        <div
+          className="rounded-[16px] border px-5 py-[18px]"
+          style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionLabel>Ugens faste forløb</SectionLabel>
+            <span
+              className="text-[12px] font-extrabold"
+              style={{ color: d.sessionsThisWeek >= 1 ? "#0f5a38" : AMBER_TEXT }}
+            >
+              {d.sessionsThisWeek >= 1
+                ? d.sessionsThisWeek > 1
+                  ? `Ugen er klaret · ${d.sessionsThisWeek} sessioner`
+                  : "Ugen er klaret"
+                : "0 af 1 holdt"}
+            </span>
+          </div>
+
+          {member.has_absence ? (
+            <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+              Der er registreret fravær hele ugen — forløbet er ikke krævet.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <ProgramRow
+                sessions={d.sessionsThisWeek}
+                member={member}
+                missedWeeks={d.missedWeeks}
+                onOpen={() => onOpen(member, "coaching", d.sessionsThisWeek > 0)}
+              />
+              {d.sessionsThisWeek > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onOpen(member, "coaching", true)}
+                  className="flex w-full items-center gap-2 rounded-[13px] border border-dashed px-[15px] py-[11px] text-left text-[13px] font-bold"
+                  style={{ borderColor: "#c3ccc8", color: "#0f5a38", background: "#ffffff" }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Tilføj ekstra session i uge {member.iso_week}
+                </button>
+              )}
+              {!member.week_required && (
+                <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
+                  {member.weekly_program_active
+                    ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
+                    : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={logAction.isPending}
+                onClick={() =>
+                  logAction.mutate({
+                    employeeId: member.employee_id,
+                    actionType: RAMP_WEEKLY_ABSENCE,
+                    flagId: null,
+                  })
+                }
+                className="text-[12px] font-semibold underline disabled:opacity-50"
+                style={{ color: "#57635e" }}
+              >
+                Registrér fravær hele ugen
+              </button>
+            </div>
+          )}
+
+          <HistoryBars member={member} d={d} />
+
+          {d.feedbackLog.length > 0 && (
+            <div className="mt-3 space-y-2 border-t pt-3" style={{ borderColor: "#e7eeeb" }}>
+              <SectionLabel>Sendt feedback</SectionLabel>
+              {d.feedbackLog.slice(0, 2).map((a, index) => {
+                const { week } = isoWeekOf(new Date(a.performed_at));
+                return (
+                  <div
+                    key={`${a.performed_at}-${index}`}
+                    className="rounded-[13px] border bg-white p-3"
+                    style={{ borderColor: "#e7eeeb" }}
+                  >
+                    <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
+                      {a.action_type}
+                    </p>
+                    <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                      {a.performed_by_name ? `Af ${a.performed_by_name} · ` : ""}
+                      Sendt til {a.recipients.length} · uge {week}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
+                      {a.note}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function FeedbackDialog({
   member,
   kind,
   alreadyDone,
   onClose,
 }: {
-  member: RampTeamMember;
+  member: AnyMember;
   kind: SessionKind;
   alreadyDone: boolean;
   onClose: () => void;
@@ -871,6 +1081,7 @@ function FeedbackDialog({
 export default function RampTeam() {
   const { data: canView, isLoading: accessLoading } = useCanViewRampTeam();
   const { data: members = [], isLoading } = useRampTeamOverview();
+  const { data: fullTeam = [], isLoading: fullTeamLoading } = useRampFullTeam();
   const { data: stats = [] } = useRampRiskStats();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [showEvidence, setShowEvidence] = useState(false);
@@ -932,7 +1143,26 @@ export default function RampTeam() {
     };
   }, [members, dangerList.length, missingList.length]);
 
-  const dialogMember = dialog ? members.find((m) => m.employee_id === dialog.employeeId) : undefined;
+  const fullTeamList = useMemo(
+    () =>
+      [...fullTeam].sort(
+        (a, b) =>
+          Number(derive(b).missedWeeks > 0) - Number(derive(a).missedWeeks > 0) ||
+          a.employee_name.localeCompare(b.employee_name, "da"),
+      ),
+    [fullTeam],
+  );
+  const fullTeamMissing = useMemo(
+    () =>
+      fullTeam.filter((m) => m.week_required && !m.has_absence && !m.has_coaching && !m.has_listen)
+        .length,
+    [fullTeam],
+  );
+
+  const dialogMember: AnyMember | undefined = dialog
+    ? (members.find((m) => m.employee_id === dialog.employeeId) as AnyMember | undefined) ??
+      fullTeam.find((m) => m.employee_id === dialog.employeeId)
+    : undefined;
 
   if (accessLoading || isLoading) {
     return (
@@ -1204,6 +1434,56 @@ export default function RampTeam() {
             ) : (
               list.map((member) => (
                 <MemberCard
+                  key={member.employee_id}
+                  member={member}
+                  onOpen={(m, kind, done) =>
+                    setDialog({ employeeId: m.employee_id, kind, done })
+                  }
+                />
+              ))
+            )}
+          </section>
+
+          <section style={{ display: "grid", gap: 12 }}>
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p
+                  className="text-[19px] font-extrabold"
+                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
+                >
+                  Hele holdet · {fullTeamList.length}
+                </p>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                  Alle øvrige aktive sælgere på {campaignLabel}. Ingen norm og ingen farezone — kun
+                  tallene og ugens 1-1 session med feedback.
+                </p>
+              </div>
+              <p
+                className="text-[13px] font-bold"
+                style={{ color: fullTeamMissing > 0 ? AMBER_TEXT : "#0f5a38" }}
+              >
+                {fullTeamMissing > 0
+                  ? `${fullTeamMissing} mangler forløb i uge ${isoWeek ?? "-"}`
+                  : "Alle forløb er afviklet"}
+              </p>
+            </div>
+
+            {fullTeamLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#57635e" }} />
+              </div>
+            ) : fullTeamList.length === 0 ? (
+              <div
+                className="rounded-[20px] bg-white p-6 text-center"
+                style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+              >
+                <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
+                  Ingen øvrige sælgere på holdet lige nu
+                </p>
+              </div>
+            ) : (
+              fullTeamList.map((member) => (
+                <FullTeamMemberCard
                   key={member.employee_id}
                   member={member}
                   onOpen={(m, kind, done) =>

@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.get_ramp_full_team() TO supabase_read_only_user;
