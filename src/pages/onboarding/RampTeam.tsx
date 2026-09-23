@@ -405,9 +405,11 @@ function effectLine(member: AnyMember, d: Derived): { text: string; color: strin
 function MemberCard({
   member,
   onOpen,
+  onExclude,
 }: {
   member: RampTeamMember;
   onOpen: (member: RampTeamMember, kind: SessionKind, done: boolean) => void;
+  onExclude: (member: RampTeamMember) => void;
 }) {
   const logAction = useLogRampAction();
   const d = derive(member);
@@ -465,6 +467,7 @@ function MemberCard({
                 {d.gap} under spændet
               </Pill>
             )}
+            <ExcludeButton onClick={() => onExclude(member)} />
           </div>
         </div>
 
@@ -688,9 +691,11 @@ function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
 function FullTeamMemberCard({
   member,
   onOpen,
+  onExclude,
 }: {
   member: RampFullTeamMember;
   onOpen: (member: RampFullTeamMember, kind: SessionKind, done: boolean) => void;
+  onExclude: (member: RampFullTeamMember) => void;
 }) {
   const logAction = useLogRampAction();
   const d = derive(member);
@@ -729,9 +734,12 @@ function FullTeamMemberCard({
               </p>
             </div>
           </div>
-          <Pill bg="#f1f4f3" color="#1b1f1d">
-            {weekSum} produkter på 6 uger
-          </Pill>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill bg="#f1f4f3" color="#1b1f1d">
+              {weekSum} produkter på 6 uger
+            </Pill>
+            <ExcludeButton onClick={() => onExclude(member)} />
+          </div>
         </div>
       </div>
 
