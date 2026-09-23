@@ -265,6 +265,39 @@ export default function TrygEditSales() {
     [trygAlkaSales]
   );
 
+  /** "United-salg" — alle salg på teamet Uniteds kunder for den valgte dag. */
+  const { data: unitedSales, isLoading: isLoadingUnited } = useUnitedSales(
+    day,
+    hasAccess && view === "united"
+  );
+  const visibleUnitedSales = useMemo(
+    () => (unitedSales || []).filter((s) => matchesSearch(s.customerPhone)),
+    [unitedSales, phoneSearch]
+  );
+  const unitedClientNames = useMemo(
+    () =>
+      new Map<string, string>(
+        (unitedSales || []).map((s) => [s.saleItemId, s.clientName])
+      ),
+    [unitedSales]
+  );
+  const findUnitedSale = (saleItemId: string) =>
+    (unitedSales || []).find((s) => s.saleItemId === saleItemId) || null;
+
+  const handleDeleteUnited = async () => {
+    if (!unitedDeleteTarget) return;
+    try {
+      await deleteSale.mutateAsync(unitedDeleteTarget.saleId);
+      toast.success("Salget er slettet permanent");
+      setUnitedDeleteTarget(null);
+    } catch (error: unknown) {
+      queryClient.invalidateQueries({ queryKey: ["united-sales"] });
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke slette salget"
+      );
+    }
+  };
+
 
 
   /** Synlige linjer for status-fanerne (den valgte periode). */
