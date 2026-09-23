@@ -11,7 +11,7 @@ Ja — mistanken holder. Der ligger **314 dobbelt-registrerede Lederne-salg**, h
   - flk@: 76 salg / 6.600 kr.
   - jeph@: 78 salg / 6.780 kr.
   - noto@: 79 salg / 6.990 kr.
-- Salgsdatoerne ligger 18/9–23/9, alle i den igangværende lønperiode (15/9–14/10). Ingen af de manuelle dubletter er brugt i provisionsposteringer eller annulleringskøen, så de kan fjernes uden at røre historik.
+- Salgsdatoerne ligger 18/9–23/9: **alle 314 ligger efter 14/9**, altså i den igangværende lønperiode (15/9–14/10). Ingen af dem ligger i perioden 15/8–14/9 eller tidligere, så der er ikke udbetalt dobbelt provision. Ingen af dubletterne er brugt i provisionsposteringer eller annulleringskøen, så de kan fjernes uden at røre historik.
 - Dagens upload (191 manuelle rækker) er **100 % dubletter**.
 
 ## Hvorfor dublettjekket ikke fangede det
