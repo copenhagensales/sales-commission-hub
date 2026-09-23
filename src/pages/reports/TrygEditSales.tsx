@@ -568,9 +568,11 @@ export default function TrygEditSales() {
                 </div>
 
                 <CardDescription>
-                  {view === "kanvas"
-                    ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
-                    : "Alle salg på kunderne Tryg og ALKA på den valgte dag."}
+                  {view === "united"
+                    ? "Alle salg på teamet Uniteds kunder på den valgte dag. Ret eller slet et salg direkte på linjen."
+                    : view === "kanvas"
+                      ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
+                      : "Alle salg på kunderne Tryg og ALKA på den valgte dag."}
                 </CardDescription>
 
               </div>
