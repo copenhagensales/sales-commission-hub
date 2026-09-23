@@ -53,6 +53,8 @@ import {
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
 import { useTrygAlkaSales } from "@/hooks/useTrygAlkaSales";
+import { useUnitedSales, type UnitedSale } from "@/hooks/useUnitedSales";
+import { UnitedEditSaleDialog } from "@/components/reports/UnitedEditSaleDialog";
 
 import {
   useTrygSaleReviews,
@@ -130,7 +132,11 @@ function normalizePhone(value: string): string {
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<"kanvas" | "tryg-alka">("kanvas");
+  const [view, setView] = useState<"united" | "kanvas" | "tryg-alka">("united");
+  const [unitedEditTarget, setUnitedEditTarget] = useState<UnitedSale | null>(null);
+  const [unitedDeleteTarget, setUnitedDeleteTarget] = useState<UnitedSale | null>(
+    null
+  );
   const [day, setDay] = useState<Date>(new Date());
   const [rangeFrom, setRangeFrom] = useState<Date>(new Date());
   const [rangeTo, setRangeTo] = useState<Date>(new Date());
@@ -258,6 +264,39 @@ export default function TrygEditSales() {
       ),
     [trygAlkaSales]
   );
+
+  /** "United-salg" — alle salg på teamet Uniteds kunder for den valgte dag. */
+  const { data: unitedSales, isLoading: isLoadingUnited } = useUnitedSales(
+    day,
+    hasAccess && view === "united"
+  );
+  const visibleUnitedSales = useMemo(
+    () => (unitedSales || []).filter((s) => matchesSearch(s.customerPhone)),
+    [unitedSales, phoneSearch]
+  );
+  const unitedClientNames = useMemo(
+    () =>
+      new Map<string, string>(
+        (unitedSales || []).map((s) => [s.saleItemId, s.clientName])
+      ),
+    [unitedSales]
+  );
+  const findUnitedSale = (saleItemId: string) =>
+    (unitedSales || []).find((s) => s.saleItemId === saleItemId) || null;
+
+  const handleDeleteUnited = async () => {
+    if (!unitedDeleteTarget) return;
+    try {
+      await deleteSale.mutateAsync(unitedDeleteTarget.saleId);
+      toast.success("Salget er slettet permanent");
+      setUnitedDeleteTarget(null);
+    } catch (error: unknown) {
+      queryClient.invalidateQueries({ queryKey: ["united-sales"] });
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke slette salget"
+      );
+    }
+  };
 
 
 
@@ -500,6 +539,15 @@ export default function TrygEditSales() {
               <div className="space-y-2">
                 <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                   <Button
+                    variant={view === "united" ? "default" : "outline"}
+                    className={`h-10 px-4 text-lg font-semibold tracking-tight ${
+                      view === "united" ? "shadow-sm" : "bg-background"
+                    }`}
+                    onClick={() => setView("united")}
+                  >
+                    United-salg
+                  </Button>
+                  <Button
                     variant={view === "kanvas" ? "default" : "outline"}
                     className={`h-10 px-4 text-lg font-semibold tracking-tight ${
                       view === "kanvas" ? "shadow-sm" : "bg-background"
@@ -520,9 +568,11 @@ export default function TrygEditSales() {
                 </div>
 
                 <CardDescription>
-                  {view === "kanvas"
-                    ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
-                    : "Alle salg på kunderne Tryg og ALKA på den valgte dag."}
+                  {view === "united"
+                    ? "Alle salg på teamet Uniteds kunder på den valgte dag. Ret eller slet et salg direkte på linjen."
+                    : view === "kanvas"
+                      ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
+                      : "Alle salg på kunderne Tryg og ALKA på den valgte dag."}
                 </CardDescription>
 
               </div>
@@ -646,7 +696,7 @@ export default function TrygEditSales() {
                 </Popover>
               </div>
               )}
-              {view === "tryg-alka" && (
+              {view !== "kanvas" && (
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -690,7 +740,26 @@ export default function TrygEditSales() {
 
             </CardHeader>
             <CardContent>
-              {view === "tryg-alka" ? (
+              {view === "united" ? (
+                <TrygSalesTable
+                  mode="edit"
+                  sales={visibleUnitedSales}
+                  clientNames={unitedClientNames}
+                  isLoading={isLoadingUnited || loadingAccess}
+                  emptyText={
+                    phoneSearch
+                      ? "Ingen salg matcher søgningen."
+                      : "Ingen United-salg på den valgte dag."
+                  }
+                  onDelete={(saleItemId) =>
+                    setUnitedDeleteTarget(findUnitedSale(saleItemId))
+                  }
+                  onEdit={(saleItemId) =>
+                    setUnitedEditTarget(findUnitedSale(saleItemId))
+                  }
+                  isPending={deleteSale.isPending}
+                />
+              ) : view === "tryg-alka" ? (
                 <TrygSalesTable
                   mode="plain"
                   sales={visibleTrygAlkaSales}
@@ -902,6 +971,70 @@ export default function TrygEditSales() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog
+          open={!!unitedDeleteTarget}
+          onOpenChange={(open) => !open && setUnitedDeleteTarget(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Slet salget permanent?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    Salg fra{" "}
+                    <strong>{unitedDeleteTarget?.sellerName}</strong> kl.{" "}
+                    {unitedDeleteTarget
+                      ? format(new Date(unitedDeleteTarget.saleDatetime), "HH:mm")
+                      : ""}{" "}
+                    på <strong>{unitedDeleteTarget?.productName}</strong> (
+                    {unitedDeleteTarget?.clientName}).
+                  </p>
+                  <p>
+                    Følgende forsvinder fra boards, rapporter og løngrundlag:{" "}
+                    <strong>
+                      {(unitedDeleteTarget?.mappedCommission ?? 0).toLocaleString(
+                        "da-DK"
+                      )}{" "}
+                      kr provision
+                    </strong>{" "}
+                    og{" "}
+                    <strong>
+                      {(unitedDeleteTarget?.mappedRevenue ?? 0).toLocaleString(
+                        "da-DK"
+                      )}{" "}
+                      kr omsætning
+                    </strong>
+                    .
+                  </p>
+                  <p className="font-semibold text-destructive">
+                    Handlingen er permanent og kan ikke fortrydes.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteSale.isPending}>
+                Annuller
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteUnited();
+                }}
+                disabled={deleteSale.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSale.isPending ? "Sletter..." : "Ja, slet salget"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <UnitedEditSaleDialog
+          sale={unitedEditTarget}
+          onOpenChange={(open) => !open && setUnitedEditTarget(null)}
+        />
 
         <SendTrygMailDialog
           open={isMailOpen}

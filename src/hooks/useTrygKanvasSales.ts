@@ -110,6 +110,8 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
 
 const INVALIDATE_KEYS = [
   ["tryg-kanvas-sales"],
+  ["tryg-alka-sales"],
+  ["united-sales"],
   ["tryg-sale-reviews"],
   ["sales-aggregates"],
 ];

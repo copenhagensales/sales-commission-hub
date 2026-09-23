@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -46,16 +46,27 @@ interface PlainProps extends CommonProps {
   clientNames?: Map<string, string>;
 }
 
+/** Visning med "Slet salg" og "Ret" pr. linje. */
+interface EditProps extends CommonProps {
+  mode: "edit";
+  /** Kunde-navn pr. salgslinje. */
+  clientNames?: Map<string, string>;
+  onDelete: (saleItemId: string) => void;
+  onEdit: (saleItemId: string) => void;
+  isPending: boolean;
+}
 
-type Props = ReviewProps | StatusProps | PlainProps;
+
+type Props = ReviewProps | StatusProps | PlainProps | EditProps;
 
 /** Fælles tabel-skabelon for fanerne på "Tryg - Ret salg". */
 export function TrygSalesTable(props: Props) {
   const { sales, isLoading, emptyText, mode } = props;
   const showDate = mode === "status" && props.showDate === true;
-  const showClient = mode === "plain" && props.clientNames !== undefined;
+  const showClient =
+    (mode === "plain" || mode === "edit") && props.clientNames !== undefined;
   const colSpan =
-    (mode === "review" ? 6 : mode === "status" ? 8 : 5) +
+    (mode === "review" ? 6 : mode === "status" ? 8 : mode === "edit" ? 6 : 5) +
     (showDate ? 1 : 0) +
     (showClient ? 1 : 0);
 
@@ -163,7 +174,7 @@ export function TrygSalesTable(props: Props) {
                   </TableCell>
                   {showClient && (
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {(mode === "plain" &&
+                      {((mode === "plain" || mode === "edit") &&
                         props.clientNames?.get(sale.saleItemId)) ||
                         "—"}
                     </TableCell>
@@ -238,6 +249,34 @@ export function TrygSalesTable(props: Props) {
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                           Fortryd
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                  {mode === "edit" && (
+                    <TableCell className="w-56 whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 gap-1.5 font-medium"
+                          disabled={props.isPending}
+                          onClick={() => props.onDelete(sale.saleItemId)}
+                          title="Slet salget permanent"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Slet salg
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 font-medium"
+                          disabled={props.isPending}
+                          onClick={() => props.onEdit(sale.saleItemId)}
+                          title="Ret salgsdato, sælger eller produkt"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Ret
                         </Button>
                       </div>
                     </TableCell>
