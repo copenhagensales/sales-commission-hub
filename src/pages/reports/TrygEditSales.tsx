@@ -53,6 +53,8 @@ import {
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
 import { useTrygAlkaSales } from "@/hooks/useTrygAlkaSales";
+import { useUnitedSales, type UnitedSale } from "@/hooks/useUnitedSales";
+import { UnitedEditSaleDialog } from "@/components/reports/UnitedEditSaleDialog";
 
 import {
   useTrygSaleReviews,
@@ -130,7 +132,11 @@ function normalizePhone(value: string): string {
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<"kanvas" | "tryg-alka">("kanvas");
+  const [view, setView] = useState<"united" | "kanvas" | "tryg-alka">("united");
+  const [unitedEditTarget, setUnitedEditTarget] = useState<UnitedSale | null>(null);
+  const [unitedDeleteTarget, setUnitedDeleteTarget] = useState<UnitedSale | null>(
+    null
+  );
   const [day, setDay] = useState<Date>(new Date());
   const [rangeFrom, setRangeFrom] = useState<Date>(new Date());
   const [rangeTo, setRangeTo] = useState<Date>(new Date());
