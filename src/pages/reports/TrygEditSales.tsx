@@ -539,6 +539,15 @@ export default function TrygEditSales() {
               <div className="space-y-2">
                 <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                   <Button
+                    variant={view === "united" ? "default" : "outline"}
+                    className={`h-10 px-4 text-lg font-semibold tracking-tight ${
+                      view === "united" ? "shadow-sm" : "bg-background"
+                    }`}
+                    onClick={() => setView("united")}
+                  >
+                    United-salg
+                  </Button>
+                  <Button
                     variant={view === "kanvas" ? "default" : "outline"}
                     className={`h-10 px-4 text-lg font-semibold tracking-tight ${
                       view === "kanvas" ? "shadow-sm" : "bg-background"
