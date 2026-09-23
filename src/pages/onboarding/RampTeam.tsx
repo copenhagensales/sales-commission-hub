@@ -1149,9 +1149,31 @@ function FeedbackDialog({
 
 export default function RampTeam() {
   const { data: canView, isLoading: accessLoading } = useCanViewRampTeam();
-  const { data: members = [], isLoading } = useRampTeamOverview();
-  const { data: fullTeam = [], isLoading: fullTeamLoading } = useRampFullTeam();
+  const { data: allMembers = [], isLoading } = useRampTeamOverview();
+  const { data: allFullTeam = [], isLoading: fullTeamLoading } = useRampFullTeam();
   const { data: stats = [] } = useRampRiskStats();
+  const { data: exclusions = [] } = useRampFeedbackExclusions();
+  const setExclusion = useSetRampFeedbackExclusion();
+
+  const excludedIds = useMemo(
+    () => new Set(exclusions.map((e) => e.employee_id)),
+    [exclusions],
+  );
+  const members = useMemo(
+    () => allMembers.filter((m) => !excludedIds.has(m.employee_id)),
+    [allMembers, excludedIds],
+  );
+  const fullTeam = useMemo(
+    () => allFullTeam.filter((m) => !excludedIds.has(m.employee_id)),
+    [allFullTeam, excludedIds],
+  );
+  const pausedList = useMemo(
+    () =>
+      ([...allMembers, ...allFullTeam] as AnyMember[])
+        .filter((m) => excludedIds.has(m.employee_id))
+        .sort((a, b) => a.employee_name.localeCompare(b.employee_name, "da")),
+    [allMembers, allFullTeam, excludedIds],
+  );
   const [filter, setFilter] = useState<FilterMode>("all");
   const [showEvidence, setShowEvidence] = useState(false);
   const [dialog, setDialog] = useState<{
