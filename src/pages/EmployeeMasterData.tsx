@@ -582,7 +582,19 @@ export default function EmployeeMasterData() {
       }
 
       if (response.error) {
-        throw new Error(response.error.message || t("employees.toast.couldNotCreate"));
+        // Edge-funktionen returnerer fejlteksten i body ved non-2xx (fx svagt kodeord).
+        let serverMessage = "";
+        const context = (response.error as { context?: Response }).context;
+        if (context && typeof context.text === "function") {
+          try {
+            const raw = await context.text();
+            const parsed = raw ? (JSON.parse(raw) as { error?: string }) : null;
+            serverMessage = parsed?.error ?? raw ?? "";
+          } catch {
+            serverMessage = "";
+          }
+        }
+        throw new Error(serverMessage || response.error.message || t("employees.toast.couldNotCreate"));
       }
 
       if (!response.data?.success) {
