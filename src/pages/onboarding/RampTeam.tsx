@@ -291,7 +291,50 @@ function PausedRow({
   );
 }
 
-function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor: string }) {
+/** Markerer den indevaerende uge i ugelabels, saa "nu" er tydelig. */
+function WeekLabels({
+  weeks,
+  currentWeek,
+}: {
+  weeks: { iso_year: number; iso_week: number }[];
+  currentWeek: number;
+}) {
+  return (
+    <div className="mt-2 flex gap-2">
+      {weeks.map((w) => {
+        const isNow = w.iso_week === currentWeek;
+        return (
+          <span
+            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
+            className="flex-1 text-center text-[11px] font-bold tabular-nums"
+            style={{ color: isNow ? "#0f5a38" : "#57635e" }}
+          >
+            {isNow ? (
+              <span
+                className="inline-block rounded-[6px] px-1.5 py-0.5 font-extrabold"
+                style={{ background: "#e7f4ed" }}
+              >
+                u{w.iso_week} · nu
+              </span>
+            ) : (
+              `u${w.iso_week}`
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function WeeklyBars({
+  weeks,
+  stripColor,
+  currentWeek,
+}: {
+  weeks: RampWeekPoint[];
+  stripColor: string;
+  currentWeek: number;
+}) {
   const last = weeks[weeks.length - 1];
   const bandLow = last ? last.p25 : 0;
   const bandHigh = last ? last.p75 : 0;
