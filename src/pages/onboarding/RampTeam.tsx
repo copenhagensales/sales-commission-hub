@@ -382,17 +382,7 @@ function WeeklyBars({
           );
         })}
       </div>
-      <div className="mt-2 flex gap-2">
-        {weeks.map((w) => (
-          <span
-            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
-            className="flex-1 text-center text-[11px] font-bold tabular-nums"
-            style={{ color: "#57635e" }}
-          >
-            u{w.iso_week}
-          </span>
-        ))}
-      </div>
+      <WeekLabels weeks={weeks} currentWeek={currentWeek} />
       {last && (
         <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
           Stiplet felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · median{" "}
