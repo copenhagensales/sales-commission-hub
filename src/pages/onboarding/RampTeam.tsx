@@ -620,7 +620,7 @@ function MemberCard({
         className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
         style={{ borderColor: "#eef2f0" }}
       >
-        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} />
+        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} currentWeek={member.iso_week} />
 
         <div
           className="rounded-[16px] border px-5 py-[18px]"
