@@ -706,7 +706,13 @@ function MemberCard({
 }
 
 /** Rene tal pr. uge uden norm — hele holdet maales ikke mod en kurve. */
-function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
+function PlainWeeklyBars({
+  weeks,
+  currentWeek,
+}: {
+  weeks: RampFullTeamMember["weeks"];
+  currentWeek: number;
+}) {
   const max = Math.max(1, ...weeks.map((w) => w.sales)) * 1.12;
   const H = 72;
 
@@ -736,17 +742,7 @@ function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
           </div>
         ))}
       </div>
-      <div className="mt-2 flex gap-2">
-        {weeks.map((w) => (
-          <span
-            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
-            className="flex-1 text-center text-[11px] font-bold tabular-nums"
-            style={{ color: "#57635e" }}
-          >
-            u{w.iso_week}
-          </span>
-        ))}
-      </div>
+      <WeekLabels weeks={weeks} currentWeek={currentWeek} />
       <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
         Ingen norm på hele holdet — tallene står som de er.
       </p>
