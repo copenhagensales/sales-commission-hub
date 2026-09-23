@@ -810,7 +810,7 @@ function FullTeamMemberCard({
         className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
         style={{ borderColor: "#eef2f0" }}
       >
-        <PlainWeeklyBars weeks={member.weeks} />
+        <PlainWeeklyBars weeks={member.weeks} currentWeek={member.iso_week} />
 
         <div
           className="rounded-[16px] border px-5 py-[18px]"
