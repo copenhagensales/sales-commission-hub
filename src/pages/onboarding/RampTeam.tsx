@@ -291,7 +291,50 @@ function PausedRow({
   );
 }
 
-function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor: string }) {
+/** Markerer den indevaerende uge i ugelabels, saa "nu" er tydelig. */
+function WeekLabels({
+  weeks,
+  currentWeek,
+}: {
+  weeks: { iso_year: number; iso_week: number }[];
+  currentWeek: number;
+}) {
+  return (
+    <div className="mt-2 flex gap-2">
+      {weeks.map((w) => {
+        const isNow = w.iso_week === currentWeek;
+        return (
+          <span
+            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
+            className="flex-1 text-center text-[11px] font-bold tabular-nums"
+            style={{ color: isNow ? "#0f5a38" : "#57635e" }}
+          >
+            {isNow ? (
+              <span
+                className="inline-block rounded-[6px] px-1.5 py-0.5 font-extrabold"
+                style={{ background: "#e7f4ed" }}
+              >
+                u{w.iso_week} · nu
+              </span>
+            ) : (
+              `u${w.iso_week}`
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function WeeklyBars({
+  weeks,
+  stripColor,
+  currentWeek,
+}: {
+  weeks: RampWeekPoint[];
+  stripColor: string;
+  currentWeek: number;
+}) {
   const last = weeks[weeks.length - 1];
   const bandLow = last ? last.p25 : 0;
   const bandHigh = last ? last.p75 : 0;
@@ -339,17 +382,7 @@ function WeeklyBars({ weeks, stripColor }: { weeks: RampWeekPoint[]; stripColor:
           );
         })}
       </div>
-      <div className="mt-2 flex gap-2">
-        {weeks.map((w) => (
-          <span
-            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
-            className="flex-1 text-center text-[11px] font-bold tabular-nums"
-            style={{ color: "#57635e" }}
-          >
-            u{w.iso_week}
-          </span>
-        ))}
-      </div>
+      <WeekLabels weeks={weeks} currentWeek={currentWeek} />
       {last && (
         <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
           Stiplet felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · median{" "}
@@ -587,7 +620,7 @@ function MemberCard({
         className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
         style={{ borderColor: "#eef2f0" }}
       >
-        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} />
+        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} currentWeek={member.iso_week} />
 
         <div
           className="rounded-[16px] border px-5 py-[18px]"
@@ -673,7 +706,13 @@ function MemberCard({
 }
 
 /** Rene tal pr. uge uden norm — hele holdet maales ikke mod en kurve. */
-function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
+function PlainWeeklyBars({
+  weeks,
+  currentWeek,
+}: {
+  weeks: RampFullTeamMember["weeks"];
+  currentWeek: number;
+}) {
   const max = Math.max(1, ...weeks.map((w) => w.sales)) * 1.12;
   const H = 72;
 
@@ -703,17 +742,7 @@ function PlainWeeklyBars({ weeks }: { weeks: RampFullTeamMember["weeks"] }) {
           </div>
         ))}
       </div>
-      <div className="mt-2 flex gap-2">
-        {weeks.map((w) => (
-          <span
-            key={`lbl-${weekKey(w.iso_year, w.iso_week)}`}
-            className="flex-1 text-center text-[11px] font-bold tabular-nums"
-            style={{ color: "#57635e" }}
-          >
-            u{w.iso_week}
-          </span>
-        ))}
-      </div>
+      <WeekLabels weeks={weeks} currentWeek={currentWeek} />
       <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
         Ingen norm på hele holdet — tallene står som de er.
       </p>
@@ -781,7 +810,7 @@ function FullTeamMemberCard({
         className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
         style={{ borderColor: "#eef2f0" }}
       >
-        <PlainWeeklyBars weeks={member.weeks} />
+        <PlainWeeklyBars weeks={member.weeks} currentWeek={member.iso_week} />
 
         <div
           className="rounded-[16px] border px-5 py-[18px]"
