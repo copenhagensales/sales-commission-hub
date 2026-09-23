@@ -109,14 +109,25 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="united-sale-datetime">Salgsdato og tid</Label>
+            <Label htmlFor="united-sale-date">Salgsdato</Label>
             <Input
-              id="united-sale-datetime"
-              type="datetime-local"
-              value={datetime}
-              onChange={(e) => setDatetime(e.target.value)}
+              id="united-sale-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="united-sale-phone">Telefonnummer</Label>
+            <Input
+              id="united-sale-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Intet nummer"
+            />
+          </div>
+
 
           <div className="space-y-2">
             <Label>Sælger</Label>
