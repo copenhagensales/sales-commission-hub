@@ -188,26 +188,6 @@ export function useUnitedSales(day: Date, enabled = true) {
       }
       if (items.size === 0) return [];
 
-      // Manglende salgsdata for spor B hentes særskilt
-      const missingSaleIds = Array.from(
-        new Set(
-          Array.from(items.values())
-            .map((i) => i.sale_id)
-            .filter((id) => !saleById.has(id))
-        )
-      );
-      if (missingSaleIds.length > 0) {
-        const extra = await Promise.all(
-          chunk(missingSaleIds).map((ids) =>
-            supabase.from("sales").select(SALE_FIELDS).in("id", ids)
-          )
-        );
-        for (const res of extra) {
-          if (res.error) throw res.error;
-          for (const s of (res.data || []) as SaleRow[]) saleById.set(s.id, s);
-        }
-      }
-
       // Sælgernavne via work_email
       const rows = Array.from(items.values()).filter((i) => saleById.has(i.sale_id));
       const emails = Array.from(
