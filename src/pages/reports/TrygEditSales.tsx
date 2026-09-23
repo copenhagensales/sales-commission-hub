@@ -696,7 +696,7 @@ export default function TrygEditSales() {
                 </Popover>
               </div>
               )}
-              {view === "tryg-alka" && (
+              {view !== "kanvas" && (
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -740,7 +740,26 @@ export default function TrygEditSales() {
 
             </CardHeader>
             <CardContent>
-              {view === "tryg-alka" ? (
+              {view === "united" ? (
+                <TrygSalesTable
+                  mode="edit"
+                  sales={visibleUnitedSales}
+                  clientNames={unitedClientNames}
+                  isLoading={isLoadingUnited || loadingAccess}
+                  emptyText={
+                    phoneSearch
+                      ? "Ingen salg matcher søgningen."
+                      : "Ingen United-salg på den valgte dag."
+                  }
+                  onDelete={(saleItemId) =>
+                    setUnitedDeleteTarget(findUnitedSale(saleItemId))
+                  }
+                  onEdit={(saleItemId) =>
+                    setUnitedEditTarget(findUnitedSale(saleItemId))
+                  }
+                  isPending={deleteSale.isPending}
+                />
+              ) : view === "tryg-alka" ? (
                 <TrygSalesTable
                   mode="plain"
                   sales={visibleTrygAlkaSales}
