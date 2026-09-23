@@ -940,33 +940,13 @@ function FeedbackLogList({
       )}
       {entries.map(({ a, key, week, isCurrent, weeksAgo }) => {
         const meta = `${a.performed_by_name ? `Af ${a.performed_by_name} · ` : ""}Sendt til ${a.recipients.length} · ${weekLabel(week, weeksAgo)}`;
-
-        if (isCurrent) {
-          return (
-            <div
-              key={key}
-              className="rounded-[13px] border bg-white p-3"
-              style={{ borderColor: "#e7eeeb" }}
-            >
-              <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                {a.action_type}
-              </p>
-              <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
-                {meta}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
-                {a.note}
-              </p>
-            </div>
-          );
-        }
-
         const open = openKey === key;
+
         return (
           <div
             key={key}
             className="rounded-[13px] border bg-white"
-            style={{ borderColor: "#e7eeeb" }}
+            style={{ borderColor: isCurrent ? "#cfe6da" : "#e7eeeb" }}
           >
             <button
               type="button"
