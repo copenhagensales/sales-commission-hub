@@ -544,8 +544,8 @@ function MemberCard({
           </span>
           <div className="min-w-0">
             <p
-              className="text-[16px] font-extrabold"
-              style={{ color: band.tone.text, letterSpacing: "-.01em" }}
+              className="whitespace-normal text-[16px] font-extrabold"
+              style={{ color: band.tone.text, letterSpacing: "-.01em", textWrap: "balance" }}
             >
               {band.title}
             </p>
@@ -664,35 +664,8 @@ function MemberCard({
             {effect.text}
           </p>
 
-          {d.feedbackLog.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <SectionLabel>Sendt feedback</SectionLabel>
-              {d.feedbackLog.slice(0, 4).map((a, index) => {
-                const { week } = isoWeekOf(new Date(a.performed_at));
-                return (
-                  <div
-                    key={`${a.performed_at}-${index}`}
-                    className="rounded-[13px] border bg-white p-3"
-                    style={{ borderColor: "#e7eeeb" }}
-                  >
-                    <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                      {a.action_type}
-                    </p>
-                    <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
-                      {a.performed_by_name ? `Af ${a.performed_by_name} · ` : ""}
-                      Sendt til {a.recipients.length} · uge {week}
-                    </p>
-                    <p
-                      className="mt-1 whitespace-pre-wrap text-[12px]"
-                      style={{ color: "#1b1f1d" }}
-                    >
-                      {a.note}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <FeedbackLogList member={member} d={d} limit={4} />
+
         </div>
       </div>
     </article>
