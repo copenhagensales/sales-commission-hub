@@ -10,6 +10,8 @@ export interface UpdateUnitedSaleInput {
   agentEmail?: string;
   /** Nyt produkt på salgslinjen — udelades hvis uændret. */
   productId?: string;
+  /** Nyt telefonnummer på salget — udelades hvis uændret, null rydder feltet. */
+  customerPhone?: string | null;
 }
 
 const INVALIDATE_KEYS = [
