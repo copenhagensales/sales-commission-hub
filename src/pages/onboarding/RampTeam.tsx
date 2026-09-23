@@ -1530,6 +1530,9 @@ export default function RampTeam() {
                   onOpen={(m, kind, done) =>
                     setDialog({ employeeId: m.employee_id, kind, done })
                   }
+                  onExclude={(m) =>
+                    setExclusion.mutate({ employeeId: m.employee_id, excluded: true })
+                  }
                 />
               ))
             )}
@@ -1580,10 +1583,40 @@ export default function RampTeam() {
                   onOpen={(m, kind, done) =>
                     setDialog({ employeeId: m.employee_id, kind, done })
                   }
+                  onExclude={(m) =>
+                    setExclusion.mutate({ employeeId: m.employee_id, excluded: true })
+                  }
                 />
               ))
             )}
           </section>
+
+          {pausedList.length > 0 && (
+            <section style={{ display: "grid", gap: 8 }}>
+              <div className="mt-1.5">
+                <p
+                  className="text-[19px] font-extrabold"
+                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
+                >
+                  Skal ikke have feedback · {pausedList.length}
+                </p>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                  Disse sælgere er taget ud af oversigten og tælles ikke med i manglende forløb. De
+                  kan aktiveres igen når som helst.
+                </p>
+              </div>
+              {pausedList.map((member) => (
+                <PausedRow
+                  key={member.employee_id}
+                  member={member}
+                  isPending={setExclusion.isPending}
+                  onActivate={(m) =>
+                    setExclusion.mutate({ employeeId: m.employee_id, excluded: false })
+                  }
+                />
+              ))}
+            </section>
+          )}
 
           <p className="pb-4 text-[12px]" style={{ color: "#57635e" }}>
             Forløbet kører indtil sælgeren er inde i det typiske spænd. Det er en samtale der
