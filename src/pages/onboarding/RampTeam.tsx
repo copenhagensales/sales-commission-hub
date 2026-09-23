@@ -10,7 +10,9 @@ import {
   useLogRampAction,
   useRampRiskStats,
   useRampFullTeam,
+  useRampFeedbackExclusions,
   useRampTeamOverview,
+  useSetRampFeedbackExclusion,
   useSendRampSessionFeedback,
   type RampAction,
   type RampFullTeamMember,
@@ -227,6 +229,65 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     >
       {children}
     </p>
+  );
+}
+
+/** Knap der tager saelgeren ud af feedback-oversigten (kan altid aktiveres igen). */
+function ExcludeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border px-3 py-1 text-[12px] font-bold"
+      style={{ borderColor: "#e0e6e3", color: "#57635e", background: "#fff" }}
+    >
+      Skal ikke have feedback
+    </button>
+  );
+}
+
+/** Linje i bunden for en saelger der er sat paa pause. */
+function PausedRow({
+  member,
+  onActivate,
+  isPending,
+}: {
+  member: AnyMember;
+  onActivate: (member: AnyMember) => void;
+  isPending: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] bg-white px-5 py-3.5"
+      style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-[13px] font-extrabold"
+          style={{ background: "#f1f4f3", color: "#7b857f" }}
+        >
+          {getInitials(member.employee_name)}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[15px] font-extrabold" style={{ color: "#4a5651" }}>
+            {member.employee_name}
+          </p>
+          <p className="text-[12px] font-semibold" style={{ color: "#8b958f" }}>
+            {[member.team_name, member.campaign_name].filter(Boolean).join(" · ") ||
+              "Ingen feedback"}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => onActivate(member)}
+        className="rounded-full px-3.5 py-1.5 text-[12px] font-bold disabled:opacity-50"
+        style={{ background: "#e7f4ed", color: "#0f5a38" }}
+      >
+        Aktivér igen
+      </button>
+    </div>
   );
 }
 
