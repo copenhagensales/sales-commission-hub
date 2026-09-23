@@ -46,16 +46,27 @@ interface PlainProps extends CommonProps {
   clientNames?: Map<string, string>;
 }
 
+/** Visning med "Slet salg" og "Ret" pr. linje. */
+interface EditProps extends CommonProps {
+  mode: "edit";
+  /** Kunde-navn pr. salgslinje. */
+  clientNames?: Map<string, string>;
+  onDelete: (saleItemId: string) => void;
+  onEdit: (saleItemId: string) => void;
+  isPending: boolean;
+}
 
-type Props = ReviewProps | StatusProps | PlainProps;
+
+type Props = ReviewProps | StatusProps | PlainProps | EditProps;
 
 /** Fælles tabel-skabelon for fanerne på "Tryg - Ret salg". */
 export function TrygSalesTable(props: Props) {
   const { sales, isLoading, emptyText, mode } = props;
   const showDate = mode === "status" && props.showDate === true;
-  const showClient = mode === "plain" && props.clientNames !== undefined;
+  const showClient =
+    (mode === "plain" || mode === "edit") && props.clientNames !== undefined;
   const colSpan =
-    (mode === "review" ? 6 : mode === "status" ? 8 : 5) +
+    (mode === "review" ? 6 : mode === "status" ? 8 : mode === "edit" ? 6 : 5) +
     (showDate ? 1 : 0) +
     (showClient ? 1 : 0);
 
