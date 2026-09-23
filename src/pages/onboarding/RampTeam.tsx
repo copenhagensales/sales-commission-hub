@@ -851,35 +851,132 @@ function FullTeamMemberCard({
 
           <HistoryBars member={member} d={d} />
 
-          {d.feedbackLog.length > 0 && (
-            <div className="mt-3 space-y-2 border-t pt-3" style={{ borderColor: "#e7eeeb" }}>
-              <SectionLabel>Sendt feedback</SectionLabel>
-              {d.feedbackLog.slice(0, 2).map((a, index) => {
-                const { week } = isoWeekOf(new Date(a.performed_at));
-                return (
-                  <div
-                    key={`${a.performed_at}-${index}`}
-                    className="rounded-[13px] border bg-white p-3"
-                    style={{ borderColor: "#e7eeeb" }}
-                  >
-                    <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
-                      {a.action_type}
-                    </p>
-                    <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
-                      {a.performed_by_name ? `Af ${a.performed_by_name} · ` : ""}
-                      Sendt til {a.recipients.length} · uge {week}
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
-                      {a.note}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <FeedbackLogList member={member} d={d} limit={2} bordered />
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * Sendt feedback pr. kort. Feedback fra den indevaerende uge staar aaben;
+ * aeldre uger foldes sammen til en linje med ugenummer, saa det er tydeligt
+ * at de ikke daekker ugens krav.
+ */
+function FeedbackLogList({
+  member,
+  d,
+  limit,
+  bordered = false,
+}: {
+  member: AnyMember;
+  d: Derived;
+  limit: number;
+  bordered?: boolean;
+}) {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  if (d.feedbackLog.length === 0) return null;
+
+  const currentRank = member.iso_year * 100 + member.iso_week;
+  const ranks = member.weeks.map((w) => w.iso_year * 100 + w.iso_week);
+
+  const entries = d.feedbackLog.slice(0, limit).map((a, index) => {
+    const { year, week } = isoWeekOf(new Date(a.performed_at));
+    const rank = year * 100 + week;
+    const idx = ranks.indexOf(rank);
+    const weeksAgo = idx >= 0 ? ranks.length - 1 - idx : rank < currentRank ? -1 : 0;
+    return { a, key: `${a.performed_at}-${index}`, week, isCurrent: rank >= currentRank, weeksAgo };
+  });
+
+  const weekLabel = (week: number, weeksAgo: number) => {
+    if (weeksAgo <= 0) return `uge ${week}`;
+    if (weeksAgo === 1) return `uge ${week} (sidste uge)`;
+    return `uge ${week} (${weeksAgo} uger siden)`;
+  };
+
+  const latest = entries[0];
+  const anyCurrent = entries.some((e) => e.isCurrent);
+
+  return (
+    <div
+      className={bordered ? "mt-3 space-y-2 border-t pt-3" : "mt-3 space-y-2"}
+      style={bordered ? { borderColor: "#e7eeeb" } : undefined}
+    >
+      <SectionLabel>Sendt feedback</SectionLabel>
+      {!anyCurrent && latest && (
+        <p className="text-[11px] font-semibold" style={{ color: AMBER_TEXT }}>
+          Ingen feedback sendt i uge {member.iso_week} — seneste er fra{" "}
+          {weekLabel(latest.week, latest.weeksAgo)}
+        </p>
+      )}
+      {entries.map(({ a, key, week, isCurrent, weeksAgo }) => {
+        const meta = `${a.performed_by_name ? `Af ${a.performed_by_name} · ` : ""}Sendt til ${a.recipients.length} · ${weekLabel(week, weeksAgo)}`;
+
+        if (isCurrent) {
+          return (
+            <div
+              key={key}
+              className="rounded-[13px] border bg-white p-3"
+              style={{ borderColor: "#e7eeeb" }}
+            >
+              <p className="text-[12px] font-bold" style={{ color: "#1b1f1d" }}>
+                {a.action_type}
+              </p>
+              <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                {meta}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
+                {a.note}
+              </p>
+            </div>
+          );
+        }
+
+        const open = openKey === key;
+        return (
+          <div
+            key={key}
+            className="rounded-[13px] border bg-white"
+            style={{ borderColor: "#e7eeeb" }}
+          >
+            <button
+              type="button"
+              onClick={() => setOpenKey(open ? null : key)}
+              className="flex w-full items-start justify-between gap-2 p-3 text-left"
+            >
+              <span className="min-w-0">
+                <span
+                  className="block text-[12px] font-bold"
+                  style={{ color: "#1b1f1d", textWrap: "pretty" }}
+                >
+                  {a.action_type} · {weekLabel(week, weeksAgo)}
+                </span>
+                <span className="block text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                  {a.performed_by_name ? `Af ${a.performed_by_name}` : `Sendt til ${a.recipients.length}`}
+                </span>
+              </span>
+              <span
+                className="shrink-0 text-[11px] font-extrabold"
+                style={{ color: "#57635e" }}
+                aria-hidden
+              >
+                {open ? "▲" : "▼"}
+              </span>
+            </button>
+            {open && (
+              <div className="border-t px-3 pb-3 pt-2" style={{ borderColor: "#eef2f0" }}>
+                <p className="text-[11px] font-semibold" style={{ color: "#57635e" }}>
+                  {meta}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-[12px]" style={{ color: "#1b1f1d" }}>
+                  {a.note}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
