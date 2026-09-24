@@ -313,39 +313,8 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     input.excludedStatuses,
   );
 
-  const statusHead = `<thead><tr>${th("Rapportlinje")}${input.statusKeys
-    .map((s) => th(s.label, "right"))
-    .join("")}</tr></thead>`;
-  const statusBody = input.statusRows
-    .map((r) => {
-      const sum = input.statusKeys.reduce((s, k) => s + (r.counts[k.status] ?? 0), 0);
-      const dim = sum === 0;
-      return `<tr>${td(r.reportLine, "left", { bold: true, dim })}${input.statusKeys
-        .map((s, idx) =>
-          td(nf(r.counts[s.status] ?? 0), "right", { dim, accent: idx === 0 && !dim, bold: idx === 0 }),
-        )
-        .join("")}</tr>`;
-    })
-    .join("");
-  const statusTotals = `<tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", {
-    bold: true,
-    onDark: true,
-  })}${input.statusKeys
-    .map((s) =>
-      td(
-        nf(input.statusRows.reduce((sum, r) => sum + (r.counts[s.status] ?? 0), 0)),
-        "right",
-        { bold: true, onDark: true },
-      ),
-    )
-    .join("")}</tr>`;
-  const table2 = section(
-    "Tabel 2 — status pr. rapportlinje",
-    "Antal afsluttede emner fordelt på lead-status.",
-    `${statusHead}<tbody>${statusBody}${statusTotals}</tbody>`,
-  );
-
-  // Tabel 3 (pr. sælger) vises ikke i mailen efter ønske — tallene findes stadig på rapportsiden.
+  // Tabel 2 (status pr. rapportlinje) og tabel 3 (pr. sælger) vises ikke i mailen efter ønske —
+  // tallene findes stadig på rapportsiden.
 
 
 
@@ -424,11 +393,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     </table>
 
     <div style="font-size:15px;color:${BRAND.text};line-height:1.7;margin:0 0 26px;">
-      Her er ugens tal for mødebooking på Tryg pr. kampagne, derefter statusfordeling og pr. sælger.
+      Her er ugens tal for mødebooking på Tryg pr. kampagne.
       Skriv endelig, hvis I vil have en anden opdeling.
     </div>
 
-    ${table1}${table2}${table4}${notesHtml}
+    ${table1}${table4}${notesHtml}
 
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
