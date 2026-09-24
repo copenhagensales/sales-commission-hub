@@ -45,6 +45,11 @@ export interface LineTotals {
   booked: number;
   /** Lukkede statusser der vises for sig og holdes ude af hitraten. */
   extras: Record<string, number>;
+  /**
+   * Emner dialeren selv har lukket ved max kontaktforsøg (kun Enreach markerer dem).
+   * På Adversus ligger de allerede i "invalid", så mcr = 0 dér.
+   */
+  mcr?: number;
   /** Opkaldstal for linjen. null når kilden ikke leverer opkald. */
   calls?: CallTotalsView | null;
 }
@@ -203,96 +208,76 @@ function section(title: string, subtitle: string, tableHtml: string): string {
 
 
 /**
- * Tragt fra venstre mod højre: lukkede → frasorteret → kvalificeret → hitrate.
+ * Samme kolonner og begreber som rapportsiden i Stork, så kunden ser ét begreb
+ * på tværs af Adversus og Enreach:
+ *   Emner lukket = lukkede + dialerens max call-lukninger
+ *   Ikke kontaktbare = ugyldige + max call (Adversus har max call i ugyldige)
+ *   Sælgerhitrate = bookede ÷ kvalificerede samtaler
+ *   Emneudnyttelse = bookede ÷ emner lukket
  * Linjer uden aktivitet udelades og nævnes i en note under tabellen.
  */
-function lineSection(
-  title: string,
-  subtitle: string,
-  lines: LineTotals[],
-  excluded: { status: string; label: string }[],
-): string {
-  const active = lines.filter((l) => l.closed > 0 || (l.calls?.attempts ?? 0) > 0);
-  const idle = lines.filter((l) => !(l.closed > 0 || (l.calls?.attempts ?? 0) > 0));
+const INVALID_STATUS = "invalid";
+const UNQUALIFIED_STATUS = "unqualified";
 
-  const totalClosed = active.reduce((s, l) => s + l.closed, 0);
-  const totalDecided = active.reduce((s, l) => s + l.decided, 0);
-  const totalBooked = active.reduce((s, l) => s + l.booked, 0);
-  const callSum = (pick: (c: CallTotalsView) => number) =>
-    active.reduce((s, l) => s + (l.calls ? pick(l.calls) : 0), 0);
-  const totalAttempts = callSum((c) => c.attempts);
-  const totalAnswered = callSum((c) => c.answered);
-  const totalDialed = callSum((c) => c.leadsDialed);
-  const totalTalked = callSum((c) => c.leadsAnswered);
+function countPct(count: number, whole: number): string {
+  return whole > 0 ? `${nf(count)} (${pct1(count, whole)})` : nf(count);
+}
+
+function lineSection(title: string, subtitle: string, lines: LineTotals[]): string {
+  const view = lines.map((l) => {
+    const mcr = l.mcr ?? 0;
+    return {
+      reportLine: l.reportLine,
+      closedTotal: l.closed + mcr,
+      unreachable: (l.extras[INVALID_STATUS] ?? 0) + mcr,
+      unqualified: l.extras[UNQUALIFIED_STATUS] ?? 0,
+      decided: l.decided,
+      booked: l.booked,
+      active: l.closed > 0 || mcr > 0 || (l.calls?.attempts ?? 0) > 0,
+    };
+  });
+  const active = view.filter((l) => l.active);
+  const idle = view.filter((l) => !l.active);
+  const total = (pick: (l: (typeof view)[number]) => number) => active.reduce((s, l) => s + pick(l), 0);
+  const t = {
+    closedTotal: total((l) => l.closedTotal),
+    unreachable: total((l) => l.unreachable),
+    unqualified: total((l) => l.unqualified),
+    decided: total((l) => l.decided),
+    booked: total((l) => l.booked),
+  };
 
   const head = `<thead>
-    <tr>${groupTh("", 2, "left")}${excluded.length ? groupTh("Frasorteret", excluded.length) : ""}${groupTh("Kvalificeret", 3)}${groupTh("", 1)}${groupTh("Opkald", 2)}</tr>
-    <tr>${th("Rapportlinje")}${th("Lukkede", "right")}${excluded
-      .map((e) => th(e.label, "right"))
-      .join("")}${th("Ja/nej", "right")}${th("Ja/nej-andel", "right")}${th("Bookede", "right")}${th("Hitrate", "right")}${th("Svarprocent", "right")}${th("Kontaktandel", "right")}</tr>
+    <tr>${groupTh("", 2, "left")}${groupTh("Frasorteret", 2)}${groupTh("", 2)}${groupTh("Sælger", 1)}${groupTh("Kampagne", 1)}</tr>
+    <tr>${th("Kampagne")}${th("Emner lukket", "right")}${th("Ikke kontaktbare", "right")}${th("Ukvalificerede", "right")}${th("Kvalificerede samtaler", "right")}${th("Bookede", "right")}${th("Sælgerhitrate", "right")}${th("Emneudnyttelse", "right")}</tr>
   </thead>`;
 
-  const rows = active
-    .map(
-      (l) =>
-        `<tr>${td(l.reportLine, "left", { bold: true })}${td(nf(l.closed), "right")}${excluded
-          .map((e) => td(sharePlusCount(l.extras[e.status] ?? 0, l.closed), "right"))
-          .join("")}${td(nf(l.decided), "right")}${td(pct1(l.decided, l.closed), "right", {
-          dim: true,
-        })}${td(nf(l.booked), "right")}${td(pct1(l.booked, l.decided), "right", {
-          bold: true,
-          accent: true,
-        })}${td(l.calls ? pct1(l.calls.answered, l.calls.attempts) : "–", "right")}${td(
-          l.calls ? pct1(l.calls.leadsAnswered, l.calls.leadsDialed) : "–",
-          "right",
-          { dim: true },
-        )}</tr>`,
-    )
-    .join("");
+  const row = (l: typeof t & { reportLine: string }, dark: boolean) => {
+    const o = dark ? { onDark: true } : {};
+    return `<tr${dark ? ` style="background:${BRAND.dark};"` : ""}>${td(l.reportLine, "left", { bold: true, ...o })}${td(
+      nf(l.closedTotal),
+      "right",
+      { bold: dark, ...o },
+    )}${td(countPct(l.unreachable, l.closedTotal), "right", o)}${td(countPct(l.unqualified, l.closedTotal), "right", o)}${td(
+      countPct(l.decided, l.closedTotal),
+      "right",
+      o,
+    )}${td(nf(l.booked), "right", o)}${td(pct1(l.booked, l.decided), "right", o)}${td(
+      pct1(l.booked, l.closedTotal),
+      "right",
+      { bold: true, accent: true, ...o },
+    )}</tr>`;
+  };
 
-  const totalExtras = excluded
-    .map((e) =>
-      td(sharePlusCount(active.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0), totalClosed), "right", {
-        bold: true,
-        onDark: true,
-      }),
-    )
-    .join("");
-
-  const totalRow = `<tr style="background:${BRAND.dark};">${td("Tryg i alt", "left", {
-    bold: true,
-    onDark: true,
-  })}${td(nf(totalClosed), "right", { bold: true, onDark: true })}${totalExtras}${td(
-    nf(totalDecided),
-    "right",
-    { bold: true, onDark: true },
-  )}${td(pct1(totalDecided, totalClosed), "right", { onDark: true })}${td(nf(totalBooked), "right", {
-    bold: true,
-    onDark: true,
-  })}${td(pct1(totalBooked, totalDecided), "right", { bold: true, accent: true, onDark: true })}${td(
-    pct1(totalAnswered, totalAttempts),
-    "right",
-    { bold: true, onDark: true },
-  )}${td(pct1(totalTalked, totalDialed), "right", { onDark: true })}</tr>`;
-
+  const rows = active.map((l) => row(l, false)).join("");
   const body = rows
-    ? `<tbody>${rows}${totalRow}</tbody>`
+    ? `<tbody>${rows}${row({ reportLine: "Tryg i alt", ...t }, true)}</tbody>`
     : `<tbody><tr>${td("Ingen lukkede emner i perioden.", "left", { dim: true })}</tr></tbody>`;
 
-  const missingCalls = active.filter((l) => !l.calls).map((l) => l.reportLine);
-  const notes = [
-    idle.length
-      ? `${idle.length} ${idle.length === 1 ? "linje" : "linjer"} uden aktivitet: ${
-        escapeHtml(idle.map((l) => l.reportLine).join(", "))
-      }`
-      : "",
-    missingCalls.length
-      ? `Opkaldstal mangler for: ${escapeHtml(missingCalls.join(", "))}`
-      : "",
-  ].filter((n) => n.length > 0);
-
-  const note = notes.length
-    ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${notes.join("<br />")}</div>`
+  const note = idle.length
+    ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${idle.length} ${
+      idle.length === 1 ? "kampagne" : "kampagner"
+    } uden aktivitet: ${escapeHtml(idle.map((l) => l.reportLine).join(", "))}</div>`
     : "";
 
   return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(`${head}${body}`)}${note}</div>`;

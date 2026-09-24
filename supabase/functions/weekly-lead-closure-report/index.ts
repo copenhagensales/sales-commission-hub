@@ -934,6 +934,7 @@ function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): L
       decided: sum((status) => config.hitrate.has(status)),
       booked: sum((status) => status === BOOKED_STATUS),
       extras,
+      mcr: sum((status) => status === MCR_STATUS),
       calls: calls.get(reportLine) ?? null,
     };
   });
