@@ -28,19 +28,9 @@ function eventDayAt(eventDate: string, hour: number, minute: number): Date {
 }
 
 
-const PODIUM_TONES = [
-  // index 0 = 1st (gold)
-  { ring: "ring-yellow-400/60", text: "text-yellow-400", badge: "bg-yellow-400 text-black", glow: "shadow-[0_0_60px_-10px_rgba(250,204,21,0.45)]", border: "border-yellow-400/50" },
-  // index 1 = 2nd (silver)
-  { ring: "ring-slate-300/30", text: "text-slate-200", badge: "bg-slate-300 text-black", glow: "", border: "border-white/5" },
-  // index 2 = 3rd (bronze)
-  { ring: "ring-orange-400/30", text: "text-orange-300", badge: "bg-orange-400 text-black", glow: "", border: "border-white/5" },
-];
-
 // Display order: 2nd, 1st (center), 3rd
 const PODIUM_ORDER = [1, 0, 2];
 
-const REST_BAR_COLORS = ["bg-emerald-400", "bg-violet-400", "bg-rose-400", "bg-sky-400", "bg-amber-400"];
 
 function formatPoints(n: number) {
   return n.toLocaleString("da-DK", { minimumFractionDigits: n % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 });
