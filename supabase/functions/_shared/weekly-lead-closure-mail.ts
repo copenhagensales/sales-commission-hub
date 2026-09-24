@@ -201,28 +201,6 @@ function section(title: string, subtitle: string, tableHtml: string): string {
   return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(tableHtml)}</div>`;
 }
 
-function statCard(options: {
-  label: string;
-  value: string;
-  note: string;
-  dark?: boolean;
-}): string {
-  const { label, value, note, dark } = options;
-  const bg = dark ? BRAND.dark : BRAND.card;
-  const border = dark ? BRAND.dark : BRAND.cellBorder;
-  const labelColor = dark ? BRAND.headerMuted : BRAND.muted;
-  const valueColor = dark ? BRAND.accent : BRAND.text;
-  const noteColor = dark ? BRAND.headerMuted : BRAND.muted;
-  return `<td width="25%" valign="top" style="padding:0 6px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${bg};border:1px solid ${border};border-radius:12px;">
-      <tr><td style="padding:16px 16px 18px;">
-        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;color:${labelColor};text-transform:uppercase;">${escapeHtml(label)}</div>
-        <div style="font-size:28px;font-weight:800;color:${valueColor};margin-top:10px;line-height:1.1;">${escapeHtml(value)}</div>
-        <div style="font-size:12px;color:${noteColor};margin-top:10px;line-height:1.5;">${escapeHtml(note)}</div>
-      </td></tr>
-    </table>
-  </td>`;
-}
 
 /**
  * Tragt fra venstre mod højre: lukkede → frasorteret → kvalificeret → hitrate.
@@ -327,41 +305,6 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
 } {
   const subject = `Kampagneoversigt Tryg — uge ${input.weekNumber}`;
 
-  const totalClosed = input.lines.reduce((s, l) => s + l.closed, 0);
-  const totalDecided = input.lines.reduce((s, l) => s + l.decided, 0);
-  const totalBooked = input.lines.reduce((s, l) => s + l.booked, 0);
-  const activeLines = input.lines.filter((l) => l.closed > 0).length;
-  const extraTotals = input.excludedStatuses.map((e) => ({
-    label: e.label,
-    value: input.lines.reduce((s, l) => s + (l.extras[e.status] ?? 0), 0),
-  }));
-
-  const statCards = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 30px;">
-      <tr>
-        ${statCard({
-          label: "Lukkede emner",
-          value: nf(totalClosed),
-          note: `heraf ${nf(totalDecided)} ja/nej`,
-        })}
-        ${statCard({
-          label: "Bookede møder",
-          value: nf(totalBooked),
-          note: `på tværs af ${activeLines} aktive linjer`,
-        })}
-        ${statCard({
-          label: "Mødebook-hitrate",
-          value: pct1(totalBooked, totalDecided),
-          note: "bookede / lukkede ja/nej",
-          dark: true,
-        })}
-        ${statCard({
-          label: extraTotals.length ? extraTotals.map((e) => e.label).join(" / ") : "Uden udfald",
-          value: extraTotals.length ? extraTotals.map((e) => nf(e.value)).join(" / ") : "0",
-          note: "ikke talt med i hitrate",
-        })}
-      </tr>
-    </table>`;
 
   const table1 = lineSection(
     "Tabel 1 — Trygs skabelon",
@@ -481,11 +424,10 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     </table>
 
     <div style="font-size:15px;color:${BRAND.text};line-height:1.7;margin:0 0 26px;">
-      Her er ugens tal for mødebooking på Tryg. Øverst ser I totalerne, derefter tallene pr. rapportlinje,
-      statusfordeling og pr. sælger. Skriv endelig, hvis I vil have en anden opdeling.
+      Her er ugens tal for mødebooking på Tryg pr. kampagne, derefter statusfordeling og pr. sælger.
+      Skriv endelig, hvis I vil have en anden opdeling.
     </div>
 
-    ${statCards}
     ${table1}${table2}${table4}${notesHtml}
 
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
