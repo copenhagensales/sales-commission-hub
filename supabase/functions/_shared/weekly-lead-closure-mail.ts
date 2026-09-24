@@ -150,41 +150,6 @@ function pct1(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1).replace(".", ",")} %`;
 }
 
-/** Frasorteret vises som andel af lukkede med antallet i parentes. */
-
-
-
-function th(text: string, align = "left"): string {
-  return `<th style="text-align:${align};font-size:10px;font-weight:700;letter-spacing:1.2px;color:${BRAND.muted};text-transform:uppercase;padding:14px 12px;border-bottom:1px solid ${BRAND.cellBorder};white-space:nowrap;">${escapeHtml(text)}</th>`;
-}
-
-function td(
-  text: string,
-  align = "left",
-  opts: { bold?: boolean; dim?: boolean; accent?: boolean; onDark?: boolean } = {},
-): string {
-  const color = opts.onDark
-    ? opts.accent
-      ? BRAND.accent
-      : "#ffffff"
-    : opts.dim
-      ? BRAND.faint
-      : opts.accent
-        ? BRAND.accent
-        : BRAND.text;
-  const border = opts.onDark ? "none" : `1px solid ${BRAND.cellBorder}`;
-  return `<td style="text-align:${align};font-size:14px;color:${color};padding:14px 12px;border-bottom:${border};font-weight:${opts.bold ? 700 : 500};white-space:nowrap;">${escapeHtml(text)}</td>`;
-}
-
-/** Gruppeoverskrift over flere kolonner. */
-function groupTh(text: string, span: number, align = "center"): string {
-  const label = text
-    ? `<span style="display:inline-block;background:${BRAND.pageBg};color:${BRAND.muted};font-size:9px;font-weight:800;letter-spacing:1.2px;padding:4px 8px;border-radius:6px;text-transform:uppercase;">${escapeHtml(text)}</span>`
-    : "&nbsp;";
-  return `<th colspan="${span}" style="text-align:${align};padding:12px 12px 0;font-weight:400;">${label}</th>`;
-}
-
-
 function sectionTitle(title: string, subtitle: string): string {
   return `
     <div style="margin:0 0 10px;">
@@ -192,15 +157,6 @@ function sectionTitle(title: string, subtitle: string): string {
       <div style="font-size:13px;color:${BRAND.muted};margin-top:4px;">${escapeHtml(subtitle)}</div>
     </div>`;
 }
-
-function card(tableHtml: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:collapse;background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;overflow:hidden;">${tableHtml}</table>`;
-}
-
-function section(title: string, subtitle: string, tableHtml: string): string {
-  return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(tableHtml)}</div>`;
-}
-
 
 /**
  * Samme begreber og visuelle sprog som rapportsiden i Stork:
