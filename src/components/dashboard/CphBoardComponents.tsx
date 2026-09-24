@@ -249,6 +249,7 @@ export function CphLeaderboard({
         padding: tvMode ? "18px 26px" : "18px 20px",
       }}
     >
+      {!hideTitle && (
       <div
         className="flex items-center justify-between gap-3"
         style={{ paddingBottom: 14, borderBottom: `2px solid ${light ? ONYX : "hsl(var(--cph-light-blue) / 0.18)"}` }}
@@ -263,7 +264,11 @@ export function CphLeaderboard({
         </div>
         <span style={{ fontSize: tvMode ? 17 : 12, color: fgDim }}>Provision, kr</span>
       </div>
+      )}
 
+      {mobileBody}
+
+      <div className={tvMode ? "contents" : "hidden sm:contents"}>
       <div
         className="grid items-center font-extrabold uppercase"
         style={{
