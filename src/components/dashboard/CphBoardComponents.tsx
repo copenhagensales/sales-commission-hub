@@ -246,8 +246,8 @@ export function CphLeaderboard({
                   )}
                 </span>
                 <span
-                  className={index < 3 ? "truncate font-extrabold" : "truncate"}
-                  style={{ fontSize: tvMode ? (isTop ? 23 : 22) : 15 }}
+                  className={`${tvMode ? "truncate" : "min-w-0 break-words leading-tight text-[13px] sm:text-[15px]"}${index < 3 ? " font-extrabold" : ""}`}
+                  style={tvMode ? { fontSize: isTop ? 23 : 22 } : undefined}
                 >
                   {seller.displayName || seller.name}
                 </span>
