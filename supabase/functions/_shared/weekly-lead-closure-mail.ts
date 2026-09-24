@@ -353,7 +353,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
           <span style="color:${BRAND.muted};">Vesterbrogade 149 · 1620 København V</span>
         </td>
         <td align="right" style="font-size:12px;color:${BRAND.muted};line-height:1.7;">
-          Rapporten sendes hver mandag kl. 07.00.<br />Spørgsmål? Svar blot på denne mail.
+          Rapporten sendes hver mandag kl. 07.00.
         </td>
       </tr>
     </table>
