@@ -203,19 +203,28 @@ function section(title: string, subtitle: string, tableHtml: string): string {
 
 
 /**
- * Samme kolonner og begreber som rapportsiden i Stork, så kunden ser ét begreb
- * på tværs af Adversus og Enreach:
+ * Samme begreber og visuelle sprog som rapportsiden i Stork:
  *   Emner lukket = lukkede + dialerens max call-lukninger
- *   Ikke kontaktbare = ugyldige + max call (Adversus har max call i ugyldige)
- *   Sælgerhitrate = bookede ÷ kvalificerede samtaler
+ *   Kvalificerede samtaler = ja/nej (grøn boks med andel af emner lukket)
+ *   Sælgerhitrate = bookede ÷ kvalificerede samtaler (bjælke + procent)
  *   Emneudnyttelse = bookede ÷ emner lukket
  * Linjer uden aktivitet udelades og nævnes i en note under tabellen.
+ * Kolonnebredder er i procent, så tabellen skalerer ned på mobil.
  */
-const INVALID_STATUS = "invalid";
-const UNQUALIFIED_STATUS = "unqualified";
+const SMALL_BASE_DECIDED = 50;
+const GREEN_SOFT = "#e9f8ef";
+const GREEN_TEXT = "#15994f";
 
-function countPct(count: number, whole: number): string {
-  return whole > 0 ? `${nf(count)} (${pct1(count, whole)})` : nf(count);
+function hitrateCell(booked: number, decided: number): string {
+  if (!decided) return `<span style="color:${BRAND.faint};">–</span>`;
+  const value = (booked / decided) * 100;
+  const small = decided < SMALL_BASE_DECIDED;
+  const bar = small ? BRAND.faint : BRAND.accent;
+  const width = Math.max(4, Math.min(100, Math.round(value)));
+  return `<div style="font-size:14px;font-weight:700;color:${small ? BRAND.muted : GREEN_TEXT};">${pct1(booked, decided)}</div>
+    <div style="height:4px;background:${BRAND.track};border-radius:4px;margin:6px auto 0;width:64px;max-width:100%;overflow:hidden;">
+      <div style="height:4px;width:${width}%;background:${bar};border-radius:4px;"></div>
+    </div>${small ? `<div style="font-size:10px;color:${BRAND.faint};margin-top:4px;">lille grundlag</div>` : ""}`;
 }
 
 function lineSection(title: string, subtitle: string, lines: LineTotals[]): string {
@@ -224,8 +233,6 @@ function lineSection(title: string, subtitle: string, lines: LineTotals[]): stri
     return {
       reportLine: l.reportLine,
       closedTotal: l.closed + mcr,
-      unreachable: (l.extras[INVALID_STATUS] ?? 0) + mcr,
-      unqualified: l.extras[UNQUALIFIED_STATUS] ?? 0,
       decided: l.decided,
       booked: l.booked,
       active: l.closed > 0 || mcr > 0 || (l.calls?.attempts ?? 0) > 0,
@@ -233,41 +240,37 @@ function lineSection(title: string, subtitle: string, lines: LineTotals[]): stri
   });
   const active = view.filter((l) => l.active);
   const idle = view.filter((l) => !l.active);
-  const total = (pick: (l: (typeof view)[number]) => number) => active.reduce((s, l) => s + pick(l), 0);
-  const t = {
-    closedTotal: total((l) => l.closedTotal),
-    unreachable: total((l) => l.unreachable),
-    unqualified: total((l) => l.unqualified),
-    decided: total((l) => l.decided),
-    booked: total((l) => l.booked),
+  const sum = (pick: (l: (typeof view)[number]) => number) => active.reduce((s, l) => s + pick(l), 0);
+  const total = {
+    reportLine: "Tryg i alt",
+    closedTotal: sum((l) => l.closedTotal),
+    decided: sum((l) => l.decided),
+    booked: sum((l) => l.booked),
   };
 
-  const head = `<thead>
-    <tr>${groupTh("", 2, "left")}${groupTh("Frasorteret", 2)}${groupTh("", 2)}${groupTh("Sælger", 1)}${groupTh("Kampagne", 1)}</tr>
-    <tr>${th("Kampagne")}${th("Emner lukket", "right")}${th("Ikke kontaktbare", "right")}${th("Ukvalificerede", "right")}${th("Kvalificerede samtaler", "right")}${th("Bookede", "right")}${th("Sælgerhitrate", "right")}${th("Emneudnyttelse", "right")}</tr>
-  </thead>`;
+  const h = (text: string, width: string, align = "center") =>
+    `<th width="${width}" style="width:${width};text-align:${align};font-size:9px;font-weight:700;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase;padding:12px 6px 10px;line-height:1.3;">${escapeHtml(text)}</th>`;
+  const head = `<thead><tr>${h("Kampagne", "28%", "left")}${h("Emner lukket", "14%")}${h("Kvalificerede samtaler", "18%")}${h("Bookede", "12%")}${h("Sælgerhitrate", "15%")}${h("Emneudnyttelse", "13%")}</tr></thead>`;
 
-  const row = (l: typeof t & { reportLine: string }, dark: boolean) => {
-    const o = dark ? { onDark: true } : {};
-    return `<tr${dark ? ` style="background:${BRAND.dark};"` : ""}>${td(l.reportLine, "left", { bold: true, ...o })}${td(
-      nf(l.closedTotal),
-      "right",
-      { bold: dark, ...o },
-    )}${td(countPct(l.unreachable, l.closedTotal), "right", o)}${td(countPct(l.unqualified, l.closedTotal), "right", o)}${td(
-      countPct(l.decided, l.closedTotal),
-      "right",
-      o,
-    )}${td(nf(l.booked), "right", o)}${td(pct1(l.booked, l.decided), "right", o)}${td(
-      pct1(l.booked, l.closedTotal),
-      "right",
-      { bold: true, accent: true, ...o },
-    )}</tr>`;
+  const cell = (content: string, align = "center", extra = "") =>
+    `<td style="text-align:${align};padding:14px 6px;border-top:1px solid ${BRAND.cellBorder};vertical-align:middle;${extra}">${content}</td>`;
+
+  const row = (l: typeof total, isTotal: boolean) => {
+    const bg = isTotal ? `background:${BRAND.pageBg};` : "";
+    const name = `<span style="font-size:14px;font-weight:${isTotal ? 800 : 600};color:${BRAND.text};">${escapeHtml(l.reportLine)}</span>`;
+    const closed = `<span style="font-size:15px;font-weight:${isTotal ? 800 : 600};color:${BRAND.text};">${nf(l.closedTotal)}</span>`;
+    const qualified = `<div style="display:inline-block;background:${GREEN_SOFT};border-radius:10px;padding:6px 10px;min-width:48px;">
+      <div style="font-size:15px;font-weight:700;color:${GREEN_TEXT};">${nf(l.decided)}</div>
+      <div style="font-size:10px;color:${GREEN_TEXT};margin-top:2px;">${pct1(l.decided, l.closedTotal)}</div></div>`;
+    const booked = `<span style="font-size:14px;color:${BRAND.text};font-weight:${isTotal ? 800 : 500};">${nf(l.booked)}</span>`;
+    const usage = `<span style="font-size:15px;font-weight:800;color:${BRAND.text};">${pct1(l.booked, l.closedTotal)}</span>`;
+    return `<tr>${cell(name, "left", `padding-left:14px;${bg}`)}${cell(closed, "center", bg)}${cell(qualified, "center", bg)}${cell(booked, "center", bg)}${cell(hitrateCell(l.booked, l.decided), "center", bg)}${cell(usage, "center", `padding-right:14px;${bg}`)}</tr>`;
   };
 
   const rows = active.map((l) => row(l, false)).join("");
   const body = rows
-    ? `<tbody>${rows}${row({ reportLine: "Tryg i alt", ...t }, true)}</tbody>`
-    : `<tbody><tr>${td("Ingen lukkede emner i perioden.", "left", { dim: true })}</tr></tbody>`;
+    ? `<tbody>${rows}${row(total, true)}</tbody>`
+    : `<tbody><tr><td colspan="6" style="padding:16px;font-size:13px;color:${BRAND.faint};">Ingen lukkede emner i perioden.</td></tr></tbody>`;
 
   const note = idle.length
     ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${idle.length} ${
@@ -275,8 +278,10 @@ function lineSection(title: string, subtitle: string, lines: LineTotals[]): stri
     } uden aktivitet: ${escapeHtml(idle.map((l) => l.reportLine).join(", "))}</div>`
     : "";
 
-  return `<div style="margin:0 0 30px;">${sectionTitle(title, subtitle)}${card(`${head}${body}`)}${note}</div>`;
+  const table = `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:14px;overflow:hidden;font-variant-numeric:tabular-nums;">${head}${body}</table>`;
+  return `<div style="margin:0 0 28px;">${sectionTitle(title, subtitle)}${table}${note}</div>`;
 }
+
 
 
 export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
@@ -347,11 +352,18 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
 
   const html = `<!DOCTYPE html>
 <html lang="da"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:26px 14px;background:${BRAND.pageBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<title>${escapeHtml(subject)}</title>
+<style>
+  @media only screen and (max-width:600px) {
+    .pd-wrap { padding:14px 8px !important; }
+    .pd-hero td { padding:20px 18px 22px !important; }
+    .pd-hero-title { font-size:22px !important; }
+  }
+</style></head>
+<body class="pd-wrap" style="margin:0;padding:26px 14px;background:${BRAND.pageBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
   <div style="max-width:760px;margin:0 auto;">
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${BRAND.dark};border-top:4px solid ${BRAND.accent};border-radius:16px;overflow:hidden;margin:0 0 26px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="pd-hero" style="border-collapse:collapse;background:${BRAND.dark};border-top:4px solid ${BRAND.accent};border-radius:16px;overflow:hidden;margin:0 0 26px;">
       <tr><td style="padding:26px 28px 30px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
           <tr>
@@ -361,28 +373,17 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
             <td align="right" style="font-size:12px;color:${BRAND.headerMuted};">Ugerapport · Uge ${input.weekNumber}</td>
           </tr>
         </table>
-        <div style="font-size:28px;font-weight:800;color:#ffffff;margin-top:24px;line-height:1.2;">Kampagneoversigt Tryg</div>
+        <div class="pd-hero-title" style="font-size:28px;font-weight:800;color:#ffffff;margin-top:24px;line-height:1.2;">Kampagneoversigt Tryg</div>
         <div style="font-size:13px;color:${BRAND.headerMuted};margin-top:10px;">${escapeHtml(weekRange(input.weekStart))} · lukkede emner, bookede møder og hitrate</div>
       </td></tr>
     </table>
 
     <div style="font-size:15px;color:${BRAND.text};line-height:1.7;margin:0 0 26px;">
       Her er ugens tal for mødebooking på Tryg pr. kampagne.
-      Skriv endelig, hvis I vil have en anden opdeling.
     </div>
 
     ${table1}${table4}${notesHtml}
 
-    <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
-      <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
-      <div style="font-size:13px;color:${BRAND.text};line-height:1.7;">
-        <strong>Emner lukket</strong> er alle emner afsluttet i ugen – af en sælger eller af dialeren.
-        <strong>Ikke kontaktbare</strong> er forkerte numre, allerede kunder og emner lukket ved max kontaktforsøg.
-        <strong>Ukvalificerede</strong> er emner der ikke opfyldte kriterierne for et møde.
-        <strong>Sælgerhitrate</strong> er bookede møder i procent af kvalificerede samtaler.
-        <strong>Emneudnyttelse</strong> er bookede møder i procent af alle lukkede emner – hvad kampagnen får ud af de leverede leads.
-      </div>
-    </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;padding:0;">
       <tr>
