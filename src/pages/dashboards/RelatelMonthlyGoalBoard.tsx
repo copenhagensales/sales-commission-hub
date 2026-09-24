@@ -176,13 +176,13 @@ export default function RelatelMonthlyGoalBoard() {
                     <div key={s.employeeId}>
                       <div className="flex items-baseline justify-between mb-1">
                         <span
-                          className={`text-base md:text-lg font-medium truncate pr-3 ${
+                          className={`text-sm sm:text-base md:text-lg font-medium min-w-0 break-words sm:truncate pr-3 ${
                             s.goal > 0 && s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
                           }`}
                         >
                           {s.name}
                         </span>
-                        <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
+                        <span className="text-sm sm:text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap shrink-0">
                           {fmt(s.count)}
                           {s.goal > 0 && (
                             <>
