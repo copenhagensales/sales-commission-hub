@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
-import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, formatDisplayName, type LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -321,9 +321,8 @@ function RestTeamRow({ team, rank, leaderPoints, tv, delay = 0 }: {
   );
 }
 
-type Seller = ReturnType<typeof useCachedLeaderboard>["data"] extends (infer T)[] | undefined ? T : never;
 
-function TopSellersList({ tv, topSellers }: { tv: boolean; topSellers: Seller[] }) {
+function TopSellersList({ tv, topSellers }: { tv: boolean; topSellers: LeaderboardEntry[] }) {
   if (topSellers.length === 0) {
     return <p className="pd-sub py-8 text-center">Ingen sælgerdata endnu.</p>;
   }
