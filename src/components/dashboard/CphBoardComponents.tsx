@@ -99,6 +99,99 @@ interface CphLeaderboardProps {
   crossSalesLabel?: string;
   showFiber?: boolean;
   maxRows?: number;
+  /** Den indloggede medarbejder – fremhæves og vises fastlåst nederst på mobil, hvis uden for listen. */
+  currentEmployeeId?: string | null;
+  /** Skjul titel-linjen (bruges når faner allerede viser titlen). */
+  hideTitle?: boolean;
+}
+
+function CphMobileRows({
+  sellers,
+  fullList,
+  light,
+  showCrossSales,
+  crossSalesLabel,
+  showFiber,
+  currentEmployeeId,
+}: {
+  sellers: LeaderboardSeller[];
+  fullList: LeaderboardSeller[];
+  light: boolean;
+  showCrossSales: boolean;
+  crossSalesLabel: string;
+  showFiber: boolean;
+  currentEmployeeId?: string | null;
+}) {
+  const fg = light ? ONYX : LIGHT;
+  const fgDim = light ? ONYX_DIM : LIGHT_DIM;
+  const myIndex = currentEmployeeId ? fullList.findIndex((s) => s.id === currentEmployeeId) : -1;
+  const meOutside = myIndex >= 0 && !sellers.some((s) => s.id === currentEmployeeId);
+
+  const renderRow = (seller: LeaderboardSeller, index: number, pinned = false) => {
+    const isTop = index === 0;
+    const isMe = !!currentEmployeeId && seller.id === currentEmployeeId;
+    const name = seller.displayName || seller.name;
+    return (
+      <div
+        key={`${pinned ? "me-" : ""}${seller.id}`}
+        className="flex min-h-[52px] items-center gap-3 rounded-2xl px-3 py-2.5"
+        style={{
+          background: isTop
+            ? light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)"
+            : isMe
+            ? "hsl(var(--cph-emerald) / 0.14)"
+            : undefined,
+          color: isTop && light ? LIGHT : fg,
+          boxShadow: isMe ? `inset 0 0 0 1.5px ${EMERALD}` : undefined,
+        }}
+      >
+        <span
+          className="w-5 shrink-0 text-center text-[15px] font-extrabold tabular-nums"
+          style={{ color: isTop ? EMERALD : index < 3 ? undefined : fgDim }}
+        >
+          {index + 1}
+        </span>
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[12px] font-extrabold"
+          style={{
+            background: isTop ? EMERALD : light ? "hsl(var(--cph-onyx) / 0.10)" : "hsl(var(--cph-light-blue) / 0.12)",
+            color: isTop ? ONYX : undefined,
+          }}
+        >
+          {seller.avatarUrl ? (
+            <img src={seller.avatarUrl} alt={name} className="h-full w-full rounded-full object-cover" />
+          ) : (
+            getInitials(name)
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className={`break-words text-[15px] leading-tight ${index < 3 || isMe ? "font-extrabold" : "font-semibold"}`}>
+            {name}
+            {isMe && <span className="ml-1.5 text-[11px] font-bold" style={{ color: EMERALD }}>(dig)</span>}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] tabular-nums" style={{ color: isTop && light ? LIGHT_DIM : fgDim }}>
+            <span>{seller.salesCount} salg</span>
+            {showCrossSales && <span>· {seller.crossSales ?? 0} {crossSalesLabel.toLowerCase()}</span>}
+            {showFiber && <span>· {seller.fiberPoints ?? 0} fiber</span>}
+          </div>
+        </div>
+        <span className="shrink-0 whitespace-nowrap text-[17px] font-extrabold tabular-nums tracking-tight">
+          {formatNumber(Math.round(seller.commission))}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      {sellers.map((s, i) => renderRow(s, i))}
+      {meOutside && (
+        <div className="sticky bottom-0 mt-2 pt-2" style={{ borderTop: `1px dashed ${fgDim}` }}>
+          {renderRow(fullList[myIndex], myIndex, true)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CphLeaderboard({
@@ -111,8 +204,11 @@ export function CphLeaderboard({
   crossSalesLabel = "Switch",
   showFiber = false,
   maxRows,
+  currentEmployeeId,
+  hideTitle = false,
 }: CphLeaderboardProps) {
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
+  const mobileRows = sellers.slice(0, 10);
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
   const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${
@@ -124,9 +220,25 @@ export function CphLeaderboard({
   const padL = tvMode ? 10 : 8;
   const padR = tvMode ? 14 : 10;
 
-
-
-
+  const mobileBody = !tvMode && (
+    <div className="sm:hidden pt-3">
+      {isLoading ? (
+        <div className="py-8 text-center" style={{ color: fgDim }}>Indlæser...</div>
+      ) : mobileRows.length === 0 ? (
+        <div className="py-8 text-center" style={{ color: fgDim }}>Ingen salg endnu</div>
+      ) : (
+        <CphMobileRows
+          sellers={mobileRows}
+          fullList={sellers}
+          light={light}
+          showCrossSales={showCrossSales}
+          crossSalesLabel={crossSalesLabel}
+          showFiber={showFiber}
+          currentEmployeeId={currentEmployeeId}
+        />
+      )}
+    </div>
+  );
 
   return (
     <div
