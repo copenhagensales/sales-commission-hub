@@ -1208,17 +1208,17 @@ export default function CphSalesDashboard() {
                         : 'bg-muted/30'
                     } p-3`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center w-8">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center justify-center w-8 shrink-0">
                         {getRankDisplay(seller.rank)}
                       </div>
-                      <span className="font-medium truncate text-sm">
+                      <span className="font-medium break-words md:truncate text-sm min-w-0">
                         {seller.name}
                       </span>
                     </div>
                     <Badge 
                       variant="secondary" 
-                      className="bg-emerald-500/20 text-emerald-600 font-mono"
+                      className="ml-2 shrink-0 bg-emerald-500/20 text-emerald-600 font-mono"
                     >
                       {formatCommission(seller.commission)}
                     </Badge>
@@ -1249,7 +1249,7 @@ export default function CphSalesDashboard() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium truncate text-sm">{sale.agent_name}</p>
+                        <p className="font-medium break-words md:truncate text-sm min-w-0">{sale.agent_name}</p>
                         <Badge 
                           variant={sale.status === "confirmed" ? "default" : "secondary"}
                           className={`shrink-0 ${sale.status === "confirmed" ? "bg-emerald-500" : ""} text-[10px] px-1.5`}

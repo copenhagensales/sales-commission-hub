@@ -172,7 +172,7 @@ export default function TdcMonthlyGoalBoard() {
                     <div key={s.employeeId}>
                       <div className="flex items-baseline justify-between mb-1">
                         <span
-                          className={`text-base md:text-lg font-medium truncate pr-3 flex items-center gap-2 ${
+                          className={`text-sm sm:text-base md:text-lg font-medium min-w-0 pr-3 flex items-center gap-2 ${
                             exempt
                               ? "text-amber-700"
                               : gold
@@ -182,7 +182,7 @@ export default function TdcMonthlyGoalBoard() {
                                   : "text-slate-100"
                           }`}
                         >
-                          <span className="truncate">{s.name}</span>
+                          <span className="min-w-0 break-words sm:truncate">{s.name}</span>
                           {exempt ? (
                             <span
                               className="text-lg md:text-xl shrink-0 leading-none"
@@ -198,7 +198,7 @@ export default function TdcMonthlyGoalBoard() {
                             />
                           ) : null}
                         </span>
-                        <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
+                        <span className="text-sm sm:text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap shrink-0">
                           {fmt(s.count)}
                           {s.goal > 0 && (
                             <>
