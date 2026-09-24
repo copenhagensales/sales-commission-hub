@@ -178,7 +178,7 @@ function hitrateCell(booked: number, decided: number): string {
   const bar = small ? BRAND.faint : BRAND.accent;
   const width = Math.max(4, Math.min(100, Math.round(value)));
   return `<div style="font-size:14px;font-weight:700;color:${small ? BRAND.muted : GREEN_TEXT};">${pct1(booked, decided)}</div>
-    <div style="height:4px;background:${BRAND.track};border-radius:4px;margin:6px auto 0;width:64px;max-width:100%;overflow:hidden;">
+    <div class="pd-bar" style="height:4px;background:${BRAND.track};border-radius:4px;margin:6px auto 0;width:64px;max-width:100%;overflow:hidden;">
       <div style="height:4px;width:${width}%;background:${bar};border-radius:4px;"></div>
     </div>${small ? `<div style="font-size:10px;color:${BRAND.faint};margin-top:4px;">lille grundlag</div>` : ""}`;
 }
@@ -205,17 +205,17 @@ function lineSection(title: string, subtitle: string, lines: LineTotals[]): stri
   };
 
   const h = (text: string, width: string, align = "center") =>
-    `<th width="${width}" style="width:${width};text-align:${align};font-size:9px;font-weight:700;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase;padding:12px 6px 10px;line-height:1.3;">${escapeHtml(text)}</th>`;
-  const head = `<thead><tr>${h("Kampagne", "28%", "left")}${h("Emner lukket", "14%")}${h("Kvalificerede samtaler", "18%")}${h("Bookede", "12%")}${h("Sælgerhitrate", "15%")}${h("Emneudnyttelse", "13%")}</tr></thead>`;
+    `<th class="pd-th" width="${width}" style="width:${width};word-break:break-word;text-align:${align};font-size:9px;font-weight:700;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase;padding:12px 6px 10px;line-height:1.3;">${escapeHtml(text)}</th>`;
+  const head = `<thead><tr>${h("Kampagne", "24%", "left")}${h("Emner lukket", "13%")}${h("Kvalificerede samtaler", "18%")}${h("Bookede", "12%")}${h("Sælger-hitrate", "16%")}${h("Emne-udnyttelse", "17%")}</tr></thead>`;
 
   const cell = (content: string, align = "center", extra = "") =>
-    `<td style="text-align:${align};padding:14px 6px;border-top:1px solid ${BRAND.cellBorder};vertical-align:middle;${extra}">${content}</td>`;
+    `<td class="pd-td" style="text-align:${align};padding:14px 6px;word-break:break-word;border-top:1px solid ${BRAND.cellBorder};vertical-align:middle;${extra}">${content}</td>`;
 
   const row = (l: typeof total, isTotal: boolean) => {
     const bg = isTotal ? `background:${BRAND.pageBg};` : "";
     const name = `<span style="font-size:14px;font-weight:${isTotal ? 800 : 600};color:${BRAND.text};">${escapeHtml(l.reportLine)}</span>`;
     const closed = `<span style="font-size:15px;font-weight:${isTotal ? 800 : 600};color:${BRAND.text};">${nf(l.closedTotal)}</span>`;
-    const qualified = `<div style="display:inline-block;background:${GREEN_SOFT};border-radius:10px;padding:6px 10px;min-width:48px;">
+    const qualified = `<div class="pd-pill" style="display:inline-block;background:${GREEN_SOFT};border-radius:10px;padding:6px 10px;min-width:44px;">
       <div style="font-size:15px;font-weight:700;color:${GREEN_TEXT};">${nf(l.decided)}</div>
       <div style="font-size:10px;color:${GREEN_TEXT};margin-top:2px;">${pct1(l.decided, l.closedTotal)}</div></div>`;
     const booked = `<span style="font-size:14px;color:${BRAND.text};font-weight:${isTotal ? 800 : 500};">${nf(l.booked)}</span>`;
@@ -248,8 +248,8 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
 
 
   const table1 = lineSection(
-    "Tabel 1 — Trygs skabelon",
-    `Pr. kampagne, uge ${input.weekNumber}.`,
+    "Resultater pr. kampagne",
+    `Uge ${input.weekNumber}`,
     input.lines,
   );
 
@@ -262,7 +262,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     ? input.previousWeeks
         .map((w) =>
           lineSection(
-            `Tabel 4 — uge ${w.weekNumber}`,
+            `Uge ${w.weekNumber}`,
             weekRange(w.weekStart),
             w.lines,
           ),
@@ -314,6 +314,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     .pd-wrap { padding:14px 8px !important; }
     .pd-hero td { padding:20px 18px 22px !important; }
     .pd-hero-title { font-size:22px !important; }
+    .pd-th { font-size:8px !important; letter-spacing:.3px !important; padding:10px 3px 8px !important; }
+    .pd-td { padding:12px 3px !important; }
+    .pd-td span, .pd-td div { font-size:12px !important; }
+    .pd-pill { padding:4px 5px !important; min-width:0 !important; }
+    .pd-pill div + div, .pd-bar { display:none !important; }
   }
 </style></head>
 <body class="pd-wrap" style="margin:0;padding:26px 14px;background:${BRAND.pageBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
@@ -330,7 +335,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
           </tr>
         </table>
         <div class="pd-hero-title" style="font-size:28px;font-weight:800;color:#ffffff;margin-top:24px;line-height:1.2;">Kampagneoversigt Tryg</div>
-        <div style="font-size:13px;color:${BRAND.headerMuted};margin-top:10px;">${escapeHtml(weekRange(input.weekStart))} · lukkede emner, bookede møder og hitrate</div>
+        <div style="font-size:13px;color:${BRAND.headerMuted};margin-top:10px;">${escapeHtml(weekRange(input.weekStart))} · resultater pr. kampagne</div>
       </td></tr>
     </table>
 
