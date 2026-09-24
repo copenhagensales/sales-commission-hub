@@ -151,7 +151,7 @@ export default function PowerdagBoard() {
               </div>
               {!tv && hasEditAccess && (
                 <div className="flex items-center gap-3 border-l border-white/10 pl-6">
-                  <TvBoardQuickGenerator dashboardSlug="powerdag" />
+                  <span className="pd-tvlink"><TvBoardQuickGenerator dashboardSlug="powerdag" /></span>
                   <Link to="/dashboards/powerdag/input">
                     <Button variant="outline" className="pd-btn-ghost"><Plus className="h-4 w-4 mr-1.5" />Indtast salg</Button>
                   </Link>
@@ -280,7 +280,7 @@ export default function PowerdagBoard() {
 
 function PowerTitle({ head, tail, tv }: { head: string; tail: string; tv: boolean }) {
   return (
-    <h1 className={`pd-title ${tv ? "text-8xl" : "text-5xl md:text-7xl"}`}>
+    <h1 className={`pd-title ${tv ? "text-7xl" : "text-4xl md:text-6xl"}`}>
       {head}
       {tail && <> <span className="pd-title-accent">{tail}</span></>}
     </h1>
@@ -357,7 +357,7 @@ function TopSellersList({ tv, topSellers }: { tv: boolean; topSellers: Leaderboa
                 </div>
               )}
             </div>
-            <p className={`pd-num pd-tone-text flex-shrink-0 ${isFirst ? (tv ? "text-8xl" : "text-6xl") : (tv ? "text-5xl" : "text-4xl")}`}>
+            <p className={`pd-num pd-tone-text flex-shrink-0 ${isFirst ? (tv ? "text-7xl" : "text-5xl") : (tv ? "text-5xl" : "text-4xl")}`}>
               {seller.commission.toLocaleString("da-DK")}
               <span className="pd-unit ml-1.5">kr.</span>
             </p>
