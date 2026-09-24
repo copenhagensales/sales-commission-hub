@@ -314,7 +314,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     .pd-wrap { padding:14px 8px !important; }
     .pd-hero td { padding:20px 18px 22px !important; }
     .pd-hero-title { font-size:22px !important; }
-    .pd-th { font-size:8px !important; letter-spacing:.3px !important; padding:10px 3px 8px !important; }
+    .pd-th { font-size:9px !important; letter-spacing:0 !important; text-transform:none !important; word-break:normal !important; padding:10px 3px 8px !important; }
     .pd-td { padding:12px 3px !important; }
     .pd-td span, .pd-td div { font-size:12px !important; }
     .pd-pill { padding:4px 5px !important; min-width:0 !important; }
