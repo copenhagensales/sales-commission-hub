@@ -9,7 +9,8 @@ import { useCachedLeaderboards, type LeaderboardEntry } from "@/hooks/useCachedL
 import { DashboardPeriodSelector, getDefaultPeriod, canUseCachedKpis, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
-import { CphBoardFrame, CphLeaderboard, type CphKpi } from "@/components/dashboard/CphBoardComponents";
+import { CphBoardFrame, CphLeaderboard, CphLeaderboardTabs, type CphKpi } from "@/components/dashboard/CphBoardComponents";
+import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
 import { calculatePayrollPeriod } from "@/lib/calculations";
@@ -69,6 +70,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   useDisplayNameOverrides();
 
   const tvMode = isTvMode();
+  const { data: currentEmployeeId } = useCurrentEmployeeId(!tvMode);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
 
@@ -427,6 +429,23 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         >
           {useCached ? (
             <>
+              {!tvMode && (
+                <div className="lg:hidden">
+                  <CphLeaderboardTabs
+                    tabs={[
+                      { key: "day", label: "I dag", title: "Top i dag", sellers: sortedDailySellers },
+                      { key: "week", label: "Uge", title: "Top uge", sellers: sortedWeeklySellers },
+                      { key: "payroll", label: "Lønperiode", title: "Top lønperiode", sellers: sortedPayrollSellers, light: true },
+                    ]}
+                    isLoading={isLoading}
+                    showCrossSales={showCrossSales || hasSecondary}
+                    crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                    showFiber={showFiber}
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                </div>
+              )}
+              <div className={tvMode ? "contents" : "hidden lg:contents"}>
               <CphLeaderboard
                 title="Top lønperiode"
                 sellers={sortedPayrollSellers}
@@ -458,6 +477,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showFiber={showFiber}
                 maxRows={tvMode ? 7 : undefined}
               />
+              </div>
             </>
           ) : (
             <div className="lg:col-span-3">
@@ -469,6 +489,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 light
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                currentEmployeeId={currentEmployeeId}
               />
 
             </div>

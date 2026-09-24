@@ -566,3 +566,70 @@ export function CphBoardFrame({
     </div>
   );
 }
+
+export interface CphLeaderboardTab {
+  key: string;
+  label: string;
+  title: string;
+  sellers: LeaderboardSeller[];
+  light?: boolean;
+}
+
+/** Mobil: én topliste ad gangen med faner i stedet for tre lister under hinanden. */
+export function CphLeaderboardTabs({
+  tabs,
+  isLoading,
+  showCrossSales,
+  crossSalesLabel,
+  showFiber,
+  currentEmployeeId,
+}: {
+  tabs: CphLeaderboardTab[];
+  isLoading: boolean;
+  showCrossSales?: boolean;
+  crossSalesLabel?: string;
+  showFiber?: boolean;
+  currentEmployeeId?: string | null;
+}) {
+  const [active, setActive] = React.useState(tabs[0]?.key);
+  const current = tabs.find((t) => t.key === active) ?? tabs[0];
+  if (!current) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        role="tablist"
+        aria-label="Toplister"
+        className="grid rounded-2xl p-1"
+        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0,1fr))`, background: SURFACE }}
+      >
+        {tabs.map((t) => {
+          const on = t.key === current.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setActive(t.key)}
+              className="min-h-[44px] rounded-xl text-[14px] font-extrabold transition-colors"
+              style={{ background: on ? LIGHT : "transparent", color: on ? ONYX : LIGHT_DIM }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <CphLeaderboard
+        title={current.title}
+        sellers={current.sellers}
+        isLoading={isLoading}
+        tvMode={false}
+        light={current.light}
+        showCrossSales={showCrossSales}
+        crossSalesLabel={crossSalesLabel}
+        showFiber={showFiber}
+        currentEmployeeId={currentEmployeeId}
+      />
+    </div>
+  );
+}
