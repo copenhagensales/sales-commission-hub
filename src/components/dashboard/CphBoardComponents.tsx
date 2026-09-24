@@ -458,7 +458,7 @@ export function CphBoardFrame({
         background: ONYX,
         color: LIGHT,
         fontVariantNumeric: "tabular-nums",
-        padding: tvMode ? "24px 40px 24px" : "20px 20px 28px",
+        padding: tvMode ? "24px 40px 24px" : "16px 12px 24px",
         gap: tvMode ? 18 : 16,
       }}
     >
@@ -472,15 +472,15 @@ export function CphBoardFrame({
       />
 
       <header
-        className="relative flex flex-wrap items-center justify-between gap-6"
+        className="relative flex flex-wrap items-center justify-between gap-3 sm:gap-6"
         style={{ paddingBottom: tvMode ? 12 : 12 }}
       >
-        <div className="flex items-center gap-6">
-          <img src={cphLogo} alt="Copenhagen Sales" style={{ width: tvMode ? 132 : 92, height: "auto" }} />
+        <div className="flex items-center min-w-0 gap-3 sm:gap-6">
+          <img src={cphLogo} alt="Copenhagen Sales" className={tvMode ? undefined : "w-16 shrink-0 sm:w-[92px]"} style={{ width: tvMode ? 132 : undefined, height: "auto" }} />
           <div>
             <div
               className="font-extrabold"
-              style={{ fontSize: tvMode ? 44 : 26, lineHeight: 1, letterSpacing: "-0.02em" }}
+              style={{ fontSize: tvMode ? 44 : "clamp(20px, 5.5vw, 26px)", lineHeight: 1, letterSpacing: "-0.02em" }}
             >
               {title}
             </div>
