@@ -415,6 +415,7 @@ export function CphLeaderboard({
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }
