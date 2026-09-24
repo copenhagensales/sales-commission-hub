@@ -9,7 +9,8 @@ import { useCachedLeaderboards, type LeaderboardEntry } from "@/hooks/useCachedL
 import { DashboardPeriodSelector, getDefaultPeriod, canUseCachedKpis, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
-import { CphBoardFrame, CphLeaderboard, type CphKpi } from "@/components/dashboard/CphBoardComponents";
+import { CphBoardFrame, CphLeaderboard, CphLeaderboardTabs, type CphKpi } from "@/components/dashboard/CphBoardComponents";
+import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
 import { calculatePayrollPeriod } from "@/lib/calculations";
@@ -69,6 +70,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   useDisplayNameOverrides();
 
   const tvMode = isTvMode();
+  const { data: currentEmployeeId } = useCurrentEmployeeId(!tvMode);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
 
@@ -379,7 +381,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
 
   // Tailwind needs static classes – map col counts to full class strings
   const colsMap: Record<number, { tv: string; normal: string }> = {
-    3: { tv: "grid grid-cols-3 gap-4", normal: "grid grid-cols-3 gap-4" },
+    3: { tv: "grid grid-cols-3 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-3 [&>*:first-child]:col-span-2 md:[&>*:first-child]:col-span-1" },
     4: { tv: "grid grid-cols-4 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4" },
     5: { tv: "grid grid-cols-5 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-5" },
     6: { tv: "grid grid-cols-6 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6" },
@@ -427,6 +429,23 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         >
           {useCached ? (
             <>
+              {!tvMode && (
+                <div className="2xl:hidden">
+                  <CphLeaderboardTabs
+                    tabs={[
+                      { key: "day", label: "I dag", title: "Top i dag", sellers: sortedDailySellers },
+                      { key: "week", label: "Uge", title: "Top uge", sellers: sortedWeeklySellers },
+                      { key: "payroll", label: "Lønperiode", title: "Top lønperiode", sellers: sortedPayrollSellers, light: true },
+                    ]}
+                    isLoading={isLoading}
+                    showCrossSales={showCrossSales || hasSecondary}
+                    crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                    showFiber={showFiber}
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                </div>
+              )}
+              <div className={tvMode ? "contents" : "hidden 2xl:contents"}>
               <CphLeaderboard
                 title="Top lønperiode"
                 sellers={sortedPayrollSellers}
@@ -458,9 +477,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 showFiber={showFiber}
                 maxRows={tvMode ? 7 : undefined}
               />
+              </div>
             </>
           ) : (
-            <div className="lg:col-span-3">
+            <div className="2xl:col-span-3">
               <CphLeaderboard
                 title={`Top – ${selectedPeriod.label}`}
                 sellers={liveSellers}
@@ -469,6 +489,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 light
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                currentEmployeeId={currentEmployeeId}
               />
 
             </div>

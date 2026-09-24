@@ -99,6 +99,99 @@ interface CphLeaderboardProps {
   crossSalesLabel?: string;
   showFiber?: boolean;
   maxRows?: number;
+  /** Den indloggede medarbejder – fremhæves og vises fastlåst nederst på mobil, hvis uden for listen. */
+  currentEmployeeId?: string | null;
+  /** Skjul titel-linjen (bruges når faner allerede viser titlen). */
+  hideTitle?: boolean;
+}
+
+function CphMobileRows({
+  sellers,
+  fullList,
+  light,
+  showCrossSales,
+  crossSalesLabel,
+  showFiber,
+  currentEmployeeId,
+}: {
+  sellers: LeaderboardSeller[];
+  fullList: LeaderboardSeller[];
+  light: boolean;
+  showCrossSales: boolean;
+  crossSalesLabel: string;
+  showFiber: boolean;
+  currentEmployeeId?: string | null;
+}) {
+  const fg = light ? ONYX : LIGHT;
+  const fgDim = light ? ONYX_DIM : LIGHT_DIM;
+  const myIndex = currentEmployeeId ? fullList.findIndex((s) => s.id === currentEmployeeId) : -1;
+  const meOutside = myIndex >= 0 && !sellers.some((s) => s.id === currentEmployeeId);
+
+  const renderRow = (seller: LeaderboardSeller, index: number, pinned = false) => {
+    const isTop = index === 0;
+    const isMe = !!currentEmployeeId && seller.id === currentEmployeeId;
+    const name = seller.name || seller.displayName;
+    return (
+      <div
+        key={`${pinned ? "me-" : ""}${seller.id}`}
+        className="flex min-h-[52px] items-center gap-3 rounded-2xl px-3 py-2.5"
+        style={{
+          background: isTop
+            ? light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)"
+            : isMe
+            ? "hsl(var(--cph-emerald) / 0.14)"
+            : undefined,
+          color: isTop && light ? LIGHT : fg,
+          boxShadow: isMe ? `inset 0 0 0 1.5px ${EMERALD}` : undefined,
+        }}
+      >
+        <span
+          className="w-5 shrink-0 text-center text-[15px] font-extrabold tabular-nums"
+          style={{ color: isTop ? EMERALD : index < 3 ? undefined : fgDim }}
+        >
+          {index + 1}
+        </span>
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[12px] font-extrabold"
+          style={{
+            background: isTop ? EMERALD : light ? "hsl(var(--cph-onyx) / 0.10)" : "hsl(var(--cph-light-blue) / 0.12)",
+            color: isTop ? ONYX : undefined,
+          }}
+        >
+          {seller.avatarUrl ? (
+            <img src={seller.avatarUrl} alt={name} className="h-full w-full rounded-full object-cover" />
+          ) : (
+            getInitials(name)
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className={`break-words text-[15px] leading-tight ${index < 3 || isMe ? "font-extrabold" : "font-semibold"}`}>
+            {name}
+            {isMe && <span className="ml-1.5 text-[11px] font-bold" style={{ color: EMERALD }}>(dig)</span>}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] tabular-nums" style={{ color: isTop && light ? LIGHT_DIM : fgDim }}>
+            <span>{seller.salesCount} salg</span>
+            {showCrossSales && <span>· {seller.crossSales ?? 0} {crossSalesLabel.toLowerCase()}</span>}
+            {showFiber && <span>· {seller.fiberPoints ?? 0} fiber</span>}
+          </div>
+        </div>
+        <span className="shrink-0 whitespace-nowrap text-[17px] font-extrabold tabular-nums tracking-tight">
+          {formatNumber(Math.round(seller.commission))}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      {sellers.map((s, i) => renderRow(s, i))}
+      {meOutside && (
+        <div className="sticky bottom-0 mt-2 pt-2" style={{ borderTop: `1px dashed ${fgDim}` }}>
+          {renderRow(fullList[myIndex], myIndex, true)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CphLeaderboard({
@@ -111,8 +204,11 @@ export function CphLeaderboard({
   crossSalesLabel = "Switch",
   showFiber = false,
   maxRows,
+  currentEmployeeId,
+  hideTitle = false,
 }: CphLeaderboardProps) {
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
+  const mobileRows = sellers.slice(0, 10);
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
   const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${
@@ -124,9 +220,25 @@ export function CphLeaderboard({
   const padL = tvMode ? 10 : 8;
   const padR = tvMode ? 14 : 10;
 
-
-
-
+  const mobileBody = !tvMode && (
+    <div className="sm:hidden pt-3">
+      {isLoading ? (
+        <div className="py-8 text-center" style={{ color: fgDim }}>Indlæser...</div>
+      ) : mobileRows.length === 0 ? (
+        <div className="py-8 text-center" style={{ color: fgDim }}>Ingen salg endnu</div>
+      ) : (
+        <CphMobileRows
+          sellers={mobileRows}
+          fullList={sellers}
+          light={light}
+          showCrossSales={showCrossSales}
+          crossSalesLabel={crossSalesLabel}
+          showFiber={showFiber}
+          currentEmployeeId={currentEmployeeId}
+        />
+      )}
+    </div>
+  );
 
   return (
     <div
@@ -137,6 +249,7 @@ export function CphLeaderboard({
         padding: tvMode ? "18px 26px" : "18px 20px",
       }}
     >
+      {!hideTitle && (
       <div
         className="flex items-center justify-between gap-3"
         style={{ paddingBottom: 14, borderBottom: `2px solid ${light ? ONYX : "hsl(var(--cph-light-blue) / 0.18)"}` }}
@@ -151,7 +264,11 @@ export function CphLeaderboard({
         </div>
         <span style={{ fontSize: tvMode ? 17 : 12, color: fgDim }}>Provision, kr</span>
       </div>
+      )}
 
+      {mobileBody}
+
+      <div className={tvMode ? "contents" : "hidden sm:contents"}>
       <div
         className="grid items-center font-extrabold uppercase"
         style={{
@@ -246,8 +363,8 @@ export function CphLeaderboard({
                   )}
                 </span>
                 <span
-                  className={`${tvMode ? "truncate" : "min-w-0 break-words leading-tight text-[13px] sm:text-[15px]"}${index < 3 ? " font-extrabold" : ""}`}
-                  style={tvMode ? { fontSize: isTop ? 23 : 22 } : undefined}
+                  className={index < 3 ? "truncate font-extrabold" : "truncate"} title={seller.name}
+                  style={{ fontSize: tvMode ? (isTop ? 23 : 22) : 15 }}
                 >
                   {seller.displayName || seller.name}
                 </span>
@@ -298,6 +415,7 @@ export function CphLeaderboard({
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -340,7 +458,7 @@ export function CphBoardFrame({
         background: ONYX,
         color: LIGHT,
         fontVariantNumeric: "tabular-nums",
-        padding: tvMode ? "24px 40px 24px" : "20px 20px 28px",
+        padding: tvMode ? "24px 40px 24px" : "16px 12px 24px",
         gap: tvMode ? 18 : 16,
       }}
     >
@@ -354,15 +472,15 @@ export function CphBoardFrame({
       />
 
       <header
-        className="relative flex flex-wrap items-center justify-between gap-6"
+        className="relative flex flex-wrap items-center justify-between gap-3 sm:gap-6"
         style={{ paddingBottom: tvMode ? 12 : 12 }}
       >
-        <div className="flex items-center gap-6">
-          <img src={cphLogo} alt="Copenhagen Sales" style={{ width: tvMode ? 132 : 92, height: "auto" }} />
+        <div className="flex items-center min-w-0 gap-3 sm:gap-6">
+          <img src={cphLogo} alt="Copenhagen Sales" className={tvMode ? undefined : "w-16 shrink-0 sm:w-[92px]"} style={{ width: tvMode ? 132 : undefined, height: "auto" }} />
           <div>
             <div
               className="font-extrabold"
-              style={{ fontSize: tvMode ? 44 : 26, lineHeight: 1, letterSpacing: "-0.02em" }}
+              style={{ fontSize: tvMode ? 44 : "clamp(20px, 5.5vw, 26px)", lineHeight: 1, letterSpacing: "-0.02em" }}
             >
               {title}
             </div>
@@ -414,7 +532,7 @@ export function CphBoardFrame({
       </header>
 
       <section
-        className={tvMode ? "relative grid gap-4" : "relative grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5"}
+        className={tvMode ? "relative grid gap-4" : "relative grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5 [&>*:first-child]:col-span-2 md:[&>*:first-child]:col-span-1"}
         style={tvMode ? { gridTemplateColumns: kpiCols } : undefined}
       >
         {primaryKpis.map((kpi, i) => (
@@ -440,11 +558,78 @@ export function CphBoardFrame({
         className={
           tvMode
             ? "relative grid min-h-0 flex-1 grid-cols-3 gap-4"
-            : "relative grid grid-cols-1 gap-4 lg:grid-cols-3"
+            : "relative grid grid-cols-1 gap-4 2xl:grid-cols-3"
         }
       >
         {children}
       </section>
+    </div>
+  );
+}
+
+export interface CphLeaderboardTab {
+  key: string;
+  label: string;
+  title: string;
+  sellers: LeaderboardSeller[];
+  light?: boolean;
+}
+
+/** Mobil: én topliste ad gangen med faner i stedet for tre lister under hinanden. */
+export function CphLeaderboardTabs({
+  tabs,
+  isLoading,
+  showCrossSales,
+  crossSalesLabel,
+  showFiber,
+  currentEmployeeId,
+}: {
+  tabs: CphLeaderboardTab[];
+  isLoading: boolean;
+  showCrossSales?: boolean;
+  crossSalesLabel?: string;
+  showFiber?: boolean;
+  currentEmployeeId?: string | null;
+}) {
+  const [active, setActive] = React.useState(tabs[0]?.key);
+  const current = tabs.find((t) => t.key === active) ?? tabs[0];
+  if (!current) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        role="tablist"
+        aria-label="Toplister"
+        className="grid rounded-2xl p-1"
+        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0,1fr))`, background: SURFACE }}
+      >
+        {tabs.map((t) => {
+          const on = t.key === current.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setActive(t.key)}
+              className="min-h-[44px] rounded-xl text-[14px] font-extrabold transition-colors"
+              style={{ background: on ? LIGHT : "transparent", color: on ? ONYX : LIGHT_DIM }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <CphLeaderboard
+        title={current.title}
+        sellers={current.sellers}
+        isLoading={isLoading}
+        tvMode={false}
+        light={current.light}
+        showCrossSales={showCrossSales}
+        crossSalesLabel={crossSalesLabel}
+        showFiber={showFiber}
+        currentEmployeeId={currentEmployeeId}
+      />
     </div>
   );
 }
