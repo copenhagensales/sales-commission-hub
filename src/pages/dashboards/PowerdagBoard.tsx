@@ -1,13 +1,13 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings, useUpdateEvent } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy, Crown, Star, Pencil, Sparkles, Lock } from "lucide-react";
+import { Trophy, Crown, Star, Pencil, Sparkles, Lock, Plus, Play, Zap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
-import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, formatDisplayName, type LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import { useDisplayNameOverrides } from "@/hooks/useDisplayNameOverrides";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -28,19 +28,9 @@ function eventDayAt(eventDate: string, hour: number, minute: number): Date {
 }
 
 
-const PODIUM_TONES = [
-  // index 0 = 1st (gold)
-  { ring: "ring-yellow-400/60", text: "text-yellow-400", badge: "bg-yellow-400 text-black", glow: "shadow-[0_0_60px_-10px_rgba(250,204,21,0.45)]", border: "border-yellow-400/50" },
-  // index 1 = 2nd (silver)
-  { ring: "ring-slate-300/30", text: "text-slate-200", badge: "bg-slate-300 text-black", glow: "", border: "border-white/5" },
-  // index 2 = 3rd (bronze)
-  { ring: "ring-orange-400/30", text: "text-orange-300", badge: "bg-orange-400 text-black", glow: "", border: "border-white/5" },
-];
-
 // Display order: 2nd, 1st (center), 3rd
 const PODIUM_ORDER = [1, 0, 2];
 
-const REST_BAR_COLORS = ["bg-emerald-400", "bg-violet-400", "bg-rose-400", "bg-sky-400", "bg-amber-400"];
 
 function formatPoints(n: number) {
   return n.toLocaleString("da-DK", { minimumFractionDigits: n % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 });
@@ -102,195 +92,207 @@ export default function PowerdagBoard() {
 
 
 
+  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 10 });
+
+  const tickerItems: string[] = [];
+  topSellers.slice(0, 3).forEach((s) => tickerItems.push(`${formatDisplayName(s.employeeName)} · ${s.commission.toLocaleString("da-DK")} kr.`));
+  if (standings.length > 0) {
+    if (!isSuspense && standings.every((s) => s.total_points === 0)) {
+      tickerItems.push("Alle hold står på 0 point – første salg tager føringen");
+    }
+    if (!isSuspense) tickerItems.push(`${standings[0].team_name} fører holdkonkurrencen`);
+    else tickerItems.push("Pointene er låst – vinderen afsløres kl. 16.30");
+  }
+  if (tickerItems.length === 0) tickerItems.push("Powerdag er i gang – kom så!");
+
+  const nameParts = (event?.name ?? "Powerdag").split(" ");
+  const titleHead = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : nameParts[0];
+  const titleTail = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+
   return (
     <DashboardShell>
-      <div className={`cph-board ${tv ? "p-8" : "p-4 md:p-8"} max-w-[1600px] mx-auto`}>
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-8">
-          <div className="flex items-start gap-4 min-w-0">
-            <div className="rounded-2xl bg-yellow-400/10 border border-yellow-400/20 p-3 flex-shrink-0">
-              <Trophy className="h-7 w-7 text-yellow-400" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-3 flex-wrap">
-                {event && !tv && hasEditAccess ? (
-                  <EditableEventName event={event} />
-                ) : (
-                  <h1 className={`${tv ? "text-5xl" : "text-3xl md:text-4xl"} font-black tracking-tight`}>{event?.name ?? "Powerdag"}</h1>
-                )}
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
-                  Live
-                </span>
+      <div className={`pd-board ${tv ? "p-10" : "p-4 md:p-8"}`}>
+        <div className="pd-rays" aria-hidden />
+        <div className="relative max-w-[1700px] mx-auto">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-6 mb-10 flex-wrap">
+            <div className="flex items-center gap-5 min-w-0">
+              <div className="pd-trophy flex-shrink-0">
+                <Trophy className={tv ? "h-10 w-10" : "h-8 w-8"} />
               </div>
-              {event && (
-                !tv && hasEditAccess ? (
-                  <EditableEventDate event={event} />
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-1 capitalize">
-                    {new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                  </p>
-                )
+              <div className="min-w-0">
+                <div className="flex items-center gap-4 flex-wrap">
+                  {event && !tv && hasEditAccess ? (
+                    <EditableEventName event={event} head={titleHead} tail={titleTail} tv={tv} />
+                  ) : (
+                    <PowerTitle head={titleHead} tail={titleTail} tv={tv} />
+                  )}
+                  <span className="pd-live">
+                    <span className="pd-live-dot" />
+                    Live
+                  </span>
+                </div>
+                {event && (
+                  !tv && hasEditAccess ? (
+                    <EditableEventDate event={event} />
+                  ) : (
+                    <p className="pd-sub mt-1 first-letter:uppercase">
+                      {new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                    </p>
+                  )
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 flex-shrink-0">
+              <div className="text-center">
+                <p className="pd-eyebrow flex items-center gap-1.5 justify-center"><RefreshCw className="h-3 w-3" />Opdateret</p>
+                <p className={`pd-num leading-none mt-1 ${tv ? "text-6xl" : "text-4xl md:text-5xl"}`}>{updatedAt}</p>
+              </div>
+              {!tv && hasEditAccess && (
+                <div className="flex items-center gap-3 border-l border-white/10 pl-6">
+                  <span className="pd-tvlink"><TvBoardQuickGenerator dashboardSlug="powerdag" /></span>
+                  <Link to="/dashboards/powerdag/input">
+                    <Button variant="outline" className="pd-btn-ghost"><Plus className="h-4 w-4 mr-1.5" />Indtast salg</Button>
+                  </Link>
+                  <Link to="/dashboards/powerdag/admin">
+                    <Button className="pd-btn-primary"><Play className="h-4 w-4 mr-1.5 fill-current" />Start nyt spil</Button>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-3 flex-shrink-0">
-            <div className="text-right">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Opdateret</p>
-              <p className={`tabular-nums font-light ${tv ? "text-3xl" : "text-2xl"}`}>{updatedAt}</p>
-            </div>
-            {!tv && hasEditAccess && (
-              <div className="flex items-center gap-2">
-                <TvBoardQuickGenerator dashboardSlug="powerdag" />
-                <Link to="/dashboards/powerdag/input">
-                  <Button variant="outline" size="sm">Indtast salg</Button>
-                </Link>
-                <Link to="/dashboards/powerdag/admin">
-                  <Button size="sm">Start nyt spil</Button>
-                </Link>
+          {standings.length === 0 ? (
+            <p className="pd-sub text-center py-20">Ingen data endnu – start med at indtaste salg.</p>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-8">
+              {/* LEFT: team competition */}
+              <div className="space-y-5 min-w-0">
+                <div className="flex items-baseline gap-3">
+                  <h2 className={`pd-h2 ${tv ? "text-4xl" : "text-2xl md:text-3xl"}`}>Holdkonkurrencen</h2>
+                  <span className="pd-sub">{isSuspense ? "· lukket – afsløres kl. 16.30" : "· point i dag"}</span>
+                </div>
 
+                {isSuspense ? (
+                  <SuspensePanel
+                    teams={standings.map(s => s.team_name)}
+                    tv={tv}
+                    canRevealNow={canRevealNow}
+                    msUntilReveal={msUntilReveal}
+                    onReveal={handleReveal}
+                    isRevealing={updateEvent.isPending}
+                  />
+                ) : (
+                  <>
+                    {top3.length >= 3 && (
+                      <div className="grid grid-cols-3 gap-4 md:gap-7 items-end pt-10">
+                        {PODIUM_ORDER.map((rankIdx, displayIdx) => {
+                          const team = top3[rankIdx];
+                          const tone = ["gold", "silver", "bronze"][rankIdx];
+                          const isFirst = rankIdx === 0;
+                          const subs = team.sub_entries.filter(e => e.sub_client_name).map(e => e.sub_client_name!);
+                          return (
+                            <div key={team.team_name} style={{ animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both` }}>
+                              <div
+                                className={`pd-podium pd-${tone} relative text-center px-4 ${isFirst ? "pt-14 pb-8" : "pt-8 pb-7"}`}
+                                style={{ minHeight: isFirst ? (tv ? 420 : 340) : rankIdx === 1 ? (tv ? 340 : 270) : (tv ? 300 : 240) }}
+                              >
+                                {isFirst && (
+                                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                    <span className="pd-eyebrow pd-accent mb-1">Fører</span>
+                                    <Crown className="h-9 w-9 pd-accent fill-current" />
+                                  </div>
+                                )}
+                                <div className={`pd-rank-badge mx-auto mb-4 ${isFirst ? "h-16 w-16 text-2xl" : "h-12 w-12 text-xl"}`}>{rankIdx + 1}</div>
+                                <p className={`pd-num pd-tone-text leading-none ${isFirst ? (tv ? "text-[9rem]" : "text-8xl") : (tv ? "text-8xl" : "text-7xl")}`}>
+                                  {formatPoints(team.total_points)}
+                                </p>
+                                <p className="pd-eyebrow mt-4">Point</p>
+                                <p className={`pd-team mt-4 truncate ${isFirst ? (tv ? "text-4xl" : "text-3xl") : (tv ? "text-3xl" : "text-2xl")}`}>{team.team_name}</p>
+                                {subs.length > 1 && <p className="pd-eyebrow mt-2 truncate">{subs.join(" · ")}</p>}
+                              </div>
+                              <div className={`pd-plinth pd-${tone} ${isFirst ? "h-24" : rankIdx === 1 ? "h-16" : "h-10"}`}>
+                                <span className="pd-num">{rankIdx + 1}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {top3.length < 3 && top3.length > 0 && (
+                      <div className="space-y-3">
+                        {top3.map((team, i) => (
+                          <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} tv={tv} />
+                        ))}
+                      </div>
+                    )}
+
+                    {rest.length > 0 && (
+                      <div className="space-y-3 pt-2">
+                        {rest.map((team, i) => (
+                          <RestTeamRow key={team.team_name} team={team} rank={i + 4} leaderPoints={leaderPoints} tv={tv} delay={i * 0.08} />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+
+              {/* RIGHT: Top 10 sellers */}
+              <div className="space-y-5 min-w-0">
+                <div className="flex items-baseline gap-3">
+                  <h2 className={`pd-h2 flex items-center gap-3 ${tv ? "text-4xl" : "text-2xl md:text-3xl"}`}>
+                    <Star className="h-6 w-6 pd-accent fill-current" />
+                    Top 10
+                  </h2>
+                  <span className="pd-sub">· i dag</span>
+                </div>
+                <TopSellersList tv={tv} topSellers={topSellers} />
+              </div>
+            </div>
+          )}
+
+          {/* Ticker */}
+          <div className="pd-ticker mt-8">
+            <div className="pd-ticker-label"><Zap className="h-4 w-4 fill-current" />Powerdag</div>
+            <div className="pd-ticker-track">
+              <div className="pd-ticker-move">
+                {[0, 1].map((dup) => (
+                  <div key={dup} className="flex items-center" aria-hidden={dup === 1}>
+                    {tickerItems.map((t, i) => (
+                      <span key={i} className="flex items-center">
+                        <span className="px-8 whitespace-nowrap">{t}</span>
+                        <Star className="h-4 w-4 pd-accent fill-current" />
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-
-        {standings.length === 0 ? (
-          <p className="text-muted-foreground text-center py-20">Ingen data endnu – start med at indtaste salg.</p>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* LEFT: team competition */}
-            <div className="lg:col-span-2 space-y-5">
-              <div className="flex items-baseline gap-3">
-                <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold`}>Holdkonkurrencen</h2>
-                <span className="text-xs text-muted-foreground">
-                  {isSuspense ? "· lukket – afsløres kl. 16.30" : "· point i dag"}
-                </span>
-              </div>
-
-              {isSuspense ? (
-                <SuspensePanel
-                  teams={standings.map(s => s.team_name)}
-                  tv={tv}
-                  canRevealNow={canRevealNow}
-                  msUntilReveal={msUntilReveal}
-                  onReveal={handleReveal}
-                  isRevealing={updateEvent.isPending}
-                />
-              ) : (
-                <>
-                  {/* Podium */}
-                  {top3.length >= 3 && (
-                    <div className="grid grid-cols-3 gap-3 md:gap-4 items-end">
-                      {PODIUM_ORDER.map((rankIdx, displayIdx) => {
-                        const team = top3[rankIdx];
-                        const cfg = PODIUM_TONES[rankIdx];
-                        const isFirst = rankIdx === 0;
-                        return (
-                          <div
-                            key={team.team_name}
-                            className={`relative rounded-2xl border ${cfg.border} bg-card/40 backdrop-blur px-4 py-6 text-center ${isFirst ? `${cfg.glow} ring-2 ${cfg.ring}` : ""}`}
-                            style={{
-                              animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both`,
-                              minHeight: isFirst ? (tv ? 320 : 270) : (tv ? 260 : 220),
-                            }}
-                          >
-                            {isFirst && (
-                              <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                                <span className="text-[10px] font-black tracking-[0.25em] text-yellow-400 mb-0.5">FØRER</span>
-                                <Crown className="h-7 w-7 text-yellow-400 fill-yellow-400" />
-                              </div>
-                            )}
-                            <div className={`mx-auto mb-3 h-10 w-10 rounded-full flex items-center justify-center font-black text-base ${cfg.badge} shadow-lg`}>
-                              {rankIdx + 1}
-                            </div>
-                            <p className={`font-black tabular-nums leading-none ${cfg.text} ${tv ? "text-7xl" : "text-5xl md:text-6xl"}`}>
-                              {formatPoints(team.total_points)}
-                            </p>
-                            <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-2">Point</p>
-                            <p className={`font-bold mt-4 truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
-                            {team.sub_entries.length > 1 && team.sub_entries.some(e => e.sub_client_name) && (
-                              <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                                {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {top3.length < 3 && top3.length > 0 && (
-                    <div className="space-y-3">
-                      {top3.map((team, i) => (
-                        <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]} tv={tv} />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Rest */}
-                  {rest.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      {rest.map((team, i) => (
-                        <RestTeamRow
-                          key={team.team_name}
-                          team={team}
-                          rank={i + 4}
-                          leaderPoints={leaderPoints}
-                          barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]}
-                          tv={tv}
-                          delay={i * 0.08}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-
-            {/* RIGHT: Top 5 sellers */}
-            <div className="space-y-5">
-              <div className="flex items-baseline gap-3">
-                <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold flex items-center gap-2`}>
-                  <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                  Top 10
-                </h2>
-                <span className="text-xs text-muted-foreground">· i dag</span>
-              </div>
-              <TopSellersList tv={tv} />
-            </div>
-          </div>
-        )}
       </div>
     </DashboardShell>
   );
 }
 
-const SELLER_AVATAR_COLORS = [
-  "bg-yellow-400 text-black",
-  "bg-emerald-400 text-black",
-  "bg-yellow-300 text-black",
-  "bg-sky-400 text-black",
-  "bg-orange-400 text-black",
-];
+function PowerTitle({ head, tail, tv }: { head: string; tail: string; tv: boolean }) {
+  return (
+    <h1 className={`pd-title ${tv ? "text-7xl" : "text-4xl md:text-6xl"}`}>
+      {head}
+      {tail && <> <span className="pd-title-accent">{tail}</span></>}
+    </h1>
+  );
+}
 
-const SELLER_RANK_COLORS = [
-  "bg-yellow-400 text-black",
-  "bg-slate-300 text-black",
-  "bg-orange-400 text-black",
-  "bg-muted text-muted-foreground",
-  "bg-muted text-muted-foreground",
-];
+type Standing = ReturnType<typeof computeStandings>[number];
 
-function RestTeamRow({ team, rank, leaderPoints, barColor, tv, delay = 0 }: {
-  team: ReturnType<typeof computeStandings>[number];
+function RestTeamRow({ team, rank, leaderPoints, tv, delay = 0 }: {
+  team: Standing;
   rank: number;
   leaderPoints: number;
-  barColor: string;
   tv: boolean;
   delay?: number;
 }) {
@@ -298,72 +300,67 @@ function RestTeamRow({ team, rank, leaderPoints, barColor, tv, delay = 0 }: {
   const subs = team.sub_entries.filter(e => e.sub_client_name).map(e => e.sub_client_name!);
 
   return (
-    <div
-      className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur px-4 py-3.5"
-      style={{ animation: `fade-in 0.4s ease-out ${delay}s both` }}
-    >
-      <div className="flex items-center gap-4">
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted/40 border border-white/5 flex items-center justify-center font-bold text-muted-foreground">
-          {rank}
-        </div>
+    <div className="pd-row px-6 py-5" style={{ animation: `fade-in 0.4s ease-out ${delay}s both` }}>
+      <div className="flex items-center gap-6">
+        <div className="pd-rank-ring h-14 w-14 text-xl flex-shrink-0">{rank}</div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-2 mb-2">
-            <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
-              <p className={`font-bold truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
-              {subs.length > 0 && (
-                <p className="text-[11px] text-muted-foreground truncate">{subs.join(" · ")}</p>
-              )}
-            </div>
-            <p className={`font-black tabular-nums flex-shrink-0 ${tv ? "text-3xl" : "text-2xl"}`}>
-              {formatPoints(team.total_points)}
-              <span className="text-xs font-normal text-muted-foreground ml-1">pt</span>
-            </p>
+          <div className="flex items-baseline gap-4 min-w-0">
+            <p className={`pd-team truncate ${tv ? "text-3xl" : "text-2xl"}`}>{team.team_name}</p>
+            {subs.length > 0 && <p className="pd-eyebrow truncate">{subs.join(" · ")}</p>}
           </div>
-          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+          <div className="pd-bar mt-3">
+            <div className="pd-bar-fill" style={{ width: `${Math.max(pct, 0)}%` }} />
           </div>
         </div>
+        <p className={`pd-num flex-shrink-0 ${tv ? "text-6xl" : "text-5xl"}`}>
+          {formatPoints(team.total_points)}
+          <span className="pd-unit ml-1.5">pt</span>
+        </p>
       </div>
     </div>
   );
 }
 
-function TopSellersList({ tv }: { tv: boolean }) {
-  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 10 });
 
+function TopSellersList({ tv, topSellers }: { tv: boolean; topSellers: LeaderboardEntry[] }) {
   if (topSellers.length === 0) {
-    return <p className="text-sm text-muted-foreground py-8 text-center">Ingen sælgerdata endnu.</p>;
+    return <p className="pd-sub py-8 text-center">Ingen sælgerdata endnu.</p>;
   }
+  const lead = topSellers.length > 1 ? topSellers[0].commission - topSellers[1].commission : 0;
 
   return (
     <div className="space-y-3">
       {topSellers.map((seller, idx) => {
         const isFirst = idx === 0;
+        const tone = idx === 0 ? "gold" : idx === 1 ? "silver" : idx === 2 ? "bronze" : "plain";
         return (
           <div
             key={seller.employeeId}
-            className={`flex items-center gap-3 rounded-2xl border bg-card/40 backdrop-blur px-3.5 py-3 ${isFirst ? "border-yellow-400/40 ring-1 ring-yellow-400/30 shadow-[0_0_40px_-15px_rgba(250,204,21,0.5)]" : "border-white/5"}`}
-            style={{ animation: `fade-in 0.4s ease-out ${idx * 0.08}s both` }}
+            className={`pd-seller pd-${tone} flex items-center gap-5 ${isFirst ? "px-6 py-6" : "px-6 py-3.5"}`}
+            style={{ animation: `fade-in 0.4s ease-out ${idx * 0.06}s both` }}
           >
-            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${SELLER_RANK_COLORS[idx] ?? SELLER_RANK_COLORS[3]}`}>
+            <div className={`${idx < 3 ? "pd-rank-badge" : "pd-rank-ring"} flex-shrink-0 ${isFirst ? "h-20 w-20 text-3xl" : "h-12 w-12 text-lg"}`}>
               {idx + 1}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`font-bold truncate ${tv ? "text-lg" : "text-sm"}`}>
-                {formatDisplayName(seller.employeeName)}
-              </p>
-              {seller.teamName && (
-                <span className="inline-block mt-0.5 text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-muted-foreground">
-                  {seller.teamName}
-                </span>
+              <div className={`flex items-center gap-3 min-w-0 ${isFirst ? "" : "flex-wrap"}`}>
+                <p className={`pd-name truncate ${isFirst ? (tv ? "text-4xl" : "text-3xl") : (tv ? "text-2xl" : "text-xl")}`}>
+                  {formatDisplayName(seller.employeeName)}
+                </p>
+                {isFirst && <Crown className="h-6 w-6 pd-accent fill-current flex-shrink-0" />}
+                {!isFirst && seller.teamName && <span className="pd-chip">{seller.teamName}</span>}
+              </div>
+              {isFirst && (
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {seller.teamName && <span className="pd-chip">{seller.teamName}</span>}
+                  {lead > 0 && <span className="pd-accent text-sm font-semibold">+{lead.toLocaleString("da-DK")} kr. foran #2</span>}
+                </div>
               )}
             </div>
-            <div className="text-right flex-shrink-0">
-              <p className={`font-black tabular-nums ${isFirst ? "text-yellow-400" : ""} ${tv ? "text-2xl" : "text-xl"}`}>
-                {seller.commission.toLocaleString("da-DK")}
-                <span className="text-xs font-normal text-muted-foreground ml-1">kr.</span>
-              </p>
-            </div>
+            <p className={`pd-num pd-tone-text flex-shrink-0 ${isFirst ? (tv ? "text-7xl" : "text-5xl") : (tv ? "text-5xl" : "text-4xl")}`}>
+              {seller.commission.toLocaleString("da-DK")}
+              <span className="pd-unit ml-1.5">kr.</span>
+            </p>
           </div>
         );
       })}
@@ -371,7 +368,7 @@ function TopSellersList({ tv }: { tv: boolean }) {
   );
 }
 
-function EditableEventName({ event }: { event: { id: string; name: string } }) {
+function EditableEventName({ event, head, tail, tv }: { event: { id: string; name: string }; head: string; tail: string; tv: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(event.name);
   const update = useUpdateEvent();
@@ -412,7 +409,7 @@ function EditableEventName({ event }: { event: { id: string; name: string } }) {
       className="group inline-flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-muted/50 transition-colors"
       title="Klik for at redigere"
     >
-      <h1 className="text-3xl md:text-4xl font-black tracking-tight">{event.name}</h1>
+      <PowerTitle head={head} tail={tail} tv={tv} />
       <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
@@ -461,7 +458,7 @@ function EditableEventDate({ event }: { event: { id: string; event_date: string 
       className="group mt-1 inline-flex items-center gap-2 rounded px-1 -mx-1 hover:bg-muted/50 transition-colors"
       title="Klik for at redigere"
     >
-      <span className="text-sm text-muted-foreground capitalize">{formatted}</span>
+      <span className="pd-sub first-letter:uppercase">{formatted}</span>
       <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
