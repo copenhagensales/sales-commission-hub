@@ -558,7 +558,7 @@ export function CphBoardFrame({
         className={
           tvMode
             ? "relative grid min-h-0 flex-1 grid-cols-3 gap-4"
-            : "relative grid grid-cols-1 gap-4 xl:grid-cols-3"
+            : "relative grid grid-cols-1 gap-4 2xl:grid-cols-3"
         }
       >
         {children}

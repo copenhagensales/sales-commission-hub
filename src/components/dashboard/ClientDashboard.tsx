@@ -430,7 +430,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
           {useCached ? (
             <>
               {!tvMode && (
-                <div className="xl:hidden">
+                <div className="2xl:hidden">
                   <CphLeaderboardTabs
                     tabs={[
                       { key: "day", label: "I dag", title: "Top i dag", sellers: sortedDailySellers },
@@ -445,7 +445,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                   />
                 </div>
               )}
-              <div className={tvMode ? "contents" : "hidden xl:contents"}>
+              <div className={tvMode ? "contents" : "hidden 2xl:contents"}>
               <CphLeaderboard
                 title="Top lønperiode"
                 sellers={sortedPayrollSellers}
@@ -480,7 +480,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
               </div>
             </>
           ) : (
-            <div className="xl:col-span-3">
+            <div className="2xl:col-span-3">
               <CphLeaderboard
                 title={`Top – ${selectedPeriod.label}`}
                 sellers={liveSellers}
