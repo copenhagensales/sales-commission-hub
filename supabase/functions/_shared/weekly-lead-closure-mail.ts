@@ -151,11 +151,6 @@ function pct1(part: number, whole: number): string {
 }
 
 /** Frasorteret vises som andel af lukkede med antallet i parentes. */
-function sharePlusCount(count: number, whole: number): string {
-  if (!whole) return `${nf(count)} stk`;
-  return `${pct1(count, whole)} (${nf(count)} stk)`;
-}
-
 
 
 
