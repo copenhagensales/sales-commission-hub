@@ -1046,7 +1046,7 @@
   background: repeating-conic-gradient(from 180deg at 50% 40%, hsl(var(--pd-green) / .14) 0deg 4deg, transparent 4deg 14deg);
   mask-image: radial-gradient(circle at 50% 40%, black 10%, transparent 65%); }
 .pd-title { font-family:'Unbounded',sans-serif; font-weight:900; letter-spacing:-.03em; line-height:1; }
-.pd-title-accent { background:linear-gradient(180deg, hsl(142 90% 65%), hsl(var(--pd-green))); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.pd-title-accent { color:hsl(var(--pd-green)) !important; text-shadow:0 0 30px hsl(var(--pd-green) / .45); }
 .pd-num { font-family:'Unbounded',sans-serif; font-weight:800; font-variant-numeric: tabular-nums; letter-spacing:-.02em; }
 .pd-h2 { font-weight:800; letter-spacing:-.01em; }
 .pd-team { font-family:'Archivo',sans-serif; font-weight:800; text-transform:uppercase; letter-spacing:.01em; }
