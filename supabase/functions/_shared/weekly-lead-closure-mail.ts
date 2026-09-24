@@ -293,9 +293,8 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
 
   const table1 = lineSection(
     "Tabel 1 — Trygs skabelon",
-    `Pr. rapportlinje, uge ${input.weekNumber}. Hitrate = bookede møder ÷ lukkede ja/nej.`,
+    `Pr. kampagne, uge ${input.weekNumber}.`,
     input.lines,
-    input.excludedStatuses,
   );
 
   // Tabel 2 (status pr. rapportlinje) og tabel 3 (pr. sælger) vises ikke i mailen efter ønske —
@@ -310,7 +309,6 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
             `Tabel 4 — uge ${w.weekNumber}`,
             weekRange(w.weekStart),
             w.lines,
-            input.excludedStatuses,
           ),
         )
         .join("")
@@ -352,10 +350,6 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
         .join("")}</div>`
     : "";
 
-  const legendExtras = input.excludedStatuses.length
-    ? input.excludedStatuses.map((e) => e.label.toLowerCase()).join(" og ")
-    : "statusser uden udfald";
-
   const html = `<!DOCTYPE html>
 <html lang="da"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>${escapeHtml(subject)}</title></head>
@@ -387,10 +381,11 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     <div style="background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:12px;padding:18px 20px;margin:0 0 18px;">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${BRAND.muted};text-transform:uppercase;margin:0 0 10px;">Sådan læses tallene</div>
       <div style="font-size:13px;color:${BRAND.text};line-height:1.7;">
-        Tabellen læses fra venstre mod højre: <strong>Lukkede</strong> er alle emner afsluttet i ugen.
-        Derefter falder ${escapeHtml(legendExtras)} fra, og tilbage står <strong>Ja/nej</strong> — emnerne hvor kunden
-        reelt er nået og har svaret. <strong>Ja/nej-andel</strong> er ja/nej i procent af lukkede og viser, hvor stor en
-        del af emnerne der kunne bruges. <strong>Hitrate</strong> er bookede møder delt med lukkede ja/nej.
+        <strong>Emner lukket</strong> er alle emner afsluttet i ugen – af en sælger eller af dialeren.
+        <strong>Ikke kontaktbare</strong> er forkerte numre, allerede kunder og emner lukket ved max kontaktforsøg.
+        <strong>Ukvalificerede</strong> er emner der ikke opfyldte kriterierne for et møde.
+        <strong>Sælgerhitrate</strong> er bookede møder i procent af kvalificerede samtaler.
+        <strong>Emneudnyttelse</strong> er bookede møder i procent af alle lukkede emner – hvad kampagnen får ud af de leverede leads.
       </div>
     </div>
 
