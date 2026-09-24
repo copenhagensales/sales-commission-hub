@@ -130,7 +130,7 @@ function CphMobileRows({
   const renderRow = (seller: LeaderboardSeller, index: number, pinned = false) => {
     const isTop = index === 0;
     const isMe = !!currentEmployeeId && seller.id === currentEmployeeId;
-    const name = seller.displayName || seller.name;
+    const name = seller.name || seller.displayName;
     return (
       <div
         key={`${pinned ? "me-" : ""}${seller.id}`}
@@ -363,8 +363,8 @@ export function CphLeaderboard({
                   )}
                 </span>
                 <span
-                  className={`${tvMode ? "truncate" : "min-w-0 break-words leading-tight text-[13px] sm:text-[15px]"}${index < 3 ? " font-extrabold" : ""}`}
-                  style={tvMode ? { fontSize: isTop ? 23 : 22 } : undefined}
+                  className={index < 3 ? "truncate font-extrabold" : "truncate"} title={seller.name}
+                  style={{ fontSize: tvMode ? (isTop ? 23 : 22) : 15 }}
                 >
                   {seller.displayName || seller.name}
                 </span>
