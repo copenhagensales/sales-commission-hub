@@ -1306,7 +1306,7 @@ async function finishAndMail(
     );
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
-      (state.testRecipient ? [state.testRecipient] : config.recipients).map((recipient) => ({
+      config.recipients.map((recipient) => ({
         recipient_email: recipient,
         subject: mail.subject,
         content: mail.html,
@@ -1390,7 +1390,9 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status" | "sync_campaign_names";
+      action?: "status" | "sync_campaign_names" | "test_mail";
+      test_recipient?: string;
+      week_start?: string;
       run_ids?: string[];
     };
 
@@ -1402,6 +1404,57 @@ Deno.serve(async (req) => {
       return json(200, {
         summaries: summaries.map(({ failed: _failed, ...summary }) => summary),
       });
+    }
+
+    // Testmail: bygger mailen af de GEMTE tal for én uge (ingen ny hentning,
+    // så gemte uger ændres ikke) og sender den kun til én intern modtager.
+    // Modtagerlisten og "mail sendt"-markeringen røres ikke.
+    if (body.action === "test_mail") {
+      const recipient = safeString(body.test_recipient).toLowerCase();
+      if (!recipient.endsWith(OUR_DOMAIN)) return json(400, { error: "Testmail kun til en intern adresse" });
+      if (!body.week_start || !/^\d{4}-\d{2}-\d{2}$/.test(body.week_start)) {
+        return json(400, { error: "week_start mangler" });
+      }
+      const config = await loadConfig(svc);
+      const weeks = [4, 3, 2, 1, 0].map((n) => addDays(body.week_start!, -7 * n));
+      const { data: stored } = await svc
+        .from("weekly_lead_closure_stats")
+        .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, invalid_reason, lead_count")
+        .in("week_start", weeks);
+      const rows = ((stored ?? []) as StatRow[]).map((r) => ({
+        ...r,
+        report_line: config.mapping.get(mapKey(r.account, r.adversus_campaign_id))?.reportLine ?? null,
+      }));
+      const { data: storedCalls } = await svc
+        .from("weekly_lead_call_stats")
+        .select("week_start, account, campaign_id, attempts, answered, leads_dialed, leads_answered")
+        .in("week_start", weeks);
+      const callRows = (storedCalls ?? []) as CallStatRow[];
+      const latest = body.week_start;
+      const mail = buildMail(
+        latest,
+        rows.filter((r) => r.week_start === latest),
+        weeks.slice(0, 4).reverse().map((week) => ({
+          weekStart: week,
+          rows: rows.filter((r) => r.week_start === week),
+          callRows: callRows.filter((r) => r.week_start === week),
+        })).filter((w) => w.rows.length > 0),
+        config,
+        new Map(),
+        [],
+        callRows.filter((r) => r.week_start === latest),
+      );
+      const { error } = await svc.from("scheduled_emails").insert({
+        recipient_email: recipient,
+        subject: `[TEST] ${mail.subject}`,
+        content: mail.html,
+        template_key: "weekly_lead_closure_report_test",
+        scheduled_at: new Date().toISOString(),
+        status: "pending",
+      });
+      if (error) throw new Error(`Kunne ikke lægge testmailen i køen: ${error.message}`);
+      await flushMailQueue();
+      return json(200, { stage: "testmail sendt", recipient, week: latest });
     }
 
     if (body.action === "sync_campaign_names") {
