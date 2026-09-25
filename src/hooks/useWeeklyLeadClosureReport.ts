@@ -102,7 +102,12 @@ export type ClosureReportData = {
   unmapped: ClosureUnmappedRow[];
   calls: ClosureCallRow[];
   mcrLines: string[];
+  /** Ugyldige pr. årsag (kun Adversus). reason null = lukket af dialeren. */
+  invalidReasons: ClosureInvalidReasonRow[];
+  lineAccounts: { report_line: string; account: string }[];
 };
+
+export type ClosureInvalidReasonRow = { report_line: string; reason: string | null; lead_count: number };
 
 /**
  * Henter rapportens tal i ét kald. Aggregeringen sker i databasen
@@ -127,6 +132,8 @@ export function useWeeklyLeadClosureReportData(
         unmapped?: ClosureUnmappedRow[];
         calls?: ClosureCallRow[];
         mcr_lines?: string[];
+        invalid_reasons?: ClosureInvalidReasonRow[];
+        line_accounts?: { report_line: string; account: string }[];
       };
       return {
         weeks: payload.weeks ?? [],
@@ -135,6 +142,8 @@ export function useWeeklyLeadClosureReportData(
         unmapped: payload.unmapped ?? [],
         calls: payload.calls ?? [],
         mcrLines: payload.mcr_lines ?? [],
+        invalidReasons: payload.invalid_reasons ?? [],
+        lineAccounts: payload.line_accounts ?? [],
       };
     },
   });
