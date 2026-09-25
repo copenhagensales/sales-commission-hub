@@ -6,7 +6,13 @@
 //
 // Hårde regler i denne fil:
 //   * Der læses kun felterne id (dedup i hukommelsen), campaignId, status,
-//     lastContactedBy og updated. Intet fra masterData eller resultData.
+//     lastContactedBy og updated. Intet fra masterData.
+//   * Undtagelse godkendt af Kasper (25/9 2026): fra resultData læses ÉT felt —
+//     årsagsfeltet for ugyldig (main: 91278 "Ugyldig:"), som er en lukket
+//     rulleliste — og kun på emner med status invalid. Værdien matches mod en
+//     fast liste (INVALID_REASON_FIELDS); ukendte værdier gemmes som "Andet".
+//     Intet andet resultatfelt og ingen fritekst læses ("Andet:" 91276, noter).
+//     Lederne-kontoen har intet tilsvarende felt, så dér læses intet.
 //   * Ingen leads, lead-id'er, navne, numre eller noter gemmes eller logges.
 //   * Kun emner behandlet af vores egne @copenhagensales.dk-brugere tælles.
 //   * Afsluttende statusser står i public.lead_closing_statuses — ikke i kode.
@@ -213,10 +219,46 @@ type LeadFacts = {
   status: string;
   user: string;
   day: string;
+  /** Årsag fra rullelisten (kun invalid på konti med årsagsfelt), ellers "". */
+  reason: string;
 };
 
 /** Egen nøgle i weekly_lead_closure_stats, så MCR kan aggregeres som statusser. */
 const MCR_STATUS = "max_call_reach";
+const INVALID_STATUS = "invalid";
+
+/**
+ * Årsagsfeltet for ugyldig pr. Adversus-konto: felt-id og rullelistens faste
+ * værdier. Kun disse værdier gemmes; en ukendt værdi gemmes som "Andet".
+ * Lederne-kontoen har intet tilsvarende felt (undersøgt 25/9 2026) og står
+ * derfor ikke her.
+ */
+const INVALID_REASON_FIELDS: Partial<Record<AccountKey, { fieldId: number; values: string[] }>> = {
+  main: {
+    fieldId: 91278,
+    values: [
+      "De har allerede modtaget et tilbud fra TRYG",
+      "Er ikke en del af FDM",
+      "Forkert nummer",
+      "Forkert info på kontaktperson",
+      "Andet",
+    ],
+  },
+};
+const OTHER_REASON = "Andet";
+
+/** Læser KUN årsagsfeltet og returnerer en whitelistet værdi eller "". */
+function invalidReason(account: AccountKey, lead: Record<string, unknown>): string {
+  const def = INVALID_REASON_FIELDS[account];
+  if (!def || !Array.isArray(lead.resultData)) return "";
+  for (const field of lead.resultData as Record<string, unknown>[]) {
+    if (Number(field?.id) !== def.fieldId) continue;
+    const value = safeString(field.value);
+    if (!value) return "";
+    return def.values.includes(value) ? value : OTHER_REASON;
+  }
+  return "";
+}
 
 /**
  * Max Call Reach opgøres KUN på dialerens egen markering. Enreach sætter selv
@@ -233,6 +275,7 @@ const ENREACH_MCR_STATUS = "Depleted";
  */
 async function streamCampaignPages(
   auth: string,
+  account: AccountKey,
   campaignId: string,
   startPage: number,
   onLead: (lead: LeadFacts) => void,
@@ -255,10 +298,12 @@ async function streamCampaignPages(
     );
     for (const lead of batch) {
       scanned++;
+      const status = safeString(lead.status);
       onLead({
-        status: safeString(lead.status),
+        status,
         user: safeString(lead.lastContactedBy),
         day: copenhagenDay(safeString(lead.updated)),
+        reason: status === INVALID_STATUS ? invalidReason(account, lead) : "",
       });
     }
     if (batch.length < PAGE_SIZE) return { scanned, nextPage: null };
