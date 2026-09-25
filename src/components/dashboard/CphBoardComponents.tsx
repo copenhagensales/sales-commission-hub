@@ -208,7 +208,7 @@ export function CphLeaderboard({
   hideTitle = false,
 }: CphLeaderboardProps) {
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
-  const mobileRows = sellers.slice(0, 10);
+  const mobileRows = sellers;
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
   const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${
