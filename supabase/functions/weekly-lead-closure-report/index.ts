@@ -1114,6 +1114,8 @@ async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
       container: "lead_meta",
       fields: ["status", "lastContactedBy", "updated"],
     },
+    // Den eneste godkendte undtagelse i resultData: årsagsfeltet for ugyldig.
+    { integration: "adversus", container: "leadResultData", fields: ["Ugyldig:"] },
     { integration: "enreach", container: "lead_meta", fields: ENREACH_FIELDS },
     { integration: "adversus", container: "call_meta", fields: ADVERSUS_CALL_FIELDS },
     { integration: "enreach", container: "call_meta", fields: ENREACH_CALL_FIELDS },
@@ -1257,7 +1259,7 @@ async function finishAndMail(
   const weeks = state.weeks;
   const { data: stored } = await svc
     .from("weekly_lead_closure_stats")
-    .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, lead_count")
+    .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, invalid_reason, lead_count")
     .in("week_start", weeks);
   /**
    * Rapportlinjen slås altid op i mappingen, så en rettet mapping virker med
@@ -1304,7 +1306,7 @@ async function finishAndMail(
     );
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
-      config.recipients.map((recipient) => ({
+      (state.testRecipient ? [state.testRecipient] : config.recipients).map((recipient) => ({
         recipient_email: recipient,
         subject: mail.subject,
         content: mail.html,
