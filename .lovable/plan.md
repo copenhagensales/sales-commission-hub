@@ -1,24 +1,26 @@
-# Hiper Lukning: CPO mangler på salg før 14/9
+# Hiper-annulleringer v2: CPO og provision efter produktets historik
 
-## Årsag (bekræftet i databasen)
-- Produktet "Hiper Lukning" har som grundindstilling provision 125 kr. og omsætning 1.300 kr. Det er det, du ser under produkter.
-- Produktet har også en aktiv prisregel, "Hiper Lukning - default", der gælder fra 8/7. Den sætter provision 200 kr. og **omsætning 0 kr.** En regel går altid forud for grundindstillingen.
-- Derfor ser salgene sådan ud i Stork:
-  - 9/7–13/9: 303 salg med provision 200 kr. og omsætning 0 kr.
-  - 14/9: 10 salg med provision 200 kr. og omsætning 1.300 kr.
-  - Fra 15/9: 59 salg med provision 125 kr. og omsætning 1.300 kr.
-- Konklusion: omsætningen er blevet rettet på et tidspunkt omkring 14/9, men salgene fra før den dato er ikke blevet genberegnet. Arket viste derfor korrekt det, Stork har gemt, men det Stork har gemt, er forkert for de gamle salg.
-- "Hiper lukning rabattrin 1/2" har ingen regler og har derfor den rigtige omsætning (1.200 og 1.100 kr.). "Viderestilling" har 0 kr. med vilje.
+## Hvad produkthistorikken viser
+Hvert Hiper-produkt har to priser: én der gjaldt fra 8.–9. juli og én der gælder fra 15. september.
 
-## Hvad jeg laver nu (kun arket, ingen ændringer i Stork)
-1. Jeg laver en ny version af arket: `hiper_annulleringer_15-8_14-9_udfyldt_v2.xlsx`.
-2. På rækker med "Hiper Lukning", hvor Stork har 0 kr. i omsætning, skriver jeg produktets CPO fra produktlisten (1.300 kr.). Cellen markeres med orange, og der står en note om, at tallet kommer fra produktlisten og ikke fra salget.
-3. Viderestilling står fortsat tom og markeret med gult, fordi den med vilje er 0 kr.
-4. Provisionen står som Stork har beregnet den, dvs. 200 kr. på de gamle Lukning-salg. Det står også i noten, så I kan tage stilling til den.
+| Produkt | Provision før 15/9 | Provision fra 15/9 | CPO (uændret) |
+|---|---|---|---|
+| Hiper Lukning | 200 | 125 | 1.300 |
+| Hiper Viderestilling | 400 | 325 | 0 |
+| Hiper lukning rabattrin 1 | 175 | 100 | 1.200 |
+| Hiper viderestilling rabattrin 1 | 375 | 300 | 0 |
+| Hiper lukning rabattrin 2 | 150 | 75 | 1.100 |
+| Hiper viderestilling rabattrin 2 | (opslås) | 275 | 0 |
 
-## Separat beslutning (ikke med i denne plan)
-Selve rettelsen i Stork hører til pricing-motoren, som er rød zone, og kræver jeres godkendelse. Der er to muligheder:
-- **A:** Ret reglen "Hiper Lukning - default" til omsætning 1.300 kr. og genberegn salgene fra 8/7. Det ændrer omsætningen på de gamle salg, og provisionen på 200 kr. bliver stående.
-- **B:** Slå reglen fra, så grundindstillingen gælder. Så bliver både omsætningen (1.300 kr.) og provisionen (125 kr.) ændret bagud. **Det påvirker løn.**
+**Hvorfor CPO manglede:** "Hiper Lukning" har desuden en aktiv prisregel, der sætter omsætningen til 0 kr. Den regel går forud for produktets egen pris. Derfor står 303 Lukning-salg fra 9/7–13/9 med 0 kr. i omsætning i Stork, selv om produktets egen pris var 1.300 kr.
 
-I skal også afklare, hvilken provision der er den rigtige for perioden før 15/9: 200 kr. eller 125 kr.
+## Sådan udfyldes v2 (kun arket, ingen ændringer i Stork)
+1. Det er samme matchning som før: én række pr. sælger og produkt, og sælgernavnet står, som det hedder i Stork.
+2. **Provision:** den pris fra produktets historik, der gjaldt på salgsdatoen. Alle salg i arket er fra før 15/9, så de får den gamle pris, fx 200 kr. for Lukning. Hvis Stork har gemt en anden provision på salget, markeres cellen orange med en note, der viser Storks tal.
+3. **CPO:** den pris fra produktets historik, der gjaldt på salgsdatoen. Lukning-produkterne får altså 1.300, 1.200 eller 1.100 kr. Viderestilling står som 0 kr., fordi den med vilje er 0 kr. Cellen er ikke længere gul.
+4. Kunde-id'er, der ikke findes i Stork, står stadig som "Ikke fundet i Stork" og er markeret.
+5. Nederst er der en totalrække med formler.
+6. Filen gemmes som `hiper_annulleringer_15-8_14-9_udfyldt_v2.xlsx`. Den første udgave bevares.
+
+## Ikke med i denne plan (separat beslutning)
+Prisreglen "Hiper Lukning - default" med 0 kr. i omsætning og 200 kr. i provision er stadig aktiv i Stork. Den er grunden til, at rapporterne mangler omsætning på Lukning før 15/9. At rette den hører til pricing-motoren (rød zone), og det kræver jeres godkendelse bagefter.
