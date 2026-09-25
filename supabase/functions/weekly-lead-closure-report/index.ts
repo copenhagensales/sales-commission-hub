@@ -740,7 +740,7 @@ async function saveCounts(
 ): Promise<void> {
   if (counts.size === 0) return;
   const rows = [...counts.entries()].map(([key, lead_count]) => {
-    const [week_start, acc, campaignId, user, status] = key.split("|");
+    const [week_start, acc, campaignId, user, status, reason = ""] = key.split("|");
     return {
       week_start,
       account: acc,
@@ -748,6 +748,7 @@ async function saveCounts(
       report_line: config.mapping.get(mapKey(acc, campaignId))?.reportLine ?? "",
       agent_reference: `${acc}:${user}`,
       status,
+      invalid_reason: reason,
       lead_count,
     };
   });
@@ -884,6 +885,7 @@ async function processTask(
 
   const { scanned, nextPage } = await streamCampaignPages(
     auth,
+    job.account,
     job.campaignId,
     job.nextPage,
     (lead) => {
@@ -892,7 +894,8 @@ async function processTask(
       if (!weekSet.has(week)) return;
       if (!users.has(lead.user)) return; // kun vores egne sælgere
       const status = lead.status || UNKNOWN_BUCKET;
-      const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}`;
+      // Årsagen er kun med for invalid; tom = lukket af dialeren (gemmes som NULL).
+      const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}|${lead.reason}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     },
 
