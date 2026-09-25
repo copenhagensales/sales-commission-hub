@@ -936,6 +936,7 @@ type StatRow = {
   report_line: string | null;
   agent_reference: string;
   status: string;
+  invalid_reason: string | null;
   lead_count: number;
 };
 
@@ -968,6 +969,17 @@ function callsByLine(
   return out;
 }
 
+/** Hvilken kilde en rapportlinje har årsag til ugyldig fra. */
+function reasonSource(reportLine: string, config: Config): LineTotals["reasonSource"] {
+  const accounts = new Set<string>();
+  for (const [key, value] of config.mapping) {
+    if (value.reportLine === reportLine) accounts.add(key.split("|")[0]);
+  }
+  if (accounts.has("enreach")) return "enreach";
+  const all = [...accounts];
+  return all.length > 0 && all.every((a) => INVALID_REASON_FIELDS[a as AccountKey]) ? "adversus" : "none";
+}
+
 function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): LineTotals[] {
   const calls = callsByLine(callRows, config);
   return config.lines.map((reportLine) => {
@@ -976,6 +988,12 @@ function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): L
       mine.filter((r) => predicate(r.status)).reduce((s, r) => s + r.lead_count, 0);
     const extras: Record<string, number> = {};
     for (const e of config.excluded) extras[e.status] = sum((status) => status === e.status);
+    const reasons = new Map<string, number>();
+    for (const r of mine) {
+      if (r.status !== INVALID_STATUS) continue;
+      const key = r.invalid_reason ?? "";
+      reasons.set(key, (reasons.get(key) ?? 0) + r.lead_count);
+    }
     return {
       reportLine,
       closed: sum((status) => config.closing.has(status)),
@@ -984,6 +1002,8 @@ function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): L
       extras,
       mcr: sum((status) => status === MCR_STATUS),
       calls: calls.get(reportLine) ?? null,
+      invalidReasons: [...reasons.entries()].map(([reason, count]) => ({ reason: reason || null, count })),
+      reasonSource: reasonSource(reportLine, config),
     };
   });
 }
