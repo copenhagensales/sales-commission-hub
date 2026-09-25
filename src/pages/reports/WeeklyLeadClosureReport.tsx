@@ -192,6 +192,94 @@ function FunnelCell({
 }
 
 
+type ReasonSource = "adversus" | "enreach" | "none";
+
+/** Konti hvor Adversus har et årsagsfelt for ugyldig. Lederne har ikke. */
+const REASON_ACCOUNTS = ["main"];
+/** Gemt årsag for uger hentet før opdelingen, som ikke kunne genskabes. */
+const NOT_SPLIT_REASON = "Ikke opgjort";
+
+function BreakdownLine({
+  label,
+  count,
+  whole,
+  indent = false,
+  strong = false,
+}: {
+  label: string;
+  count: number;
+  whole: number;
+  indent?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <div className={`flex items-baseline justify-between gap-3 ${indent ? "pl-4 text-muted-foreground" : ""}`}>
+      <span className={`truncate text-left ${strong ? "font-medium" : ""}`} title={label}>
+        {label}
+      </span>
+      <span className="whitespace-nowrap tabular-nums">
+        {formatCount(count)}
+        <span className="ml-1 text-muted-foreground">{formatPct(pctValue(count, whole))}</span>
+      </span>
+    </div>
+  );
+}
+
+function UnreachableBreakdown({
+  source,
+  invalid,
+  mcr,
+  reasons,
+}: {
+  source: ReasonSource;
+  invalid: number;
+  mcr: number;
+  reasons: { reason: string | null; count: number }[];
+}) {
+  const total = invalid + mcr;
+  if (source === "enreach") {
+    return (
+      <div className="ml-auto max-w-xs space-y-0.5 text-xs">
+        <BreakdownLine label="Max call (lukket af dialeren)" count={mcr} whole={total} />
+        <BreakdownLine label="Ugyldig" count={invalid} whole={total} />
+      </div>
+    );
+  }
+  if (source === "none") {
+    return <span className="text-xs text-muted-foreground">årsag ikke tilgængelig</span>;
+  }
+  const marked = reasons
+    .filter((r) => r.reason && r.reason !== NOT_SPLIT_REASON)
+    .sort((a, b) => b.count - a.count);
+  const markedTotal = marked.reduce((sum, r) => sum + r.count, 0);
+  const notSplit = reasons
+    .filter((r) => r.reason === NOT_SPLIT_REASON)
+    .reduce((sum, r) => sum + r.count, 0);
+  return (
+    <div className="ml-auto max-w-xs space-y-0.5 text-xs">
+      <BreakdownLine label="Sælgermarkeret ugyldig" count={markedTotal} whole={total} strong />
+      {marked.map((r) => (
+        <BreakdownLine
+          key={r.reason}
+          label={r.reason as string}
+          count={r.count}
+          whole={markedTotal}
+          indent
+        />
+      ))}
+      <BreakdownLine
+        label="Lukket af dialeren (max kontaktforsøg eller dødt nummer)"
+        count={total - markedTotal - notSplit}
+        whole={total}
+        strong
+      />
+      {notSplit > 0 && (
+        <BreakdownLine label="Ikke opgjort (hentet før opdelingen)" count={notSplit} whole={total} />
+      )}
+    </div>
+  );
+}
+
 export default function WeeklyLeadClosureReport() {
   const { isSuperadmin } = useIsSuperadmin();
   const [selectedWeek, setSelectedWeek] = useState<string>("");
@@ -313,6 +401,27 @@ export default function WeeklyLeadClosureReport() {
     () => new Set(report?.mcrLines ?? []),
     [report],
   );
+
+  /** Ugyldige pr. årsag pr. rapportlinje (kun Adversus). */
+  const reasonsByLine = useMemo(() => {
+    const out = new Map<string, { reason: string | null; count: number }[]>();
+    for (const r of report?.invalidReasons ?? []) {
+      const list = out.get(r.report_line) ?? [];
+      list.push({ reason: r.reason, count: r.lead_count });
+      out.set(r.report_line, list);
+    }
+    return out;
+  }, [report]);
+
+  /** Hvilken opdeling en linje kan vise: Enreach, Adversus med årsagsfelt, eller ingen. */
+  const reasonSourceOf = (reportLine: string): ReasonSource => {
+    const accounts = (report?.lineAccounts ?? [])
+      .filter((a) => a.report_line === reportLine)
+      .map((a) => a.account);
+    if (accounts.includes("enreach")) return "enreach";
+    if (accounts.length > 0 && accounts.every((a) => REASON_ACCOUNTS.includes(a))) return "adversus";
+    return "none";
+  };
 
   const lineTotals = useMemo(() => {
     return lines.map((line) => {
@@ -759,16 +868,12 @@ export default function WeeklyLeadClosureReport() {
                               )}
                             </TableCell>
                             <TableCell className="text-right text-sm">
-                              {row.mcrAvailable ? (
-                                <span className="tabular-nums">
-                                  Max call {formatCount(row.mcr)} · forkert nummer{" "}
-                                  {formatCount(row.extras[INVALID_STATUS] ?? 0)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  kan ikke opdeles (Adversus lukker max call som ugyldig)
-                                </span>
-                              )}
+                              <UnreachableBreakdown
+                                source={reasonSourceOf(row.reportLine)}
+                                invalid={row.extras[INVALID_STATUS] ?? 0}
+                                mcr={row.mcr}
+                                reasons={reasonsByLine.get(row.reportLine) ?? []}
+                              />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -801,11 +906,12 @@ export default function WeeklyLeadClosureReport() {
                         </p>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">Max Call Reach</p>
+                        <p className="font-medium text-foreground">Ikke kontaktbare – opdeling</p>
                         <p>
-                          Emner dialeren selv har lukket, fordi loftet af opkaldsforsøg er nået
-                          (Enreach: status Depleted). Adversus lukker dem som ugyldige uden egen
-                          markering, så opdelingen kan kun vises for Enreach-kampagner.
+                          Sælgermarkeret ugyldig: sælgeren har talt med eller afklaret emnet og
+                          markeret det ugyldigt med en årsag. Lukket af dialeren: emnet blev lukket
+                          automatisk uden kontakt – ved max kontaktforsøg eller fordi nummeret ikke
+                          virker. På Kanvas (Enreach) markerer dialeren selv max call.
                         </p>
                       </div>
                     </div>
@@ -814,8 +920,8 @@ export default function WeeklyLeadClosureReport() {
               </>
             )}
             <p className="mt-3 text-sm text-muted-foreground">
-              Ikke kontaktbare = forkert nummer, allerede kunde eller lukket af dialeren ved max
-              kontaktforsøg. Adversus skelner ikke mellem de to; Enreach gør – se detaljer.
+              Ikke kontaktbare = sælgermarkeret ugyldig eller lukket af dialeren (max kontaktforsøg
+              eller dødt nummer) – se opdelingen under detaljer.
             </p>
             {!statsLoading && availableWeeks.length > 0 && idleLines.length > 0 && (
               <p className="mt-1 text-sm text-muted-foreground">

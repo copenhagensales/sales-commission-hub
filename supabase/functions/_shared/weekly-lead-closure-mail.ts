@@ -52,6 +52,10 @@ export interface LineTotals {
   mcr?: number;
   /** Opkaldstal for linjen. null når kilden ikke leverer opkald. */
   calls?: CallTotalsView | null;
+  /** Ugyldige pr. årsag. reason null = ingen årsag (lukket af dialeren). */
+  invalidReasons?: { reason: string | null; count: number }[];
+  /** adversus = årsag kan vises; enreach = Depleted-opdeling; none = ikke tilgængelig. */
+  reasonSource?: "adversus" | "enreach" | "none";
 }
 
 export interface StatusTotals {
@@ -183,62 +187,125 @@ function hitrateCell(booked: number, decided: number): string {
     </div>${small ? `<div style="font-size:10px;color:${BRAND.faint};margin-top:4px;">lille grundlag</div>` : ""}`;
 }
 
+const INVALID = "invalid";
+const UNQUALIFIED = "unqualified";
+/** Årsag gemt for uger hentet før opdelingen, som ikke kunne genskabes. */
+const NOT_SPLIT = "Ikke opgjort";
+
+type LineView = {
+  reportLine: string;
+  closedTotal: number;
+  unreachable: number;
+  unqualified: number;
+  decided: number;
+  booked: number;
+  source: LineTotals;
+};
+
+function viewOf(l: LineTotals): LineView & { active: boolean } {
+  const mcr = l.mcr ?? 0;
+  return {
+    reportLine: l.reportLine,
+    closedTotal: l.closed + mcr,
+    unreachable: (l.extras[INVALID] ?? 0) + mcr,
+    unqualified: l.extras[UNQUALIFIED] ?? 0,
+    decided: l.decided,
+    booked: l.booked,
+    source: l,
+    active: l.closed > 0 || mcr > 0 || (l.calls?.attempts ?? 0) > 0,
+  };
+}
+
+const th = (text: string, width: string, align = "center") =>
+  `<th class="pd-th" width="${width}" style="width:${width};word-break:break-word;text-align:${align};font-size:9px;font-weight:700;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase;padding:12px 6px 10px;line-height:1.3;">${escapeHtml(text)}</th>`;
+const td = (content: string, align = "center", extra = "") =>
+  `<td class="pd-td" style="text-align:${align};padding:14px 6px;word-break:break-word;border-top:1px solid ${BRAND.cellBorder};vertical-align:middle;${extra}">${content}</td>`;
+const tableWrap = (inner: string) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:14px;overflow:hidden;font-variant-numeric:tabular-nums;">${inner}</table>`;
+
+function countPct(count: number, whole: number, color: string = BRAND.text): string {
+  return `<div style="font-size:14px;font-weight:600;color:${color};">${nf(count)}</div><div class="pd-sub" style="font-size:10px;color:${BRAND.muted};margin-top:2px;">${pct1(count, whole)}</div>`;
+}
+
+/** Hovedtabel: samme 8 kolonner som siden i Stork, ingen totalrække. */
 function lineSection(title: string, subtitle: string, lines: LineTotals[]): string {
-  const view = lines.map((l) => {
-    const mcr = l.mcr ?? 0;
-    return {
-      reportLine: l.reportLine,
-      closedTotal: l.closed + mcr,
-      decided: l.decided,
-      booked: l.booked,
-      active: l.closed > 0 || mcr > 0 || (l.calls?.attempts ?? 0) > 0,
-    };
-  });
+  const view = lines.map(viewOf);
   const active = view.filter((l) => l.active);
   const idle = view.filter((l) => !l.active);
-  const sum = (pick: (l: (typeof view)[number]) => number) => active.reduce((s, l) => s + pick(l), 0);
-  const total = {
-    reportLine: "Tryg i alt",
-    closedTotal: sum((l) => l.closedTotal),
-    decided: sum((l) => l.decided),
-    booked: sum((l) => l.booked),
-  };
 
-  const h = (text: string, width: string, align = "center") =>
-    `<th class="pd-th" width="${width}" style="width:${width};word-break:break-word;text-align:${align};font-size:9px;font-weight:700;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase;padding:12px 6px 10px;line-height:1.3;">${escapeHtml(text)}</th>`;
-  const head = `<thead><tr>${h("Kampagne", "24%", "left")}${h("Emner lukket", "13%")}${h("Kvalificerede samtaler", "18%")}${h("Bookede", "12%")}${h("Sælger-hitrate", "16%")}${h("Emne-udnyttelse", "17%")}</tr></thead>`;
+  const head = `<thead><tr>${th("Kampagne", "19%", "left")}${th("Emner lukket", "10%")}${th("Ikke kontakt-bare", "11%")}${th("Ukvalifi-cerede", "11%")}${th("Kvalificerede samtaler", "13%")}${th("Bookede", "9%")}${th("Sælger-hitrate", "14%")}${th("Emne-udnyttelse", "13%")}</tr></thead>`;
 
-  const cell = (content: string, align = "center", extra = "") =>
-    `<td class="pd-td" style="text-align:${align};padding:14px 6px;word-break:break-word;border-top:1px solid ${BRAND.cellBorder};vertical-align:middle;${extra}">${content}</td>`;
-
-  const row = (l: typeof total, isTotal: boolean) => {
-    const bg = isTotal ? `background:${BRAND.pageBg};` : "";
-    const name = `<span style="font-size:14px;font-weight:${isTotal ? 800 : 600};color:${BRAND.text};">${escapeHtml(l.reportLine)}</span>`;
-    const closed = `<span style="font-size:15px;font-weight:${isTotal ? 800 : 600};color:${BRAND.text};">${nf(l.closedTotal)}</span>`;
+  const row = (l: LineView) => {
+    const name = `<span style="font-size:14px;font-weight:600;color:${BRAND.text};">${escapeHtml(l.reportLine)}</span>`;
+    const closed = `<span style="font-size:15px;font-weight:600;color:${BRAND.text};">${nf(l.closedTotal)}</span>`;
     const qualified = `<div class="pd-pill" style="display:inline-block;background:${GREEN_SOFT};border-radius:10px;padding:6px 10px;min-width:44px;">
       <div style="font-size:15px;font-weight:700;color:${GREEN_TEXT};">${nf(l.decided)}</div>
       <div style="font-size:10px;color:${GREEN_TEXT};margin-top:2px;">${pct1(l.decided, l.closedTotal)}</div></div>`;
-    const booked = `<span style="font-size:14px;color:${BRAND.text};font-weight:${isTotal ? 800 : 500};">${nf(l.booked)}</span>`;
+    const booked = `<span style="font-size:14px;color:${BRAND.text};font-weight:500;">${nf(l.booked)}</span>`;
     const usage = `<span style="font-size:15px;font-weight:800;color:${BRAND.text};">${pct1(l.booked, l.closedTotal)}</span>`;
-    return `<tr>${cell(name, "left", `padding-left:14px;${bg}`)}${cell(closed, "center", bg)}${cell(qualified, "center", bg)}${cell(booked, "center", bg)}${cell(hitrateCell(l.booked, l.decided), "center", bg)}${cell(usage, "center", `padding-right:14px;${bg}`)}</tr>`;
+    return `<tr>${td(name, "left", "padding-left:14px;")}${td(closed)}${td(countPct(l.unreachable, l.closedTotal))}${td(countPct(l.unqualified, l.closedTotal))}${td(qualified)}${td(booked)}${td(hitrateCell(l.booked, l.decided))}${td(usage, "center", "padding-right:14px;")}</tr>`;
   };
 
-  const rows = active.map((l) => row(l, false)).join("");
+  const rows = active.map(row).join("");
   const body = rows
-    ? `<tbody>${rows}${row(total, true)}</tbody>`
-    : `<tbody><tr><td colspan="6" style="padding:16px;font-size:13px;color:${BRAND.faint};">Ingen lukkede emner i perioden.</td></tr></tbody>`;
-
+    ? `<tbody>${rows}</tbody>`
+    : `<tbody><tr><td colspan="8" style="padding:16px;font-size:13px;color:${BRAND.faint};">Ingen lukkede emner i perioden.</td></tr></tbody>`;
   const note = idle.length
     ? `<div style="font-size:12px;color:${BRAND.muted};margin:8px 0 0;">${idle.length} ${
       idle.length === 1 ? "kampagne" : "kampagner"
     } uden aktivitet: ${escapeHtml(idle.map((l) => l.reportLine).join(", "))}</div>`
     : "";
-
-  const table = `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:14px;overflow:hidden;font-variant-numeric:tabular-nums;">${head}${body}</table>`;
-  return `<div style="margin:0 0 28px;">${sectionTitle(title, subtitle)}${table}${note}</div>`;
+  return `<div style="margin:0 0 28px;">${sectionTitle(title, subtitle)}${tableWrap(head + body)}${note}</div>`;
 }
 
+/** Opdeling af Ikke kontaktbare for én kampagne — samme som detaljerne i Stork. */
+function unreachableBreakdown(l: LineView): string {
+  const line = (label: string, count: number, whole: number, indent = false, strong = false) =>
+    `<tr><td style="padding:5px ${indent ? "0 5px 22px" : "0 5px 0"};font-size:13px;color:${indent ? BRAND.muted : BRAND.text};font-weight:${strong ? 700 : 400};">${escapeHtml(label)}</td><td align="right" style="padding:5px 0;font-size:13px;color:${BRAND.text};font-weight:${strong ? 700 : 500};white-space:nowrap;">${nf(count)} <span style="color:${BRAND.muted};font-weight:400;">· ${pct1(count, whole)}</span></td></tr>`;
+  const source = l.source.reasonSource ?? "none";
+  const total = l.unreachable;
+  let rows = line("Ikke kontaktbare", total, l.closedTotal, false, true);
+  if (source === "enreach") {
+    const mcr = l.source.mcr ?? 0;
+    rows += line("Max call (lukket af dialeren)", mcr, total, true);
+    rows += line("Ugyldig", total - mcr, total, true);
+  } else if (source === "adversus") {
+    const reasons = l.source.invalidReasons ?? [];
+    const marked = reasons.filter((r) => r.reason && r.reason !== NOT_SPLIT).sort((a, b) => b.count - a.count);
+    const markedTotal = marked.reduce((s, r) => s + r.count, 0);
+    const notSplit = reasons.filter((r) => r.reason === NOT_SPLIT).reduce((s, r) => s + r.count, 0);
+    rows += line("Sælgermarkeret ugyldig", markedTotal, total);
+    for (const r of marked) rows += line(r.reason as string, r.count, markedTotal, true);
+    rows += line("Lukket af dialeren (max kontaktforsøg eller dødt nummer)", total - markedTotal - notSplit, total);
+    if (notSplit) rows += line("Ikke opgjort (hentet før opdelingen)", notSplit, total);
+  } else {
+    rows += `<tr><td colspan="2" style="padding:5px 0 5px 22px;font-size:12px;color:${BRAND.muted};">Årsag ikke tilgængelig for denne kampagne</td></tr>`;
+  }
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:collapse;">${rows}</table>`;
+}
 
+function specifiedSection(weekNumber: number, lines: LineTotals[]): string {
+  const active = lines.map(viewOf).filter((l) => l.active);
+  if (!active.length) return "";
+  const kpi = (label: string, value: string) =>
+    `<td class="pd-td" width="20%" style="width:20%;padding:8px 4px;text-align:center;vertical-align:top;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${BRAND.muted};text-transform:uppercase;">${escapeHtml(label)}</div><div style="font-size:14px;font-weight:700;color:${BRAND.text};margin-top:4px;">${value}</div></td>`;
+  const blocks = active.map((l) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:separate;background:${BRAND.card};border:1px solid ${BRAND.cellBorder};border-radius:14px;margin:0 0 14px;">
+      <tr><td style="padding:14px 16px 6px;font-size:15px;font-weight:800;color:${BRAND.text};">${escapeHtml(l.reportLine)} <span style="font-size:12px;font-weight:400;color:${BRAND.muted};">· ${nf(l.closedTotal)} emner lukket</span></td></tr>
+      <tr><td style="padding:4px 16px 8px;">${unreachableBreakdown(l)}</td></tr>
+      <tr><td style="padding:0 10px 10px;border-top:1px solid ${BRAND.cellBorder};">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;border-collapse:collapse;table-layout:fixed;"><tr>
+          ${kpi("Ukvalificerede", `${nf(l.unqualified)} <span style="font-size:11px;font-weight:400;color:${BRAND.muted};">${pct1(l.unqualified, l.closedTotal)}</span>`)}
+          ${kpi("Kvalificerede samtaler", `<span style="color:${GREEN_TEXT};">${nf(l.decided)}</span> <span style="font-size:11px;font-weight:400;color:${BRAND.muted};">${pct1(l.decided, l.closedTotal)}</span>`)}
+          ${kpi("Bookede", nf(l.booked))}
+          ${kpi("Sælgerhitrate", pct1(l.booked, l.decided))}
+          ${kpi("Emneudnyttelse", pct1(l.booked, l.closedTotal))}
+        </tr></table>
+      </td></tr>
+    </table>`).join("");
+  const definition = `<div style="font-size:12px;color:${BRAND.muted};line-height:1.6;margin:4px 0 0;"><strong style="color:${BRAND.text};">Sælgermarkeret ugyldig:</strong> sælgeren har talt med eller afklaret emnet og markeret det ugyldigt med en årsag. <strong style="color:${BRAND.text};">Lukket af dialeren:</strong> emnet blev lukket automatisk uden kontakt – ved max kontaktforsøg eller fordi nummeret ikke virker.</div>`;
+  return `<div style="margin:0 0 28px;">${sectionTitle("Specificeret pr. kampagne", `Uge ${weekNumber} · opdeling af ikke kontaktbare`)}${blocks}${definition}</div>`;
+}
 
 export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
   subject: string;
@@ -318,7 +385,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
     .pd-td { padding:12px 3px !important; }
     .pd-td span, .pd-td div { font-size:12px !important; }
     .pd-pill { padding:4px 5px !important; min-width:0 !important; }
-    .pd-pill div + div, .pd-bar { display:none !important; }
+    .pd-pill div + div, .pd-bar, .pd-sub { display:none !important; }
   }
 </style></head>
 <body class="pd-wrap" style="margin:0;padding:26px 14px;background:${BRAND.pageBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
@@ -343,7 +410,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
       Her er ugens tal for mødebooking på Tryg pr. kampagne.
     </div>
 
-    ${table1}${table4}${notesHtml}
+    ${table1}${table4}${specifiedSection(input.weekNumber, input.lines)}${notesHtml}
 
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;padding:0;">

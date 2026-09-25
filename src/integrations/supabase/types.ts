@@ -17307,6 +17307,7 @@ export type Database = {
           agent_reference: string
           created_at: string
           id: string
+          invalid_reason: string | null
           lead_count: number
           report_line: string | null
           status: string
@@ -17319,6 +17320,7 @@ export type Database = {
           agent_reference: string
           created_at?: string
           id?: string
+          invalid_reason?: string | null
           lead_count?: number
           report_line?: string | null
           status: string
@@ -17331,6 +17333,7 @@ export type Database = {
           agent_reference?: string
           created_at?: string
           id?: string
+          invalid_reason?: string | null
           lead_count?: number
           report_line?: string | null
           status?: string

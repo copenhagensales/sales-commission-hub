@@ -6,7 +6,13 @@
 //
 // Hårde regler i denne fil:
 //   * Der læses kun felterne id (dedup i hukommelsen), campaignId, status,
-//     lastContactedBy og updated. Intet fra masterData eller resultData.
+//     lastContactedBy og updated. Intet fra masterData.
+//   * Undtagelse godkendt af Kasper (25/9 2026): fra resultData læses ÉT felt —
+//     årsagsfeltet for ugyldig (main: 91278 "Ugyldig:"), som er en lukket
+//     rulleliste — og kun på emner med status invalid. Værdien matches mod en
+//     fast liste (INVALID_REASON_FIELDS); ukendte værdier gemmes som "Andet".
+//     Intet andet resultatfelt og ingen fritekst læses ("Andet:" 91276, noter).
+//     Lederne-kontoen har intet tilsvarende felt, så dér læses intet.
 //   * Ingen leads, lead-id'er, navne, numre eller noter gemmes eller logges.
 //   * Kun emner behandlet af vores egne @copenhagensales.dk-brugere tælles.
 //   * Afsluttende statusser står i public.lead_closing_statuses — ikke i kode.
@@ -213,10 +219,46 @@ type LeadFacts = {
   status: string;
   user: string;
   day: string;
+  /** Årsag fra rullelisten (kun invalid på konti med årsagsfelt), ellers "". */
+  reason: string;
 };
 
 /** Egen nøgle i weekly_lead_closure_stats, så MCR kan aggregeres som statusser. */
 const MCR_STATUS = "max_call_reach";
+const INVALID_STATUS = "invalid";
+
+/**
+ * Årsagsfeltet for ugyldig pr. Adversus-konto: felt-id og rullelistens faste
+ * værdier. Kun disse værdier gemmes; en ukendt værdi gemmes som "Andet".
+ * Lederne-kontoen har intet tilsvarende felt (undersøgt 25/9 2026) og står
+ * derfor ikke her.
+ */
+const INVALID_REASON_FIELDS: Partial<Record<AccountKey, { fieldId: number; values: string[] }>> = {
+  main: {
+    fieldId: 91278,
+    values: [
+      "De har allerede modtaget et tilbud fra TRYG",
+      "Er ikke en del af FDM",
+      "Forkert nummer",
+      "Forkert info på kontaktperson",
+      "Andet",
+    ],
+  },
+};
+const OTHER_REASON = "Andet";
+
+/** Læser KUN årsagsfeltet og returnerer en whitelistet værdi eller "". */
+function invalidReason(account: AccountKey, lead: Record<string, unknown>): string {
+  const def = INVALID_REASON_FIELDS[account];
+  if (!def || !Array.isArray(lead.resultData)) return "";
+  for (const field of lead.resultData as Record<string, unknown>[]) {
+    if (Number(field?.id) !== def.fieldId) continue;
+    const value = safeString(field.value);
+    if (!value) return "";
+    return def.values.includes(value) ? value : OTHER_REASON;
+  }
+  return "";
+}
 
 /**
  * Max Call Reach opgøres KUN på dialerens egen markering. Enreach sætter selv
@@ -233,6 +275,7 @@ const ENREACH_MCR_STATUS = "Depleted";
  */
 async function streamCampaignPages(
   auth: string,
+  account: AccountKey,
   campaignId: string,
   startPage: number,
   onLead: (lead: LeadFacts) => void,
@@ -255,10 +298,12 @@ async function streamCampaignPages(
     );
     for (const lead of batch) {
       scanned++;
+      const status = safeString(lead.status);
       onLead({
-        status: safeString(lead.status),
+        status,
         user: safeString(lead.lastContactedBy),
         day: copenhagenDay(safeString(lead.updated)),
+        reason: status === INVALID_STATUS ? invalidReason(account, lead) : "",
       });
     }
     if (batch.length < PAGE_SIZE) return { scanned, nextPage: null };
@@ -695,7 +740,7 @@ async function saveCounts(
 ): Promise<void> {
   if (counts.size === 0) return;
   const rows = [...counts.entries()].map(([key, lead_count]) => {
-    const [week_start, acc, campaignId, user, status] = key.split("|");
+    const [week_start, acc, campaignId, user, status, reason = ""] = key.split("|");
     return {
       week_start,
       account: acc,
@@ -703,6 +748,7 @@ async function saveCounts(
       report_line: config.mapping.get(mapKey(acc, campaignId))?.reportLine ?? "",
       agent_reference: `${acc}:${user}`,
       status,
+      invalid_reason: reason,
       lead_count,
     };
   });
@@ -839,6 +885,7 @@ async function processTask(
 
   const { scanned, nextPage } = await streamCampaignPages(
     auth,
+    job.account,
     job.campaignId,
     job.nextPage,
     (lead) => {
@@ -847,7 +894,8 @@ async function processTask(
       if (!weekSet.has(week)) return;
       if (!users.has(lead.user)) return; // kun vores egne sælgere
       const status = lead.status || UNKNOWN_BUCKET;
-      const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}`;
+      // Årsagen er kun med for invalid; tom = lukket af dialeren (gemmes som NULL).
+      const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}|${lead.reason}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     },
 
@@ -888,6 +936,7 @@ type StatRow = {
   report_line: string | null;
   agent_reference: string;
   status: string;
+  invalid_reason: string | null;
   lead_count: number;
 };
 
@@ -920,6 +969,17 @@ function callsByLine(
   return out;
 }
 
+/** Hvilken kilde en rapportlinje har årsag til ugyldig fra. */
+function reasonSource(reportLine: string, config: Config): LineTotals["reasonSource"] {
+  const accounts = new Set<string>();
+  for (const [key, value] of config.mapping) {
+    if (value.reportLine === reportLine) accounts.add(key.split("|")[0]);
+  }
+  if (accounts.has("enreach")) return "enreach";
+  const all = [...accounts];
+  return all.length > 0 && all.every((a) => INVALID_REASON_FIELDS[a as AccountKey]) ? "adversus" : "none";
+}
+
 function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): LineTotals[] {
   const calls = callsByLine(callRows, config);
   return config.lines.map((reportLine) => {
@@ -928,6 +988,12 @@ function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): L
       mine.filter((r) => predicate(r.status)).reduce((s, r) => s + r.lead_count, 0);
     const extras: Record<string, number> = {};
     for (const e of config.excluded) extras[e.status] = sum((status) => status === e.status);
+    const reasons = new Map<string, number>();
+    for (const r of mine) {
+      if (r.status !== INVALID_STATUS) continue;
+      const key = r.invalid_reason ?? "";
+      reasons.set(key, (reasons.get(key) ?? 0) + r.lead_count);
+    }
     return {
       reportLine,
       closed: sum((status) => config.closing.has(status)),
@@ -936,6 +1002,8 @@ function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): L
       extras,
       mcr: sum((status) => status === MCR_STATUS),
       calls: calls.get(reportLine) ?? null,
+      invalidReasons: [...reasons.entries()].map(([reason, count]) => ({ reason: reason || null, count })),
+      reasonSource: reasonSource(reportLine, config),
     };
   });
 }
@@ -1046,6 +1114,8 @@ async function assertFieldsAllowed(svc: SupabaseClient): Promise<void> {
       container: "lead_meta",
       fields: ["status", "lastContactedBy", "updated"],
     },
+    // Den eneste godkendte undtagelse i resultData: årsagsfeltet for ugyldig.
+    { integration: "adversus", container: "leadResultData", fields: ["Ugyldig:"] },
     { integration: "enreach", container: "lead_meta", fields: ENREACH_FIELDS },
     { integration: "adversus", container: "call_meta", fields: ADVERSUS_CALL_FIELDS },
     { integration: "enreach", container: "call_meta", fields: ENREACH_CALL_FIELDS },
@@ -1189,7 +1259,7 @@ async function finishAndMail(
   const weeks = state.weeks;
   const { data: stored } = await svc
     .from("weekly_lead_closure_stats")
-    .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, lead_count")
+    .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, invalid_reason, lead_count")
     .in("week_start", weeks);
   /**
    * Rapportlinjen slås altid op i mappingen, så en rettet mapping virker med
@@ -1320,7 +1390,9 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status" | "sync_campaign_names";
+      action?: "status" | "sync_campaign_names" | "test_mail";
+      test_recipient?: string;
+      week_start?: string;
       run_ids?: string[];
     };
 
@@ -1332,6 +1404,57 @@ Deno.serve(async (req) => {
       return json(200, {
         summaries: summaries.map(({ failed: _failed, ...summary }) => summary),
       });
+    }
+
+    // Testmail: bygger mailen af de GEMTE tal for én uge (ingen ny hentning,
+    // så gemte uger ændres ikke) og sender den kun til én intern modtager.
+    // Modtagerlisten og "mail sendt"-markeringen røres ikke.
+    if (body.action === "test_mail") {
+      const recipient = safeString(body.test_recipient).toLowerCase();
+      if (!recipient.endsWith(OUR_DOMAIN)) return json(400, { error: "Testmail kun til en intern adresse" });
+      if (!body.week_start || !/^\d{4}-\d{2}-\d{2}$/.test(body.week_start)) {
+        return json(400, { error: "week_start mangler" });
+      }
+      const config = await loadConfig(svc);
+      const weeks = [4, 3, 2, 1, 0].map((n) => addDays(body.week_start!, -7 * n));
+      const { data: stored } = await svc
+        .from("weekly_lead_closure_stats")
+        .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, invalid_reason, lead_count")
+        .in("week_start", weeks);
+      const rows = ((stored ?? []) as StatRow[]).map((r) => ({
+        ...r,
+        report_line: config.mapping.get(mapKey(r.account, r.adversus_campaign_id))?.reportLine ?? null,
+      }));
+      const { data: storedCalls } = await svc
+        .from("weekly_lead_call_stats")
+        .select("week_start, account, campaign_id, attempts, answered, leads_dialed, leads_answered")
+        .in("week_start", weeks);
+      const callRows = (storedCalls ?? []) as CallStatRow[];
+      const latest = body.week_start;
+      const mail = buildMail(
+        latest,
+        rows.filter((r) => r.week_start === latest),
+        weeks.slice(0, 4).reverse().map((week) => ({
+          weekStart: week,
+          rows: rows.filter((r) => r.week_start === week),
+          callRows: callRows.filter((r) => r.week_start === week),
+        })).filter((w) => w.rows.length > 0),
+        config,
+        new Map(),
+        [],
+        callRows.filter((r) => r.week_start === latest),
+      );
+      const { error } = await svc.from("scheduled_emails").insert({
+        recipient_email: recipient,
+        subject: `[TEST] ${mail.subject}`,
+        content: mail.html,
+        template_key: "weekly_lead_closure_report_test",
+        scheduled_at: new Date().toISOString(),
+        status: "pending",
+      });
+      if (error) throw new Error(`Kunne ikke lægge testmailen i køen: ${error.message}`);
+      await flushMailQueue();
+      return json(200, { stage: "testmail sendt", recipient, week: latest });
     }
 
     if (body.action === "sync_campaign_names") {
