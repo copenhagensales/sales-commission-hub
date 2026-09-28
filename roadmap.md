@@ -106,3 +106,7 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 - [x] Cron hvert 15. min + daglig anonymisering af medlemsnummer (90 dage)
 - [ ] Oprydning i `adversus-discover` (read-only, superadmin) når opdagelsesfasen lukkes
 - [ ] Beslutning: Hiper Lukning/Viderestilling-regler med 0 kr omsætning
+
+## Åbne opgaver (28/9)
+- [ ] Lederne-salg uden telefon på United-fanen — afventer GDPR-beslutning fra Kasper/Mathias
+- [ ] Kasper: read-only afstemning FDM+FDM 2 uge 39 (Adversus 1.074/280 vs. Stork 906/250)
