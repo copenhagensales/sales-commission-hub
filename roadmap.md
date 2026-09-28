@@ -109,4 +109,4 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 
 ## Åbne opgaver (28/9)
 - [ ] Lederne-salg uden telefon på United-fanen — afventer GDPR-beslutning fra Kasper/Mathias
-- [ ] Kasper: read-only afstemning FDM+FDM 2 uge 39 (Adversus 1.074/280 vs. Stork 906/250)
+- [x] Kasper: read-only afstemning FDM uge 39 — forklaret fuldt (Stork-hentning 25/9, mandagskørsel gik i stå)
