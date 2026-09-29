@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { TrygKanvasSale } from "@/hooks/useTrygKanvasSales";
 import type { TrygSaleReview } from "@/hooks/useTrygSaleReviews";
+import { formatDanishPhone } from "@/utils/phoneFormat";
 
 interface CommonProps {
   sales: TrygKanvasSale[];
@@ -164,7 +165,7 @@ export function TrygSalesTable(props: Props) {
                     {sale.sellerName}
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">
-                    {sale.customerPhone || "—"}
+                    {formatDanishPhone(sale.customerPhone) || "—"}
                   </TableCell>
                   <TableCell className="w-16 text-right font-semibold text-primary tabular-nums">
                     {sale.quantity}

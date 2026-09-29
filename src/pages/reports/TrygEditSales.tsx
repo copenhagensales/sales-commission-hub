@@ -122,13 +122,7 @@ function fillPhonePlaceholders(template: string, phones: string[]): string {
 }
 
 
-/** Kun cifre, uden dansk landekode foran — bruges til telefon-søgning. */
-function normalizePhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("0045")) return digits.slice(4);
-  if (digits.startsWith("45") && digits.length > 8) return digits.slice(2);
-  return digits;
-}
+import { normalizePhone, formatDanishPhone } from "@/utils/phoneFormat";
 
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
@@ -234,7 +228,7 @@ export default function TrygEditSales() {
     () =>
       (sales || [])
         .filter((s) => selectedIds.has(s.saleId) && s.customerPhone)
-        .map((s) => s.customerPhone as string),
+        .map((s) => formatDanishPhone(s.customerPhone)),
     [sales, selectedIds]
   );
 
@@ -404,7 +398,7 @@ export default function TrygEditSales() {
     () =>
       rejectedSales
         .filter((s) => s.customerPhone)
-        .map((s) => s.customerPhone as string),
+        .map((s) => formatDanishPhone(s.customerPhone)),
     [rejectedSales]
   );
 
