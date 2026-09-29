@@ -524,9 +524,9 @@ export default function UpcomingStarts() {
                   return (
                     <div 
                       key={member.id} 
-                      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg"
+                      className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 bg-muted/30 rounded-lg"
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-[10rem]">
                         {member.employee_id ? (
                           <Link 
                             to={`/employees/${member.employee_id}`}
@@ -550,11 +550,11 @@ export default function UpcomingStarts() {
                         {member.agent_email && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Mail className="h-3 w-3" />
-                            {member.agent_email}
+                            <span className="truncate">{member.agent_email}</span>
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
+                      <div className="flex flex-wrap items-center gap-2 ml-auto">
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
@@ -662,11 +662,12 @@ export default function UpcomingStarts() {
 
           {/* Quick actions */}
           {canEdit && cohort.status === "planned" && (
-            <div className="flex gap-2 mt-4 pt-3 border-t">
+            <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
               <Button
                 variant="default"
                 size="sm"
                 onClick={() => startCohortAndInviteMutation.mutate(cohort)}
+                className="max-w-full whitespace-normal h-auto min-h-9 text-left"
                 disabled={startCohortAndInviteMutation.isPending}
               >
                 {startCohortAndInviteMutation.isPending ? (
@@ -694,7 +695,7 @@ export default function UpcomingStarts() {
             {cohortList.length}
           </Badge>
         </h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))]">
           {cohortList.map(renderCohortCard)}
         </div>
       </div>
@@ -843,7 +844,7 @@ export default function UpcomingStarts() {
                   </h2>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))]">
                     {past.map(renderCohortCard)}
                   </div>
                 </CollapsibleContent>
