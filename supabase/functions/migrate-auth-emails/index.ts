@@ -55,11 +55,16 @@ Deno.serve(async (req) => {
     .not("work_email", "is", null)
     .not("auth_user_id", "is", null);
 
-  if (onlyEmails) empQuery = empQuery.in("work_email", onlyEmails);
-
-  const { data: employees, error: empErr } = await empQuery;
+  const { data: allEmployees, error: empErr } = await empQuery;
 
   if (empErr) return json(500, { error: empErr.message });
+
+  // Afgrænsning sker case-insensitivt, da work_email kan være gemt med store bogstaver.
+  const employees = onlyEmails
+    ? (allEmployees ?? []).filter((e) =>
+        onlyEmails!.includes(((e.work_email as string) ?? "").trim().toLowerCase())
+      )
+    : allEmployees;
 
   // Hent alle auth-brugere (paginated)
   const authUsers: { id: string; email: string }[] = [];
