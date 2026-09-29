@@ -122,8 +122,15 @@ export function useDeleteTrygKanvasSale() {
 
   return useMutation({
     mutationFn: async (saleId: string) => {
-      const { error } = await supabase.from("sales").delete().eq("id", saleId);
+      const { data, error } = await supabase
+        .from("sales")
+        .delete()
+        .eq("id", saleId)
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Du har ikke adgang, eller salget findes ikke længere.");
+      }
     },
     onSuccess: () => {
       for (const key of INVALIDATE_KEYS) {
@@ -145,13 +152,22 @@ export function useDeleteTrygKanvasSales() {
       const ids = Array.from(new Set(saleIds.filter(Boolean)));
       if (ids.length === 0) throw new Error("Ingen salg valgt til sletning.");
 
+      let deleted = 0;
       // Batches så URL'en ikke bliver for lang ved store perioder.
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
-        const { error } = await supabase.from("sales").delete().in("id", batch);
+        const { data, error } = await supabase
+          .from("sales")
+          .delete()
+          .in("id", batch)
+          .select("id");
         if (error) throw error;
+        deleted += data?.length ?? 0;
       }
-      return ids.length;
+      if (deleted === 0) {
+        throw new Error("Du har ikke adgang, eller salgene findes ikke længere.");
+      }
+      return deleted;
     },
     onSuccess: () => {
       for (const key of INVALIDATE_KEYS) {

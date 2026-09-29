@@ -17743,6 +17743,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      can_edit_tryg_sales: { Args: { _user_id: string }; Returns: boolean }
       can_manage_dpa_documents: { Args: { _user_id: string }; Returns: boolean }
       can_manage_employee_perks: {
         Args: { _user_id: string }
@@ -18657,6 +18658,7 @@ export type Database = {
         Returns: Json
       }
       sale_is_tdc_erhverv: { Args: { _sale_id: string }; Returns: boolean }
+      sale_is_united_client: { Args: { _sale_id: string }; Returns: boolean }
       save_integration_secret: {
         Args: {
           p_api_url: string
