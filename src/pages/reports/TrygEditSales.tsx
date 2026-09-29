@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrygSalesTable } from "@/components/reports/TrygSalesTable";
 import { SendTrygMailDialog } from "@/components/reports/SendTrygMailDialog";
@@ -145,6 +146,7 @@ export default function TrygEditSales() {
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [phoneSearch, setPhoneSearch] = useState("");
+  const [hideNoPhone, setHideNoPhone] = useState(true);
   const [isMailOpen, setIsMailOpen] = useState(false);
   const [isDeleteRejectedOpen, setIsDeleteRejectedOpen] = useState(false);
 
@@ -271,8 +273,13 @@ export default function TrygEditSales() {
     hasAccess && view === "united"
   );
   const visibleUnitedSales = useMemo(
-    () => (unitedSales || []).filter((s) => matchesSearch(s.customerPhone)),
-    [unitedSales, phoneSearch]
+    () =>
+      (unitedSales || []).filter(
+        (s) =>
+          (!hideNoPhone || !!s.customerPhone?.trim()) &&
+          matchesSearch(s.customerPhone)
+      ),
+    [unitedSales, phoneSearch, hideNoPhone]
   );
   const unitedClientNames = useMemo(
     () =>
@@ -718,6 +725,15 @@ export default function TrygEditSales() {
                       </button>
                     )}
                   </div>
+                  {view === "united" && (
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={hideNoPhone}
+                        onCheckedChange={(c) => setHideNoPhone(c === true)}
+                      />
+                      Skjul salg uden telefonnummer
+                    </label>
+                  )}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="gap-2">
