@@ -14,6 +14,8 @@ export interface UpdateUnitedSaleInput {
   customerPhone?: string | null;
 }
 
+const NO_ACCESS = "Du har ikke adgang, eller salget findes ikke længere.";
+
 const INVALIDATE_KEYS = [
   ["united-sales"],
   ["tryg-kanvas-sales"],
@@ -49,19 +51,27 @@ export function useUpdateUnitedSale() {
       }
 
       if (Object.keys(saleUpdate).length > 0) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("sales")
           .update(saleUpdate)
-          .eq("id", input.saleId);
+          .eq("id", input.saleId)
+          .select("id");
         if (error) throw error;
+        if (!data || data.length === 0) throw new Error(NO_ACCESS);
       }
 
       if (input.productId) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("sale_items")
           .update({ product_id: input.productId, needs_mapping: false })
-          .eq("id", input.saleItemId);
+          .eq("id", input.saleItemId)
+          .select("id");
         if (error) throw error;
+        if (!data || data.length === 0) throw new Error(NO_ACCESS);
+      }
+
+      // Pris afhænger af produkt og dato — genberegn ved begge.
+      if (input.productId || input.saleDatetime) {
 
         // Genberegn kun den ene salgslinje.
         const { error: rematchError } = await supabase.functions.invoke(
