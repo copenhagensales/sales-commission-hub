@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { requiresBasketNumber } from "@/config/fmBasketNumberProducts";
 
 interface ProductSelection {
   productId: string;
@@ -385,7 +386,7 @@ const SalesRegistration = () => {
       p.phoneNumbers.some((phone) => !phone.trim())
     );
     if (missingPhones) {
-      toast.error("Udfyld alle telefonnumre");
+      toast.error("Udfyld alle telefon-/kurvnumre");
       return;
     }
 
@@ -411,7 +412,9 @@ const SalesRegistration = () => {
           location_id: activeBooking.location!.id,
           client_id: clientId,
           product_name: selection.productName,
-          phone_number: phone.trim(),
+          ...(requiresBasketNumber(selection.productId)
+            ? { phone_number: "", basket_number: phone.trim() }
+            : { phone_number: phone.trim() }),
           
           claim_reimport: selection.claimFlags[index] === true,
               registered_at: isCallbackMode && callbackDate 
@@ -457,7 +460,11 @@ const SalesRegistration = () => {
               <div className="flex items-center justify-between gap-4">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Phone className="h-5 w-5" />
-                  Telefonnumre *
+                  {productSelections.every((p) => requiresBasketNumber(p.productId))
+                    ? "Kurvnumre *"
+                    : productSelections.some((p) => requiresBasketNumber(p.productId))
+                      ? "Telefon-/kurvnumre *"
+                      : "Telefonnumre *"}
                 </CardTitle>
                 {isEesyFm && (
                   <div className="flex items-center gap-2 rounded-full border px-4 py-2 shrink-0">
@@ -490,8 +497,8 @@ const SalesRegistration = () => {
                         #{index + 1}
                       </span>
                       <Input
-                        type="tel"
-                        placeholder="Telefonnummer *"
+                        type={requiresBasketNumber(selection.productId) ? "text" : "tel"}
+                        placeholder={requiresBasketNumber(selection.productId) ? "Kurvnummer *" : "Telefonnummer *"}
                         value={phone}
                         onChange={(e) =>
                           updatePhoneNumber(

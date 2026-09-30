@@ -196,6 +196,8 @@ interface CreateSaleParams {
   client_id: string;
   product_name: string;
   phone_number: string;
+  /** Kurvnummer for YouSee-fiberprodukter; gemmes i raw_payload, ikke som telefon. */
+  basket_number?: string;
   registered_at?: string;
   claim_reimport?: boolean;
 }
@@ -226,7 +228,7 @@ export function useCreateFieldmarketingSale() {
           source: 'fieldmarketing' as const,
           integration_type: 'manual' as const,
           sale_datetime: sale.registered_at || new Date().toISOString(),
-          customer_phone: sale.phone_number,
+          customer_phone: sale.basket_number ? null : sale.phone_number,
           agent_name: employee ? `${employee.first_name} ${employee.last_name}` : null,
           agent_email: employee?.work_email || null,
           client_campaign_id: null, // Set by enrich_fm_sale trigger
@@ -237,6 +239,7 @@ export function useCreateFieldmarketingSale() {
             fm_client_id: sale.client_id,
             fm_product_name: sale.product_name,
             fm_claim_reimport: sale.claim_reimport === true,
+            ...(sale.basket_number ? { fm_basket_number: sale.basket_number } : {}),
             // fm_comment / kommentar: GDPR – fritekstnoter må ikke gemmes
           }
         };
