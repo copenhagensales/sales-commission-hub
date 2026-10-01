@@ -626,6 +626,25 @@ export function useCreateSeason() {
   });
 }
 
+// Start ny sæson — altid med kvalifikationsuge. Rettighed tjekkes i DB (menu_league_admin, redigér).
+export function useStartNewSeason() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (qualificationStart: string) => {
+      const { data, error } = await supabase.rpc("league_start_new_season", {
+        p_qualification_start: qualificationStart,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["league-all-seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["league-active-season"] });
+    },
+  });
+}
+
 // Update season status (admin)
 export function useUpdateSeasonStatus() {
   const queryClient = useQueryClient();
