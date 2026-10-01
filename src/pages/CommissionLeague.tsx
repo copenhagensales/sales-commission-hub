@@ -47,6 +47,7 @@ import { useLeagueWeeklyProvision } from "@/hooks/useLeagueWeeklyProvision";
 import { useLeagueRoundProvision } from "@/hooks/useLeagueRoundProvision";
 import { PrizeShowcase } from "@/components/league/PrizeShowcase";
 import { FinalRoundBanner } from "@/components/league/FinalRoundBanner";
+import { StartSeasonButton } from "@/components/league/StartSeasonButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -322,6 +323,7 @@ export default function CommissionLeague() {
                 <p className="text-muted-foreground mb-6">
                   Der er ingen aktiv sæson lige nu. Kom tilbage senere!
                 </p>
+                <StartSeasonButton />
               </CardContent>
             </Card>
           </div>
@@ -388,6 +390,9 @@ export default function CommissionLeague() {
       )}
       <div className="cph-board min-h-screen bg-slate-900 p-2 sm:p-4 md:p-6">
         <div className="max-w-6xl mx-auto space-y-3 sm:space-y-6">
+          {isCompletedPhase && (
+            <div className="flex justify-end"><StartSeasonButton /></div>
+          )}
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
               <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 border border-indigo-500/20 border-t-2 border-t-indigo-500/30 p-4 sm:p-6 md:p-8 shadow-lg shadow-indigo-500/5">
