@@ -18565,6 +18565,10 @@ export type Database = {
         Args: { p_agent_email: string }
         Returns: string
       }
+      league_start_new_season: {
+        Args: { p_qualification_start: string }
+        Returns: string
+      }
       log_salary_access: {
         Args: { p_access_type?: string; p_employee_id: string; p_field: string }
         Returns: undefined
