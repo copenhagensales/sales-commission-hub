@@ -288,7 +288,6 @@ const categories: Category[] = [
           <div className="space-y-2">
             <p>Copenhagen Sales har en arbejdsmiljøorganisation (AMO) for at sikre et godt og sikkert arbejdsmiljø for alle medarbejdere. AMO består af repræsentanter fra både ledelse og medarbejderside.</p>
             <p>Medarbejdere opfordres til at kontakte arbejdsmiljørepræsentanten, hvis de oplever problemer eller har forslag til forbedringer.</p>
-            <p>Kontaktperson: William Hoe – ws@copenhagensales.dk</p>
           </div>
         ),
       },
@@ -523,7 +522,6 @@ export function HandbookTabContent() {
 
       <p className="text-xs text-muted-foreground text-center pt-4">
         Hvis du har spørgsmål til noget i håndbogen, er du altid velkommen til at kontakte din nærmeste leder.
-        <br />Medarbejderrepræsentant: William Hoe – ws@copenhagensales.dk
       </p>
     </div>
   );
