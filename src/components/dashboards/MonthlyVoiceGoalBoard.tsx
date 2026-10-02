@@ -66,7 +66,7 @@ export function MonthlyVoiceGoalBoard({
     if (!editOpen || !data) return;
     setTeamInput(String(data.teamGoal || ""));
     const next: Record<string, string> = {};
-    for (const s of data.sellers) next[s.employeeId] = s.goal > 0 ? String(s.goal) : "";
+    for (const s of data.allSellers) next[s.employeeId] = s.goal > 0 ? String(s.goal) : "";
     setSellerInputs(next);
   }, [editOpen, data]);
 
@@ -79,10 +79,12 @@ export function MonthlyVoiceGoalBoard({
     try {
       await saveGoals.mutateAsync({
         teamGoal: parse(teamInput),
-        sellerGoals: data.sellers.map((s) => ({
-          employeeId: s.employeeId,
-          target: parse(sellerInputs[s.employeeId] ?? ""),
-        })),
+        sellerGoals: data.allSellers
+          .filter((s) => s.goal > 0 || (sellerInputs[s.employeeId] ?? "").trim() !== "")
+          .map((s) => ({
+            employeeId: s.employeeId,
+            target: parse(sellerInputs[s.employeeId] ?? ""),
+          })),
       });
       toast.success("Målene er gemt");
       setEditOpen(false);
@@ -318,12 +320,12 @@ export function MonthlyVoiceGoalBoard({
               </div>
 
               <div className="border-t pt-4 space-y-3">
-                {(data?.sellers.length ?? 0) === 0 ? (
+                {(data?.allSellers.length ?? 0) === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Ingen sælgere med salg i denne måned endnu.
+                    Ingen sælgere fundet på teamet.
                   </p>
                 ) : (
-                  data!.sellers.map((s) => (
+                  [...data!.allSellers].sort((a, b) => a.name.localeCompare(b.name, "da-DK")).map((s) => (
                     <div key={s.employeeId} className="flex items-center justify-between gap-4">
                       <span className="truncate">{s.name}</span>
                       <Input
