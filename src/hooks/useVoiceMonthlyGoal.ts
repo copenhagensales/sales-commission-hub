@@ -26,6 +26,8 @@ export interface MonthlyVoiceGoalData {
   teamGoal: number;
   teamProgress: number;
   sellers: MonthlyVoiceGoalSeller[];
+  /** Alle sælgere inkl. teammedlemmer uden salg/mål — bruges i mål-editoren. */
+  allSellers: MonthlyVoiceGoalSeller[];
   days: MonthlyVoiceGoalDay[];
   /** Sat hvis en delforespørgsel fejlede — målene vises stadig. */
   warning?: string;
@@ -134,7 +136,7 @@ export function useVoiceMonthlyGoal({ boardKey, action, isVoiceItem, enabled = t
         else teamGoal = Number(g.target ?? 0);
       }
 
-      const sellers: MonthlyVoiceGoalSeller[] = payload.sellers
+      const allSellers: MonthlyVoiceGoalSeller[] = payload.sellers
         .map((e) => {
           const name =
             [e.firstName, e.lastName].filter(Boolean).join(" ").trim() || (e.workEmail ?? "Ukendt");
@@ -153,8 +155,8 @@ export function useVoiceMonthlyGoal({ boardKey, action, isVoiceItem, enabled = t
             progress: sellerGoal > 0 ? (count / sellerGoal) * 100 : 0,
           };
         })
-        .filter((s) => s.count > 0 || s.goal > 0)
         .sort((a, b) => b.progress - a.progress || b.count - a.count || a.name.localeCompare(b.name, "da-DK"));
+      const sellers = allSellers.filter((s) => s.count > 0 || s.goal > 0);
 
       return {
         monthKey,
@@ -163,6 +165,7 @@ export function useVoiceMonthlyGoal({ boardKey, action, isVoiceItem, enabled = t
         teamGoal,
         teamProgress: teamGoal > 0 ? (teamCount / teamGoal) * 100 : 0,
         sellers,
+        allSellers,
         days,
         warning: warnings.length > 0 ? warnings.join(" · ") : undefined,
       };
