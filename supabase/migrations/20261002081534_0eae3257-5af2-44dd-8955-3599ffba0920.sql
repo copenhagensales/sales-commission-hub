@@ -1,0 +1,1 @@
+UPDATE public.location_rate_surcharges SET surcharge_per_day = 700, note = 'Coop-prisstigning 1700 fra 1000, afholdes af Eesy FM' WHERE location_type = 'Coop butik' AND chain_match = 'Kvickly' AND valid_from = '2026-09-01';
