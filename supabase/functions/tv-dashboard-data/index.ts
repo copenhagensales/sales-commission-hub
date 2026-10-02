@@ -2978,6 +2978,26 @@ async function handleVoiceMonthlyGoal(
         for (const e of (byWorkEmail || []) as any[]) employeeIds.add(e.id);
       }
 
+      // Aktive medlemmer af klientens team(s), så teamlederen kan sætte mål
+      // på alle — også før de har lavet salg i måneden.
+      const { data: teamClientRows, error: tcError } = await supabase
+        .from("team_clients")
+        .select("team_id")
+        .eq("client_id", clientId);
+      if (tcError) throw tcError;
+      const teamIds = (teamClientRows || []).map((r: any) => r.team_id).filter(Boolean);
+      if (teamIds.length > 0) {
+        const { data: memberRows, error: tmError } = await supabase
+          .from("team_members")
+          .select("employee_id, employee_master_data!inner(is_active)")
+          .in("team_id", teamIds)
+          .eq("employee_master_data.is_active", true);
+        if (tmError) throw tmError;
+        for (const m of (memberRows || []) as any[]) {
+          if (m.employee_id) employeeIds.add(m.employee_id);
+        }
+      }
+
       if (employeeIds.size > 0) {
         const ids = Array.from(employeeIds);
         const { data, error } = await supabase
