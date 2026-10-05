@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchPricingRuleNames } from "@/lib/pricingRuleNames";
 
 /** "Meeting -- CPH sales Kanvas" – det eneste produkt der vises på Tryg - Ret salg. */
 export const TRYG_KANVAS_PRODUCT_ID = "24664858-d4e3-4227-9d6f-727f9c29cae0";
@@ -16,6 +17,10 @@ export interface TrygKanvasSale {
   mappedCommission: number;
   /** Omsætning på salgslinjen — vises i sletnings-bekræftelsen. */
   mappedRevenue: number;
+  /** Navn på den prisregel der er brugt på salgslinjen (null = ingen regel). */
+  ruleName?: string | null;
+  /** Prisreglen der er brugt på salgslinjen. */
+  matchedRuleId?: string | null;
 }
 
 function dayBounds(from: Date, to?: Date) {
@@ -40,7 +45,7 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, quantity, mapped_commission, mapped_revenue, products(name), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
+          "id, quantity, mapped_commission, mapped_revenue, matched_pricing_rule_id, products(name), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
         )
         .eq("product_id", TRYG_KANVAS_PRODUCT_ID)
         .gte("sales.sale_datetime", start)
@@ -53,6 +58,7 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
         quantity: number | null;
         mapped_commission: number | null;
         mapped_revenue: number | null;
+        matched_pricing_rule_id: string | null;
         products: { name: string | null } | null;
         sales: {
           id: string;
@@ -84,6 +90,8 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
         }
       }
 
+      const ruleNames = await fetchPricingRuleNames(rows.map((r) => r.matched_pricing_rule_id));
+
       return rows
         .map((r) => {
           const email = (r.sales.agent_email || "").toLowerCase();
@@ -101,6 +109,8 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
             productName: r.products?.name || "Ukendt produkt",
             mappedCommission: Number(r.mapped_commission ?? 0),
             mappedRevenue: Number(r.mapped_revenue ?? 0),
+            matchedRuleId: r.matched_pricing_rule_id,
+            ruleName: r.matched_pricing_rule_id ? ruleNames.get(r.matched_pricing_rule_id) ?? null : null,
           };
         })
         .sort((a, b) => b.saleDatetime.localeCompare(a.saleDatetime));

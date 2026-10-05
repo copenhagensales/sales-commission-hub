@@ -24,7 +24,7 @@ import {
   useActiveSellerOptions,
   useUnitedProductOptions,
 } from "@/hooks/useUnitedSales";
-import { useUpdateUnitedSale } from "@/hooks/useUpdateUnitedSale";
+import { useMeetingTypeRules, useUpdateUnitedSale } from "@/hooks/useUpdateUnitedSale";
 
 interface Props {
   sale: UnitedSale | null;
@@ -42,6 +42,8 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
   const [agentEmail, setAgentEmail] = useState("");
   const [productId, setProductId] = useState("");
   const [phone, setPhone] = useState("");
+  const [ruleId, setRuleId] = useState("");
+  const { data: meetingRules } = useMeetingTypeRules(open ? productId || null : null);
 
   useEffect(() => {
     if (!sale) return;
@@ -49,6 +51,7 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
     setAgentEmail((sale.agentEmail || "").toLowerCase());
     setProductId(sale.productId || "");
     setPhone(sale.customerPhone || "");
+    setRuleId(sale.matchedRuleId || "");
   }, [sale]);
 
   if (!sale) return null;
@@ -60,8 +63,11 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
   const dateChanged = !!date && date !== originalDate;
   const trimmedPhone = phone.trim();
   const phoneChanged = trimmedPhone !== originalPhone;
+  const ruleOptions = meetingRules || [];
+  const ruleChanged =
+    !!ruleId && ruleId !== (sale.matchedRuleId || "") && ruleOptions.some((r) => r.id === ruleId);
   const hasChanges =
-    dateChanged || agentEmail !== originalEmail || productChanged || phoneChanged;
+    ruleChanged || dateChanged || agentEmail !== originalEmail || productChanged || phoneChanged;
 
   /** Ny dato, men samme klokkeslæt som salget havde. */
   const buildNewDatetime = () => {
@@ -82,9 +88,10 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
           agentEmail && agentEmail !== originalEmail ? agentEmail : undefined,
         productId: productChanged ? productId : undefined,
         customerPhone: phoneChanged ? trimmedPhone || null : undefined,
+        meetingRuleId: ruleChanged ? ruleId : undefined,
       });
       toast.success(
-        productChanged
+        productChanged || ruleChanged
           ? "Salget er rettet og provisionen genberegnet"
           : "Salget er rettet"
       );
@@ -152,7 +159,7 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
 
           <div className="space-y-2">
             <Label>Produkt</Label>
-            <Select value={productId} onValueChange={setProductId}>
+            <Select value={productId} onValueChange={(v) => { setProductId(v); setRuleId(""); }}>
               <SelectTrigger>
                 <SelectValue placeholder="Vælg produkt" />
               </SelectTrigger>
@@ -171,6 +178,27 @@ export function UnitedEditSaleDialog({ sale, onOpenChange }: Props) {
               {sale.mappedRevenue.toLocaleString("da-DK")} kr omsætning
             </p>
           </div>
+
+          {ruleOptions.length > 0 && (
+            <div className="space-y-2">
+              <Label>Regel</Label>
+              <Select value={ruleId} onValueChange={setRuleId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg regel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ruleOptions.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Nuværende regel: {sale.ruleName || "ingen"}. Ved skift genberegnes provisionen.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

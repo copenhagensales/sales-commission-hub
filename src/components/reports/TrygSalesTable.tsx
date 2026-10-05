@@ -68,6 +68,7 @@ export function TrygSalesTable(props: Props) {
     (mode === "plain" || mode === "edit") && props.clientNames !== undefined;
   const colSpan =
     (mode === "review" ? 6 : mode === "status" ? 8 : mode === "edit" ? 6 : 5) +
+    1 +
     (showDate ? 1 : 0) +
     (showClient ? 1 : 0);
 
@@ -90,6 +91,7 @@ export function TrygSalesTable(props: Props) {
               Antal
             </TableHead>
             <TableHead className="w-full min-w-[240px]">Produktnavn</TableHead>
+            <TableHead className="w-32 whitespace-nowrap">Regel</TableHead>
             {showClient && (
               <TableHead className="w-28 whitespace-nowrap">Kunde</TableHead>
             )}
@@ -172,6 +174,9 @@ export function TrygSalesTable(props: Props) {
                   </TableCell>
                   <TableCell className="min-w-[240px]">
                     {sale.productName}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {sale.ruleName || "—"}
                   </TableCell>
                   {showClient && (
                     <TableCell className="whitespace-nowrap text-muted-foreground">
