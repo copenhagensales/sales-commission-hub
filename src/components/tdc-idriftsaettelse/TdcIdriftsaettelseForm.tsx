@@ -174,6 +174,7 @@ export function TdcIdriftsaettelseForm() {
   if (solution === "omstilling" && !mainNumber.trim()) missing.push("hovednummer");
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
+  if (solution === "omstilling" && features.length === 0) missing.push("mindst én funktion");
   if (hasSubsidy && subsidySpecific && !(needsRouter && router) && subsidyProducts.some((x) => !x.trim())) missing.push("produkter for terminaltilskud");
   if (needsRouter && (!hasSubsidy || !subsidySpecific || !router)) missing.push("router under terminaltilskud (specifikke produkter)");
   const canCopy = missing.length === 0;
