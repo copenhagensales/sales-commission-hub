@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { HARDWARE, TILBUD_PRODUCTS } from "@/lib/tdcTilbud/catalog";
 import { affordableCount, calcTilbud, fmtKr, type Quantities } from "@/lib/tdcTilbud/calc";
 import { cn } from "@/lib/utils";
@@ -11,7 +10,6 @@ interface Props {
   hardware: Quantities;
   onProducts: (q: Quantities) => void;
   onHardware: (q: Quantities) => void;
-  onTransfer: () => void;
 }
 
 const groupBy = <T extends { group: string }>(items: T[]) =>
@@ -40,7 +38,7 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-export function TdcTilbudForm({ products, hardware, onProducts, onHardware, onTransfer }: Props) {
+export function TdcTilbudForm({ products, hardware, onProducts, onHardware }: Props) {
   const totals = useMemo(() => calcTilbud(products, hardware), [products, hardware]);
   const productGroups = groupBy(TILBUD_PRODUCTS);
   const hwGroups = groupBy(HARDWARE);
@@ -150,7 +148,6 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, onTr
             </div>
           </CardContent>
         </Card>
-        <Button className="w-full" onClick={onTransfer}>Overfør til opsummering og mail</Button>
       </div>
     </div>
   );
