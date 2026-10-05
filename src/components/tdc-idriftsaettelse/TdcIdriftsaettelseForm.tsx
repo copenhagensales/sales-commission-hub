@@ -336,6 +336,19 @@ export function TdcIdriftsaettelseForm() {
             </div>
           </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Fordele * <span className="font-normal text-muted-foreground">(vælg mindst 1)</span></Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {BENEFITS.map((b) => (
+                <div key={b} className="flex items-center gap-2">
+                  <Checkbox id={`benefit-${b}`} checked={benefits.includes(b)}
+                    onCheckedChange={(v) => setBenefits((cur) => (v ? BENEFITS.filter((x) => cur.includes(x) || x === b) : cur.filter((x) => x !== b)))} />
+                  <Label htmlFor={`benefit-${b}`} className="font-normal">{b}</Label>
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
