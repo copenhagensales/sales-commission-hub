@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchPricingRuleNames } from "@/lib/pricingRuleNames";
 import type { TrygKanvasSale } from "@/hooks/useTrygKanvasSales";
 
 /** Antal id'er pr. forespørgsel, så URL'en ikke bliver for lang. */
@@ -43,13 +44,14 @@ type ItemRow = {
   quantity: number | null;
   mapped_commission: number | null;
   mapped_revenue: number | null;
+  matched_pricing_rule_id: string | null;
   products: { name: string | null } | null;
 };
 
 const SALE_FIELDS =
   "id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id";
 const ITEM_FIELDS =
-  "id, sale_id, product_id, quantity, mapped_commission, mapped_revenue, products(name)";
+  "id, sale_id, product_id, quantity, mapped_commission, mapped_revenue, matched_pricing_rule_id, products(name)";
 
 /** Kunderne tilknyttet teamet United (samme kilde som United-dashboardet). */
 export function useUnitedTeamClients() {
@@ -210,6 +212,8 @@ export function useUnitedSales(day: Date, enabled = true) {
         }
       }
 
+      const ruleNames = await fetchPricingRuleNames(rows.map((r) => r.matched_pricing_rule_id));
+
       return rows
         .map((r) => {
           const sale = saleById.get(r.sale_id)!;
@@ -237,6 +241,8 @@ export function useUnitedSales(day: Date, enabled = true) {
             agentEmail: sale.agent_email,
             mappedCommission: Number(r.mapped_commission ?? 0),
             mappedRevenue: Number(r.mapped_revenue ?? 0),
+            matchedRuleId: r.matched_pricing_rule_id,
+            ruleName: r.matched_pricing_rule_id ? ruleNames.get(r.matched_pricing_rule_id) ?? null : null,
           };
         })
         .sort((a, b) => b.saleDatetime.localeCompare(a.saleDatetime));
