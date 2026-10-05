@@ -324,7 +324,7 @@ export function TdcIdriftsaettelseForm() {
 
           {solution === "omstilling" && (
           <div className="space-y-2">
-            <Label>Funktioner</Label>
+            <Label>Funktioner * <span className="font-normal text-muted-foreground">(vælg mindst 1)</span></Label>
             <div className="grid gap-2 sm:grid-cols-2">
               {FEATURES.map((f) => (
                 <div key={f} className="flex items-center gap-2">
