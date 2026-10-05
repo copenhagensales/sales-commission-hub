@@ -36,13 +36,13 @@ import {
  */
 export interface OpsummeringMbbChoice { mbbType: MbbType; noMbb: boolean; withoutRouter: boolean }
 
-export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudPrefill; onMbbChange?: (c: OpsummeringMbbChoice) => void } = {}) {
+export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }: { prefill?: TilbudPrefill; onMbbChange?: (c: OpsummeringMbbChoice) => void; onlyImplementering?: boolean } = {}) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [fontSize, setFontSize] = useState(16);
 
-  const [summaryVariant, setSummaryVariant] = useState<SummaryVariant>("standard");
+  const [summaryVariant, setSummaryVariant] = useState<SummaryVariant>(onlyImplementering ? "implementering" : "standard");
   const [isEnglish, setIsEnglish] = useState(false);
   const isPilot = summaryVariant === "pilot" || summaryVariant === "implementering";
   const kun5gFriSalg = summaryVariant === "5g-fri";
@@ -206,6 +206,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
                 ))}
               </div>
             </CardHeader>
+            {!onlyImplementering && (
             <CardContent>
               <div className="inline-flex w-full bg-muted/30 rounded-lg p-1">
                 {(
@@ -232,6 +233,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
                 ))}
               </div>
             </CardContent>
+            )}
           </Card>
 
           {/* Conditional blocks */}

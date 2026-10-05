@@ -55,7 +55,7 @@ export function TdcSalgTool() {
         <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} />
       </TabsContent>
       <TabsContent value="opsummering" forceMount className={HIDDEN}>
-        <TdcOpsummeringForm prefill={prefill} onMbbChange={setMbbChoice} />
+        <TdcOpsummeringForm onlyImplementering prefill={prefill} onMbbChange={setMbbChoice} />
       </TabsContent>
       <TabsContent value="mail" forceMount className={HIDDEN}>
         <TdcIdriftsaettelseForm prefill={mailPrefill} />
