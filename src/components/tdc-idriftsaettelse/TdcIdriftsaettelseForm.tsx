@@ -14,7 +14,7 @@ type Mbb = "none" | "datadeling" | "mobilevoice";
 interface NumberRow { name: string; subscription: string; sim: string }
 
 const SOLUTIONS: Record<Solution, string> = {
-  omstilling: "Omstillingsløsning + One+ Løsning",
+  omstilling: "One+ Omstillingsløsning",
   oneplus: "One+ Løsning",
 };
 
@@ -57,8 +57,8 @@ function buildMail(f: {
     "Hermed som lovet en mail med relevant information om dit videre forløb, og hvad der sker herfra.\n");
   const contact = f.contact.trim() || "<indtast kontaktperson>";
   const phone = cleanPhone(f.phone) || "<indtast telefonnummer>";
-  p(`<ul><li><b>TDC Erhverv ${esc(SOLUTIONS[f.solution])}</b></li><li>Snarest muligt kontakter min kollega jer ifm. opsætning og indhentning af oplysninger. Vi bruger følgende kontaktoplysninger:<ul><li>Kontaktperson: ${esc(contact)}</li><li>Telefonnummer: ${esc(phone)}</li></ul></li></ul>`,
-    `• TDC Erhverv ${SOLUTIONS[f.solution]}\n• Snarest muligt kontakter min kollega jer ifm. opsætning og indhentning af oplysninger. Vi bruger følgende kontaktoplysninger:\n   - Kontaktperson: ${contact}\n   - Telefonnummer: ${phone}\n`);
+  p(`<ul><li><b>${f.solution === "omstilling" ? "" : "TDC Erhverv "}${esc(SOLUTIONS[f.solution])}</b></li><li>Snarest muligt kontakter min kollega jer ifm. opsætning og indhentning af oplysninger. Vi bruger følgende kontaktoplysninger:<ul><li>Kontaktperson: ${esc(contact)}</li><li>Telefonnummer: ${esc(phone)}</li></ul></li></ul>`,
+    `• ${f.solution === "omstilling" ? "" : "TDC Erhverv "}${SOLUTIONS[f.solution]}\n• Snarest muligt kontakter min kollega jer ifm. opsætning og indhentning af oplysninger. Vi bruger følgende kontaktoplysninger:\n   - Kontaktperson: ${contact}\n   - Telefonnummer: ${phone}\n`);
 
   const forloeb = "I vil skulle lave fuldmagter for at få flyttet numrene med. Derfor må du så vidt som muligt gerne have fundet alle numrenes tilhørende simkortsnummer frem. Sidst i mailen kan du læse hvordan.";
   const forloeb2 = "Vi sørger for, at overflytningen af numrene sker når jeres nuværende bindings- og opsigelsesperiode er udløbet, så vi er sikre på i ikke modtager nogle dobbeltregninger.";
