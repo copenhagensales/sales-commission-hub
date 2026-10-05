@@ -153,6 +153,7 @@ export function TdcIdriftsaettelseForm() {
   if (solution === "omstilling" && !mainNumber.trim()) missing.push("hovednummer");
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
+  if (hasSubsidy && subsidySpecific && !subsidyProduct.trim()) missing.push("produkter for terminaltilskud");
   const canCopy = missing.length === 0;
 
   const copy = async () => {
