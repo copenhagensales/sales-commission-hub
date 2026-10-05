@@ -12,7 +12,7 @@ export interface SummaryLine {
 export type MbbType = "mobilevoice" | "datadelingskort" | null;
 export type NumberChoice = "existing" | "mixed" | "new";
 export type StartupChoice = "asap" | "specific";
-export type SummaryVariant = "standard" | "pilot" | "5g-fri";
+export type SummaryVariant = "standard" | "pilot" | "5g-fri" | "implementering";
 
 export interface SummaryState {
   isEnglish: boolean;
@@ -114,7 +114,7 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
     isStandardOmstilling,
   } = state;
 
-  const isPilot = summaryVariant === "pilot";
+  const isPilot = summaryVariant === "pilot" || summaryVariant === "implementering";
   const kun5gFriSalg = summaryVariant === "5g-fri";
   const t = (da: string) => (isEnglish ? TRANSLATIONS[da] ?? da : da);
   const lines: SummaryLine[] = [];

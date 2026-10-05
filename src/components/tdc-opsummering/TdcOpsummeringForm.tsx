@@ -40,7 +40,7 @@ export function TdcOpsummeringForm() {
 
   const [summaryVariant, setSummaryVariant] = useState<SummaryVariant>("standard");
   const [isEnglish, setIsEnglish] = useState(false);
-  const isPilot = summaryVariant === "pilot";
+  const isPilot = summaryVariant === "pilot" || summaryVariant === "implementering";
   const kun5gFriSalg = summaryVariant === "5g-fri";
 
   const [mbbType, setMbbType] = useState<MbbType>(null);
@@ -176,6 +176,7 @@ export function TdcOpsummeringForm() {
                     { val: "standard", label: "Standard" },
                     { val: "pilot", label: "Pilot" },
                     { val: "5g-fri", label: "Kun 5g fri salg" },
+                    { val: "implementering", label: "Ny implementeringsopsummering" },
                   ] as const
                 ).map((opt) => (
                   <button
