@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Solution = "omstilling" | "oneplus";
 type Mbb = "none" | "datadeling" | "mobilevoice";
@@ -19,6 +20,17 @@ const SOLUTIONS: Record<Solution, string> = {
 };
 
 const SOLUTION_LABELS: Record<Solution, string> = { omstilling: "Omstilling", oneplus: "Mobileonly" };
+
+const SUBSCRIPTIONS = [
+  "Mobil minut",
+  "Mobil DK (3GB)",
+  "Mobil Basis (5GB)",
+  "Basis mobil (15GB)",
+  "Mobil Basis (40GB)",
+  "Standard mobil (40GB)",
+  "Professionel mobil (100GB)",
+  "Premium mobil (1TB)",
+];
 
 const FEATURES = [
   "Velkomsthilsen",
@@ -175,7 +187,12 @@ export function TdcIdriftsaettelseForm() {
             {rows.map((r, i) => (
               <div key={i} className="flex gap-2">
                 <Input placeholder="Nummer/Navn" value={r.name} onChange={(e) => updateRow(i, "name", e.target.value)} />
-                <Input placeholder="Abonnement" value={r.subscription} onChange={(e) => updateRow(i, "subscription", e.target.value)} />
+                <Select value={r.subscription} onValueChange={(v) => updateRow(i, "subscription", v)}>
+                  <SelectTrigger><SelectValue placeholder="Abonnement" /></SelectTrigger>
+                  <SelectContent>
+                    {SUBSCRIPTIONS.map((sub) => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Input placeholder="Simkortnummer" value={r.sim} onChange={(e) => updateRow(i, "sim", e.target.value)} />
                 <Button variant="ghost" size="icon" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, idx) => idx !== i))}>
                   <Trash2 className="h-4 w-4" />
