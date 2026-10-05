@@ -58,7 +58,10 @@ export function TdcOpsummeringForm() {
 
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
-  const [hasMenuToday, setHasMenuToday] = useState(false);
+  const [hasMenuToday, setHasMenuToday] = useState<boolean | null>(null);
+  const [implHasOmstilling, setImplHasOmstilling] = useState<boolean | null>(null);
+  const [implIsStandard, setImplIsStandard] = useState<boolean | null>(null);
+  const isImpl = summaryVariant === "implementering";
   const [noOmstilling, setNoOmstilling] = useState(true);
 
   // Default "Ingen Omstilling" when switching to Standard variant if nothing is selected
@@ -98,6 +101,8 @@ export function TdcOpsummeringForm() {
         hasOmstilling,
         isStandardOmstilling,
         hasMenuToday,
+        implHasOmstilling,
+        implIsStandard,
       }),
     [
       isEnglish,
@@ -110,6 +115,8 @@ export function TdcOpsummeringForm() {
       hasOmstilling,
       isStandardOmstilling,
       hasMenuToday,
+      implHasOmstilling,
+      implIsStandard,
     ]
   );
 
@@ -401,7 +408,7 @@ export function TdcOpsummeringForm() {
               {/* Omstilling */}
               <div className="space-y-2">
                 <Label className="font-medium">Omstilling</Label>
-                {isPilot ? (
+                {isPilot && !isImpl ? (
                   <div className="flex items-center gap-3 pt-1">
                     <span
                       className={cn(
@@ -429,16 +436,63 @@ export function TdcOpsummeringForm() {
                     </span>
                   </div>
                 ) : null}
-                {isPilot && summaryVariant === "implementering" && isStandardOmstilling && (
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox
-                      id="hasMenuToday"
-                      checked={hasMenuToday}
-                      onCheckedChange={(checked) => setHasMenuToday(checked === true)}
-                    />
-                    <Label htmlFor="hasMenuToday" className="font-normal cursor-pointer">
-                      Kunden har menuvalg i dag
-                    </Label>
+                {isImpl && (
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Har kunden omstilling? *</p>
+                      <RadioGroup
+                        className="flex gap-4"
+                        value={implHasOmstilling === null ? "" : implHasOmstilling ? "ja" : "nej"}
+                        onValueChange={(v) => { const yes = v === "ja"; setImplHasOmstilling(yes); if (!yes) { setImplIsStandard(null); setHasMenuToday(null); } }}
+                      >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="ja" id="implOm-ja" />
+                        <Label htmlFor="implOm-ja" className="font-normal cursor-pointer">Ja</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="nej" id="implOm-nej" />
+                        <Label htmlFor="implOm-nej" className="font-normal cursor-pointer">Nej</Label>
+                      </div>
+                      </RadioGroup>
+                    </div>
+                    {implHasOmstilling === true && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Hvilken omstilling? *</p>
+                      <RadioGroup
+                        className="flex gap-4"
+                        value={implIsStandard === null ? "" : implIsStandard ? "standard" : "professionel"}
+                        onValueChange={(v) => { const std = v === "standard"; setImplIsStandard(std); if (!std) setHasMenuToday(null); }}
+                      >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="standard" id="implType-standard" />
+                        <Label htmlFor="implType-standard" className="font-normal cursor-pointer">Standard</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="professionel" id="implType-professionel" />
+                        <Label htmlFor="implType-professionel" className="font-normal cursor-pointer">Professionel</Label>
+                      </div>
+                      </RadioGroup>
+                    </div>
+                    )}
+                    {implHasOmstilling === true && implIsStandard === true && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Har kunden menuvalg i dag? *</p>
+                      <RadioGroup
+                        className="flex gap-4"
+                        value={hasMenuToday === null ? "" : hasMenuToday ? "ja" : "nej"}
+                        onValueChange={(v) => setHasMenuToday(v === "ja")}
+                      >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="ja" id="implMenu-ja" />
+                        <Label htmlFor="implMenu-ja" className="font-normal cursor-pointer">Ja</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="nej" id="implMenu-nej" />
+                        <Label htmlFor="implMenu-nej" className="font-normal cursor-pointer">Nej</Label>
+                      </div>
+                      </RadioGroup>
+                    </div>
+                    )}
                   </div>
                 )}
                 {isPilot ? null : (
