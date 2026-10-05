@@ -58,7 +58,7 @@ const cleanPhone = (s: string) => {
 function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
-  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProduct: string; features: string[];
+  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; features: string[];
 }) {
   const html: string[] = [];
   const txt: string[] = [];
@@ -134,14 +134,14 @@ export function TdcIdriftsaettelseForm() {
   const [fiveG, setFiveG] = useState(false);
   const [hasSubsidy, setHasSubsidy] = useState(false);
   const [subsidyAmount, setSubsidyAmount] = useState("");
-  const [subsidyProduct, setSubsidyProduct] = useState("");
+  const [subsidyProducts, setSubsidyProducts] = useState<string[]>([""]);
   const [subsidySpecific, setSubsidySpecific] = useState(true);
   const [features, setFeatures] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProduct, features }),
-    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProduct, features],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, features }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, features],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -152,7 +152,7 @@ export function TdcIdriftsaettelseForm() {
   if (solution === "omstilling" && !mainNumber.trim()) missing.push("hovednummer");
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
-  if (hasSubsidy && subsidySpecific && !subsidyProduct.trim()) missing.push("produkter for terminaltilskud");
+  if (hasSubsidy && subsidySpecific && subsidyProducts.some((x) => !x.trim())) missing.push("produkter for terminaltilskud");
   const canCopy = missing.length === 0;
 
   const copy = async () => {
