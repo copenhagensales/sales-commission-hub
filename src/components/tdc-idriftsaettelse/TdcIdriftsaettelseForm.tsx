@@ -56,7 +56,7 @@ const cleanPhone = (s: string) => {
 
 /** Bygger mailen som HTML (Outlook) og ren tekst. Faste afsnit følger Word-skabelonen. */
 function buildMail(f: {
-  solution: Solution; contact: string; phone: string; rows: NumberRow[];
+  solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
   hasSubsidy: boolean; subsidyAmount: string; subsidyProduct: string; features: string[];
 }) {
@@ -77,6 +77,7 @@ function buildMail(f: {
   p(`<p><b>Videre forløb</b></p><ul><li>${forloeb}<br>${forloeb2}</li></ul>`, `Videre forløb\n• ${forloeb}\n  ${forloeb2}\n`);
 
   const rows = f.rows.filter((r) => r.name || r.subscription || r.sim);
+  if (f.solution === "omstilling") rows.unshift({ name: f.mainNumber || "[Hovednummer]", subscription: "Hovednummer", sim: "" });
   const rowTxt = rows.map((r) => [r.name, r.subscription, r.sim].filter(Boolean).join(", "));
   p(`<p><b>Selve løsningen:</b></p><p>De numre vi har drøftet skal indgå i løsningen er følgende:</p><p>${rowTxt.map(esc).join("<br>") || "[Nummer/Navn], [Abonnement] [Simkortsnummer]"}</p>`,
     `Selve løsningen:\nDe numre vi har drøftet skal indgå i løsningen er følgende:\n${rowTxt.join("\n") || "[Nummer/Navn], [Abonnement] [Simkortsnummer]"}\n`);
@@ -129,10 +130,11 @@ export function TdcIdriftsaettelseForm() {
   const [subsidyAmount, setSubsidyAmount] = useState("");
   const [subsidyProduct, setSubsidyProduct] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
+  const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidyProduct, features }),
-    [solution, contact, phone, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidyProduct, features],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidyProduct, features }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidyProduct, features],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -184,6 +186,14 @@ export function TdcIdriftsaettelseForm() {
 
           <div className="space-y-2">
             <Label>Numre i løsningen</Label>
+            {solution === "omstilling" && (
+              <div className="flex gap-2">
+                <Input placeholder="Hovednummer" value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} />
+                <Input value="Hovednummer" disabled />
+                <Input placeholder="Intet simkort" disabled />
+                <div className="w-10 shrink-0" />
+              </div>
+            )}
             {rows.map((r, i) => (
               <div key={i} className="flex gap-2">
                 <Input placeholder="Nummer/Navn" value={r.name} onChange={(e) => updateRow(i, "name", e.target.value)} />
