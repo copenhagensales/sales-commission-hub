@@ -58,6 +58,7 @@ export function TdcOpsummeringForm() {
 
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
+  const [hasMenuToday, setHasMenuToday] = useState(false);
   const [noOmstilling, setNoOmstilling] = useState(true);
 
   // Default "Ingen Omstilling" when switching to Standard variant if nothing is selected
@@ -96,6 +97,7 @@ export function TdcOpsummeringForm() {
         hasSubsidy,
         hasOmstilling,
         isStandardOmstilling,
+        hasMenuToday,
       }),
     [
       isEnglish,
@@ -107,6 +109,7 @@ export function TdcOpsummeringForm() {
       hasSubsidy,
       hasOmstilling,
       isStandardOmstilling,
+      hasMenuToday,
     ]
   );
 
@@ -425,7 +428,20 @@ export function TdcOpsummeringForm() {
                       Professionel
                     </span>
                   </div>
-                ) : (
+                ) : null}
+                {isPilot && summaryVariant === "implementering" && isStandardOmstilling && (
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="hasMenuToday"
+                      checked={hasMenuToday}
+                      onCheckedChange={(checked) => setHasMenuToday(checked === true)}
+                    />
+                    <Label htmlFor="hasMenuToday" className="font-normal cursor-pointer">
+                      Kunden har menuvalg i dag
+                    </Label>
+                  </div>
+                )}
+                {isPilot ? null : (
                   <>
                     <div className="flex items-center space-x-2">
                       <Checkbox

@@ -24,6 +24,7 @@ export interface SummaryState {
   hasSubsidy: boolean;
   hasOmstilling: boolean;
   isStandardOmstilling: boolean;
+  hasMenuToday?: boolean;
 }
 
 export const TRANSLATIONS: Record<string, string> = {
@@ -97,6 +98,14 @@ export const TRANSLATIONS: Record<string, string> = {
     "Review the call flow (When someone calls the main number, what happens?) Review hardware (What equipment does the customer need for the switchboard?)",
   "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.":
     "If you need call menu options in the future, it is possible to purchase this as an add-on.",
+  "Min kollega kommer til at kontakte jer for at byde jer velkommen, så vi kan få sat jeres nye løsning op. Før min kollega kan starte jeres løsning er der brug for vi får oplyst de numre der skal indgå i aftalen og deres tilhørende simkortsnumre. Vi har aftalt, at det som udgangspunkt er følgende numre der skal indgå i aftalen:":
+    "My colleague will contact you to welcome you, so we can set up your new solution. Before my colleague can start your solution, we need to know the numbers to be included in the agreement and their corresponding SIM card numbers. We have agreed that, as a starting point, the following numbers will be included in the agreement:",
+  "[Eksisterende numre & evt nye numre. Hvis i ikke har nummer, sig til kunden de skal udfylde nummer også]":
+    "[Existing numbers & any new numbers. If you do not have a number, tell the customer they must fill in the number as well]",
+  "Jeg sender dig snarest muligt en mail. På denne mail fremgår de numre vi har aftalt, samt en guide til hvordan du skal finde simkortsnumrene. Det er meget vigtigt du kigger på denne mail, da det sikre en smidig process, hvis du kan finde dem klar til os inden min kollega ringer til dig":
+    "I will send you an email as soon as possible. The email lists the numbers we have agreed on, together with a guide on how to find the SIM card numbers. It is very important that you look at this email, as it ensures a smooth process if you can have them ready for us before my colleague calls you.",
+  "Som aftalt, så har du med denne omstilling mulighed for at have ét nul-valg, hvis du i fremtiden for brug får flere menuvalg, er det muligt at tilkøbe.":
+    "As agreed, this switchboard gives you the option of one zero-choice; if you need more menu options in the future, it is possible to purchase them as an add-on.",
   "Har du nogle spørgsmål til mig?":
     "Do you have any questions for me?",
 };
@@ -112,7 +121,9 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
     hasSubsidy,
     hasOmstilling,
     isStandardOmstilling,
+    hasMenuToday = false,
   } = state;
+  const isImplementering = summaryVariant === "implementering";
 
   const isPilot = summaryVariant === "pilot" || summaryVariant === "implementering";
   const kun5gFriSalg = summaryVariant === "5g-fri";
@@ -163,11 +174,21 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
   lines.push({ text: "" });
 
   if (isPilot) {
-    lines.push({ text: t("Snarest muligt vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Det vi skal bruge fra jer, er simkortnumrene på de numre der skal flyttes. Hvis I har mulighed for at finde dem frem inden velkomstkaldet er det en stor hjælp.") });
-    lines.push({ text: "" });
+    if (isImplementering) {
+      lines.push({ text: t("Min kollega kommer til at kontakte jer for at byde jer velkommen, så vi kan få sat jeres nye løsning op. Før min kollega kan starte jeres løsning er der brug for vi får oplyst de numre der skal indgå i aftalen og deres tilhørende simkortsnumre. Vi har aftalt, at det som udgangspunkt er følgende numre der skal indgå i aftalen:") });
+      lines.push({ text: "" });
+      lines.push({ text: t("[Eksisterende numre & evt nye numre. Hvis i ikke har nummer, sig til kunden de skal udfylde nummer også]"), isRed: true });
+      lines.push({ text: "" });
+      lines.push({ text: t("Jeg sender dig snarest muligt en mail. På denne mail fremgår de numre vi har aftalt, samt en guide til hvordan du skal finde simkortsnumrene. Det er meget vigtigt du kigger på denne mail, da det sikre en smidig process, hvis du kan finde dem klar til os inden min kollega ringer til dig") });
+      lines.push({ text: "" });
+    } else {
+      lines.push({ text: t("Snarest muligt vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Det vi skal bruge fra jer, er simkortnumrene på de numre der skal flyttes. Hvis I har mulighed for at finde dem frem inden velkomstkaldet er det en stor hjælp.") });
+      lines.push({ text: "" });
+    }
     lines.push({ text: t("Vi har kun mulighed for at opsige de numre vi flytter over. Hvis I har produkter ved siden af, som f.eks. internet eller produkter uden et nummer tilkoblet vil i selv skulle opsige disse.") });
     lines.push({ text: "" });
 
+    if (!isImplementering) {
     if (numberChoice === "existing") {
       lines.push({ text: t("Vi har snakket om, at det som udgangspunkt er") });
       lines.push({ text: t("(antal) eksisterende numre") });
@@ -185,6 +206,8 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
     if (numberChoice) {
       lines.push({ text: t("Hvilke numre i ønsker, er op til jer, men antallet af abonnementer skal overholdes") });
       lines.push({ text: "" });
+    }
+
     }
 
     if (numberChoice && numberChoice !== "new") {
@@ -254,7 +277,7 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
     lines.push({ text: t("I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen.") });
     lines.push({ text: "" });
     if (isStandardOmstilling) {
-      lines.push({ text: t("Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.") });
+      lines.push({ text: t(isImplementering && hasMenuToday ? "Som aftalt, så har du med denne omstilling mulighed for at have ét nul-valg, hvis du i fremtiden for brug får flere menuvalg, er det muligt at tilkøbe." : "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.") });
       lines.push({ text: "" });
     }
   } else if (hasOmstilling) {
