@@ -431,7 +431,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
                   </div>
                 )}
                 {isImpl && hasSubsidy && (
-                  <div className="ml-6 flex items-center space-x-2">
+                  <div className="ml-6 mt-3 pt-3 border-t border-border/60 flex items-center space-x-2">
                     <Checkbox
                       id="showUdlaeg"
                       checked={showUdlaeg}
