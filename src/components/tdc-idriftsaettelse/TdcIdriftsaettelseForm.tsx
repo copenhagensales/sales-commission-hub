@@ -20,6 +20,8 @@ const SOLUTIONS: Record<Solution, string> = {
 
 const SOLUTION_LABELS: Record<Solution, string> = { omstilling: "Omstilling", oneplus: "Mobileonly" };
 
+const ROUTERS = ["Huawei H158 381 5G MBB Router", "Huawei B535 4G MBB Router Cat 7", "Zyxel NR5307 5G Router, Hvid 230V"];
+
 const SUBSCRIPTIONS = [
   "Hovednummer",
   "Mobil minut",
@@ -58,7 +60,7 @@ const cleanPhone = (s: string) => {
 function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
-  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; features: string[];
+  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; router: string; features: string[];
 }) {
   const html: string[] = [];
   const txt: string[] = [];
@@ -92,7 +94,7 @@ function buildMail(f: {
   if (f.hasSubsidy) {
     const amt = f.subsidyAmount.trim() ? `${f.subsidyAmount.trim()} kr.` : "[Beløb]";
     if (f.subsidySpecific) {
-      const prods = f.subsidyProducts.map((x) => x.trim()).filter(Boolean);
+      const prods = [f.router, ...f.subsidyProducts].map((x) => x.trim()).filter(Boolean);
       const prodHtml = prods.length ? `<p>${prods.map(esc).join("<br>")}</p>` : "";
       p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
         `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prods.map((x) => `${x}\n`).join("")}`);
@@ -136,12 +138,14 @@ export function TdcIdriftsaettelseForm() {
   const [subsidyAmount, setSubsidyAmount] = useState("");
   const [subsidyProducts, setSubsidyProducts] = useState<string[]>([""]);
   const [subsidySpecific, setSubsidySpecific] = useState(true);
+  const [router, setRouter] = useState("");
+  const needsRouter = mbb !== "none" && noRouter;
   const [features, setFeatures] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, features }),
-    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, features],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router, needsRouter, features],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -153,6 +157,7 @@ export function TdcIdriftsaettelseForm() {
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
   if (hasSubsidy && subsidySpecific && subsidyProducts.some((x) => !x.trim())) missing.push("produkter for terminaltilskud");
+  if (needsRouter && (!hasSubsidy || !subsidySpecific || !router)) missing.push("router under terminaltilskud (specifikke produkter)");
   const canCopy = missing.length === 0;
 
   const copy = async () => {
@@ -271,6 +276,14 @@ export function TdcIdriftsaettelseForm() {
                 </RadioGroup>
                 {subsidySpecific && (
                   <div className="space-y-2">
+                    {needsRouter && (
+                      <Select value={router} onValueChange={setRouter}>
+                        <SelectTrigger><SelectValue placeholder="Vælg router (påkrævet)" /></SelectTrigger>
+                        <SelectContent>
+                          {ROUTERS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {subsidyProducts.map((prod, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <Input placeholder="Produkt inkl. evt. gigabyte, 4G/5G" value={prod}
