@@ -57,6 +57,8 @@ const cleanPhone = (s: string) => {
 };
 
 /** Bygger mailen som HTML (Outlook) og ren tekst. Faste afsnit følger Word-skabelonen. */
+const isValidDkNumber = (v: string) => /^\d{8}$/.test(v.replace(/\s/g, ""));
+
 function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
@@ -108,8 +110,8 @@ function buildMail(f: {
       p(`<p><b>Tilskud:</b></p><p style="margin-bottom:4pt">I har fået tildelt et terminaltilskud ${amtHtml}, vi har drøftet det umiddelbart skal bruges på:</p>${prods.length ? ul(prods.map(esc)) : ""}`,
         `Tilskud:\nI har fået tildelt et terminaltilskud ${amtVal}, vi har drøftet det umiddelbart skal bruges på:\n${prods.length ? `${bullets(prods)}\n` : ""}`);
     } else {
-      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${amtHtml}.</p>`,
-        `Tilskud:\nI har fået tildelt et terminaltilskud ${amtVal}.\n`);
+      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${amtHtml}</p>`,
+        `Tilskud:\nI har fået tildelt et terminaltilskud ${amtVal}\n`);
     }
   }
 
@@ -163,6 +165,12 @@ export function TdcIdriftsaettelseForm() {
 
   const missing: string[] = [];
   if (!contact.trim() || !phone.trim()) missing.push("kontaktperson og telefonnummer");
+  const phoneBad = !!phone.trim() && !isValidDkNumber(phone);
+  const mainBad = solution === "omstilling" && !!mainNumber.trim() && !isValidDkNumber(mainNumber);
+  const rowBad = (v: string) => !!v.trim() && !/\p{L}/u.test(v) && !isValidDkNumber(v);
+  if (phoneBad) missing.push("telefonnummer (8 cifre)");
+  if (mainBad) missing.push("hovednummer (8 cifre)");
+  if (rows.some((r) => rowBad(r.name))) missing.push("8 cifre på alle numre i løsningen");
   if (solution === "omstilling" && !mainNumber.trim()) missing.push("hovednummer");
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
@@ -211,14 +219,14 @@ export function TdcIdriftsaettelseForm() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><Label>Kontaktperson *</Label><Input value={contact} onChange={(e) => setContact(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Telefonnummer *</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Telefonnummer *</Label><Input value={phone} className={phoneBad ? "border-destructive" : ""} title={phoneBad ? "Skal være 8 cifre" : undefined} onChange={(e) => setPhone(e.target.value)} /></div>
           </div>
 
           <div className="space-y-2">
             <Label>Numre i løsningen</Label>
             {solution === "omstilling" && (
               <div className="flex gap-2">
-                <Input placeholder="Hovednummer" value={mainNumber} onChange={(e) => setMainNumber(e.target.value)} />
+                <Input placeholder="Hovednummer" value={mainNumber} className={mainBad ? "border-destructive" : ""} title={mainBad ? "Skal være 8 cifre" : undefined} onChange={(e) => setMainNumber(e.target.value)} />
                 <Input value="Hovednummer" disabled />
                 <Input placeholder="Intet simkort" disabled />
                 <div className="w-10 shrink-0" />
@@ -226,7 +234,7 @@ export function TdcIdriftsaettelseForm() {
             )}
             {rows.map((r, i) => (
               <div key={i} className="flex gap-2">
-                <Input placeholder="Nummer/Navn" value={r.name} onChange={(e) => updateRow(i, "name", e.target.value)} />
+                <Input placeholder="Nummer/Navn" value={r.name} className={rowBad(r.name) ? "border-destructive" : ""} title={rowBad(r.name) ? "Skal være 8 cifre" : undefined} onChange={(e) => updateRow(i, "name", e.target.value)} />
                 <Select value={r.subscription} onValueChange={(v) => updateRow(i, "subscription", v)}>
                   <SelectTrigger><SelectValue placeholder="Abonnement" /></SelectTrigger>
                   <SelectContent>
