@@ -18,6 +18,8 @@ const SOLUTIONS: Record<Solution, string> = {
   oneplus: "One+ Løsning",
 };
 
+const SOLUTION_LABELS: Record<Solution, string> = { omstilling: "Omstilling", oneplus: "Mobileonly" };
+
 const FEATURES = [
   "Velkomsthilsen",
   "Åbne- og lukketider",
@@ -157,7 +159,7 @@ export function TdcIdriftsaettelseForm() {
               {(Object.keys(SOLUTIONS) as Solution[]).map((k) => (
                 <div key={k} className="flex items-center gap-2">
                   <RadioGroupItem value={k} id={`sol-${k}`} />
-                  <Label htmlFor={`sol-${k}`} className="font-normal">{SOLUTIONS[k]}</Label>
+                  <Label htmlFor={`sol-${k}`} className="font-normal">{SOLUTION_LABELS[k]}</Label>
                 </div>
               ))}
             </RadioGroup>
