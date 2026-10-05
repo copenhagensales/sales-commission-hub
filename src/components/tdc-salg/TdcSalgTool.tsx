@@ -7,6 +7,8 @@ import { TdcIdriftsaettelseForm, type IdriftPrefill } from "@/components/tdc-idr
 import { buildPrefill } from "@/lib/tdcTilbud/prefill";
 import type { Quantities } from "@/lib/tdcTilbud/calc";
 
+const TRIGGER =
+  "h-12 rounded-lg border-2 border-border bg-card text-base font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary/50 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md";
 const HIDDEN = "data-[state=inactive]:hidden";
 
 export function TdcSalgTool() {
@@ -36,10 +38,10 @@ export function TdcSalgTool() {
 
   return (
     <Tabs value={tab} onValueChange={changeTab} className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="tilbud">1. Tilbud</TabsTrigger>
-        <TabsTrigger value="opsummering">2. Opsummering</TabsTrigger>
-        <TabsTrigger value="mail">3. Idriftsættelsesmail</TabsTrigger>
+      <TabsList className="h-auto w-full grid grid-cols-3 gap-2 bg-transparent p-0">
+        <TabsTrigger className={TRIGGER} value="tilbud">1. Tilbud</TabsTrigger>
+        <TabsTrigger className={TRIGGER} value="opsummering">2. Opsummering</TabsTrigger>
+        <TabsTrigger className={TRIGGER} value="mail">3. Idriftsættelsesmail</TabsTrigger>
       </TabsList>
       <TabsContent value="tilbud" forceMount className={HIDDEN}>
         <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} />
