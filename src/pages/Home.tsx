@@ -903,6 +903,24 @@ const Home = () => {
                             <span className="flex-none text-[12px] text-foreground/70">
                               {event.event_time ? `Kl. ${event.event_time.slice(0, 5)}` : ""}
                             </span>
+                            <div className="flex flex-none items-center gap-0.5">
+                              <button type="button" title="Læs mere" onClick={() => setSelectedEventForDetail(event.id)}
+                                className="rounded-md p-1 text-foreground/60 transition-colors hover:bg-[hsl(var(--cph-onyx)/0.06)] hover:text-foreground">
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                              {canManageEvents && (
+                                <>
+                                  <button type="button" title="Rediger" onClick={() => setEditingEvent(event.id)}
+                                    className="rounded-md p-1 text-foreground/60 transition-colors hover:bg-[hsl(var(--cph-onyx)/0.06)] hover:text-foreground">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button type="button" title="Slet" onClick={() => deleteEventMutation.mutate(event.id)}
+                                    className="rounded-md p-1 text-destructive transition-colors hover:bg-destructive/15">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
