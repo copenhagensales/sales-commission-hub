@@ -3,7 +3,6 @@ import { Copy, Check, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -59,7 +58,7 @@ const cleanPhone = (s: string) => {
 function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
-  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProduct: string; features: string[];
+  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; features: string[];
 }) {
   const html: string[] = [];
   const txt: string[] = [];
@@ -93,10 +92,10 @@ function buildMail(f: {
   if (f.hasSubsidy) {
     const amt = f.subsidyAmount.trim() ? `${f.subsidyAmount.trim()} kr.` : "[Beløb]";
     if (f.subsidySpecific) {
-      const prod = f.subsidyProduct.trim();
-      const prodHtml = prod ? `<p>${esc(prod).replace(/\n/g, "<br>")}</p>` : "";
+      const prods = f.subsidyProducts.map((x) => x.trim()).filter(Boolean);
+      const prodHtml = prods.length ? `<p>${prods.map(esc).join("<br>")}</p>` : "";
       p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
-        `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prod ? `${prod}\n` : ""}`);
+        `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prods.map((x) => `${x}\n`).join("")}`);
     } else {
       p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}.</p>`,
         `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}.\n`);
@@ -135,14 +134,14 @@ export function TdcIdriftsaettelseForm() {
   const [fiveG, setFiveG] = useState(false);
   const [hasSubsidy, setHasSubsidy] = useState(false);
   const [subsidyAmount, setSubsidyAmount] = useState("");
-  const [subsidyProduct, setSubsidyProduct] = useState("");
+  const [subsidyProducts, setSubsidyProducts] = useState<string[]>([""]);
   const [subsidySpecific, setSubsidySpecific] = useState(true);
   const [features, setFeatures] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProduct, features }),
-    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProduct, features],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, features }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, features],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -153,7 +152,7 @@ export function TdcIdriftsaettelseForm() {
   if (solution === "omstilling" && !mainNumber.trim()) missing.push("hovednummer");
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
-  if (hasSubsidy && subsidySpecific && !subsidyProduct.trim()) missing.push("produkter for terminaltilskud");
+  if (hasSubsidy && subsidySpecific && subsidyProducts.some((x) => !x.trim())) missing.push("produkter for terminaltilskud");
   const canCopy = missing.length === 0;
 
   const copy = async () => {
@@ -270,8 +269,23 @@ export function TdcIdriftsaettelseForm() {
                     <Label htmlFor="sub-no">Ingen specifikke produkter</Label>
                   </div>
                 </RadioGroup>
-                <Textarea placeholder="Produkt inkl. evt. gigabyte, 4G/5G" value={subsidySpecific ? subsidyProduct : ""}
-                  disabled={!subsidySpecific} onChange={(e) => setSubsidyProduct(e.target.value)} />
+                {subsidySpecific && (
+                  <div className="space-y-2">
+                    {subsidyProducts.map((prod, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input placeholder="Produkt inkl. evt. gigabyte, 4G/5G" value={prod}
+                          onChange={(e) => setSubsidyProducts((ps) => ps.map((x, idx) => (idx === i ? e.target.value : x)))} />
+                        <Button variant="ghost" size="icon" disabled={subsidyProducts.length === 1}
+                          onClick={() => setSubsidyProducts((ps) => ps.filter((_, idx) => idx !== i))}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => setSubsidyProducts((ps) => [...ps, ""])}>
+                      <Plus className="h-4 w-4 mr-1" /> Tilføj produkt
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
