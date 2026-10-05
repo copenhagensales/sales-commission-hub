@@ -22,6 +22,7 @@ const SOLUTIONS: Record<Solution, string> = {
 const SOLUTION_LABELS: Record<Solution, string> = { omstilling: "Omstilling", oneplus: "Mobileonly" };
 
 const SUBSCRIPTIONS = [
+  "Hovednummer",
   "Mobil minut",
   "Mobil DK (3GB)",
   "Mobil Basis (5GB)",
