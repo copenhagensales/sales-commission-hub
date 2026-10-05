@@ -139,7 +139,7 @@ export function TdcIdriftsaettelseForm() {
   const [subsidyProducts, setSubsidyProducts] = useState<string[]>([""]);
   const [subsidySpecific, setSubsidySpecific] = useState(true);
   const [router, setRouter] = useState("");
-  const needsRouter = mbb !== "none" && noRouter;
+  const needsRouter = mbb !== "none" && !noRouter;
   const [features, setFeatures] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
@@ -246,7 +246,7 @@ export function TdcIdriftsaettelseForm() {
             </RadioGroup>
             {mbb !== "none" && (
               <div className="flex items-center gap-2 pl-6">
-                <Checkbox id="norouter" checked={noRouter} onCheckedChange={(v) => setNoRouter(!!v)} />
+                <Checkbox id="norouter" checked={noRouter} onCheckedChange={(v) => { setNoRouter(!!v); if (!v) { setHasSubsidy(true); setSubsidySpecific(true); } }} />
                 <Label htmlFor="norouter" className="font-normal">Der medfølger ikke router</Label>
               </div>
             )}
