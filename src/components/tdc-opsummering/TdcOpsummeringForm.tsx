@@ -78,7 +78,11 @@ export function TdcOpsummeringForm() {
   const isOpstartMissing = isOpstartRequired && !startupChoice;
   const isMbbMissing = !noMbb && mbbType === null;
   const isTilskudMissing = !noSubsidy && !hasSubsidy;
-  const isOmstillingMissing = !noOmstilling && !hasOmstilling;
+  const isOmstillingMissing = isImpl
+    ? implHasOmstilling === null ||
+      (implHasOmstilling === true &&
+        (implIsStandard === null || (implIsStandard === true && hasMenuToday === null)))
+    : !noOmstilling && !hasOmstilling;
 
   const showWarningBanner =
     !kun5gFriSalg &&
