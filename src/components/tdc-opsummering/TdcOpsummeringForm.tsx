@@ -90,7 +90,7 @@ export function TdcOpsummeringForm() {
       isOpstartMissing ||
       isMbbMissing ||
       isTilskudMissing ||
-      (!isPilot && isOmstillingMissing));
+      ((!isPilot || isImpl) && isOmstillingMissing));
 
   const summaryLines = useMemo(
     () =>
