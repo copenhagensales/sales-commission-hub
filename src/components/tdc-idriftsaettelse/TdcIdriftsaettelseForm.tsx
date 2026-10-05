@@ -78,29 +78,38 @@ function buildMail(f: {
   const forloeb2 = "Vi sørger for, at overflytningen af numrene sker når jeres nuværende bindings- og opsigelsesperiode er udløbet, så vi er sikre på i ikke modtager nogle dobbeltregninger.";
   p(`<p><b>Videre forløb</b></p><ul><li>${forloeb}<br>${forloeb2}</li></ul>`, `Videre forløb\n• ${forloeb}\n  ${forloeb2}\n`);
 
+  const ul = (items: string[]) => `<ul style="margin-top:0;margin-bottom:8pt">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+  const bullets = (items: string[]) => items.map((i) => `• ${i}`).join("\n");
+
   const rows = f.rows.filter((r) => r.name || r.subscription || r.sim);
   if (f.solution === "omstilling") rows.unshift({ name: f.mainNumber || "[Hovednummer]", subscription: "Hovednummer", sim: "" });
-  const rowTxt = rows.map((r) => [r.name, r.subscription, r.subscription === "Hovednummer" ? "" : (r.sim || "[Simkortsnummer]")].filter(Boolean).join(", "));
-  p(`<p><b>Selve løsningen:</b></p><p>De numre vi har drøftet skal indgå i løsningen er følgende:</p><p>${rowTxt.map(esc).join("<br>") || "[Nummer/Navn], [Abonnement] [Simkortsnummer]"}</p>`,
-    `Selve løsningen:\nDe numre vi har drøftet skal indgå i løsningen er følgende:\n${rowTxt.join("\n") || "[Nummer/Navn], [Abonnement] [Simkortsnummer]"}\n`);
+  const isMain = (r: NumberRow) => r.subscription === "Hovednummer";
+  const simOf = (r: NumberRow) => (isMain(r) ? "" : `Simkort: ${r.sim || "[Simkortsnummer]"}`);
+  const rowHtml = rows.map((r) => [isMain(r) ? `<b>${esc(r.name)}</b>` : esc(r.name), esc(r.subscription), esc(simOf(r))].filter(Boolean).join(" – "));
+  const rowTxt = rows.map((r) => [r.name, r.subscription, simOf(r)].filter(Boolean).join(" – "));
+  const fallback = "[Nummer/Navn] – [Abonnement] – Simkort: [Simkortsnummer]";
 
   const extra: string[] = [];
   if (f.mbb === "datadeling") extra.push("Det mobile bredbånd oprettes som et datadelingskort, som deler data med mobilabonnementet det er tilknyttet. Derfor står det ikke som et selvstændigt abonnement.");
   if (f.mbb === "mobilevoice") extra.push("Der oprettes et mobilt bredbånd gennem et mobilevoice abonnement. Det får et fiktivt nummer.");
   if (f.mbb !== "none" && f.noRouter) extra.push("Der medfølger ikke router til dit mobilebredbånd.");
   if (f.fiveG) extra.push("Derudover får du 5G Fri internet med, hvor vi fremsender router og simkort.");
-  extra.forEach((e) => p(`<p>${e}</p>`, `${e}\n`));
+
+  p(`<p><b>Selve løsningen:</b></p><p style="margin-bottom:4pt">De numre vi har drøftet skal indgå i løsningen er følgende:</p>${ul(rowHtml.length ? rowHtml : [esc(fallback)])}${extra.length ? ul(extra) : ""}`,
+    `Selve løsningen:\nDe numre vi har drøftet skal indgå i løsningen er følgende:\n${bullets(rowTxt.length ? rowTxt : [fallback])}\n${extra.length ? `${bullets(extra)}\n` : ""}`);
 
   if (f.hasSubsidy) {
-    const amt = f.subsidyAmount.trim() ? `${f.subsidyAmount.trim()} kr.` : "[Beløb]";
+    const raw = f.subsidyAmount.trim();
+    const num = Number(raw.replace(/\./g, "").replace(",", "."));
+    const amtVal = raw ? `${/^[\d.,]+$/.test(raw) && !isNaN(num) ? num.toLocaleString("da-DK") : raw} kr.` : "[Beløb]";
+    const amtHtml = `<b>${esc(amtVal)}</b>`;
     if (f.subsidySpecific) {
       const prods = [f.router, ...f.subsidyProducts].map((x) => x.trim()).filter(Boolean);
-      const prodHtml = prods.length ? `<p>${prods.map(esc).join("<br>")}</p>` : "";
-      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
-        `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prods.map((x) => `${x}\n`).join("")}`);
+      p(`<p><b>Tilskud:</b></p><p style="margin-bottom:4pt">I har fået tildelt et terminaltilskud ${amtHtml}, vi har drøftet det umiddelbart skal bruges på:</p>${prods.length ? ul(prods.map(esc)) : ""}`,
+        `Tilskud:\nI har fået tildelt et terminaltilskud ${amtVal}, vi har drøftet det umiddelbart skal bruges på:\n${prods.length ? `${bullets(prods)}\n` : ""}`);
     } else {
-      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}.</p>`,
-        `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}.\n`);
+      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${amtHtml}.</p>`,
+        `Tilskud:\nI har fået tildelt et terminaltilskud ${amtVal}.\n`);
     }
   }
 
@@ -108,8 +117,8 @@ function buildMail(f: {
   p(`<p>${shop}</p>`, `${shop}\n`);
 
   if (f.solution === "omstilling" && f.features.length) {
-    p(`<p><b>Vi har talt om I gerne vil gøre brug af følgende funktioner:</b></p><p>${f.features.map(esc).join("<br>")}</p>`,
-      `Vi har talt om I gerne vil gøre brug af følgende funktioner:\n${f.features.join("\n")}\n`);
+    p(`<p style="margin-bottom:4pt"><b>Vi har talt om I gerne vil gøre brug af følgende funktioner:</b></p>${ul(f.features.map(esc))}`,
+      `Vi har talt om I gerne vil gøre brug af følgende funktioner:\n${bullets(f.features)}\n`);
   }
 
   const sim = [
@@ -121,7 +130,7 @@ function buildMail(f: {
     `Sådan finder du dit simkortnummer\n${sim.map(([a, b]) => `• ${a} ${b}`).join("\n")}\n`);
   p("<p>Rigtig god dag – og endnu en gang tillykke med din aftale!</p>", "Rigtig god dag – og endnu en gang tillykke med din aftale!");
 
-  return { html: `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${html.join("")}</div>`, text: txt.join("\n") };
+  return { html: `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${html.join("").replace(/<p>/g, '<p style="margin:0 0 8pt">').replace(/<p style="margin-bottom:4pt">/g, '<p style="margin:0 0 4pt">')}</div>`, text: txt.join("\n") };
 }
 
 export function TdcIdriftsaettelseForm() {
