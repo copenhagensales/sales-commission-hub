@@ -17,7 +17,7 @@ export function buildPrefill(products: Quantities, hardware: Quantities): Tilbud
   const pick = (kind: "mobile" | "mbb") =>
     TILBUD_PRODUCTS.filter((p) => p.kind === kind && (products[p.id] ?? 0) > 0);
   const text = (list: typeof TILBUD_PRODUCTS) =>
-    list.length ? list.map((p) => `${products[p.id]} x ${p.name}`).join(", ") : null;
+    list.length ? list.map((p) => `${products[p.id]} x ${p.summaryName ?? p.name}`).join(", ") : null;
   const sum = (list: typeof TILBUD_PRODUCTS) => list.reduce((s, p) => s + (products[p.id] ?? 0) * p.price, 0);
   const mobile = pick("mobile");
   const mbb = pick("mbb");
