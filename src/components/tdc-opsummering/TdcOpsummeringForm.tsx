@@ -1,3 +1,4 @@
+import { fmtKr } from "@/lib/tdcTilbud/calc";
 import { useState, useMemo, useEffect } from "react";
 import { Copy, Check, Sun, Moon, Type } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -61,6 +62,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
 
   const [hasSubsidy, setHasSubsidy] = useState(false);
   const [showUdlaeg, setShowUdlaeg] = useState(false);
+  const [subsidyLevel, setSubsidyLevel] = useState<"50" | "100" | "specific" | null>(null);
   const [noSubsidy, setNoSubsidy] = useState(false);
 
   const [hasOmstilling, setHasOmstilling] = useState(false);
@@ -84,7 +86,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
   const isOpstartRequired = !isPilot && (numberChoice === "existing" || numberChoice === "mixed");
   const isOpstartMissing = isOpstartRequired && !startupChoice;
   const isMbbMissing = !noMbb && mbbType === null;
-  const isTilskudMissing = !noSubsidy && !hasSubsidy;
+  const isTilskudMissing = (!noSubsidy && !hasSubsidy) || (!!prefill && hasSubsidy && !subsidyLevel);
   const isOmstillingMissing = isImpl
     ? implHasOmstilling === null ||
       (implHasOmstilling === true &&
@@ -133,10 +135,17 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
     ]
   );
 
-  const summaryLines = useMemo(
-    () => (isEnglish ? rawSummaryLines : applyPrefillToSummary(rawSummaryLines, prefill)),
-    [rawSummaryLines, prefill, isEnglish]
-  );
+  const summaryLines = useMemo(() => {
+    if (isEnglish) return rawSummaryLines;
+    if (!prefill) return applyPrefillToSummary(rawSummaryLines, prefill);
+    const amount =
+      subsidyLevel === "50" ? Math.round(prefill.subsidy / 2) : subsidyLevel === "100" ? Math.round(prefill.subsidy) : 0;
+    const lines = applyPrefillToSummary(rawSummaryLines, { ...prefill, subsidy: amount });
+    if (subsidyLevel !== "specific") return lines;
+    return lines.map((l) =>
+      l.text.startsWith("Du får et tilskud på (beløb)") ? { ...l, text: l.text.replace("(beløb)", "[Tilskudsbeløb]") } : l
+    );
+  }, [rawSummaryLines, prefill, isEnglish, subsidyLevel]);
 
   const summaryText = useMemo(
     () => summaryLines.map((line) => line.text).join("\n"),
@@ -402,6 +411,25 @@ export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudP
                     Tilskud inkluderet
                   </Label>
                 </div>
+                {prefill && hasSubsidy && (
+                  <div className="ml-6 space-y-1">
+                    <p className="text-sm text-muted-foreground">Tilskudsniveau * (fuldt tilskud i tilbud: {fmtKr(prefill.subsidy)})</p>
+                    {([
+                      ["50", `50 % (${fmtKr(Math.round(prefill.subsidy / 2))})`],
+                      ["100", `100 % (${fmtKr(Math.round(prefill.subsidy))})`],
+                      ["specific", "Specifikt beløb"],
+                    ] as const).map(([v, label]) => (
+                      <div key={v} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`subsidyLevel-${v}`}
+                          checked={subsidyLevel === v}
+                          onCheckedChange={(c) => setSubsidyLevel(c === true ? v : null)}
+                        />
+                        <Label htmlFor={`subsidyLevel-${v}`} className="font-normal cursor-pointer">{label}</Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {isImpl && hasSubsidy && (
                   <div className="ml-6 flex items-center space-x-2">
                     <Checkbox
