@@ -24,7 +24,9 @@ export interface SummaryState {
   hasSubsidy: boolean;
   hasOmstilling: boolean;
   isStandardOmstilling: boolean;
-  hasMenuToday?: boolean;
+  hasMenuToday?: boolean | null;
+  implHasOmstilling?: boolean | null;
+  implIsStandard?: boolean | null;
 }
 
 export const TRANSLATIONS: Record<string, string> = {
@@ -106,6 +108,9 @@ export const TRANSLATIONS: Record<string, string> = {
     "I will send you an email as soon as possible. The email lists the numbers we have agreed on, together with a guide on how to find the SIM card numbers. It is very important that you look at this email, as it ensures a smooth process if you can have them ready for us before my colleague calls you.",
   "Som aftalt, så har du med denne omstilling mulighed for at have ét nul-valg, hvis du i fremtiden for brug får flere menuvalg, er det muligt at tilkøbe.":
     "As agreed, this switchboard gives you the option of one zero-choice; if you need more menu options in the future, it is possible to purchase them as an add-on.",
+  "(Vælg om kunden har omstilling)": "(Select whether the customer has a switchboard)",
+  "(Vælg Standard eller Professionel)": "(Select Standard or Professional)",
+  "(Vælg om kunden har menuvalg i dag)": "(Select whether the customer has menu options today)",
   "Har du nogle spørgsmål til mig?":
     "Do you have any questions for me?",
 };
@@ -121,7 +126,9 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
     hasSubsidy,
     hasOmstilling,
     isStandardOmstilling,
-    hasMenuToday = false,
+    hasMenuToday = null,
+    implHasOmstilling = null,
+    implIsStandard = null,
   } = state;
   const isImplementering = summaryVariant === "implementering";
 
@@ -273,11 +280,30 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
   }
 
   // Omstilling
-  if (isPilot) {
+  if (isImplementering) {
+    if (implHasOmstilling === null) {
+      lines.push({ text: t("(Vælg om kunden har omstilling)"), isRed: true });
+      lines.push({ text: "" });
+    } else if (implHasOmstilling) {
+      lines.push({ text: t("I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen.") });
+      lines.push({ text: "" });
+      if (implIsStandard === null) {
+        lines.push({ text: t("(Vælg Standard eller Professionel)"), isRed: true });
+        lines.push({ text: "" });
+      } else if (implIsStandard) {
+        if (hasMenuToday === null) {
+          lines.push({ text: t("(Vælg om kunden har menuvalg i dag)"), isRed: true });
+        } else {
+          lines.push({ text: t(hasMenuToday ? "Som aftalt, så har du med denne omstilling mulighed for at have ét nul-valg, hvis du i fremtiden for brug får flere menuvalg, er det muligt at tilkøbe." : "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.") });
+        }
+        lines.push({ text: "" });
+      }
+    }
+  } else if (isPilot) {
     lines.push({ text: t("I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen.") });
     lines.push({ text: "" });
     if (isStandardOmstilling) {
-      lines.push({ text: t(isImplementering && hasMenuToday ? "Som aftalt, så har du med denne omstilling mulighed for at have ét nul-valg, hvis du i fremtiden for brug får flere menuvalg, er det muligt at tilkøbe." : "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.") });
+      lines.push({ text: t("Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.") });
       lines.push({ text: "" });
     }
   } else if (hasOmstilling) {
