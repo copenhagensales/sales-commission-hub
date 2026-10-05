@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, Check, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -140,6 +140,7 @@ export function TdcIdriftsaettelseForm() {
   const [subsidySpecific, setSubsidySpecific] = useState(true);
   const [router, setRouter] = useState("");
   const needsRouter = mbb !== "none" && !noRouter;
+  useEffect(() => { if (needsRouter) { setHasSubsidy(true); setSubsidySpecific(true); } }, [needsRouter]);
   const [features, setFeatures] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
@@ -258,23 +259,23 @@ export function TdcIdriftsaettelseForm() {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Checkbox id="subsidy" checked={hasSubsidy} onCheckedChange={(v) => setHasSubsidy(!!v)} />
+              <Checkbox id="subsidy" disabled={needsRouter} checked={hasSubsidy || needsRouter} onCheckedChange={(v) => setHasSubsidy(!!v)} />
               <Label htmlFor="subsidy">Terminaltilskud</Label>
             </div>
-            {hasSubsidy && (
+            {(hasSubsidy || needsRouter) && (
               <div className="space-y-2 pl-6">
                 <Input placeholder="Beløb (kr.)" value={subsidyAmount} onChange={(e) => setSubsidyAmount(e.target.value)} />
-                <RadioGroup value={subsidySpecific ? "yes" : "no"} onValueChange={(v) => setSubsidySpecific(v === "yes")} className="flex flex-wrap gap-4">
+                <RadioGroup value={subsidySpecific || needsRouter ? "yes" : "no"} onValueChange={(v) => setSubsidySpecific(v === "yes")} className="flex flex-wrap gap-4">
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value="yes" id="sub-yes" />
                     <Label htmlFor="sub-yes">Specifikke produkter</Label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <RadioGroupItem value="no" id="sub-no" />
+                    <RadioGroupItem value="no" id="sub-no" disabled={needsRouter} />
                     <Label htmlFor="sub-no">Ingen specifikke produkter</Label>
                   </div>
                 </RadioGroup>
-                {subsidySpecific && (
+                {(subsidySpecific || needsRouter) && (
                   <div className="space-y-2">
                     {needsRouter && (
                       <Select value={router} onValueChange={setRouter}>
