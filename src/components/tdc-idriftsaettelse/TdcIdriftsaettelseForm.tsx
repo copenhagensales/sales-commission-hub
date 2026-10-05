@@ -130,7 +130,7 @@ function buildMail(f: {
     `Sådan finder du dit simkortnummer\n${sim.map(([a, b]) => `• ${a} ${b}`).join("\n")}\n`);
   p("<p>Rigtig god dag – og endnu en gang tillykke med din aftale!</p>", "Rigtig god dag – og endnu en gang tillykke med din aftale!");
 
-  return { html: `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${html.join("")}</div>`, text: txt.join("\n") };
+  return { html: `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${html.join("").replace(/<p>/g, '<p style="margin:0 0 8pt">').replace(/<p style="margin-bottom:4pt">/g, '<p style="margin:0 0 4pt">')}</div>`, text: txt.join("\n") };
 }
 
 export function TdcIdriftsaettelseForm() {
