@@ -119,6 +119,7 @@ import {
   SalaryTypes,
   TdcOpsummering,
   TdcOpsummeringPublic,
+  TdcIdriftsaettelse,
   ImmediatePaymentASE,
   EconomicUpload,
   EconomicLayout,
@@ -470,6 +471,7 @@ export const routes: RouteConfig[] = [
 
   // TDC Opsummering
   { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },
+  { path: "/tdc-idriftsaettelse", component: TdcIdriftsaettelse, access: "role", positionPermission: "menu_tdc_opsummering" },
 
   // Economic Upload (Owner only)
   { path: "/admin/economic-upload", component: EconomicUpload, access: "role", positionPermission: "menu_economic_upload" },

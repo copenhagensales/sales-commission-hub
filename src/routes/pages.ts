@@ -177,6 +177,7 @@ export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
 
 // TDC Opsummering
 export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));
+export const TdcIdriftsaettelse = lazyPage(() => import("@/pages/TdcIdriftsaettelse"));
 
 // Economic
 export const EconomicUpload = lazyPage(() => import("@/pages/admin/EconomicUpload"));
