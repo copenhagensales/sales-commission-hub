@@ -329,8 +329,17 @@ export function TdcIdriftsaettelseForm() {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="prose prose-sm max-w-none dark:prose-invert rounded-md border bg-card p-4 [&_ul]:list-disc [&_ul]:pl-5"
-            dangerouslySetInnerHTML={{ __html: mail.html }} />
+          <div className="relative">
+            {!canCopy && (
+              <div className="absolute inset-0 z-10 flex items-start justify-center rounded-md bg-destructive/95 backdrop-blur-sm">
+                <div className="sticky top-1/3 p-6 text-center text-xl font-bold text-destructive-foreground">
+                  ⚠️ Udfyld venligst: {missing.join(", ")}
+                </div>
+              </div>
+            )}
+            <div className="prose prose-sm max-w-none dark:prose-invert rounded-md border bg-card p-4 [&_ul]:list-disc [&_ul]:pl-5"
+              dangerouslySetInnerHTML={{ __html: mail.html }} />
+          </div>
         </CardContent>
       </Card>
     </div>
