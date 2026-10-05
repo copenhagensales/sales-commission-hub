@@ -54,6 +54,7 @@ export function TdcOpsummeringForm() {
   const [subsidyLockedForRouter, setSubsidyLockedForRouter] = useState(false);
 
   const [hasSubsidy, setHasSubsidy] = useState(false);
+  const [showUdlaeg, setShowUdlaeg] = useState(false);
   const [noSubsidy, setNoSubsidy] = useState(false);
 
   const [hasOmstilling, setHasOmstilling] = useState(false);
@@ -102,6 +103,7 @@ export function TdcOpsummeringForm() {
         numberChoice,
         startupChoice,
         hasSubsidy,
+        showUdlaeg,
         hasOmstilling,
         isStandardOmstilling,
         hasMenuToday,
@@ -116,6 +118,7 @@ export function TdcOpsummeringForm() {
       numberChoice,
       startupChoice,
       hasSubsidy,
+      showUdlaeg,
       hasOmstilling,
       isStandardOmstilling,
       hasMenuToday,
@@ -388,6 +391,18 @@ export function TdcOpsummeringForm() {
                     Tilskud inkluderet
                   </Label>
                 </div>
+                {isImpl && hasSubsidy && (
+                  <div className="ml-6 flex items-center space-x-2">
+                    <Checkbox
+                      id="showUdlaeg"
+                      checked={showUdlaeg}
+                      onCheckedChange={(checked) => setShowUdlaeg(checked === true)}
+                    />
+                    <Label htmlFor="showUdlaeg" className="font-normal cursor-pointer">
+                      Vis udlægsordning
+                    </Label>
+                  </div>
+                )}
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="noSubsidy"
