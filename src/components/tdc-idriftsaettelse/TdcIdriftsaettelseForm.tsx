@@ -92,9 +92,10 @@ function buildMail(f: {
 
   if (f.hasSubsidy) {
     const amt = f.subsidyAmount.trim() ? `${f.subsidyAmount.trim()} kr.` : "[Beløb]";
-    const prod = f.subsidyProduct.trim() || "[Præcise produkt inkl evt. gigabyte, 4G/5G]";
-    p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p><p>${esc(prod).replace(/\n/g, "<br>")}</p>`,
-      `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prod}\n`);
+    const prod = f.subsidyProduct.trim();
+    const prodHtml = prod ? `<p>${esc(prod).replace(/\n/g, "<br>")}</p>` : "";
+    p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
+      `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prod ? `${prod}\n` : ""}`);
   }
 
   const shop = "I kan på https://shop.tdc.dk/ se hvilket hardware vi udbyder, bestillinger foregår via kontaktformularen og er ikke noget jeg har mulighed for at gøre for dig. Hvis i ønsker at bestille for mere, end det medfølgende terminaltilskud, vil i selv skulle betale differencen.";
