@@ -176,7 +176,7 @@ export function TdcOpsummeringForm() {
                     { val: "standard", label: "Standard" },
                     { val: "pilot", label: "Pilot" },
                     { val: "5g-fri", label: "Kun 5g fri salg" },
-                    { val: "implementering", label: "Ny implementeringsopsummering" },
+                    { val: "implementering", label: "Ny Implementering" },
                   ] as const
                 ).map((opt) => (
                   <button
