@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Check, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -176,6 +176,35 @@ export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } 
   const [startMode, setStartMode] = useState<"" | "binding" | "date">("");
   const [startDate, setStartDate] = useState("");
   const [mainNumber, setMainNumber] = useState("");
+
+  // Fletter nye tilbudsdata ind uden at overskrive sælgerens indtastninger.
+  const appliedRef = useRef(prefill);
+  useEffect(() => {
+    const prev = appliedRef.current;
+    if (!prefill || prefill === prev) return;
+    appliedRef.current = prefill;
+    const managed = new Set([...(prev?.subscriptions ?? []), ...prefill.subscriptions].filter(Boolean));
+    setRows((cur) => {
+      const target = new Map<string, number>();
+      prefill.subscriptions.forEach((s) => target.set(s, (target.get(s) ?? 0) + 1));
+      const seen = new Map<string, number>();
+      const kept = cur.filter((r) => {
+        if (!managed.has(r.subscription)) return true;
+        const n = (seen.get(r.subscription) ?? 0) + 1;
+        seen.set(r.subscription, n);
+        return n <= (target.get(r.subscription) ?? 0);
+      });
+      const added: NumberRow[] = [];
+      target.forEach((n, s) => { for (let i = seen.get(s) ?? 0; i < n; i++) added.push({ name: "", subscription: s, sim: "" }); });
+      const result = [...kept.filter((r) => r.name || r.subscription || r.sim || r.isNew), ...added];
+      return result.length ? result : [{ name: "", subscription: "", sim: "" }];
+    });
+    const prevAmount = prev?.subsidyAmount ? String(prev.subsidyAmount) : "";
+    setSubsidyAmount((cur) => (cur.trim() !== prevAmount ? cur : prefill.subsidyAmount ? String(prefill.subsidyAmount) : ""));
+    if (prefill.subsidyAmount) setHasSubsidy(true);
+    const prevProds = JSON.stringify(prev?.subsidyProducts?.length ? prev.subsidyProducts : [""]);
+    setSubsidyProducts((cur) => (JSON.stringify(cur) !== prevProds ? cur : prefill.subsidyProducts?.length ? prefill.subsidyProducts : [""]));
+  }, [prefill]);
 
   const mail = useMemo(
     () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features, benefits, startMode, startDate }),

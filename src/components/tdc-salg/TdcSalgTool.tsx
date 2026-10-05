@@ -3,8 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { TdcTilbudForm } from "./TdcTilbudForm";
 import { TdcOpsummeringForm } from "@/components/tdc-opsummering/TdcOpsummeringForm";
-import { TdcIdriftsaettelseForm } from "@/components/tdc-idriftsaettelse/TdcIdriftsaettelseForm";
-import { buildPrefill, type TilbudPrefill } from "@/lib/tdcTilbud/prefill";
+import { TdcIdriftsaettelseForm, type IdriftPrefill } from "@/components/tdc-idriftsaettelse/TdcIdriftsaettelseForm";
+import { buildPrefill } from "@/lib/tdcTilbud/prefill";
 import type { Quantities } from "@/lib/tdcTilbud/calc";
 
 const HIDDEN = "data-[state=inactive]:hidden";
@@ -14,41 +14,41 @@ export function TdcSalgTool() {
   const [tab, setTab] = useState("tilbud");
   const [products, setProducts] = useState<Quantities>({});
   const [hardware, setHardware] = useState<Quantities>({});
-  const [transferred, setTransferred] = useState<TilbudPrefill | undefined>();
-  const [mailKey, setMailKey] = useState(0);
+  const [mailPrefill, setMailPrefill] = useState<IdriftPrefill | undefined>();
 
-  const mailPrefill = useMemo(
-    () =>
-      transferred && {
-        subscriptions: transferred.mailSubscriptions,
-        subsidyAmount: Math.round(transferred.subsidy) || undefined,
-        subsidyProducts: transferred.hardware,
-      },
-    [transferred]
-  );
+  const prefill = useMemo(() => buildPrefill(products, hardware), [products, hardware]);
 
-  const transfer = () => {
-    setTransferred(buildPrefill(products, hardware));
-    setMailKey((k) => k + 1);
-    setTab("opsummering");
-    toast({ title: "Overført", description: "Tilbuddet er sat ind i opsummering og mail. Mailen er nulstillet med de nye linjer." });
+  const changeTab = (next: string) => {
+    if (next === "mail") {
+      const candidate: IdriftPrefill = {
+        subscriptions: prefill.mailSubscriptions,
+        subsidyAmount: Math.round(prefill.subsidy) || undefined,
+        subsidyProducts: prefill.hardware,
+      };
+      if (JSON.stringify(candidate) !== JSON.stringify(mailPrefill)) {
+        const hadPrevious = !!mailPrefill;
+        setMailPrefill(candidate);
+        if (hadPrevious) toast({ title: "Mailen er opdateret ud fra tilbuddet" });
+      }
+    }
+    setTab(next);
   };
 
   return (
-    <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+    <Tabs value={tab} onValueChange={changeTab} className="space-y-6">
       <TabsList>
         <TabsTrigger value="tilbud">1. Tilbud</TabsTrigger>
         <TabsTrigger value="opsummering">2. Opsummering</TabsTrigger>
         <TabsTrigger value="mail">3. Idriftsættelsesmail</TabsTrigger>
       </TabsList>
       <TabsContent value="tilbud" forceMount className={HIDDEN}>
-        <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} onTransfer={transfer} />
+        <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} />
       </TabsContent>
       <TabsContent value="opsummering" forceMount className={HIDDEN}>
-        <TdcOpsummeringForm prefill={transferred} />
+        <TdcOpsummeringForm prefill={prefill} />
       </TabsContent>
       <TabsContent value="mail" forceMount className={HIDDEN}>
-        <TdcIdriftsaettelseForm key={mailKey} prefill={mailPrefill} />
+        <TdcIdriftsaettelseForm prefill={mailPrefill} />
       </TabsContent>
     </Tabs>
   );
