@@ -75,7 +75,8 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
 
   // Udfyld fra tilbuddet, når valget i tilbuddet ændres. Sælger kan rette bagefter.
   const tilbudOms = prefill?.omstilling;
-  const tilbudHasSubsidy = prefill ? prefill.subsidy > 0 : undefined;
+  const tilbudPct = prefill?.subsidyPct ?? null;
+  const tilbudHasSubsidy = prefill ? (tilbudPct !== null ? tilbudPct > 0 && prefill.subsidy > 0 : prefill.subsidy > 0) : undefined;
   useEffect(() => {
     if (!prefill) return;
     setImplHasOmstilling(tilbudOms !== null);
@@ -88,13 +89,14 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
     if (tilbudHasSubsidy) {
       setHasSubsidy(true);
       setNoSubsidy(false);
+      if (tilbudPct === 50 || tilbudPct === 100) setSubsidyLevel(tilbudPct === 50 ? "50" : "100");
     } else if (!subsidyLockedForRouter) {
       setHasSubsidy(false);
       setNoSubsidy(true);
       setSubsidyLevel(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tilbudHasSubsidy]);
+  }, [tilbudHasSubsidy, tilbudPct]);
 
   // Default "Ingen Omstilling" when switching to Standard variant if nothing is selected
   useEffect(() => {
