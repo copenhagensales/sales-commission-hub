@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 type Solution = "omstilling" | "oneplus";
 type Mbb = "none" | "datadeling" | "mobilevoice";
@@ -65,6 +67,7 @@ function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
   hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; router: string; features: string[]; benefits: string[];
+  startMode: "" | "binding" | "date"; startDate: string;
 }) {
   const html: string[] = [];
   const txt: string[] = [];
@@ -79,7 +82,10 @@ function buildMail(f: {
     `TDC Erhverv ${SOLUTIONS[f.solution]}\n• Snarest muligt kontakter min kollega jer ifm. opsætning og indhentning af oplysninger. Vi bruger følgende kontaktoplysninger:\n   - Kontaktperson: ${contact}\n   - Telefonnummer: ${phone}\n`);
 
   const forloeb = "I vil skulle lave fuldmagter for at få flyttet numrene med. Derfor må du så vidt som muligt gerne have fundet alle numrenes tilhørende simkortsnummer frem. Sidst i mailen kan du læse hvordan.";
-  const forloeb2 = "Vi sørger for, at overflytningen af numrene sker når jeres nuværende bindings- og opsigelsesperiode er udløbet, så vi er sikre på i ikke modtager nogle dobbeltregninger.";
+  const dateTxt = f.startDate ? format(new Date(`${f.startDate}T12:00:00`), "d. MMMM yyyy", { locale: da }) : "[dato]";
+  const forloeb2 = f.startMode === "date"
+    ? `Vi har aftalt, at numrene flyttes den ${dateTxt} eller hurtigst muligt herefter. Hvis det ligger før jeres nuværende udbyders bindings- eller opsigelsesperiode, kan de opkræve et gebyr for tidlig udtrædelse.`
+    : "Vi sørger for, at overflytningen af numrene sker når jeres nuværende bindings- og opsigelsesperiode er udløbet, så vi er sikre på i ikke modtager nogle dobbeltregninger.";
   p(`<p><b>Videre forløb</b></p><ul><li>${forloeb}<br>${forloeb2}</li></ul>`, `Videre forløb\n• ${forloeb}\n  ${forloeb2}\n`);
 
   const ul = (items: string[]) => `<ul style="margin-top:0;margin-bottom:8pt">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
@@ -161,11 +167,13 @@ export function TdcIdriftsaettelseForm() {
   useEffect(() => { if (needsRouter) { setHasSubsidy(true); setSubsidySpecific(true); } }, [needsRouter]);
   const [features, setFeatures] = useState<string[]>([]);
   const [benefits, setBenefits] = useState<string[]>([]);
+  const [startMode, setStartMode] = useState<"" | "binding" | "date">("");
+  const [startDate, setStartDate] = useState("");
   const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features, benefits }),
-    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router, needsRouter, features, benefits],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features, benefits, startMode, startDate }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router, needsRouter, features, benefits, startMode, startDate],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -184,6 +192,8 @@ export function TdcIdriftsaettelseForm() {
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
   if (solution === "omstilling" && features.length === 0) missing.push("mindst én funktion");
   if (benefits.length === 0) missing.push("mindst én fordel");
+  if (!startMode) missing.push("opstart");
+  if (startMode === "date" && !startDate) missing.push("ønskedato");
   if (hasSubsidy && subsidySpecific && !(needsRouter && router) && subsidyProducts.some((x) => !x.trim())) missing.push("produkter for terminaltilskud");
   if (needsRouter && (!hasSubsidy || !subsidySpecific || !router)) missing.push("router under terminaltilskud (specifikke produkter)");
   const canCopy = missing.length === 0;
@@ -345,6 +355,24 @@ export function TdcIdriftsaettelseForm() {
             </div>
           </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Opstart *</Label>
+            <RadioGroup value={startMode} onValueChange={(v) => setStartMode(v as "binding" | "date")}>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="binding" id="start-binding" />
+                <Label htmlFor="start-binding" className="font-normal">Efter endt binding- og opsigelse</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="date" id="start-date" />
+                <Label htmlFor="start-date" className="font-normal">Ønskedato</Label>
+              </div>
+            </RadioGroup>
+            {startMode === "date" && (
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                className={`max-w-xs ${!startDate ? "border-destructive" : ""}`} />
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label>Fordele * <span className="font-normal text-muted-foreground">(vælg mindst 1)</span></Label>
