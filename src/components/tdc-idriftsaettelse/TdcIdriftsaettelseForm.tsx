@@ -34,6 +34,8 @@ const SUBSCRIPTIONS = [
   "Premium mobil (1TB)",
 ];
 
+const BENEFITS = ["Pris", "Udlandstelefoni", "Udlandsdata", "Datakort", "Call-record", "Yousee musik", "God dækning", "Omstilling og de fordele der følger med", "Viderestilling", "Min status", "Guldnummer", "5G+", "Internetfilter", "Samlet løsning"];
+
 const FEATURES = [
   "Velkomsthilsen",
   "Åbne- og lukketider",
@@ -62,7 +64,7 @@ const isValidDkNumber = (v: string) => /^\d{8}$/.test(v.replace(/\s/g, ""));
 function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
-  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; router: string; features: string[];
+  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProducts: string[]; router: string; features: string[]; benefits: string[];
 }) {
   const html: string[] = [];
   const txt: string[] = [];
@@ -123,6 +125,11 @@ function buildMail(f: {
       `Vi har talt om I gerne vil gøre brug af følgende funktioner:\n${bullets(f.features)}\n`);
   }
 
+  if (f.benefits.length) {
+    p(`<p style="margin-bottom:4pt"><b>Fordele</b></p><p style="margin-bottom:4pt">Nogle af de fordele vi har drøftet er:</p>${ul(f.benefits.map(esc))}`,
+      `Fordele\nNogle af de fordele vi har drøftet er:\n${bullets(f.benefits)}\n`);
+  }
+
   const sim = [
     ["På selve simkortet:", "Du kan se nummeret (ICCID) trykt på det lille nano-simkort eller på det store plastikkort, du modtog det med."],
     ["I telefonens indstillinger:", "På mange smartphones kan du finde nummeret under telefonens om- eller indstillingsmenu (fx under Om enhed / Status)."],
@@ -153,11 +160,12 @@ export function TdcIdriftsaettelseForm() {
   const needsRouter = mbb !== "none" && !noRouter;
   useEffect(() => { if (needsRouter) { setHasSubsidy(true); setSubsidySpecific(true); } }, [needsRouter]);
   const [features, setFeatures] = useState<string[]>([]);
+  const [benefits, setBenefits] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features }),
-    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router, needsRouter, features],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features, benefits }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router, needsRouter, features, benefits],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -175,6 +183,7 @@ export function TdcIdriftsaettelseForm() {
   if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
   if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
   if (solution === "omstilling" && features.length === 0) missing.push("mindst én funktion");
+  if (benefits.length === 0) missing.push("mindst én fordel");
   if (hasSubsidy && subsidySpecific && !(needsRouter && router) && subsidyProducts.some((x) => !x.trim())) missing.push("produkter for terminaltilskud");
   if (needsRouter && (!hasSubsidy || !subsidySpecific || !router)) missing.push("router under terminaltilskud (specifikke produkter)");
   const canCopy = missing.length === 0;
