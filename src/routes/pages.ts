@@ -2,6 +2,7 @@ import { lazy } from "react";
 export { default as Home } from "@/pages/Home";
 
 export const TdcOpsummeringPublic = lazy(() => import("@/pages/TdcOpsummeringPublic"));
+export const TdcSalgPublic = lazy(() => import("@/pages/TdcSalgPublic"));
 
 const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
@@ -178,6 +179,7 @@ export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
 // TDC Opsummering
 export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));
 export const TdcIdriftsaettelse = lazyPage(() => import("@/pages/TdcIdriftsaettelse"));
+export const TdcSalg = lazyPage(() => import("@/pages/TdcSalg"));
 
 // Economic
 export const EconomicUpload = lazyPage(() => import("@/pages/admin/EconomicUpload"));

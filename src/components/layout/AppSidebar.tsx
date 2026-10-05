@@ -101,7 +101,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   }, [menuConfig]);
 
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse", "/tdc-salgsvaerktoej"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -755,6 +755,19 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 >
                   <FileText className="h-4 w-4" />
                   TDC Idriftsættelsesmail
+                </NavLink>
+              )}
+              {p.canViewTdcOpsummering && (
+                <NavLink
+                  to="/tdc-salgsvaerktoej"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/tdc-salgsvaerktoej" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <FileText className="h-4 w-4" />
+                  TDC Salgsværktøj (test)
                 </NavLink>
               )}
 
