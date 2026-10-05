@@ -86,7 +86,7 @@ function buildMail(f: {
   const shop = "I kan på https://shop.tdc.dk/ se hvilket hardware vi udbyder, bestillinger foregår via kontaktformularen og er ikke noget jeg har mulighed for at gøre for dig. Hvis i ønsker at bestille for mere, end det medfølgende terminaltilskud, vil i selv skulle betale differencen.";
   p(`<p>${shop}</p>`, `${shop}\n`);
 
-  if (f.features.length) {
+  if (f.solution === "omstilling" && f.features.length) {
     p(`<p><b>Vi har talt om I gerne vil gøre brug af følgende funktioner:</b></p><p>${f.features.map(esc).join("<br>")}</p>`,
       `Vi har talt om I gerne vil gøre brug af følgende funktioner:\n${f.features.join("\n")}\n`);
   }
@@ -222,6 +222,7 @@ export function TdcIdriftsaettelseForm() {
             )}
           </div>
 
+          {solution === "omstilling" && (
           <div className="space-y-2">
             <Label>Funktioner</Label>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -234,6 +235,7 @@ export function TdcIdriftsaettelseForm() {
               ))}
             </div>
           </div>
+          )}
         </CardContent>
       </Card>
 
