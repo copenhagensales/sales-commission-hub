@@ -59,7 +59,7 @@ const cleanPhone = (s: string) => {
 function buildMail(f: {
   solution: Solution; contact: string; phone: string; mainNumber: string; rows: NumberRow[];
   mbb: Mbb; noRouter: boolean; fiveG: boolean;
-  hasSubsidy: boolean; subsidyAmount: string; subsidyProduct: string; features: string[];
+  hasSubsidy: boolean; subsidyAmount: string; subsidySpecific: boolean; subsidyProduct: string; features: string[];
 }) {
   const html: string[] = [];
   const txt: string[] = [];
@@ -92,10 +92,15 @@ function buildMail(f: {
 
   if (f.hasSubsidy) {
     const amt = f.subsidyAmount.trim() ? `${f.subsidyAmount.trim()} kr.` : "[Beløb]";
-    const prod = f.subsidyProduct.trim();
-    const prodHtml = prod ? `<p>${esc(prod).replace(/\n/g, "<br>")}</p>` : "";
-    p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
-      `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prod ? `${prod}\n` : ""}`);
+    if (f.subsidySpecific) {
+      const prod = f.subsidyProduct.trim();
+      const prodHtml = prod ? `<p>${esc(prod).replace(/\n/g, "<br>")}</p>` : "";
+      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
+        `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prod ? `${prod}\n` : ""}`);
+    } else {
+      p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}.</p>`,
+        `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}.\n`);
+    }
   }
 
   const shop = "I kan på https://shop.tdc.dk/ se hvilket hardware vi udbyder, bestillinger foregår via kontaktformularen og er ikke noget jeg har mulighed for at gøre for dig. Hvis i ønsker at bestille for mere, end det medfølgende terminaltilskud, vil i selv skulle betale differencen.";
@@ -131,12 +136,13 @@ export function TdcIdriftsaettelseForm() {
   const [hasSubsidy, setHasSubsidy] = useState(false);
   const [subsidyAmount, setSubsidyAmount] = useState("");
   const [subsidyProduct, setSubsidyProduct] = useState("");
+  const [subsidySpecific, setSubsidySpecific] = useState(true);
   const [features, setFeatures] = useState<string[]>([]);
   const [mainNumber, setMainNumber] = useState("");
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidyProduct, features }),
-    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidyProduct, features],
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProduct, features }),
+    [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProduct, features],
   );
 
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
@@ -253,7 +259,18 @@ export function TdcIdriftsaettelseForm() {
             {hasSubsidy && (
               <div className="space-y-2 pl-6">
                 <Input placeholder="Beløb (kr.)" value={subsidyAmount} onChange={(e) => setSubsidyAmount(e.target.value)} />
-                <Textarea placeholder="Produkt inkl. evt. gigabyte, 4G/5G" value={subsidyProduct} onChange={(e) => setSubsidyProduct(e.target.value)} />
+                <RadioGroup value={subsidySpecific ? "yes" : "no"} onValueChange={(v) => setSubsidySpecific(v === "yes")} className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="yes" id="sub-yes" />
+                    <Label htmlFor="sub-yes">Specifikke produkter</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="no" id="sub-no" />
+                    <Label htmlFor="sub-no">Ingen specifikke produkter</Label>
+                  </div>
+                </RadioGroup>
+                <Textarea placeholder="Produkt inkl. evt. gigabyte, 4G/5G" value={subsidySpecific ? subsidyProduct : ""}
+                  disabled={!subsidySpecific} onChange={(e) => setSubsidyProduct(e.target.value)} />
               </div>
             )}
           </div>
