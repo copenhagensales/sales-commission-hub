@@ -16,18 +16,20 @@ export interface TilbudProduct {
   countsInCommission?: boolean;
   /** Navn i idriftsættelsesmailens abonnementsliste, hvis relevant */
   mailSubscription?: string;
+  /** Længere produktnavn til opsummeringsteksten */
+  summaryName?: string;
   kind: "mobile" | "mbb" | "other";
 }
 
 export const TILBUD_PRODUCTS: TilbudProduct[] = [
-  { id: "premium-1000", group: "Mobilpakker", name: "1000GB Premium", price: 379, subsidy: 3411, commission: [2075, 1680, 1250], mailSubscription: "Premium mobil (1TB)", kind: "mobile" },
-  { id: "pro-100", group: "Mobilpakker", name: "100GB Pro", price: 209, subsidy: 1881, commission: [1300, 1075, 850], mailSubscription: "Professionel mobil (100GB)", kind: "mobile" },
-  { id: "standard-40", group: "Mobilpakker", name: "40GB Standard", price: 189, subsidy: 1701, commission: [1060, 855, 650], mailSubscription: "Standard mobil (40GB)", kind: "mobile" },
-  { id: "basis-15", group: "Mobilpakker", name: "15GB Basis", price: 139, subsidy: 1251, commission: [750, 600, 450], mailSubscription: "Basis mobil (15GB)", kind: "mobile" },
-  { id: "dk-3", group: "Mobilpakker", name: "3GB", price: 99, subsidy: 891, commission: [540, 430, 325], mailSubscription: "Mobil DK (3GB)", kind: "mobile" },
-  { id: "eu-basis-40", group: "Kun EU", name: "40GB Basis", price: 159, subsidy: 1431, commission: [845, 670, 500], mailSubscription: "Mobil Basis (40GB)", kind: "mobile" },
-  { id: "eu-basis-5", group: "Kun EU", name: "5GB Basis", price: 109, subsidy: 684, commission: [585, 470, 350], mailSubscription: "Mobil Basis (5GB)", kind: "mobile" },
-  { id: "eu-minut", group: "Kun EU", name: "Mobil Minut", price: 38.5, subsidy: 306, commission: [190, 160, 125], mailSubscription: "Mobil minut", kind: "mobile" },
+  { id: "premium-1000", summaryName: "Mobil Premium 1TB", group: "Mobilpakker", name: "1000GB Premium", price: 379, subsidy: 3411, commission: [2075, 1680, 1250], mailSubscription: "Premium mobil (1TB)", kind: "mobile" },
+  { id: "pro-100", summaryName: "Mobil Professionel 100GB", group: "Mobilpakker", name: "100GB Pro", price: 209, subsidy: 1881, commission: [1300, 1075, 850], mailSubscription: "Professionel mobil (100GB)", kind: "mobile" },
+  { id: "standard-40", summaryName: "Mobil Standard 40GB", group: "Mobilpakker", name: "40GB Standard", price: 189, subsidy: 1701, commission: [1060, 855, 650], mailSubscription: "Standard mobil (40GB)", kind: "mobile" },
+  { id: "basis-15", summaryName: "Mobil Basis 15GB", group: "Mobilpakker", name: "15GB Basis", price: 139, subsidy: 1251, commission: [750, 600, 450], mailSubscription: "Basis mobil (15GB)", kind: "mobile" },
+  { id: "dk-3", summaryName: "Mobil DK 3GB", group: "Mobilpakker", name: "3GB", price: 99, subsidy: 891, commission: [540, 430, 325], mailSubscription: "Mobil DK (3GB)", kind: "mobile" },
+  { id: "eu-basis-40", summaryName: "Mobil Basis 40GB", group: "Kun EU", name: "40GB Basis", price: 159, subsidy: 1431, commission: [845, 670, 500], mailSubscription: "Mobil Basis (40GB)", kind: "mobile" },
+  { id: "eu-basis-5", summaryName: "Mobil Basis 5GB", group: "Kun EU", name: "5GB Basis", price: 109, subsidy: 684, commission: [585, 470, 350], mailSubscription: "Mobil Basis (5GB)", kind: "mobile" },
+  { id: "eu-minut", summaryName: "Mobil Minut", group: "Kun EU", name: "Mobil Minut", price: 38.5, subsidy: 306, commission: [190, 160, 125], mailSubscription: "Mobil minut", kind: "mobile" },
   { id: "oms-pro", group: "Omstilling", name: "Professionel omstilling", price: 388.5, subsidy: 0, commission: [1250, 1250, 1250], kind: "other" },
   { id: "oms-std", group: "Omstilling", name: "Standard omstilling", price: 145.6, subsidy: 0, commission: [850, 850, 850], kind: "other" },
   { id: "ddi", group: "Omstilling", name: "DDI nummer", price: 14, subsidy: 0, commission: [0, 0, 0], kind: "other" },
