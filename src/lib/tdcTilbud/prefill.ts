@@ -11,6 +11,8 @@ export interface TilbudPrefill {
   hardware: string[];
   /** Én linje pr. abonnement til idriftsættelsesmailen */
   mailSubscriptions: string[];
+  /** Omstilling valgt i tilbuddet (professionel vinder, hvis begge er valgt). */
+  omstilling: "standard" | "professionel" | null;
 }
 
 export function buildPrefill(products: Quantities, hardware: Quantities): TilbudPrefill {
@@ -30,6 +32,8 @@ export function buildPrefill(products: Quantities, hardware: Quantities): Tilbud
     subsidy: calcTilbud(products, hardware).subsidy,
     hardware: HARDWARE.filter((h) => (hardware[h.id] ?? 0) > 0).map((h) => `${hardware[h.id]} x ${h.name}`),
     mailSubscriptions,
+    omstilling:
+      (products["oms-pro"] ?? 0) > 0 ? "professionel" : (products["oms-std"] ?? 0) > 0 ? "standard" : null,
   };
 }
 

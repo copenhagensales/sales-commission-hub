@@ -73,6 +73,29 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
   const isImpl = summaryVariant === "implementering";
   const [noOmstilling, setNoOmstilling] = useState(true);
 
+  // Udfyld fra tilbuddet, når valget i tilbuddet ændres. Sælger kan rette bagefter.
+  const tilbudOms = prefill?.omstilling;
+  const tilbudHasSubsidy = prefill ? prefill.subsidy > 0 : undefined;
+  useEffect(() => {
+    if (!prefill) return;
+    setImplHasOmstilling(tilbudOms !== null);
+    setImplIsStandard(tilbudOms === null ? null : tilbudOms === "standard");
+    if (tilbudOms !== "standard") setHasMenuToday(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tilbudOms]);
+  useEffect(() => {
+    if (tilbudHasSubsidy === undefined) return;
+    if (tilbudHasSubsidy) {
+      setHasSubsidy(true);
+      setNoSubsidy(false);
+    } else if (!subsidyLockedForRouter) {
+      setHasSubsidy(false);
+      setNoSubsidy(true);
+      setSubsidyLevel(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tilbudHasSubsidy]);
+
   // Default "Ingen Omstilling" when switching to Standard variant if nothing is selected
   useEffect(() => {
     if (summaryVariant === "standard" && !hasOmstilling && !noOmstilling) {
