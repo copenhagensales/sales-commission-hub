@@ -94,7 +94,7 @@ function buildMail(f: {
   const rows = f.rows.filter((r) => r.name || r.subscription || r.sim);
   if (f.solution === "omstilling") rows.unshift({ name: f.mainNumber || "[Hovednummer]", subscription: "Hovednummer", sim: "" });
   const isMain = (r: NumberRow) => r.subscription === "Hovednummer";
-  const simOf = (r: NumberRow) => (isMain(r) ? "" : `Simkort: ${r.sim || "[Simkortsnummer]"}`);
+  const simOf = (r: NumberRow) => (isMain(r) ? "" : r.isNew ? "Nyt nummer oprettes" : `Simkort: ${r.sim || "[Simkortsnummer]"}`);
   const rowHtml = rows.map((r) => [isMain(r) ? `<b>${esc(r.name)}</b>` : esc(r.name), esc(r.subscription), esc(simOf(r))].filter(Boolean).join(" – "));
   const rowTxt = rows.map((r) => [r.name, r.subscription, simOf(r)].filter(Boolean).join(" – "));
   const fallback = "[Nummer/Navn] – [Abonnement] – Simkort: [Simkortsnummer]";
