@@ -100,11 +100,11 @@ export const TRANSLATIONS: Record<string, string> = {
     "Review the call flow (When someone calls the main number, what happens?) Review hardware (What equipment does the customer need for the switchboard?)",
   "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe.":
     "If you need call menu options in the future, it is possible to purchase this as an add-on.",
-  "Min kollega kommer til at kontakte jer for at byde jer velkommen, så vi kan få sat jeres nye løsning op. Før min kollega kan starte jeres løsning er der brug for vi får oplyst de numre der skal indgå i aftalen og deres tilhørende simkortsnumre. Vi har aftalt, at det som udgangspunkt er følgende numre der skal indgå i aftalen:":
+  "Min kollega vil kontakte jer for at byde jer velkommen, så vi kan få sat jeres nye løsning op. Før min kollega kan starte jeres løsning, har vi brug for at få oplyst de numre, der skal indgå i aftalen, og deres tilhørende simkortnumre. Vi har aftalt, at det som udgangspunkt er følgende numre, der skal indgå i aftalen:":
     "My colleague will contact you to welcome you, so we can set up your new solution. Before my colleague can start your solution, we need to know the numbers to be included in the agreement and their corresponding SIM card numbers. We have agreed that, as a starting point, the following numbers will be included in the agreement:",
-  "[Eksisterende numre & evt nye numre. Hvis i ikke har nummer, sig til kunden de skal udfylde nummer også]":
+  "[Eksisterende numre og evt. nye numre. Hvis I ikke har et nummer, så sig til kunden, at de også skal udfylde nummeret]":
     "[Existing numbers & any new numbers. If you do not have a number, tell the customer they must fill in the number as well]",
-  "Jeg sender dig snarest muligt en mail. På denne mail fremgår de numre vi har aftalt, samt en guide til hvordan du skal finde simkortsnumrene. Det er meget vigtigt du kigger på denne mail, da det sikre en smidig process, hvis du kan finde dem klar til os inden min kollega ringer til dig":
+  "Jeg sender dig en mail snarest muligt. Af mailen fremgår de numre, vi har aftalt, samt en guide til, hvordan du finder simkortnumrene. Det er meget vigtigt, at du kigger på mailen, da det sikrer en smidig proces, hvis du har fundet dem frem, inden min kollega ringer til dig.":
     "I will send you an email as soon as possible. The email lists the numbers we have agreed on, together with a guide on how to find the SIM card numbers. It is very important that you look at this email, as it ensures a smooth process if you can have them ready for us before my colleague calls you.",
   "Som aftalt, så har du med denne omstilling mulighed for at have ét nul-valg, hvis du i fremtiden for brug får flere menuvalg, er det muligt at tilkøbe.":
     "As agreed, this switchboard gives you the option of one zero-choice; if you need more menu options in the future, it is possible to purchase them as an add-on.",
@@ -182,11 +182,11 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
 
   if (isPilot) {
     if (isImplementering) {
-      lines.push({ text: t("Min kollega kommer til at kontakte jer for at byde jer velkommen, så vi kan få sat jeres nye løsning op. Før min kollega kan starte jeres løsning er der brug for vi får oplyst de numre der skal indgå i aftalen og deres tilhørende simkortsnumre. Vi har aftalt, at det som udgangspunkt er følgende numre der skal indgå i aftalen:") });
+      lines.push({ text: t("Min kollega vil kontakte jer for at byde jer velkommen, så vi kan få sat jeres nye løsning op. Før min kollega kan starte jeres løsning, har vi brug for at få oplyst de numre, der skal indgå i aftalen, og deres tilhørende simkortnumre. Vi har aftalt, at det som udgangspunkt er følgende numre, der skal indgå i aftalen:") });
       lines.push({ text: "" });
-      lines.push({ text: t("[Eksisterende numre & evt nye numre. Hvis i ikke har nummer, sig til kunden de skal udfylde nummer også]"), isRed: true });
+      lines.push({ text: t("[Eksisterende numre og evt. nye numre. Hvis I ikke har et nummer, så sig til kunden, at de også skal udfylde nummeret]"), isRed: true });
       lines.push({ text: "" });
-      lines.push({ text: t("Jeg sender dig snarest muligt en mail. På denne mail fremgår de numre vi har aftalt, samt en guide til hvordan du skal finde simkortsnumrene. Det er meget vigtigt du kigger på denne mail, da det sikre en smidig process, hvis du kan finde dem klar til os inden min kollega ringer til dig") });
+      lines.push({ text: t("Jeg sender dig en mail snarest muligt. Af mailen fremgår de numre, vi har aftalt, samt en guide til, hvordan du finder simkortnumrene. Det er meget vigtigt, at du kigger på mailen, da det sikrer en smidig proces, hvis du har fundet dem frem, inden min kollega ringer til dig.") });
       lines.push({ text: "" });
     } else {
       lines.push({ text: t("Snarest muligt vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Det vi skal bruge fra jer, er simkortnumrene på de numre der skal flyttes. Hvis I har mulighed for at finde dem frem inden velkomstkaldet er det en stor hjælp.") });
