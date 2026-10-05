@@ -92,7 +92,7 @@ function buildMail(f: {
   if (f.hasSubsidy) {
     const amt = f.subsidyAmount.trim() ? `${f.subsidyAmount.trim()} kr.` : "[Beløb]";
     if (f.subsidySpecific) {
-      const prods = f.subsidyProducts.map((x) => x.trim()).filter(Boolean);
+      const prods = [f.router, ...f.subsidyProducts].map((x) => x.trim()).filter(Boolean);
       const prodHtml = prods.length ? `<p>${prods.map(esc).join("<br>")}</p>` : "";
       p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${esc(amt)}, vi har drøftet det umiddelbart skal bruges på:</p>${prodHtml}`,
         `Tilskud:\nI har fået tildelt et terminaltilskud ${amt}, vi har drøftet det umiddelbart skal bruges på:\n${prods.map((x) => `${x}\n`).join("")}`);
@@ -271,6 +271,14 @@ export function TdcIdriftsaettelseForm() {
                 </RadioGroup>
                 {subsidySpecific && (
                   <div className="space-y-2">
+                    {needsRouter && (
+                      <Select value={router} onValueChange={setRouter}>
+                        <SelectTrigger><SelectValue placeholder="Vælg router (påkrævet)" /></SelectTrigger>
+                        <SelectContent>
+                          {ROUTERS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {subsidyProducts.map((prod, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <Input placeholder="Produkt inkl. evt. gigabyte, 4G/5G" value={prod}
