@@ -13,7 +13,7 @@ import { da } from "date-fns/locale";
 
 type Solution = "omstilling" | "oneplus";
 type Mbb = "none" | "datadeling" | "mobilevoice";
-interface NumberRow { name: string; subscription: string; sim: string }
+interface NumberRow { name: string; subscription: string; sim: string; isNew?: boolean }
 
 const SOLUTIONS: Record<Solution, string> = {
   omstilling: "One+ Omstillingsløsning",
@@ -94,7 +94,7 @@ function buildMail(f: {
   const rows = f.rows.filter((r) => r.name || r.subscription || r.sim);
   if (f.solution === "omstilling") rows.unshift({ name: f.mainNumber || "[Hovednummer]", subscription: "Hovednummer", sim: "" });
   const isMain = (r: NumberRow) => r.subscription === "Hovednummer";
-  const simOf = (r: NumberRow) => (isMain(r) ? "" : `Simkort: ${r.sim || "[Simkortsnummer]"}`);
+  const simOf = (r: NumberRow) => (isMain(r) ? "" : r.isNew ? "Nyt nummer oprettes" : `Simkort: ${r.sim || "[Simkortsnummer]"}`);
   const rowHtml = rows.map((r) => [isMain(r) ? `<b>${esc(r.name)}</b>` : esc(r.name), esc(r.subscription), esc(simOf(r))].filter(Boolean).join(" – "));
   const rowTxt = rows.map((r) => [r.name, r.subscription, simOf(r)].filter(Boolean).join(" – "));
   const fallback = "[Nummer/Navn] – [Abonnement] – Simkort: [Simkortsnummer]";
@@ -249,7 +249,7 @@ export function TdcIdriftsaettelseForm() {
                 <Input placeholder="Hovednummer" value={mainNumber} className={mainBad ? "border-destructive" : ""} title={mainBad ? "Skal være 8 cifre" : undefined} onChange={(e) => setMainNumber(e.target.value)} />
                 <Input value="Hovednummer" disabled />
                 <Input placeholder="Intet simkort" disabled />
-                <div className="w-10 shrink-0" />
+                <div className="w-[5.5rem] shrink-0" />
               </div>
             )}
             {rows.map((r, i) => (
@@ -261,7 +261,12 @@ export function TdcIdriftsaettelseForm() {
                     {SUBSCRIPTIONS.map((sub) => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Input placeholder="Simkortnummer" value={r.sim} onChange={(e) => updateRow(i, "sim", e.target.value)} />
+                <Input placeholder={r.isNew ? "Nyt nummer oprettes" : "Simkortnummer"} value={r.isNew ? "" : r.sim} disabled={r.isNew || r.subscription === "Hovednummer"} onChange={(e) => updateRow(i, "sim", e.target.value)} />
+                <div className="flex items-center gap-1 shrink-0">
+                  <Checkbox id={`new-${i}`} checked={!!r.isNew}
+                    onCheckedChange={(v) => setRows((cur) => cur.map((row, idx) => (idx === i ? { ...row, isNew: !!v, sim: v ? "" : row.sim } : row)))} />
+                  <Label htmlFor={`new-${i}`} className="font-normal text-sm">Nyt</Label>
+                </div>
                 <Button variant="ghost" size="icon" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, idx) => idx !== i))}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
