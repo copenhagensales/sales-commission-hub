@@ -142,9 +142,16 @@ export function TdcIdriftsaettelseForm() {
   const updateRow = (i: number, k: keyof NumberRow, v: string) =>
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)));
 
+  const missing: string[] = [];
+  if (!contact.trim() || !phone.trim()) missing.push("kontaktperson og telefonnummer");
+  if (solution === "omstilling" && !mainNumber.trim()) missing.push("hovednummer");
+  if (rows.some((r) => !r.name.trim() || !r.subscription)) missing.push("nummer/navn og abonnement på alle linjer");
+  if (hasSubsidy && !subsidyAmount.trim()) missing.push("beløb for terminaltilskud");
+  const canCopy = missing.length === 0;
+
   const copy = async () => {
-    if (!contact.trim() || !phone.trim()) {
-      toast({ title: "Udfyld kontaktperson og telefonnummer", variant: "destructive" });
+    if (!canCopy) {
+      toast({ title: `Udfyld: ${missing.join(", ")}`, variant: "destructive" });
       return;
     }
     try {
@@ -271,7 +278,7 @@ export function TdcIdriftsaettelseForm() {
       <Card className="lg:sticky lg:top-4 self-start">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Mail</CardTitle>
-          <Button onClick={copy}>
+          <Button onClick={copy} disabled={!canCopy} title={canCopy ? undefined : `Udfyld: ${missing.join(", ")}`}>
             {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />} Kopiér mail
           </Button>
         </CardHeader>
