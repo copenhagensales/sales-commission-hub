@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { applyPrefillToSummary, type TilbudPrefill } from "@/lib/tdcTilbud/prefill";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +33,7 @@ import {
  * Bruges af både /tdc-opsummering (intern, MainLayout) og /tdc-public (offentlig).
  * Single source of truth — al logik bor her, generator bor i src/lib/tdcOpsummering/.
  */
-export function TdcOpsummeringForm() {
+export function TdcOpsummeringForm({ prefill }: { prefill?: TilbudPrefill } = {}) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -93,7 +94,7 @@ export function TdcOpsummeringForm() {
       isTilskudMissing ||
       ((!isPilot || isImpl) && isOmstillingMissing));
 
-  const summaryLines = useMemo(
+  const rawSummaryLines = useMemo(
     () =>
       generateSummary({
         isEnglish,
@@ -125,6 +126,11 @@ export function TdcOpsummeringForm() {
       implHasOmstilling,
       implIsStandard,
     ]
+  );
+
+  const summaryLines = useMemo(
+    () => (isEnglish ? rawSummaryLines : applyPrefillToSummary(rawSummaryLines, prefill)),
+    [rawSummaryLines, prefill, isEnglish]
   );
 
   const summaryText = useMemo(

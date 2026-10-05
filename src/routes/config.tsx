@@ -120,6 +120,8 @@ import {
   TdcOpsummering,
   TdcOpsummeringPublic,
   TdcIdriftsaettelse,
+  TdcSalg,
+  TdcSalgPublic,
   ImmediatePaymentASE,
   EconomicUpload,
   EconomicLayout,
@@ -215,6 +217,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
   { path: "/tdc-public", component: TdcOpsummeringPublic, access: "public" },
+  { path: "/tdc-salg", component: TdcSalgPublic, access: "public" },
   { path: "/book/:candidateId", component: PublicCandidateBooking, access: "public" },
   { path: "/unsubscribe/:candidateId", component: PublicUnsubscribe, access: "public" },
   { path: "/r/:code", component: ShortLinkRedirect, access: "public" },
@@ -472,6 +475,7 @@ export const routes: RouteConfig[] = [
   // TDC Opsummering
   { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },
   { path: "/tdc-idriftsaettelse", component: TdcIdriftsaettelse, access: "role", positionPermission: "menu_tdc_opsummering" },
+  { path: "/tdc-salgsvaerktoej", component: TdcSalg, access: "role", positionPermission: "menu_tdc_opsummering" },
 
   // Economic Upload (Owner only)
   { path: "/admin/economic-upload", component: EconomicUpload, access: "role", positionPermission: "menu_economic_upload" },

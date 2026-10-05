@@ -148,19 +148,25 @@ function buildMail(f: {
   return { html: `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${html.join("").replace(/<p>/g, '<p style="margin:0 0 8pt">').replace(/<p style="margin-bottom:4pt">/g, '<p style="margin:0 0 4pt">')}</div>`, text: txt.join("\n") };
 }
 
-export function TdcIdriftsaettelseForm() {
+export interface IdriftPrefill { subscriptions: string[]; subsidyAmount?: number; subsidyProducts?: string[] }
+
+export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } = {}) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [solution, setSolution] = useState<Solution>("omstilling");
   const [contact, setContact] = useState("");
   const [phone, setPhone] = useState("");
-  const [rows, setRows] = useState<NumberRow[]>([{ name: "", subscription: "", sim: "" }]);
+  const [rows, setRows] = useState<NumberRow[]>(() =>
+    prefill?.subscriptions.length
+      ? prefill.subscriptions.map((subscription) => ({ name: "", subscription, sim: "" }))
+      : [{ name: "", subscription: "", sim: "" }]
+  );
   const [mbb, setMbb] = useState<Mbb>("none");
   const [noRouter, setNoRouter] = useState(true);
   const [fiveG, setFiveG] = useState(false);
-  const [hasSubsidy, setHasSubsidy] = useState(false);
-  const [subsidyAmount, setSubsidyAmount] = useState("");
-  const [subsidyProducts, setSubsidyProducts] = useState<string[]>([""]);
+  const [hasSubsidy, setHasSubsidy] = useState(!!prefill?.subsidyAmount);
+  const [subsidyAmount, setSubsidyAmount] = useState(prefill?.subsidyAmount ? String(prefill.subsidyAmount) : "");
+  const [subsidyProducts, setSubsidyProducts] = useState<string[]>(prefill?.subsidyProducts?.length ? prefill.subsidyProducts : [""]);
   const [subsidySpecific, setSubsidySpecific] = useState(true);
   const [router, setRouter] = useState("");
   const needsRouter = mbb !== "none" && !noRouter;
