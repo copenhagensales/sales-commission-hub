@@ -148,7 +148,7 @@ function buildMail(f: {
   return { html: `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${html.join("").replace(/<p>/g, '<p style="margin:0 0 8pt">').replace(/<p style="margin-bottom:4pt">/g, '<p style="margin:0 0 4pt">')}</div>`, text: txt.join("\n") };
 }
 
-export interface IdriftPrefill { subscriptions: string[]; subsidyAmount?: number; subsidyProducts?: string[] }
+export interface IdriftPrefill { subscriptions: string[]; subsidyAmount?: number; subsidyProducts?: string[]; mbb?: Mbb; noRouter?: boolean; fiveG?: boolean }
 
 export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } = {}) {
   const { toast } = useToast();
@@ -202,6 +202,9 @@ export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } 
     const prevAmount = prev?.subsidyAmount ? String(prev.subsidyAmount) : "";
     setSubsidyAmount((cur) => (cur.trim() !== prevAmount ? cur : prefill.subsidyAmount ? String(prefill.subsidyAmount) : ""));
     if (prefill.subsidyAmount) setHasSubsidy(true);
+    if (prefill.mbb !== undefined && prefill.mbb !== prev?.mbb) setMbb(prefill.mbb);
+    if (prefill.noRouter !== undefined && prefill.noRouter !== prev?.noRouter) setNoRouter(prefill.noRouter);
+    if (prefill.fiveG !== undefined && prefill.fiveG !== prev?.fiveG) setFiveG(prefill.fiveG);
     const prevProds = JSON.stringify(prev?.subsidyProducts?.length ? prev.subsidyProducts : [""]);
     setSubsidyProducts((cur) => (JSON.stringify(cur) !== prevProds ? cur : prefill.subsidyProducts?.length ? prefill.subsidyProducts : [""]));
   }, [prefill]);
