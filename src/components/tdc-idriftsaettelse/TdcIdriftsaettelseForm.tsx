@@ -79,7 +79,7 @@ function buildMail(f: {
 
   const rows = f.rows.filter((r) => r.name || r.subscription || r.sim);
   if (f.solution === "omstilling") rows.unshift({ name: f.mainNumber || "[Hovednummer]", subscription: "Hovednummer", sim: "" });
-  const rowTxt = rows.map((r) => [r.name, r.subscription, r.sim].filter(Boolean).join(", "));
+  const rowTxt = rows.map((r) => [r.name, r.subscription, r.subscription === "Hovednummer" ? "" : (r.sim || "[Simkortsnummer]")].filter(Boolean).join(", "));
   p(`<p><b>Selve løsningen:</b></p><p>De numre vi har drøftet skal indgå i løsningen er følgende:</p><p>${rowTxt.map(esc).join("<br>") || "[Nummer/Navn], [Abonnement] [Simkortsnummer]"}</p>`,
     `Selve løsningen:\nDe numre vi har drøftet skal indgå i løsningen er følgende:\n${rowTxt.join("\n") || "[Nummer/Navn], [Abonnement] [Simkortsnummer]"}\n`);
 
