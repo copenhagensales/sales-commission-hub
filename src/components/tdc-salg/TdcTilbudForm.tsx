@@ -139,7 +139,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware }: Pr
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Budget</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Tilskud</CardTitle></CardHeader>
           <CardContent>
             <Stat label="Budget (fuldt tilskud)" value={fmtKr(totals.subsidy)} />
             <Stat label="Valgt hardware" value={fmtKr(totals.hardwareSpent)} />
