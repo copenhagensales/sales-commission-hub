@@ -13,9 +13,13 @@ export interface TilbudPrefill {
   mailSubscriptions: string[];
   /** Omstilling valgt i tilbuddet (professionel vinder, hvis begge er valgt). */
   omstilling: "standard" | "professionel" | null;
+  /** Tilskudsniveau valgt i tilbuddet (null = ikke valgt endnu). */
+  subsidyPct: SubsidyPct | null;
 }
 
-export function buildPrefill(products: Quantities, hardware: Quantities): TilbudPrefill {
+export type SubsidyPct = 0 | 50 | 100;
+
+export function buildPrefill(products: Quantities, hardware: Quantities, subsidyPct: SubsidyPct | null = null): TilbudPrefill {
   const pick = (kind: "mobile" | "mbb") =>
     TILBUD_PRODUCTS.filter((p) => p.kind === kind && (products[p.id] ?? 0) > 0);
   const text = (list: typeof TILBUD_PRODUCTS) =>
@@ -34,6 +38,7 @@ export function buildPrefill(products: Quantities, hardware: Quantities): Tilbud
     mailSubscriptions,
     omstilling:
       (products["oms-pro"] ?? 0) > 0 ? "professionel" : (products["oms-std"] ?? 0) > 0 ? "standard" : null,
+    subsidyPct,
   };
 }
 

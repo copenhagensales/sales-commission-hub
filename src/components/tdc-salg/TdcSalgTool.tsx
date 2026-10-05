@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { TdcTilbudForm } from "./TdcTilbudForm";
 import { TdcOpsummeringForm, type OpsummeringMbbChoice } from "@/components/tdc-opsummering/TdcOpsummeringForm";
 import { TdcIdriftsaettelseForm, type IdriftPrefill } from "@/components/tdc-idriftsaettelse/TdcIdriftsaettelseForm";
-import { buildPrefill } from "@/lib/tdcTilbud/prefill";
+import { buildPrefill, type SubsidyPct } from "@/lib/tdcTilbud/prefill";
 import type { Quantities } from "@/lib/tdcTilbud/calc";
 
 const TRIGGER =
@@ -19,13 +19,14 @@ export function TdcSalgTool() {
   const [mailPrefill, setMailPrefill] = useState<IdriftPrefill | undefined>();
 
   const [mbbChoice, setMbbChoice] = useState<OpsummeringMbbChoice | undefined>();
-  const prefill = useMemo(() => buildPrefill(products, hardware), [products, hardware]);
+  const [subsidyPct, setSubsidyPct] = useState<SubsidyPct | null>(null);
+  const prefill = useMemo(() => buildPrefill(products, hardware, subsidyPct), [products, hardware, subsidyPct]);
 
   const changeTab = (next: string) => {
     if (next === "mail") {
       const candidate: IdriftPrefill = {
         subscriptions: prefill.mailSubscriptions,
-        subsidyAmount: Math.round(prefill.subsidy) || undefined,
+        subsidyAmount: Math.round((prefill.subsidy * (subsidyPct ?? 100)) / 100) || undefined,
         subsidyProducts: prefill.hardware,
         fiveG: Object.entries(products).some(([id, n]) => id.startsWith("mbb-") && n > 0),
         ...(mbbChoice && (mbbChoice.noMbb || mbbChoice.mbbType)
@@ -52,7 +53,7 @@ export function TdcSalgTool() {
         <TabsTrigger className={TRIGGER} value="mail">3. Idriftsættelsesmail</TabsTrigger>
       </TabsList>
       <TabsContent value="tilbud" forceMount className={HIDDEN}>
-        <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} />
+        <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} subsidyPct={subsidyPct} onSubsidyPct={setSubsidyPct} />
       </TabsContent>
       <TabsContent value="opsummering" forceMount className={HIDDEN}>
         <TdcOpsummeringForm onlyImplementering prefill={prefill} onMbbChange={setMbbChoice} />

@@ -4,12 +4,15 @@ import { Input } from "@/components/ui/input";
 import { HARDWARE, TILBUD_PRODUCTS } from "@/lib/tdcTilbud/catalog";
 import { affordableCount, calcTilbud, fmtKr, type Quantities } from "@/lib/tdcTilbud/calc";
 import { cn } from "@/lib/utils";
+import type { SubsidyPct } from "@/lib/tdcTilbud/prefill";
 
 interface Props {
   products: Quantities;
   hardware: Quantities;
   onProducts: (q: Quantities) => void;
   onHardware: (q: Quantities) => void;
+  subsidyPct: SubsidyPct | null;
+  onSubsidyPct: (p: SubsidyPct | null) => void;
 }
 
 const groupBy = <T extends { group: string }>(items: T[]) =>
@@ -38,7 +41,7 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-export function TdcTilbudForm({ products, hardware, onProducts, onHardware }: Props) {
+export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subsidyPct, onSubsidyPct }: Props) {
   const totals = useMemo(() => calcTilbud(products, hardware), [products, hardware]);
   const productGroups = groupBy(TILBUD_PRODUCTS);
   const hwGroups = groupBy(HARDWARE);
@@ -141,6 +144,27 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware }: Pr
         <Card>
           <CardHeader><CardTitle>Tilskud</CardTitle></CardHeader>
           <CardContent>
+            <div className="mb-3 grid grid-cols-3 gap-2" role="group" aria-label="Tilskud til kunden">
+              {([0, 50, 100] as const).map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  aria-pressed={subsidyPct === pct}
+                  onClick={() => onSubsidyPct(subsidyPct === pct ? null : pct)}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                    subsidyPct === pct
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {pct} %
+                </button>
+              ))}
+            </div>
+            {subsidyPct !== null && subsidyPct > 0 && (
+              <Stat label={`Kunden får (${subsidyPct} %)`} value={fmtKr((totals.subsidy * subsidyPct) / 100)} strong />
+            )}
             <Stat label="Budget (fuldt tilskud)" value={fmtKr(totals.subsidy)} />
             <Stat label="Valgt hardware" value={fmtKr(totals.hardwareSpent)} />
             <div className={cn(totals.remainingBudget < 0 && "text-destructive")}>
