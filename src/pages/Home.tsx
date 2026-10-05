@@ -88,7 +88,8 @@ const Home = () => {
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   
-  const { isOwner } = usePermissions();
+  const { isOwner, canEdit: canEditPermission } = usePermissions();
+  const canManageEvents = canEditPermission("action_manage_company_events");
   const lookupAvatar = useAvatarLookup();
 
   const handleLogout = async () => {
@@ -739,7 +740,7 @@ const Home = () => {
                       title={featured.title}
                       location={featured.location}
                       onOpenDetail={() => setSelectedEventForDetail(featured.id)}
-                      canManage={isOwner || featured.created_by === user?.id}
+                      canManage={canManageEvents}
                       onEdit={() => setEditingEvent(featured.id)}
                       onDelete={() => deleteEventMutation.mutate(featured.id)}
                     />
