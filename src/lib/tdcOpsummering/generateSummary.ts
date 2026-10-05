@@ -22,6 +22,7 @@ export interface SummaryState {
   numberChoice: NumberChoice | null;
   startupChoice: StartupChoice | null;
   hasSubsidy: boolean;
+  showUdlaeg?: boolean;
   hasOmstilling: boolean;
   isStandardOmstilling: boolean;
   hasMenuToday?: boolean | null;
@@ -124,6 +125,7 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
     numberChoice,
     startupChoice,
     hasSubsidy,
+    showUdlaeg = false,
     hasOmstilling,
     isStandardOmstilling,
     hasMenuToday = null,
@@ -269,8 +271,10 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
   if (hasSubsidy) {
     lines.push({ text: t("Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers.") });
     lines.push({ text: "" });
-    lines.push({ text: t("Hvis du har behov for at benytte tilskuddet før denne dato, så har du mulighed for at lave en udlægsordning, hvor du betaler for produktet nu, og derefter får krediteret pengene på datoen, hvor tilskuddet vil blive frigivet. Du kan ikke få refunderet mere end du har lagt ud for.") });
-    lines.push({ text: "" });
+    if (!isImplementering || showUdlaeg) {
+      lines.push({ text: t("Hvis du har behov for at benytte tilskuddet før denne dato, så har du mulighed for at lave en udlægsordning, hvor du betaler for produktet nu, og derefter får krediteret pengene på datoen, hvor tilskuddet vil blive frigivet. Du kan ikke få refunderet mere end du har lagt ud for.") });
+      lines.push({ text: "" });
+    }
     lines.push({ text: t("Vi har talt om, at du skal bruge tilskuddet på disse produkter:") });
     lines.push({ text: "" });
     lines.push({ text: t("(Nævn produkt og gigabyte, samt deres pris og eventuel resterende egenbetaling - Hvis router nævn også forbindelsestype 4G/5G)"), isRed: true });
