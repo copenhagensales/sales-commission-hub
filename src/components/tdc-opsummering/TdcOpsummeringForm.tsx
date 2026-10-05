@@ -33,7 +33,9 @@ import {
  * Bruges af både /tdc-opsummering (intern, MainLayout) og /tdc-public (offentlig).
  * Single source of truth — al logik bor her, generator bor i src/lib/tdcOpsummering/.
  */
-export function TdcOpsummeringForm({ prefill }: { prefill?: TilbudPrefill } = {}) {
+export interface OpsummeringMbbChoice { mbbType: MbbType; noMbb: boolean; withoutRouter: boolean }
+
+export function TdcOpsummeringForm({ prefill, onMbbChange }: { prefill?: TilbudPrefill; onMbbChange?: (c: OpsummeringMbbChoice) => void } = {}) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -47,6 +49,9 @@ export function TdcOpsummeringForm({ prefill }: { prefill?: TilbudPrefill } = {}
   const [mbbType, setMbbType] = useState<MbbType>(null);
   const [includeWithoutRouter, setIncludeWithoutRouter] = useState(false);
   const [noMbb, setNoMbb] = useState(false);
+  useEffect(() => {
+    onMbbChange?.({ mbbType, noMbb, withoutRouter: includeWithoutRouter });
+  }, [mbbType, noMbb, includeWithoutRouter, onMbbChange]);
 
   const [numberChoice, setNumberChoice] = useState<NumberChoice | null>(null);
   const [startupChoice, setStartupChoice] = useState<StartupChoice | null>(null);
