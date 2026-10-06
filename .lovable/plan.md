@@ -15,7 +15,7 @@
 | MBB 200/40 (ny) | 1.200 | 1.600 |
 | MBB 500/100 | 1.300 | 1.700 |
 
-Kampagnesatserne er de samme som dem, der står i værktøjet i dag. Ingen af de otte produkter har prisregler, der ændrer satserne.
+Kampagnesatserne er de samme som dem, der står i værktøjet i dag. Satserne kommer fra de otte produkter "5G - X/Y" og "5G - X/Y - Kampagnepris - TDC Erhverv". Ingen af dem har regler. Jeg har slået det op i databasen: de har hverken aktive eller inaktive regler. Hvis du mener andre produkter, så send navnet på et af dem.
 
 ## Det mangler / bliver ikke ændret
 - **Pris pr. md. uden kampagne** findes ikke i produkterne, fordi de kun gemmer provision og omsætning. Jeg bruger dagens priser (249/299/399) både med og uden kampagne, indtil du sender de rigtige priser.
