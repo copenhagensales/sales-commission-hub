@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Loader2, Check, X, Plus } from "lucide-react";
+import { Loader2, Check, X, Plus, Search } from "lucide-react";
 import {
   RAMP_WEEKLY_ABSENCE,
   RAMP_WEEKLY_COACHING,
@@ -1254,6 +1254,10 @@ export default function RampTeam() {
     [allMembers, allFullTeam, excludedIds],
   );
   const [filter, setFilter] = useState<FilterMode>("all");
+  const [search, setSearch] = useState("");
+  const searchTerm = search.trim().toLocaleLowerCase("da");
+  const matchesSearch = (m: { employee_name: string }) =>
+    !searchTerm || m.employee_name.toLocaleLowerCase("da").includes(searchTerm);
   const [showEvidence, setShowEvidence] = useState(false);
   const [dialog, setDialog] = useState<{
     employeeId: string;
@@ -1354,7 +1358,9 @@ export default function RampTeam() {
     );
   }
 
-  const list = filter === "all" ? allList : filter === "danger" ? dangerList : missingList;
+  const list = (filter === "all" ? allList : filter === "danger" ? dangerList : missingList).filter(
+    matchesSearch,
+  );
   const day10 = stats.find((s) => s.day_no === 10);
 
   return (
@@ -1420,6 +1426,21 @@ export default function RampTeam() {
                   </button>
                 );
               })}
+              <div className="relative ml-auto">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                  style={{ color: "#57635e" }}
+                />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Søg sælger"
+                  aria-label="Søg sælger"
+                  className="w-56 rounded-full bg-white py-2.5 pl-9 pr-4 text-[14px] font-semibold outline-none"
+                  style={{ color: "#1b1f1d", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}
+                />
+              </div>
             </div>
           </header>
 
@@ -1645,7 +1666,7 @@ export default function RampTeam() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#57635e" }} />
               </div>
-            ) : fullTeamList.length === 0 ? (
+            ) : fullTeamList.filter(matchesSearch).length === 0 ? (
               <div
                 className="rounded-[20px] bg-white p-6 text-center"
                 style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
@@ -1655,7 +1676,7 @@ export default function RampTeam() {
                 </p>
               </div>
             ) : (
-              fullTeamList.map((member) => (
+              fullTeamList.filter(matchesSearch).map((member) => (
                 <FullTeamMemberCard
                   key={member.employee_id}
                   member={member}
@@ -1684,7 +1705,7 @@ export default function RampTeam() {
                   kan aktiveres igen når som helst.
                 </p>
               </div>
-              {pausedList.map((member) => (
+              {pausedList.filter(matchesSearch).map((member) => (
                 <PausedRow
                   key={member.employee_id}
                   member={member}
