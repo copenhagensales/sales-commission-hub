@@ -163,7 +163,7 @@ export function useTdcMonthlyGoal(enabled = true) {
 
       const sellers: TdcMonthlyGoalSeller[] = employees
         .filter((e) => !excluded.has(e.id))
-        .map((e) => {
+        .map((e): TdcMonthlyGoalSeller => {
           const name = [e.first_name, e.last_name].filter(Boolean).join(" ").trim() || (e.work_email ?? "Ukendt");
           // Salg matches på alle sælgerens mails (dialer-mails via agent-mapping + work_email)
           const emails = new Set<string>(emailsFor(e));
