@@ -29,4 +29,12 @@ describe("calcTilbud (Aarhus Arket 2.0)", () => {
     expect(affordableCount(h.remainingBudget, 959.2)).toBe(1);
     expect(affordableCount(-5, 100)).toBe(0);
   });
+
+  it("kampagne-kontakt skifter MBB-provision (inkl. MBB 200/40)", () => {
+    const m = { "mbb-50": 1, "mbb-200": 1 };
+    expect(calcTilbud(m, {}).commission[0]).toBe(1000 + 1200);
+    expect(calcTilbud(m, {}, undefined, undefined, { campaign: false }).commission[0]).toBe(1400 + 1600);
+    expect(calcTilbud({ "fiber-100": 1 }, {}, undefined, undefined, { campaign: false }).commission[0]).toBe(1250);
+    expect(calcTilbud({ "mbb-200": 1 }, {}).price).toBe(0);
+  });
 });
