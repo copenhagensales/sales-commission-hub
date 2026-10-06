@@ -18,13 +18,13 @@ describe("calcTilbud (Aarhus Arket 2.0)", () => {
     expect(t.commissionDiff).toBe(t.commission[0] - t.commission[1]);
   });
 
-  it("Ready Supportaftale tæller ikke med i provision, som i arket", () => {
-    expect(calcTilbud({ ready: 1 }, {}).commission).toEqual([0, 0, 0]);
-    expect(calcTilbud({ ready: 1 }, {}).price).toBe(91);
+  it("MB hovednummer tæller ikke med i provision, som i arket", () => {
+    expect(calcTilbud({ "mb-hoved": 1 }, {}).commission).toEqual([0, 0, 0]);
+    expect(calcTilbud({ "mb-hoved": 1 }, {}).price).toBe(38.5);
   });
 
   it("resterende budget og antal", () => {
-    const h = calcTilbud(q, { "Apple-14": 1 });
+    const h = calcTilbud(q, { "Apple-11": 1 });
     expect(h.remainingBudget).toBeCloseTo(2565 - 959.2);
     expect(affordableCount(h.remainingBudget, 959.2)).toBe(1);
     expect(affordableCount(-5, 100)).toBe(0);

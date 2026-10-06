@@ -42,11 +42,7 @@ export const TILBUD_PRODUCTS: TilbudProduct[] = [
   { id: "fiber-100", group: "5G Bredbånd / Fiber", name: "Fiber 100/100 (VOK)", price: 499, subsidy: 0, commission: [1250, 1250, 1250], kind: "mbb" },
   { id: "fiber-1000", group: "5G Bredbånd / Fiber", name: "Fiber 1000/1000 (VOK)", price: 359, subsidy: 0, commission: [750, 750, 750], kind: "mbb" },
   { id: "filter", group: "Diverse", name: "Internetfilter", price: 10, subsidy: 0, commission: [35, 35, 35], kind: "other" },
-  { id: "fast-ip", group: "Diverse", name: "Fast IP (MBB)", price: 39, subsidy: 0, commission: [0, 0, 0], kind: "other" },
-  { id: "router-leje", group: "Diverse", name: "Router Leje (MBB)", price: 20, subsidy: 0, commission: [0, 0, 0], kind: "other" },
   { id: "passivt", group: "Diverse", name: "Passivt nummer", price: 12, subsidy: 0, commission: [35, 35, 35], kind: "other" },
-  { id: "ready", group: "Diverse", name: "Ready Supportaftale", price: 91, subsidy: 0, commission: [100, 100, 100], countsInCommission: false, kind: "other" },
-  { id: "watch-sim", group: "Diverse", name: "Smartwatch SIM", price: 29, subsidy: 0, commission: [0, 0, 0], countsInCommission: false, kind: "other" },
   { id: "datakort", group: "Diverse", name: "Extra datakort", price: 36.4, subsidy: 0, commission: [0, 0, 0], kind: "other" },
 ];
 
