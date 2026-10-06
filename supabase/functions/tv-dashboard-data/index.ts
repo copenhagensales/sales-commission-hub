@@ -369,6 +369,35 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (action === "yousee-fm-monthly-goal") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const monthKey = url.searchParams.get("monthKey") || "";
+      if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+        return new Response(JSON.stringify({ error: "Ugyldig monthKey" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const cacheKey = `yousee-fm-monthly-goal-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleVoiceMonthlyGoal(
+        supabase,
+        YOUSEE_FM_CLIENT_ID_EF,
+        YOUSEE_FM_BOARD_KEY_EF,
+        start,
+        end,
+        monthKey,
+        corsHeaders,
+        cacheKey,
+      );
+    }
+
     if (action === "eesy-tm-monthly-goal") {
       const start = url.searchParams.get("start") || "";
       const end = url.searchParams.get("end") || "";
@@ -2874,6 +2903,8 @@ async function handleMonthlyGoal(
 // Mål læses fra board_monthly_goals. Voice-filteret (fravalg af 5G internet) sker i frontend.
 const EESY_FM_CLIENT_ID_EF = "9a92ea4c-6404-4b58-be08-065e7552d552";
 const EESY_FM_BOARD_KEY_EF = "eesy-fm-monthly-goal";
+const YOUSEE_FM_CLIENT_ID_EF = "5011a7cd-bf07-4838-a63f-55a12c604b40";
+const YOUSEE_FM_BOARD_KEY_EF = "yousee-fm-monthly-goal";
 const EESY_TM_CLIENT_ID_EF = "81993a7b-ff24-46b8-8ffb-37a83138ddba";
 const EESY_TM_BOARD_KEY_EF = "eesy-tm-monthly-goal";
 
