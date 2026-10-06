@@ -140,15 +140,33 @@ export function useTdcMonthlyGoal(enabled = true) {
 
       const excluded = new Set(goal?.excludeEmployeeIds ?? []);
       const crownExempt = new Set(goal?.crownExemptEmployeeIds ?? []);
+      const combined = goal?.combinedSellers ?? [];
+      for (const c of combined) for (const id of c.employeeIds) excluded.add(id);
+
+      const emailsFor = (e: { work_email: string | null; emails?: string[] }) =>
+        [...(e.emails ?? []), e.work_email ?? ""].filter(Boolean).map((m) => m.toLowerCase());
+
+      const combinedRows: TdcMonthlyGoalSeller[] = combined.map((c) => {
+        const emails = new Set<string>((c.extraEmails ?? []).map((m) => m.toLowerCase()));
+        for (const e of employees) if (c.employeeIds.includes(e.id)) for (const m of emailsFor(e)) emails.add(m);
+        let count = 0;
+        for (const m of emails) count += countByEmail.get(m) || 0;
+        return {
+          employeeId: c.employeeIds[0],
+          name: c.name,
+          count,
+          goal: c.goal,
+          progress: c.goal > 0 ? (count / c.goal) * 100 : 0,
+          isCrownExempt: c.employeeIds.some((id) => crownExempt.has(id)),
+        };
+      });
 
       const sellers: TdcMonthlyGoalSeller[] = employees
         .filter((e) => !excluded.has(e.id))
-        .map((e) => {
+        .map((e): TdcMonthlyGoalSeller => {
           const name = [e.first_name, e.last_name].filter(Boolean).join(" ").trim() || (e.work_email ?? "Ukendt");
           // Salg matches på alle sælgerens mails (dialer-mails via agent-mapping + work_email)
-          const emails = new Set<string>(
-            [...(e.emails ?? []), e.work_email ?? ""].filter(Boolean).map((m) => m.toLowerCase()),
-          );
+          const emails = new Set<string>(emailsFor(e));
           let count = 0;
           for (const m of emails) count += countByEmail.get(m) || 0;
           const sellerGoal = getTdcSellerGoal(goal, name);
@@ -161,6 +179,7 @@ export function useTdcMonthlyGoal(enabled = true) {
             isCrownExempt: crownExempt.has(e.id),
           };
         })
+        .concat(combinedRows)
         // Kronefritagne sælgere låses nederst, uanset procent
         .sort(
           (a, b) =>

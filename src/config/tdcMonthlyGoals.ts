@@ -17,6 +17,15 @@ export interface TdcMonthlyGoal {
    * De placeres altid nederst og markeres særskilt i UI'et.
    */
   crownExemptEmployeeIds?: string[];
+  /** Flere medarbejdere med ét fælles mål, vist som én linje. */
+  combinedSellers?: {
+    name: string;
+    /** Første id bruges som linjens id. */
+    employeeIds: string[];
+    /** Mails for medarbejdere uden for TDC Erhverv-teamet. */
+    extraEmails?: string[];
+    goal: number;
+  }[];
 }
 
 /**
@@ -54,6 +63,35 @@ export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
     excludeEmployeeIds: [],
     // Oliver har kun et mål på 5 salg og deltager derfor ikke i kronekonkurrencen
     crownExemptEmployeeIds: ["80aac0dd-794c-4a68-97ed-374dc6b4cfea"],
+  },
+  "2026-10": {
+    team: 1100,
+    defaultSeller: 0,
+    sellers: {
+      "Mathias Victor Andersen": 155,
+      "Jacob Østergaard Hansen": 130,
+      "Sune Novrman": 75,
+      "Matias Heller Frederiksen": 70,
+      "Andreas Walther Christensen": 70,
+      "August Bach Pedersen": 100,
+      "Thomas Wehage": 65,
+      "Lukas nielsen": 105,
+      "Julius Rødsø Langkilde": 65,
+      "Storm Søegaard": 65,
+      "Thorbjørn Hansen-Larsen": 100,
+      "Jonathan Gabriely Givskov Hove": 10,
+      "Nicholaj Michael Wester": 60,
+    },
+    excludeEmployeeIds: [],
+    // Johannes (Stab) og Oliver deler ét mål og vises på én linje
+    combinedSellers: [
+      {
+        name: "Johannes / Oliver",
+        employeeIds: ["80aac0dd-794c-4a68-97ed-374dc6b4cfea", "c3c81fce-3bbb-4a5f-8250-0611bce0d7f1"],
+        extraEmails: ["joh@copenhagensales.dk"],
+        goal: 15,
+      },
+    ],
   },
 };
 
