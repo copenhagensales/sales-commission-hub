@@ -61,6 +61,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     permissionKey: "menu_dashboard_eesy_fm_monthly_goal"
   },
   {
+    slug: "yousee-fm-monthly-goal",
+    name: "Yousee FM Månedsmål",
+    path: "/dashboards/yousee-fm-monthly-goal",
+    description: "Yousee FM månedsmål – fælles og individuelle progressbarer",
+    permissionKey: "menu_dashboard_yousee_fm_monthly_goal"
+  },
+  {
     slug: "eesy-tm-monthly-goal",
     name: "Eesy TM Månedsmål",
     path: "/dashboards/eesy-tm-monthly-goal",

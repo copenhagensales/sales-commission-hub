@@ -18,6 +18,7 @@ import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
 import TdcMonthlyGoalBoard from "@/pages/dashboards/TdcMonthlyGoalBoard";
 import RelatelMonthlyGoalBoard from "@/pages/dashboards/RelatelMonthlyGoalBoard";
 import EesyFmMonthlyGoalBoard from "@/pages/dashboards/EesyFmMonthlyGoalBoard";
+import YouseeFmMonthlyGoalBoard from "@/pages/dashboards/YouseeFmMonthlyGoalBoard";
 import EesyTmMonthlyGoalBoard from "@/pages/dashboards/EesyTmMonthlyGoalBoard";
 
 const dashboardComponents: Record<string, React.ComponentType> = {
@@ -28,6 +29,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "tdc-monthly-goal": TdcMonthlyGoalBoard,
   "relatel-monthly-goal": RelatelMonthlyGoalBoard,
   "eesy-fm-monthly-goal": EesyFmMonthlyGoalBoard,
+  "yousee-fm-monthly-goal": YouseeFmMonthlyGoalBoard,
   "eesy-tm-monthly-goal": EesyTmMonthlyGoalBoard,
   "relatel": RelatelDashboard,
   "united": UnitedDashboard,
