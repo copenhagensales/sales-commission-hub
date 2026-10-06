@@ -53,7 +53,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
           <CardHeader><CardTitle>Løsninger</CardTitle></CardHeader>
           <CardContent className="space-y-5">
             {Object.entries(productGroups).map(([group, items]) => (
-              <div key={group} className="mb-6 break-inside-avoid">
+              <div key={group}>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
