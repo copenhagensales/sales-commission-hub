@@ -20,7 +20,9 @@ export function calcTilbud(
   hardware: Quantities,
   catalog: TilbudProduct[] = TILBUD_PRODUCTS,
   hwCatalog: HardwareItem[] = HARDWARE,
+  opts: { campaign?: boolean } = {},
 ): TilbudTotals {
+  const campaign = opts.campaign ?? true;
   let price = 0, subsidy = 0;
   const commission: [number, number, number] = [0, 0, 0];
   for (const p of catalog) {
@@ -28,7 +30,7 @@ export function calcTilbud(
     if (!n) continue;
     price += n * p.price;
     subsidy += n * p.subsidy;
-    if (p.countsInCommission !== false) for (let i = 0; i < 3; i++) commission[i] += n * p.commission[i];
+    if (p.countsInCommission !== false) for (let i = 0; i < 3; i++) commission[i] += n * activeCommission(p, campaign)[i];
   }
   const hardwareSpent = hwCatalog.reduce((s, h) => s + qty(hardware, h.id) * h.price, 0);
   return {
@@ -49,3 +51,7 @@ export const affordableCount = (remaining: number, itemPrice: number) =>
 
 export const fmtKr = (n: number) =>
   `${n.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kr.`;
+
+/** Provisionssats ud fra kampagne-kontakten (kampagne = standard). */
+export const activeCommission = (p: TilbudProduct, campaign: boolean) =>
+  !campaign && p.nonCampaignCommission ? p.nonCampaignCommission : p.commission;

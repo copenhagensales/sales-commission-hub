@@ -24,6 +24,7 @@ export function TdcSalgTool() {
   const [subsidyPct, setSubsidyPct] = useState<SubsidyPct | null>(null);
   const prefill = useMemo(() => buildPrefill(products, hardware, subsidyPct), [products, hardware, subsidyPct]);
 
+  const [campaign, setCampaign] = useState(true);
   const [resetKey, setResetKey] = useState(0);
   const resetAll = () => {
     setProducts({});
@@ -31,6 +32,7 @@ export function TdcSalgTool() {
     setMailPrefill(undefined);
     setMbbChoice(undefined);
     setSubsidyPct(null);
+    setCampaign(true);
     setResetKey((k) => k + 1);
     setTab("tilbud");
     toast({ title: "Alle valg er nulstillet" });
@@ -75,7 +77,7 @@ export function TdcSalgTool() {
       </TabsList>
       <TabsContent value="tilbud" forceMount className={HIDDEN}>
         <ResetBar />
-        <TdcTilbudForm key={`t${resetKey}`} products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} subsidyPct={subsidyPct} onSubsidyPct={setSubsidyPct} />
+        <TdcTilbudForm key={`t${resetKey}`} products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} subsidyPct={subsidyPct} onSubsidyPct={setSubsidyPct} campaign={campaign} onCampaign={setCampaign} />
       </TabsContent>
       <TabsContent value="opsummering" forceMount className={HIDDEN}>
         <ResetBar />

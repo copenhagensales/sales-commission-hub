@@ -14,6 +14,10 @@ export interface TilbudProduct {
   subsidy: number;
   commission: [number, number, number];
   countsInCommission?: boolean;
+  /** Provision når der IKKE sælges kampagne (kilde: produkterne "5G - X/Y" i MG Test). Uden feltet er satsen den samme. */
+  nonCampaignCommission?: [number, number, number];
+  /** Pris pr. md. er endnu ikke oplyst – vises som "–" og tæller 0 kr. */
+  priceUnknown?: boolean;
   /** Navn i idriftsættelsesmailens abonnementsliste, hvis relevant */
   mailSubscription?: string;
   /** Længere produktnavn til opsummeringsteksten */
@@ -36,9 +40,10 @@ export const TILBUD_PRODUCTS: TilbudProduct[] = [
   { id: "mb-hoved", group: "Omstilling", name: "MB hovednummer", price: 38.5, subsidy: 0, commission: [0, 0, 0], countsInCommission: false, kind: "other" },
   { id: "iot-std", group: "Omstilling", name: "IOT Standard", price: 14.6, subsidy: 0, commission: [0, 0, 0], countsInCommission: false, kind: "other" },
   { id: "iot-prem", group: "Omstilling", name: "IOT Premium", price: 29.2, subsidy: 0, commission: [0, 0, 0], countsInCommission: false, kind: "other" },
-  { id: "mbb-50", group: "5G Bredbånd / Fiber", name: "MBB 50/10", price: 249, subsidy: 0, commission: [1000, 1000, 1000], kind: "mbb" },
-  { id: "mbb-100", group: "5G Bredbånd / Fiber", name: "MBB 100/20", price: 299, subsidy: 0, commission: [1100, 1100, 1100], kind: "mbb" },
-  { id: "mbb-500", group: "5G Bredbånd / Fiber", name: "MBB 500/100", price: 399, subsidy: 0, commission: [1300, 1300, 1300], kind: "mbb" },
+  { id: "mbb-50", group: "5G Bredbånd / Fiber", name: "MBB 50/10", price: 249, subsidy: 0, commission: [1000, 1000, 1000], nonCampaignCommission: [1400, 1400, 1400], kind: "mbb" },
+  { id: "mbb-100", group: "5G Bredbånd / Fiber", name: "MBB 100/20", price: 299, subsidy: 0, commission: [1100, 1100, 1100], nonCampaignCommission: [1500, 1500, 1500], kind: "mbb" },
+  { id: "mbb-200", group: "5G Bredbånd / Fiber", name: "MBB 200/40", price: 0, priceUnknown: true, subsidy: 0, commission: [1200, 1200, 1200], nonCampaignCommission: [1600, 1600, 1600], kind: "mbb" },
+  { id: "mbb-500", group: "5G Bredbånd / Fiber", name: "MBB 500/100", price: 399, subsidy: 0, commission: [1300, 1300, 1300], nonCampaignCommission: [1700, 1700, 1700], kind: "mbb" },
   { id: "fiber-100", group: "5G Bredbånd / Fiber", name: "Fiber 100/100 (VOK)", price: 499, subsidy: 0, commission: [1250, 1250, 1250], kind: "mbb" },
   { id: "fiber-1000", group: "5G Bredbånd / Fiber", name: "Fiber 1000/1000 (VOK)", price: 359, subsidy: 0, commission: [750, 750, 750], kind: "mbb" },
   { id: "filter", group: "Diverse", name: "Internetfilter", price: 10, subsidy: 0, commission: [35, 35, 35], kind: "other" },

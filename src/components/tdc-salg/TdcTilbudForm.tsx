@@ -2,8 +2,9 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { HARDWARE, TILBUD_PRODUCTS } from "@/lib/tdcTilbud/catalog";
-import { affordableCount, calcTilbud, fmtKr, type Quantities } from "@/lib/tdcTilbud/calc";
+import { activeCommission, affordableCount, calcTilbud, fmtKr, type Quantities } from "@/lib/tdcTilbud/calc";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import type { SubsidyPct } from "@/lib/tdcTilbud/prefill";
 
 interface Props {
@@ -13,6 +14,8 @@ interface Props {
   onHardware: (q: Quantities) => void;
   subsidyPct: SubsidyPct | null;
   onSubsidyPct: (p: SubsidyPct | null) => void;
+  campaign: boolean;
+  onCampaign: (c: boolean) => void;
 }
 
 const groupBy = <T extends { group: string }>(items: T[]) =>
@@ -41,8 +44,8 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subsidyPct, onSubsidyPct }: Props) {
-  const totals = useMemo(() => calcTilbud(products, hardware), [products, hardware]);
+export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subsidyPct, onSubsidyPct, campaign, onCampaign }: Props) {
+  const totals = useMemo(() => calcTilbud(products, hardware, undefined, undefined, { campaign }), [products, hardware, campaign]);
   const productGroups = groupBy(TILBUD_PRODUCTS);
   const hwGroups = groupBy(HARDWARE);
 
@@ -54,7 +57,15 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
           <CardContent className="space-y-5">
             {Object.entries(productGroups).map(([group, items]) => (
               <div key={group}>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
+                  {items.some((p) => p.nonCampaignCommission) && (
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      Kampagne {campaign ? "ja" : "nej"}
+                      <Switch checked={campaign} onCheckedChange={onCampaign} aria-label="Kampagne" />
+                    </label>
+                  )}
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -70,10 +81,10 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
                       {items.map((p) => (
                         <tr key={p.id} className="border-t border-border/50">
                           <td className="py-1.5">{p.name}</td>
-                          <td className="py-1.5 text-right tabular-nums">{p.price.toLocaleString("da-DK")}</td>
+                          <td className="py-1.5 text-right tabular-nums">{p.priceUnknown ? "–" : p.price.toLocaleString("da-DK")}</td>
                           <td className="py-1.5 text-right tabular-nums">{p.subsidy ? p.subsidy.toLocaleString("da-DK") : "–"}</td>
                           <td className="py-1.5 text-right tabular-nums text-muted-foreground">
-                            {p.countsInCommission === false ? "–" : p.commission.join(" / ")}
+                            {p.countsInCommission === false ? "–" : activeCommission(p, campaign).join(" / ")}
                           </td>
                           <td className="py-1.5 flex justify-end">
                             <QtyInput value={products[p.id] ?? 0} onChange={(n) => onProducts({ ...products, [p.id]: n })} />
