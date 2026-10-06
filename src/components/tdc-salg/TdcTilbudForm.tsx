@@ -93,9 +93,9 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
             <CardTitle>Hardware (TDC Shop)</CardTitle>
             <p className="text-sm text-muted-foreground">"Kan få" = hvor mange stk. det resterende budget rækker til.</p>
           </CardHeader>
-          <CardContent className="grid gap-6 md:grid-cols-2">
+          <CardContent className="gap-6 md:columns-2">
             {Object.entries(hwGroups).map(([group, items]) => (
-              <div key={group}>
+              <div key={group} className="mb-6 break-inside-avoid">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
                 <table className="w-full text-sm">
                   <tbody>

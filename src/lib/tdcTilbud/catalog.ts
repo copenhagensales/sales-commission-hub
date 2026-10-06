@@ -62,15 +62,15 @@ export const HARDWARE: HardwareItem[] = [
     ["Galaxy S26 256GB", 6399.2], ["Galaxy S26 Ultra 256GB", 9199.2], ["Galaxy S26 Ultra 512GB", 10399.2],
     ["Samsung Galaxy Tab A7 Lite Wifi 32GB", 1079], ["Samsung Galaxy Buds4", 1519.2],
   ]),
+  ...hw("Routere", [
+    ["4G Router", 719.2], ["5G wifi 7 Router", 3679.2], ["Doro Leva L11s", 839.2],
+  ]),
   ...hw("Apple", [
     ["iPhone 17e 256GB", 5199], ["iPhone 18 Pro 256GB", 8799], ["iPhone 17 256GB", 6799],
     ["iPhone 18 Pro 512GB", 10399], ["iPhone 17 Pro 256GB", 7999.2], ["iPhone 17 Pro 512GB", 9599.2],
     ["iPhone 17 Pro Max 256GB", 8799.2], ["iPhone 17 Pro Max 512GB", 10399.2], ["iPhone 18 Pro Max 256GB", 9839],
     ["iPad Wifi 128GB", 3199], ["iPad Wifi 128GB + 5G", 4399], ["AirPods 4", 959.2],
     ["AirPods Pro 3", 1599.2], ["Apple Watch SE", 2199], ["Apple Watch Ultra 3", 5599.2],
-  ]),
-  ...hw("Routere og ekstra", [
-    ["4G Router", 719.2], ["5G wifi 7 Router", 3679.2], ["Doro Leva L11s", 839.2],
   ]),
 ];
 
