@@ -71,6 +71,25 @@ export const RELATEL_MONTHLY_GOALS: Record<string, RelatelMonthlyGoal> = {
     },
     excludeEmployeeIds: [],
   },
+  "2026-10": {
+    team: 790,
+    defaultSeller: 0,
+    sellers: {
+      "Gustav Fyrstenborg Diebel": 60,
+      "Anders Schjødt Kristensen": 75,
+      "Emillio Pedersen": 45,
+      "Benjamin Nickolaj Andersen": 70,
+      "William Sean Maare Bai": 100,
+      "Thorbjørn Mindedal Weichert": 105,
+      "Jacob Lykke Nielson": 105,
+      "Simon Sejer Linddal Sørensen": 50,
+      "Frederik Bülow Donner": 85,
+      "Carl Dahlgaard Nielsen": 25,
+      "Samuel Juul": 20,
+      "Rasmus Quiding Fricke": 55,
+    },
+    excludeEmployeeIds: [],
+  },
 };
 
 export function getRelatelMonthlyGoal(date: Date): RelatelMonthlyGoal | null {
