@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
 import { TdcTilbudForm } from "./TdcTilbudForm";
 import { TdcOpsummeringForm, type OpsummeringMbbChoice } from "@/components/tdc-opsummering/TdcOpsummeringForm";
 import { TdcIdriftsaettelseForm, type IdriftPrefill } from "@/components/tdc-idriftsaettelse/TdcIdriftsaettelseForm";
@@ -21,6 +23,25 @@ export function TdcSalgTool() {
   const [mbbChoice, setMbbChoice] = useState<OpsummeringMbbChoice | undefined>();
   const [subsidyPct, setSubsidyPct] = useState<SubsidyPct | null>(null);
   const prefill = useMemo(() => buildPrefill(products, hardware, subsidyPct), [products, hardware, subsidyPct]);
+
+  const [resetKey, setResetKey] = useState(0);
+  const resetAll = () => {
+    setProducts({});
+    setHardware({});
+    setMailPrefill(undefined);
+    setMbbChoice(undefined);
+    setSubsidyPct(null);
+    setResetKey((k) => k + 1);
+    setTab("tilbud");
+    toast({ title: "Alle valg er nulstillet" });
+  };
+  const ResetBar = () => (
+    <div className="mb-4 flex justify-end">
+      <Button type="button" variant="outline" size="sm" onClick={resetAll}>
+        <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Nulstil alle valg
+      </Button>
+    </div>
+  );
 
   const changeTab = (next: string) => {
     if (next === "mail") {
@@ -53,13 +74,16 @@ export function TdcSalgTool() {
         <TabsTrigger className={TRIGGER} value="mail">3. Idriftsættelsesmail</TabsTrigger>
       </TabsList>
       <TabsContent value="tilbud" forceMount className={HIDDEN}>
-        <TdcTilbudForm products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} subsidyPct={subsidyPct} onSubsidyPct={setSubsidyPct} />
+        <ResetBar />
+        <TdcTilbudForm key={`t${resetKey}`} products={products} hardware={hardware} onProducts={setProducts} onHardware={setHardware} subsidyPct={subsidyPct} onSubsidyPct={setSubsidyPct} />
       </TabsContent>
       <TabsContent value="opsummering" forceMount className={HIDDEN}>
-        <TdcOpsummeringForm onlyImplementering prefill={prefill} onMbbChange={setMbbChoice} />
+        <ResetBar />
+        <TdcOpsummeringForm key={`o${resetKey}`} onlyImplementering prefill={prefill} onMbbChange={setMbbChoice} />
       </TabsContent>
       <TabsContent value="mail" forceMount className={HIDDEN}>
-        <TdcIdriftsaettelseForm prefill={mailPrefill} />
+        <ResetBar />
+        <TdcIdriftsaettelseForm key={`m${resetKey}`} prefill={mailPrefill} />
       </TabsContent>
     </Tabs>
   );
