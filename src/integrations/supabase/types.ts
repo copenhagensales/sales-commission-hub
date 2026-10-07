@@ -5889,6 +5889,32 @@ export type Database = {
           },
         ]
       }
+      dpa_campaign_deviations: {
+        Row: {
+          client_campaign_id: string
+          deviates: boolean
+          updated_at: string
+        }
+        Insert: {
+          client_campaign_id: string
+          deviates?: boolean
+          updated_at?: string
+        }
+        Update: {
+          client_campaign_id?: string
+          deviates?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_campaign_deviations_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: true
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dpa_campaign_exclusions: {
         Row: {
           client_campaign_id: string
@@ -6014,6 +6040,41 @@ export type Database = {
           },
         ]
       }
+      dpa_client_fields: {
+        Row: {
+          business_label: string
+          client_id: string
+          created_at: string
+          description: string | null
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          business_label: string
+          client_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          business_label?: string
+          client_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_client_fields_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dpa_client_profiles: {
         Row: {
           address: string | null
@@ -6021,12 +6082,14 @@ export type Database = {
           client_id: string
           created_at: string
           cvr: string | null
+          data_source: string | null
           is_active: boolean
           legal_name: string | null
           notice_days: number | null
           original_date: string | null
           original_title: string | null
           other_changes: string | null
+          retention_text: string | null
           subprocessor_ids: string[]
           updated_at: string
           updated_by: string | null
@@ -6037,12 +6100,14 @@ export type Database = {
           client_id: string
           created_at?: string
           cvr?: string | null
+          data_source?: string | null
           is_active?: boolean
           legal_name?: string | null
           notice_days?: number | null
           original_date?: string | null
           original_title?: string | null
           other_changes?: string | null
+          retention_text?: string | null
           subprocessor_ids?: string[]
           updated_at?: string
           updated_by?: string | null
@@ -6053,12 +6118,14 @@ export type Database = {
           client_id?: string
           created_at?: string
           cvr?: string | null
+          data_source?: string | null
           is_active?: boolean
           legal_name?: string | null
           notice_days?: number | null
           original_date?: string | null
           original_title?: string | null
           other_changes?: string | null
+          retention_text?: string | null
           subprocessor_ids?: string[]
           updated_at?: string
           updated_by?: string | null
