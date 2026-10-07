@@ -323,7 +323,7 @@ function PartyDetail({ partyId, anchorName, onBack, onOpen }: { partyId: string;
               </Button>
             </div>
             {members.length === 0 && versions.length > 0 && (
-              <p className="text-sm text-muted-foreground">Ingen kunder i aftaleparten. Tidligere versioner vises nedenfor. <button className="underline" onClick={() => onOpen(partyId)}>Opdatér</button></p>
+              <p className="text-sm text-muted-foreground">Ingen kunder i aftaleparten. Tidligere versioner vises nedenfor.</p>
             )}
           </CardContent>
         </Card>
