@@ -1,0 +1,2 @@
+ALTER TABLE public.dpa_addenda DROP CONSTRAINT IF EXISTS dpa_addenda_status_check;
+ALTER TABLE public.dpa_addenda ADD CONSTRAINT dpa_addenda_status_check CHECK (status IN ('draft','sent','approved','rejected','superseded'));

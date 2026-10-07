@@ -40,6 +40,7 @@ const STATUS_LABEL: Record<DpaAddendumStatus, string> = {
   sent: "Sendt",
   approved: "Godkendt",
   rejected: "Afvist",
+  superseded: "Erstattet",
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -105,7 +106,6 @@ function DpaAddendaContent() {
                 <TableHead>Status</TableHead>
                 <TableHead>Sendt</TableHead>
                 <TableHead>Godkendt</TableHead>
-                <TableHead>Afviger fra godkendt</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -126,9 +126,6 @@ function DpaAddendaContent() {
                     <TableCell>{latest ? STATUS_LABEL[latest.status as DpaAddendumStatus] : "Ingen"}</TableCell>
                     <TableCell>{fmt(latest?.sent_at ?? null)}</TableCell>
                     <TableCell>{fmt(v.find((x) => x.status === "approved")?.approved_at ?? null)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {v.some((x) => x.status === "approved") ? "Kontrol ikke aktiveret" : "Ikke godkendt"}
-                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -454,7 +451,7 @@ function VersionRow({ v, clientName }: { v: DpaAddendum; clientName: string }) {
         <div><Label className="text-xs">Dato</Label><Input type="date" className="h-8" value={date} onChange={(e) => setDate(e.target.value)} /></div>
         <Button size="sm" variant="outline" onClick={() => update.mutate({ id: v.id, status: "sent", sent_at: date }, { onError: onErr })}>Markér sendt</Button>
         <div><Label className="text-xs">Kundens kontaktperson</Label><Input className="h-8" value={contact} onChange={(e) => setContact(e.target.value)} /></div>
-        <Button size="sm" variant="outline" disabled={!contact.trim()} onClick={() => update.mutate({ id: v.id, status: "approved", approved_at: date, approved_contact: contact.trim() }, { onError: onErr })}>Markér godkendt</Button>
+        <Button size="sm" variant="outline" disabled={!contact.trim()} onClick={() => update.mutate({ id: v.id, client_id: v.client_id, status: "approved", approved_at: date, approved_contact: contact.trim() }, { onError: onErr })}>Markér godkendt</Button>
         <Button size="sm" variant="outline" onClick={() => update.mutate({ id: v.id, status: "rejected", rejected_at: date }, { onError: onErr })}>Markér afvist</Button>
         <input
           ref={fileRef}
