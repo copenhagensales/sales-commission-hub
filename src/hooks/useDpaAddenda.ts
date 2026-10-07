@@ -228,6 +228,20 @@ export function useUploadSignedDpaAddendum() {
   });
 }
 
+/** Sletter en kladde (ikke sendt/godkendt). DB afviser sletning af alt andet. */
+export function useDeleteDpaAddendum() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (addendum: DpaAddendum) => {
+      const { data, error } = await supabase.from("dpa_addenda").delete().eq("id", addendum.id).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Versionen kunne ikke slettes");
+      await supabase.storage.from(BUCKET).remove([addendum.pdf_path]);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.versions }),
+  });
+}
+
 export function useDownloadDpaFile() {
   return useMutation({
     mutationFn: async ({ path, fileName }: { path: string; fileName: string }) => {
