@@ -390,15 +390,24 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         </CardContent>
       </Card>
 
+      <ClientDefaults
+        key={`${existing?.data_source ?? ""}|${existing?.retention_text ?? ""}`}
+        clientId={client.id}
+        source={existing?.data_source ?? ""}
+        retentionText={existing?.retention_text ?? ""}
+        labels={clientFields.filter((f) => f.client_id === client.id)}
+        policyRange={policyRange}
+      />
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Kampagner, persondatafelter og opbevaring</CardTitle>
-          <CardDescription>Vælg selv de persondatafelter, der indgår pr. kampagne, med forretningsnavn (fx "Telefonnummer").</CardDescription>
+          <CardTitle className="text-base">Kampagner</CardTitle>
+          <CardDescription>Kampagner følger kundens standard. Sæt "Afviger fra standard" for at angive kampagnens egne felter, datakilde og opbevaring.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           {allCampaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
           {allCampaigns.map((k) => (
-            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} source={sources.get(k.id) ?? ""} retentionText={retentionTexts.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
+            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} deviates={deviating.has(k.id)} source={sources.get(k.id) ?? ""} retentionText={retentionTexts.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
           ))}
           <p className="text-xs text-muted-foreground">
             Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
