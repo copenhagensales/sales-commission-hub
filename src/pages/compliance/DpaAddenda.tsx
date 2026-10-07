@@ -392,10 +392,11 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean; no_data_held: boolean | null }; labels: { id: string; business_label: string }[] }) {
+function CampaignFields({ campaign, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean; no_data_held: boolean | null }; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
   const [label, setLabel] = useState("");
+  const [desc, setDesc] = useState("");
   return (
     <div className="border rounded-md p-3 space-y-2">
       <div className="flex justify-between text-sm">
@@ -407,7 +408,7 @@ function CampaignFields({ campaign, labels }: { campaign: { id: string; name: st
       <div className="flex flex-wrap gap-2">
         {labels.map((l) => (
           <Badge key={l.id} variant="secondary" className="gap-1">
-            {l.business_label}
+            {l.business_label}{l.description ? ` (${l.description})` : ""}
             <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
           </Badge>
         ))}
@@ -417,10 +418,11 @@ function CampaignFields({ campaign, labels }: { campaign: { id: string; name: st
         onSubmit={(e) => {
           e.preventDefault();
           if (!label.trim()) return;
-          add.mutate({ campaignId: campaign.id, label }, { onSuccess: () => setLabel(""), onError: (err) => toast.error(errMsg(err)) });
+          add.mutate({ campaignId: campaign.id, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: (err) => toast.error(errMsg(err)) });
         }}
       >
-        <Input className="h-8" placeholder="Tilføj felt, fx Telefonnummer" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input className="h-8" placeholder="Tilføj felt, fx Mødetype" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input className="h-8" placeholder="Beskrivelse (valgfri), fx fysisk, online eller telefon" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <Button type="submit" size="sm" variant="outline" disabled={add.isPending}><Plus className="h-4 w-4" /></Button>
       </form>
     </div>
