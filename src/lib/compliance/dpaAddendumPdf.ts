@@ -256,6 +256,10 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
       "udelukkende for Copenhagen Sales' medarbejdere via personligt Microsoft-login og er begrænset efter rolle.",
   );
   para(
+    "Behandlingen i Stork omfatter alene den dataansvarliges kunder og medlemmer, som har indgået aftale eller booket møde " +
+      "via databehandleren. Oplysninger om øvrige kontakter på den dataansvarliges lister overføres ikke til Stork.",
+  );
+  para(
     "Databehandleren registrerer oplysninger i afregningssystemet Stork med det formål at foretage afregning, " +
       "provisionsberegning og afstemning af annulleringer og fortrydelser mellem parterne.",
   );
