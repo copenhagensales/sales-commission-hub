@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { SuperadminGate } from "@/components/auth/SuperadminGate";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -352,6 +352,7 @@ function PartyDetail({ partyId, anchorName, onBack, onOpen }: { partyId: string;
           generated_at: new Date().toISOString(),
           client: { name: anchorName, legal_name: row.legal_name ?? "", cvr: row.cvr ?? "", address: row.address ?? "" },
           original_agreement: { title: row.original_title ?? "", date: row.original_date ?? "" },
+          agreements: (row.agreements as unknown as Agreement[]) ?? [],
           subprocessor_approval: { form: row.approval_form as "general" | "specific", notice_days: row.notice_days ?? null },
           multi_brand: multi,
           campaigns: perClient.flatMap((pc) =>
@@ -383,6 +384,7 @@ function PartyDetail({ partyId, anchorName, onBack, onOpen }: { partyId: string;
 }
 
 type PartyInsert = Database["public"]["Tables"]["dpa_parties"]["Insert"];
+type Agreement = { title: string; date: string; brand?: string | null };
 
 function PartyForm({ partyId, anchorName, existing, subs, onBack, header, clientSections, extraMissing, versions, saving, generating, onSave, onGenerate }: {
   partyId: string; anchorName: string; existing: DpaParty | undefined; subs: DpaSubprocessor[]; onBack: () => void;
@@ -400,15 +402,26 @@ function PartyForm({ partyId, anchorName, existing, subs, onBack, header, client
     notice_days: existing?.notice_days?.toString() ?? "",
     subprocessor_ids: existing?.subprocessor_ids ?? subs.map((s) => s.id),
     other_changes: existing?.other_changes ?? "",
+    agreements: (Array.isArray(existing?.agreements) && existing.agreements.length
+      ? (existing.agreements as Agreement[])
+      : [{ title: existing?.original_title ?? "", date: existing?.original_date ?? "", brand: null }]
+    ).map((a) => ({ title: a.title ?? "", date: a.date ?? "", brand: a.brand ?? "" })),
   }));
+  const cleanAgreements = p.agreements
+    .filter((a) => a.title.trim() || a.date)
+    .map((a) => ({ title: a.title.trim(), date: a.date, brand: a.brand.trim() || null }));
+  const setAgreement = (i: number, patch: Partial<{ title: string; date: string; brand: string }>) =>
+    setP({ ...p, agreements: p.agreements.map((a, j) => (j === i ? { ...a, ...patch } : a)) });
   const toRow = (): PartyInsert => ({
     id: partyId,
     is_active: p.is_active,
     legal_name: p.legal_name.trim() || null,
     cvr: p.cvr.trim() || null,
     address: p.address.trim() || null,
-    original_title: p.original_title.trim() || null,
-    original_date: p.original_date || null,
+    // Første aftale spejles i de gamle felter for bagudkompatibilitet.
+    original_title: cleanAgreements[0]?.title || null,
+    original_date: cleanAgreements[0]?.date || null,
+    agreements: cleanAgreements as unknown as Json,
     approval_form: p.approval_form || null,
     notice_days: p.notice_days ? Number(p.notice_days) : null,
     subprocessor_ids: p.subprocessor_ids,
@@ -418,8 +431,8 @@ function PartyForm({ partyId, anchorName, existing, subs, onBack, header, client
     !p.legal_name.trim() && "juridisk navn",
     !p.cvr.trim() && "CVR",
     !p.address.trim() && "adresse",
-    !p.original_title.trim() && "databehandleraftalens titel",
-    !p.original_date && "databehandleraftalens dato",
+    cleanAgreements.length === 0 && "mindst én databehandleraftale",
+    cleanAgreements.some((a) => !a.title || !a.date) && "titel og dato på alle databehandleraftaler",
     !p.approval_form && "godkendelsesform",
     p.approval_form === "general" && !p.notice_days && "varselsperiode",
     p.subprocessor_ids.length === 0 && "underdatabehandlere",
@@ -443,8 +456,20 @@ function PartyForm({ partyId, anchorName, existing, subs, onBack, header, client
           <div><Label>Juridisk navn</Label><Input value={p.legal_name} onChange={(e) => setP({ ...p, legal_name: e.target.value })} /></div>
           <div><Label>CVR</Label><Input value={p.cvr} onChange={(e) => setP({ ...p, cvr: e.target.value })} /></div>
           <div className="md:col-span-2"><Label>Adresse</Label><Input value={p.address} onChange={(e) => setP({ ...p, address: e.target.value })} /></div>
-          <div><Label>Databehandleraftalens titel</Label><Input value={p.original_title} onChange={(e) => setP({ ...p, original_title: e.target.value })} /></div>
-          <div><Label>Databehandleraftalens dato</Label><Input type="date" value={p.original_date} onChange={(e) => setP({ ...p, original_date: e.target.value })} /></div>
+          <div className="md:col-span-2 space-y-2">
+            <Label>Databehandleraftaler som tillægget supplerer</Label>
+            {p.agreements.map((a, i) => (
+              <div key={i} className="grid grid-cols-[1fr_10rem_10rem_auto] gap-2">
+                <Input placeholder="Titel" value={a.title} onChange={(e) => setAgreement(i, { title: e.target.value })} />
+                <Input type="date" value={a.date} onChange={(e) => setAgreement(i, { date: e.target.value })} />
+                <Input placeholder="Brand (valgfrit)" value={a.brand} onChange={(e) => setAgreement(i, { brand: e.target.value })} />
+                <Button type="button" size="icon" variant="ghost" aria-label="Fjern aftale" disabled={p.agreements.length === 1} onClick={() => setP({ ...p, agreements: p.agreements.filter((_, j) => j !== i) })}><X className="h-4 w-4" /></Button>
+              </div>
+            ))}
+            <Button type="button" size="sm" variant="outline" onClick={() => setP({ ...p, agreements: [...p.agreements, { title: "", date: "", brand: "" }] })}>
+              <Plus className="h-4 w-4 mr-1" /> Tilføj databehandleraftale
+            </Button>
+          </div>
           <div>
             <Label>Godkendelse af underdatabehandlere</Label>
             <RadioGroup value={p.approval_form} onValueChange={(v) => setP({ ...p, approval_form: v as "general" | "specific" })} className="mt-2">

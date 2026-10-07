@@ -8,6 +8,8 @@ export interface DpaAddendumContent {
   generated_at: string;
   client: { name: string; legal_name: string; cvr: string; address: string };
   original_agreement: { title: string; date: string };
+  /** Alle databehandleraftaler tillægget supplerer. Valgfri for ældre versioner (da bruges original_agreement). */
+  agreements?: Array<{ title: string; date: string; brand?: string | null }>;
   subprocessor_approval: { form: "general" | "specific"; notice_days: number | null };
   /** Sand når aftaleparten har flere Stork-kunder; tabellen i afsnit 1 får da kolonnen "Brand". */
   multi_brand?: boolean;
@@ -250,10 +252,33 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   para("(herefter \"databehandleren\")");
 
   heading("Henvisning");
-  para(
-    `Dette tillæg supplerer parternes databehandleraftale "${c.original_agreement.title}" af ${fmtDate(c.original_agreement.date)} (herefter "aftalen"). ` +
-      "Begreber anvendt i tillægget har samme betydning som i aftalen.",
-  );
+  const agreements = c.agreements?.length ? c.agreements : [c.original_agreement];
+  if (agreements.length === 1) {
+    para(
+      `Dette tillæg supplerer parternes databehandleraftale "${agreements[0].title}" af ${fmtDate(agreements[0].date)} (herefter "aftalen"). ` +
+        "Begreber anvendt i tillægget har samme betydning som i aftalen.",
+    );
+  } else {
+    para("Dette tillæg supplerer parternes databehandleraftaler:");
+    for (const a of agreements) {
+      const b = (a as { brand?: string | null }).brand?.trim();
+      const brand = b ? ` (${b})` : "";
+      doc.setFont(FONT, "normal").setFontSize(10).setTextColor(...INK);
+      const lines = doc.splitTextToSize(`"${a.title}" af ${fmtDate(a.date)}${brand}`, TW - 6) as string[];
+      ensure(Math.min(lines.length, 2) * LH);
+      doc.text("•", M + 1, y);
+      for (const line of lines) {
+        ensure(LH);
+        doc.text(line, M + 6, y);
+        y += LH;
+      }
+      y += 1;
+    }
+    y += PARA_GAP - 1;
+    para(
+      '(herefter samlet "aftalen"). Tillægget gælder for alle de nævnte aftaler. Begreber anvendt i tillægget har samme betydning som i aftalen.',
+    );
+  }
 
   heading("1. Behandling i afregningssystemet Stork");
   para(
