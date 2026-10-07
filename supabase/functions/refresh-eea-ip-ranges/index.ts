@@ -1,10 +1,9 @@
-// Henter DB-IP Lite (land, CC BY 4.0) og gemmer kun EU/EØS-intervaller.
+// Henter DB-IP Lite (land, CC BY 4.0). Funktionen pakker kun ud og sender
+// tekst-bidder til databasen, som filtrerer EU/EØS (edge har lav CPU-grænse).
 // Køres månedligt via cron eller manuelt af ejer. Ingen persondata.
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
-const EEA = new Set(
-  "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO".split(" "),
-);
+const CHUNK_CHARS = 2_000_000;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -28,42 +27,35 @@ Deno.serve(async (req) => {
   const auth = await requireCronOrOwner(req);
   if (auth instanceof Response) return auth;
   const { svc } = auth;
+  const batch = crypto.randomUUID();
 
   try {
     const res = await fetchCsv();
     const stream = res.body!
       .pipeThrough(new DecompressionStream("gzip"))
       .pipeThrough(new TextDecoderStream());
-    const batch = crypto.randomUUID();
     let buf = "";
-    let rows: { ip_start: string; ip_end: string; country: string; batch: string }[] = [];
-    const flush = async () => {
-      if (!rows.length) return;
-      const { error } = await svc.from("eea_ip_ranges").insert(rows);
+    let total = 0;
+    const send = async (text: string) => {
+      const { data, error } = await svc.rpc("geo_eea_ingest_chunk", { _batch: batch, _csv: text });
       if (error) throw new Error(error.message);
-      rows = [];
+      total += (data as number) ?? 0;
     };
     for await (const chunk of stream) {
       buf += chunk;
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        const [s, e, c] = line.trim().split(",");
-        if (c && EEA.has(c)) rows.push({ ip_start: s, ip_end: e, country: c, batch });
+      if (buf.length >= CHUNK_CHARS) {
+        const cut = buf.lastIndexOf("\n");
+        await send(buf.slice(0, cut));
+        buf = buf.slice(cut + 1);
       }
-      if (rows.length >= 5000) await flush();
     }
-    const [s, e, c] = buf.trim().split(",");
-    if (c && EEA.has(c)) rows.push({ ip_start: s, ip_end: e, country: c, batch });
-    await flush();
+    if (buf.trim()) await send(buf);
 
     const { data, error } = await svc.rpc("geo_eea_activate_batch", { _batch: batch });
-    if (error) {
-      await svc.from("eea_ip_ranges").delete().eq("batch", batch);
-      throw new Error(error.message);
-    }
-    return json(200, { ok: true, ranges: data });
+    if (error) throw new Error(error.message);
+    return json(200, { ok: true, ranges: data, inserted: total });
   } catch (err) {
+    await svc.from("eea_ip_ranges").delete().eq("batch", batch);
     return json(500, { error: err instanceof Error ? err.message : "Ukendt fejl" });
   }
 });
