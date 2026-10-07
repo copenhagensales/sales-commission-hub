@@ -18,6 +18,8 @@ import {
   useAddDpaCampaignField,
   useDownloadDpaFile,
   useDeleteDpaAddendum,
+  useDpaCampaignExclusions,
+  useSetDpaCampaignIncluded,
   useDpaAddendaVersions,
   useDpaCampaignFields,
   useDpaClientProfiles,
@@ -198,6 +200,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const { data: subs = [] } = useDpaSubprocessors();
   const { data: fields = [] } = useDpaCampaignFields();
   const { data: allVersions = [] } = useDpaAddendaVersions();
+  const { data: excluded = new Set<string>() } = useDpaCampaignExclusions();
   const saveProfile = useSaveDpaClientProfile();
   const generate = useGenerateDpaAddendum();
 
@@ -215,7 +218,10 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
     other_changes: existing?.other_changes ?? "",
   }));
 
-  const campaigns = (base?.campaigns ?? []).filter((k) => k.client_id === client.id);
+  const allCampaigns = (base?.campaigns ?? []).filter((k) => k.client_id === client.id);
+  // Kun medtagne kampagner indgår i tillægget, advarsler og blokering.
+  const campaigns = allCampaigns.filter((k) => !excluded.has(k.id));
+  const noFields = campaigns.filter((k) => !fields.some((f) => f.client_campaign_id === k.id));
   const versions = allVersions.filter((v) => v.client_id === client.id);
   const missingRetention = campaigns.filter((k) => !k.has_retention);
   const fieldsConflict = campaigns.filter(
@@ -248,6 +254,8 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
     !p.approval_form && "godkendelsesform",
     p.approval_form === "general" && !p.notice_days && "varselsperiode",
     p.subprocessor_ids.length === 0 && "underdatabehandlere",
+    campaigns.length === 0 && "mindst én medtaget kampagne",
+    noFields.length > 0 && `persondatafelter på ${noFields.map((k) => k.name).join(", ")} (eller fravælg kampagnen)`,
   ].filter(Boolean) as string[];
 
   const onSave = () => {
@@ -274,7 +282,6 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
             .filter((f) => f.client_campaign_id === k.id)
             .map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
           retention_days: k.retention_days,
-          no_data_held: k.no_data_held === true,
           missing_retention: !k.has_retention,
         })),
         subprocessors: subs
@@ -305,6 +312,15 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Mangler opbevaringspolitik: {missingRetention.map((k) => k.name).join(", ")}. Kampagnen står som "Ikke fastsat" i tillægget.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {noFields.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {noFields.map((k) => k.name).join(", ")}: Kampagnen har ingen persondatafelter angivet — tilføj felter eller fjern kampagnen fra tillægget.
           </AlertDescription>
         </Alert>
       )}
@@ -364,9 +380,9 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
           <CardDescription>Vælg selv de persondatafelter, der indgår pr. kampagne, med forretningsnavn (fx "Telefonnummer").</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {campaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
-          {campaigns.map((k) => (
-            <CampaignFields key={k.id} campaign={k} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
+          {allCampaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
+          {allCampaigns.map((k) => (
+            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
           ))}
           <p className="text-xs text-muted-foreground">
             Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
@@ -393,17 +409,28 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean; no_data_held: boolean | null }; labels: { id: string; business_label: string; description: string | null }[] }) {
+function CampaignFields({ campaign, included, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
+  const setIncluded = useSetDpaCampaignIncluded();
   const [label, setLabel] = useState("");
   const [desc, setDesc] = useState("");
   return (
     <div className="border rounded-md p-3 space-y-2">
       <div className="flex justify-between text-sm">
-        <span className="font-medium">{campaign.name}</span>
+        <span className="flex items-center gap-3">
+          <span className="font-medium">{campaign.name}</span>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Checkbox
+              checked={included}
+              disabled={setIncluded.isPending}
+              onCheckedChange={(v) => setIncluded.mutate({ campaignId: campaign.id, included: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
+            />
+            Medtag i tillægget
+          </label>
+        </span>
         <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
-          {!campaign.has_retention ? "Mangler opbevaringspolitik" : campaign.retention_days == null ? "Periode ikke fastsat" : `${campaign.retention_days} dage → irreversibel anonymisering`}{campaign.no_data_held ? " · ingen dialer-data" : ""}
+          {!campaign.has_retention ? "Mangler opbevaringspolitik" : campaign.retention_days == null ? "Periode ikke fastsat" : `${campaign.retention_days} dage → irreversibel anonymisering`}
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
