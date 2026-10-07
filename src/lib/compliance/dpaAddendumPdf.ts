@@ -11,6 +11,8 @@ export interface DpaAddendumContent {
   campaigns: Array<{
     name: string;
     fields: string[];
+    /** Datakilde (fritekst). Valgfri for bagudkompatibilitet med ældre versioner. */
+    data_source?: string | null;
     retention_days: number | null;
     missing_retention: boolean;
   }>;
@@ -105,15 +107,16 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
-    head: [["Kampagne", "Oplysninger der registreres", "Opbevaring"]],
+    head: [["Kampagne", "Oplysninger der registreres", "Datakilde", "Opbevaring"]],
     body: c.campaigns
       .filter((k) => k.fields.length > 0)
-      .map((k) => [k.name, k.fields.join(", "), k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"]),
+      .map((k) => [k.name, k.fields.join(", "), k.data_source?.trim() || "—", k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"]),
     styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: 2 },
     headStyles: { fillColor: INK, textColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [245, 246, 247] },
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
+  para("Oplysningerne hentes fra den kilde, der er angivet for kampagnen.");
   if (anyFields) {
     para(
       "Oplysningerne opbevares i det antal dage, der er angivet for kampagnen, og anonymiseres herefter irreversibelt. " +

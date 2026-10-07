@@ -34,6 +34,7 @@ const KEYS = {
   subprocessors: ["dpa-subprocessors"] as const,
   versions: ["dpa-addenda-versions"] as const,
   exclusions: ["dpa-campaign-exclusions"] as const,
+  sources: ["dpa-campaign-sources"] as const,
 };
 
 /** Kunder + kampagner + aktive retentionspolitikker (kun metadata). */
@@ -126,6 +127,32 @@ export function useSetDpaCampaignIncluded() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.exclusions }),
+  });
+}
+
+/** Datakilde pr. kampagne (fritekst), map campaignId → tekst. */
+export function useDpaCampaignSources() {
+  return useQuery({
+    queryKey: KEYS.sources,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("dpa_campaign_sources").select("client_campaign_id, data_source");
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.client_campaign_id, r.data_source]));
+    },
+  });
+}
+
+export function useSaveDpaCampaignSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ campaignId, source }: { campaignId: string; source: string }) => {
+      const v = source.trim();
+      const { error } = v
+        ? await supabase.from("dpa_campaign_sources").upsert({ client_campaign_id: campaignId, data_source: v, updated_at: new Date().toISOString() }, { onConflict: "client_campaign_id" })
+        : await supabase.from("dpa_campaign_sources").delete().eq("client_campaign_id", campaignId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.sources }),
   });
 }
 
