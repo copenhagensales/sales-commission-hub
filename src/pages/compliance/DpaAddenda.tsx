@@ -12,32 +12,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, ArrowLeft, Download, FilePlus2, Plus, Trash2, Upload, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Download, Eye, FilePlus2, LogOut, MoreHorizontal, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import {
-  useAddDpaCampaignField,
   useAddDpaClientField,
   useRemoveDpaClientField,
   useSaveDpaClientDefault,
   useDpaClientFields,
-  useDpaCampaignDeviations,
-  useSetDpaCampaignDeviates,
+  useCopyDpaClientDefaults,
   useDownloadDpaFile,
   useDeleteDpaAddendum,
-  useDpaCampaignExclusions,
-  useDpaCampaignSources,
-  useSaveDpaCampaignSource,
   useDpaCampaignRetentionTexts,
-  useSaveDpaCampaignRetentionText,
-  useSetDpaCampaignIncluded,
   useDpaAddendaVersions,
-  useDpaCampaignFields,
   useDpaClientProfiles,
   useDpaClientsAndCampaigns,
   useDpaSubprocessors,
   useGenerateDpaAddendum,
-  useRemoveDpaCampaignField,
   useDpaParties,
   useSaveDpaParty,
   useSetDpaClientParty,
@@ -51,7 +46,7 @@ import {
   type DpaParty,
   type DpaSubprocessor,
 } from "@/hooks/useDpaAddenda";
-import { HOSTING_TEXT, type DpaAddendumContent } from "@/lib/compliance/dpaAddendumPdf";
+import { HOSTING_TEXT, generateDpaAddendumPdf, type DpaAddendumContent } from "@/lib/compliance/dpaAddendumPdf";
 
 const STATUS_LABEL: Record<DpaAddendumStatus, string> = {
   draft: "Kladde",
@@ -110,7 +105,7 @@ function DpaAddendaContent() {
   const clientName = (id: string) => base.clients.find((c) => c.id === id)?.name ?? "Ukendt";
 
   if (selected) {
-    return <PartyDetail partyId={selected} anchorName={clientName(selected)} onBack={() => setSelected(null)} onOpen={setSelected} />;
+    return <PartyDetail partyId={selected} anchorName={clientName(selected)} onBack={() => setSelected(null)} />;
   }
 
   const rows = base.clients
@@ -236,168 +231,96 @@ function SubprocessorRow({ sub }: { sub: DpaSubprocessor }) {
 }
 
 type CampaignRow = { id: string; client_id: string; name: string; retention_days: number | null; has_retention: boolean };
+type PartyInsert = Database["public"]["Tables"]["dpa_parties"]["Insert"];
+type Agreement = { title: string; date: string; brand?: string | null };
+type FieldLabel = { id: string; business_label: string; description: string | null };
 
-function PartyDetail({ partyId, anchorName, onBack, onOpen }: { partyId: string; anchorName: string; onBack: () => void; onOpen: (id: string) => void }) {
+const QUICK_FIELDS = ["Telefonnummer", "CVR-nr.", "Medlemsnummer", "Mødetype", "Ordre-/salgs-id", "Abonnementstype", "Tidspunkt for salg"];
+
+const policyRangeOf = (camps: CampaignRow[]) => {
+  const d = camps.map((k) => (k.has_retention ? k.retention_days : null)).filter((x): x is number => x != null);
+  if (d.length === 0) return "ingen politik";
+  const lo = Math.min(...d), hi = Math.max(...d);
+  return lo === hi ? `${lo} dage` : `${lo}–${hi} dage`;
+};
+
+const focusField = (id: string) => {
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  (el?.matches("input,textarea,button") ? el : el?.querySelector<HTMLElement>("input,textarea,button"))?.focus({ preventScroll: true });
+};
+
+function Step({ n, title, description, children }: { n: number; title: string; description?: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg">{n}. {title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="space-y-5">{children}</CardContent>
+    </Card>
+  );
+}
+
+function PartyDetail({ partyId, anchorName, onBack }: { partyId: string; anchorName: string; onBack: () => void }) {
   const { data: base } = useDpaClientsAndCampaigns();
   const { data: profiles = [] } = useDpaClientProfiles();
   const { data: parties = [], isLoading: partiesLoading } = useDpaParties();
   const { data: subs = [] } = useDpaSubprocessors();
-  const { data: fields = [] } = useDpaCampaignFields();
   const { data: allVersions = [] } = useDpaAddendaVersions();
-  const { data: excluded = new Set<string>() } = useDpaCampaignExclusions();
-  const { data: sources = new Map<string, string>() } = useDpaCampaignSources();
-  const { data: retentionTexts = new Map<string, string>() } = useDpaCampaignRetentionTexts();
   const { data: clientFields = [] } = useDpaClientFields();
-  const { data: deviating = new Set<string>() } = useDpaCampaignDeviations();
-  const saveParty = useSaveDpaParty();
-  const setClientParty = useSetDpaClientParty();
-  const generate = useGenerateDpaAddendum();
-  const [addId, setAddId] = useState("");
 
-  if (partiesLoading) return <p className="text-muted-foreground">Indlæser…</p>;
+  if (partiesLoading || !base) return <p className="text-muted-foreground">Indlæser…</p>;
   const existing = parties.find((x) => x.id === partyId);
   const profileOf = (id: string) => profiles.find((x) => x.client_id === id);
   const partyOf = (id: string) => profileOf(id)?.party_id ?? id;
-  const clients = base?.clients ?? [];
-  const members = clients.filter((c) => partyOf(c.id) === partyId);
-  const candidates = clients.filter((c) => partyOf(c.id) !== partyId);
-  const versions = allVersions.filter((v) => v.client_id === partyId);
-
-  // Effektive værdier pr. kunde: afvigende kampagner bruger egne værdier, øvrige kundens standard.
-  const perClient = members.map((c) => {
+  const members = base.clients.filter((c) => partyOf(c.id) === partyId);
+  const brands: BrandState[] = members.map((c) => {
     const prof = profileOf(c.id);
-    const allCampaigns = (base?.campaigns ?? []).filter((k) => k.client_id === c.id) as CampaignRow[];
-    const campaigns = allCampaigns.filter((k) => !excluded.has(k.id));
-    const defaultFields = clientFields.filter((f) => f.client_id === c.id);
-    const effRetText = (id: string) => (deviating.has(id) ? retentionTexts.get(id) : prof?.retention_text) ?? "";
-    const effHasFields = (id: string) => (deviating.has(id) ? fields.some((f) => f.client_campaign_id === id) : defaultFields.length > 0);
     return {
       client: c,
       prof,
       brand: prof?.display_name?.trim() || c.name,
-      allCampaigns,
-      campaigns,
-      defaultFields,
-      defaultEmpty: defaultFields.length === 0 && campaigns.some((k) => !deviating.has(k.id)),
-      noFields: campaigns.filter((k) => deviating.has(k.id) && !fields.some((f) => f.client_campaign_id === k.id)),
-      missingRetention: campaigns.filter((k) => !k.has_retention && !effRetText(k.id)),
-      fieldsConflict: campaigns.filter((k) => k.has_retention && !effRetText(k.id) && effHasFields(k.id) && k.retention_days == null),
+      // Alle kundens kampagner er med og følger kundens standard.
+      campaigns: base.campaigns.filter((k) => k.client_id === c.id) as CampaignRow[],
+      fields: clientFields.filter((f) => f.client_id === c.id),
     };
   });
-
   return (
     <PartyForm
-      key={existing?.updated_at ?? "new"}
       partyId={partyId}
       anchorName={anchorName}
       existing={existing}
       subs={subs}
+      brands={brands}
+      candidates={base.clients.filter((c) => partyOf(c.id) !== partyId)}
+      versions={allVersions.filter((v) => v.client_id === partyId)}
       onBack={onBack}
-      header={
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Stork-kunder i aftaleparten</CardTitle>
-            <CardDescription>Med flere kunder får tabellen i tillægget kolonnen "Brand" med kundens visningsnavn.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {members.map((m) => (
-              <div key={m.id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2">
-                <span>{m.name}{m.id === partyId && <span className="text-muted-foreground"> · aftalepartens oprindelige kunde</span>}</span>
-                {m.id !== partyId && (
-                  <Button size="sm" variant="ghost" disabled={setClientParty.isPending} onClick={() => setClientParty.mutate({ clientId: m.id, partyId: m.id }, { onSuccess: () => toast.success(`${m.name} er flyttet ud til sin egen aftalepart`), onError: (e) => toast.error(errMsg(e)) })}>
-                    Flyt ud
-                  </Button>
-                )}
-              </div>
-            ))}
-            <div className="flex gap-2 pt-1">
-              <select className="h-9 rounded-md border bg-background px-2 text-sm flex-1" value={addId} onChange={(e) => setAddId(e.target.value)}>
-                <option value="">Vælg kunde…</option>
-                {candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <Button size="sm" variant="outline" disabled={!addId || setClientParty.isPending} onClick={() => {
-                const name = clients.find((c) => c.id === addId)?.name;
-                setClientParty.mutate({ clientId: addId, partyId }, { onSuccess: () => { setAddId(""); toast.success(`${name} er tilføjet til aftaleparten`); }, onError: (e) => toast.error(errMsg(e)) });
-              }}>
-                <Plus className="h-4 w-4 mr-1" /> Tilføj kunde til denne aftalepart
-              </Button>
-            </div>
-            {members.length === 0 && versions.length > 0 && (
-              <p className="text-sm text-muted-foreground">Ingen kunder i aftaleparten. Tidligere versioner vises nedenfor.</p>
-            )}
-          </CardContent>
-        </Card>
-      }
-      clientSections={perClient.map((pc) => (
-        <ClientSection key={pc.client.id} pc={pc} fields={fields} excluded={excluded} deviating={deviating} sources={sources} retentionTexts={retentionTexts} />
-      ))}
-      extraMissing={[
-        members.length === 0 && "mindst én Stork-kunde",
-        ...perClient.flatMap((pc) => [
-          pc.campaigns.length === 0 && `mindst én medtaget kampagne for ${pc.brand}`,
-          pc.defaultEmpty && `persondatafelter i standarden for ${pc.brand}`,
-          pc.noFields.length > 0 && `persondatafelter på ${pc.noFields.map((k) => k.name).join(", ")} (eller fravælg kampagnen)`,
-        ]),
-      ].filter(Boolean) as string[]}
-      versions={versions}
-      saving={saveParty.isPending}
-      generating={generate.isPending}
-      onSave={(row) => saveParty.mutateAsync(row)}
-      onGenerate={async (row) => {
-        await saveParty.mutateAsync(row);
-        const version = (versions[0]?.version ?? 0) + 1;
-        const multi = perClient.length > 1;
-        const content: DpaAddendumContent = {
-          version,
-          generated_at: new Date().toISOString(),
-          client: { name: anchorName, legal_name: row.legal_name ?? "", cvr: row.cvr ?? "", address: row.address ?? "" },
-          original_agreement: { title: row.original_title ?? "", date: row.original_date ?? "" },
-          agreements: (row.agreements as unknown as Agreement[]) ?? [],
-          subprocessor_approval: { form: row.approval_form as "general" | "specific", notice_days: row.notice_days ?? null },
-          multi_brand: multi,
-          campaigns: perClient.flatMap((pc) =>
-            pc.campaigns.map((k) => {
-              const own = deviating.has(k.id);
-              const src = own ? fields.filter((f) => f.client_campaign_id === k.id) : pc.defaultFields;
-              return {
-                name: k.name,
-                brand: pc.brand,
-                fields: src.map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
-                data_source: own ? sources.get(k.id) ?? null : pc.prof?.data_source ?? null,
-                retention_days: k.retention_days,
-                retention_text: own ? retentionTexts.get(k.id) ?? null : pc.prof?.retention_text ?? null,
-                missing_retention: !k.has_retention,
-              };
-            }),
-          ),
-          subprocessors: subs
-            .filter((s) => (row.subprocessor_ids ?? []).includes(s.id))
-            .map((s) => ({ name: s.name, registration: s.registration ?? "", processing: s.processing ?? "", location: s.location ?? "", transfer_basis: s.transfer_basis ?? "" })),
-          hosting: HOSTING_TEXT,
-          other_changes: row.other_changes ?? null,
-        };
-        await generate.mutateAsync({ clientId: partyId, version, content });
-        return version;
-      }}
     />
   );
 }
 
-type PartyInsert = Database["public"]["Tables"]["dpa_parties"]["Insert"];
-type Agreement = { title: string; date: string; brand?: string | null };
+type BrandState = {
+  client: { id: string; name: string };
+  prof: DpaClientProfile | undefined;
+  brand: string;
+  campaigns: CampaignRow[];
+  fields: FieldLabel[];
+};
 
-function PartyForm({ partyId, anchorName, existing, subs, onBack, header, clientSections, extraMissing, versions, saving, generating, onSave, onGenerate }: {
-  partyId: string; anchorName: string; existing: DpaParty | undefined; subs: DpaSubprocessor[]; onBack: () => void;
-  header: ReactNode; clientSections: ReactNode[]; extraMissing: string[]; versions: DpaAddendum[];
-  saving: boolean; generating: boolean; onSave: (row: PartyInsert) => Promise<void>; onGenerate: (row: PartyInsert) => Promise<number>;
+function PartyForm({ partyId, anchorName, existing, subs, brands, candidates, versions, onBack }: {
+  partyId: string; anchorName: string; existing: DpaParty | undefined; subs: DpaSubprocessor[]; brands: BrandState[];
+  candidates: { id: string; name: string }[]; versions: DpaAddendum[]; onBack: () => void;
 }) {
+  const saveParty = useSaveDpaParty();
+  const setClientParty = useSetDpaClientParty();
+  const generate = useGenerateDpaAddendum();
+  const [addId, setAddId] = useState("");
   const [p, setP] = useState(() => ({
     is_active: existing?.is_active ?? true,
     legal_name: existing?.legal_name ?? "",
     cvr: existing?.cvr ?? "",
     address: existing?.address ?? "",
-    original_title: existing?.original_title ?? "",
-    original_date: existing?.original_date ?? "",
     approval_form: (existing?.approval_form ?? "") as "" | "general" | "specific",
     notice_days: existing?.notice_days?.toString() ?? "",
     subprocessor_ids: existing?.subprocessor_ids ?? subs.map((s) => s.id),
@@ -407,355 +330,368 @@ function PartyForm({ partyId, anchorName, existing, subs, onBack, header, client
       : [{ title: existing?.original_title ?? "", date: existing?.original_date ?? "", brand: null }]
     ).map((a) => ({ title: a.title ?? "", date: a.date ?? "", brand: a.brand ?? "" })),
   }));
-  const cleanAgreements = p.agreements
+  const lastSaved = useRef(JSON.stringify(p));
+
+  const cleanAgreements = (s = p) => s.agreements
     .filter((a) => a.title.trim() || a.date)
     .map((a) => ({ title: a.title.trim(), date: a.date, brand: a.brand.trim() || null }));
+  const toRow = (s = p): PartyInsert => {
+    const ag = cleanAgreements(s);
+    return {
+      id: partyId,
+      is_active: s.is_active,
+      legal_name: s.legal_name.trim() || null,
+      cvr: s.cvr.trim() || null,
+      address: s.address.trim() || null,
+      // Første aftale spejles i de gamle felter for bagudkompatibilitet.
+      original_title: ag[0]?.title || null,
+      original_date: ag[0]?.date || null,
+      agreements: ag as unknown as Json,
+      approval_form: s.approval_form || null,
+      notice_days: s.notice_days ? Number(s.notice_days) : null,
+      subprocessor_ids: s.subprocessor_ids,
+      other_changes: s.other_changes.trim() || null,
+    };
+  };
+  // Gemmer automatisk ved blur / ved valg.
+  const persist = (s = p) => {
+    const json = JSON.stringify(s);
+    if (json === lastSaved.current) return;
+    lastSaved.current = json;
+    saveParty.mutate(toRow(s), { onError: (e) => toast.error(errMsg(e)) });
+  };
+  const update = (patch: Partial<typeof p>, save = false) => {
+    const next = { ...p, ...patch };
+    setP(next);
+    if (save) persist(next);
+  };
   const setAgreement = (i: number, patch: Partial<{ title: string; date: string; brand: string }>) =>
-    setP({ ...p, agreements: p.agreements.map((a, j) => (j === i ? { ...a, ...patch } : a)) });
-  const toRow = (): PartyInsert => ({
-    id: partyId,
-    is_active: p.is_active,
-    legal_name: p.legal_name.trim() || null,
-    cvr: p.cvr.trim() || null,
-    address: p.address.trim() || null,
-    // Første aftale spejles i de gamle felter for bagudkompatibilitet.
-    original_title: cleanAgreements[0]?.title || null,
-    original_date: cleanAgreements[0]?.date || null,
-    agreements: cleanAgreements as unknown as Json,
-    approval_form: p.approval_form || null,
-    notice_days: p.notice_days ? Number(p.notice_days) : null,
-    subprocessor_ids: p.subprocessor_ids,
-    other_changes: p.other_changes.trim() || null,
-  });
-  const missingInputs = [
-    !p.legal_name.trim() && "juridisk navn",
-    !p.cvr.trim() && "CVR",
-    !p.address.trim() && "adresse",
-    cleanAgreements.length === 0 && "mindst én databehandleraftale",
-    cleanAgreements.some((a) => !a.title || !a.date) && "titel og dato på alle databehandleraftaler",
-    !p.approval_form && "godkendelsesform",
-    p.approval_form === "general" && !p.notice_days && "varselsperiode",
-    p.subprocessor_ids.length === 0 && "underdatabehandlere",
-    ...extraMissing,
-  ].filter(Boolean) as string[];
+    update({ agreements: p.agreements.map((a, j) => (j === i ? { ...a, ...patch } : a)) });
+
+  const ag = cleanAgreements();
+  const checklist: { label: string; target: string }[] = [
+    !p.legal_name.trim() && { label: "Juridisk navn", target: "f-legal" },
+    !p.cvr.trim() && { label: "CVR", target: "f-cvr" },
+    !p.address.trim() && { label: "Adresse", target: "f-address" },
+    (ag.length === 0 || ag.some((a) => !a.title || !a.date)) && { label: "Titel og dato på databehandleraftaler", target: "f-agreements" },
+    !p.approval_form && { label: "Godkendelsesform", target: "f-approval" },
+    p.approval_form === "general" && !p.notice_days && { label: "Varsel", target: "f-notice" },
+    brands.length === 0 && { label: "Mindst ét brand", target: "f-add-brand" },
+    ...brands.map((b) => b.fields.length === 0 && { label: `Oplysninger for ${b.brand}`, target: `brand-${b.client.id}` }),
+    p.subprocessor_ids.length === 0 && { label: "Underdatabehandlere", target: "f-subs" },
+  ].filter(Boolean) as { label: string; target: string }[];
+
+  const buildContent = (version: number): DpaAddendumContent => {
+    const row = toRow();
+    return {
+      version,
+      generated_at: new Date().toISOString(),
+      client: { name: anchorName, legal_name: row.legal_name ?? "", cvr: row.cvr ?? "", address: row.address ?? "" },
+      original_agreement: { title: row.original_title ?? "", date: row.original_date ?? "" },
+      agreements: ag,
+      subprocessor_approval: { form: row.approval_form as "general" | "specific", notice_days: row.notice_days ?? null },
+      multi_brand: brands.length > 1,
+      // Kundens standard gælder alle kundens kampagner. Kunde uden kampagner indgår med "ikke fastsat" opbevaring.
+      campaigns: brands.flatMap((b) => {
+        const fields = b.fields.map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label));
+        const common = { brand: b.brand, fields, data_source: b.prof?.data_source ?? null, retention_text: b.prof?.retention_text ?? null };
+        const camps = b.campaigns.length ? b.campaigns : [{ name: b.client.name, retention_days: null, has_retention: false }];
+        return camps.map((k) => ({ ...common, name: k.name, retention_days: k.retention_days, missing_retention: !k.has_retention }));
+      }),
+      subprocessors: subs
+        .filter((s) => p.subprocessor_ids.includes(s.id))
+        .map((s) => ({ name: s.name, registration: s.registration ?? "", processing: s.processing ?? "", location: s.location ?? "", transfer_basis: s.transfer_basis ?? "" })),
+      hosting: HOSTING_TEXT,
+      other_changes: row.other_changes ?? null,
+    };
+  };
+
+  const preview = () => {
+    // Åbner fanen synkront (undgår popup-blokering), og fylder den med PDF'en. Intet gemmes eller låses.
+    const win = window.open("", "_blank");
+    try {
+      const url = URL.createObjectURL(generateDpaAddendumPdf(buildContent((versions[0]?.version ?? 0) + 1)));
+      if (win) win.location.href = url;
+      else window.location.assign(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      win?.close();
+      toast.error(errMsg(e));
+    }
+  };
+
+  const onGenerate = async () => {
+    try {
+      await saveParty.mutateAsync(toRow());
+      lastSaved.current = JSON.stringify(p);
+      const version = (versions[0]?.version ?? 0) + 1;
+      await generate.mutateAsync({ clientId: partyId, version, content: buildContent(version) });
+      toast.success(`Version v${version} er genereret og låst`);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+
   const title = p.legal_name.trim() || anchorName;
+  const others = (id: string) => brands.filter((b) => b.client.id !== id);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" /> Alle aftaleparter</Button>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">{title}</h2>
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={p.is_active} onCheckedChange={(v) => setP({ ...p, is_active: v })} /> Aktiv aftalepart
-        </label>
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-muted-foreground">{saveParty.isPending ? "Gemmer…" : "Ændringer gemmes automatisk"}</span>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={p.is_active} onCheckedChange={(v) => update({ is_active: v }, true)} /> Aktiv aftalepart
+          </label>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Aftalepart og databehandleraftale</CardTitle></CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-3">
-          <div><Label>Juridisk navn</Label><Input value={p.legal_name} onChange={(e) => setP({ ...p, legal_name: e.target.value })} /></div>
-          <div><Label>CVR</Label><Input value={p.cvr} onChange={(e) => setP({ ...p, cvr: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Adresse</Label><Input value={p.address} onChange={(e) => setP({ ...p, address: e.target.value })} /></div>
-          <div className="md:col-span-2 space-y-2">
-            <Label>Databehandleraftaler som tillægget supplerer</Label>
-            {p.agreements.map((a, i) => (
-              <div key={i} className="grid grid-cols-[1fr_10rem_10rem_auto] gap-2">
-                <Input placeholder="Titel" value={a.title} onChange={(e) => setAgreement(i, { title: e.target.value })} />
-                <Input type="date" value={a.date} onChange={(e) => setAgreement(i, { date: e.target.value })} />
-                <Input placeholder="Brand (valgfrit)" value={a.brand} onChange={(e) => setAgreement(i, { brand: e.target.value })} />
-                <Button type="button" size="icon" variant="ghost" aria-label="Fjern aftale" disabled={p.agreements.length === 1} onClick={() => setP({ ...p, agreements: p.agreements.filter((_, j) => j !== i) })}><X className="h-4 w-4" /></Button>
-              </div>
+      <div className={`rounded-lg border px-4 py-3 text-sm ${checklist.length ? "bg-muted/40" : "border-primary/40 bg-primary/5"}`}>
+        {checklist.length === 0 ? (
+          <span className="flex items-center gap-2 font-medium"><CheckCircle2 className="h-4 w-4 text-primary" /> Klar til at generere</span>
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium">Mangler:</span>
+            {checklist.map((c, i) => (
+              <span key={c.target + c.label}>
+                <button type="button" className="underline underline-offset-2 hover:text-primary" onClick={() => focusField(c.target)}>{c.label}</button>
+                {i < checklist.length - 1 && ","}
+              </span>
             ))}
-            <Button type="button" size="sm" variant="outline" onClick={() => setP({ ...p, agreements: [...p.agreements, { title: "", date: "", brand: "" }] })}>
-              <Plus className="h-4 w-4 mr-1" /> Tilføj databehandleraftale
-            </Button>
           </div>
-          <div>
+        )}
+      </div>
+
+      <Step n={1} title="Aftalepart" description="Den juridiske part i tillægget og de databehandleraftaler, det supplerer.">
+        <div className="grid md:grid-cols-[2fr_1fr] gap-4">
+          <div><Label htmlFor="f-legal">Juridisk navn</Label><Input id="f-legal" value={p.legal_name} onChange={(e) => update({ legal_name: e.target.value })} onBlur={() => persist()} /></div>
+          <div><Label htmlFor="f-cvr">CVR</Label><Input id="f-cvr" value={p.cvr} onChange={(e) => update({ cvr: e.target.value })} onBlur={() => persist()} /></div>
+          <div className="md:col-span-2"><Label htmlFor="f-address">Adresse</Label><Input id="f-address" value={p.address} onChange={(e) => update({ address: e.target.value })} onBlur={() => persist()} /></div>
+        </div>
+        <div id="f-agreements" className="space-y-2">
+          <Label>Eksisterende databehandleraftaler</Label>
+          {p.agreements.map((a, i) => (
+            <div key={i} className="grid grid-cols-[1fr_10rem_11rem_auto] gap-2">
+              <Input placeholder="Titel" value={a.title} onChange={(e) => setAgreement(i, { title: e.target.value })} onBlur={() => persist()} />
+              <Input type="date" value={a.date} onChange={(e) => setAgreement(i, { date: e.target.value })} onBlur={() => persist()} />
+              <Input placeholder="Brand (valgfrit)" value={a.brand} onChange={(e) => setAgreement(i, { brand: e.target.value })} onBlur={() => persist()} />
+              <Button type="button" size="icon" variant="ghost" aria-label="Fjern aftale" disabled={p.agreements.length === 1} onClick={() => update({ agreements: p.agreements.filter((_, j) => j !== i) }, true)}><X className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          <Button type="button" size="sm" variant="ghost" onClick={() => update({ agreements: [...p.agreements, { title: "", date: "", brand: "" }] })}>
+            <Plus className="h-4 w-4 mr-1" /> Tilføj databehandleraftale
+          </Button>
+        </div>
+        <div className="grid md:grid-cols-[2fr_1fr] gap-4">
+          <div id="f-approval">
             <Label>Godkendelse af underdatabehandlere</Label>
-            <RadioGroup value={p.approval_form} onValueChange={(v) => setP({ ...p, approval_form: v as "general" | "specific" })} className="mt-2">
+            <RadioGroup value={p.approval_form} onValueChange={(v) => update({ approval_form: v as "general" | "specific" }, true)} className="mt-2 flex gap-6">
               <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="general" /> Generel (varsel)</label>
               <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="specific" /> Specifik (forudgående godkendelse)</label>
             </RadioGroup>
           </div>
-          <div><Label>Varselsperiode (dage)</Label><Input type="number" min={0} value={p.notice_days} onChange={(e) => setP({ ...p, notice_days: e.target.value })} /></div>
-          <div className="md:col-span-2">
-            <Label>Underdatabehandlere</Label>
-            <div className="flex flex-wrap gap-4 mt-2">
-              {subs.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={p.subprocessor_ids.includes(s.id)}
-                    onCheckedChange={(v) => setP({ ...p, subprocessor_ids: v ? [...p.subprocessor_ids, s.id] : p.subprocessor_ids.filter((x) => x !== s.id) })}
-                  />
-                  {s.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="md:col-span-2">
-            <Label>Øvrige ændringer/præciseringer (valgfrit)</Label>
-            <Textarea rows={3} value={p.other_changes} onChange={(e) => setP({ ...p, other_changes: e.target.value })} />
-          </div>
-          <div>
-            <Button variant="outline" disabled={saving} onClick={() => onSave(toRow()).then(() => toast.success("Aftaleparten er gemt"), (e) => toast.error(errMsg(e)))}>
-              Gem aftalepart
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {header}
-      {clientSections}
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Versioner</CardTitle>
-          <Button
-            onClick={() => onGenerate(toRow()).then((v) => toast.success(`Version v${v} er genereret og låst`), (e) => toast.error(errMsg(e)))}
-            disabled={missingInputs.length > 0 || generating || saving}
-          >
-            <FilePlus2 className="h-4 w-4 mr-1" /> {generating ? "Genererer…" : "Generér version"}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {missingInputs.length > 0 && <p className="text-sm text-muted-foreground">Mangler før generering: {missingInputs.join(", ")}.</p>}
-          {versions.length === 0 && <p className="text-sm text-muted-foreground">Ingen versioner endnu.</p>}
-          {versions.map((v) => <VersionRow key={v.id} v={v} clientName={title} />)}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-type ClientState = {
-  client: { id: string; name: string };
-  prof: DpaClientProfile | undefined;
-  brand: string;
-  allCampaigns: CampaignRow[];
-  campaigns: CampaignRow[];
-  defaultFields: { id: string; business_label: string; description: string | null }[];
-  defaultEmpty: boolean;
-  noFields: CampaignRow[];
-  missingRetention: CampaignRow[];
-  fieldsConflict: CampaignRow[];
-};
-
-/** Én Stork-kunde inden for aftaleparten: visningsnavn, standard og kampagner. */
-function ClientSection({ pc, fields, excluded, deviating, sources, retentionTexts }: {
-  pc: ClientState; fields: { id: string; client_campaign_id: string; business_label: string; description: string | null }[];
-  excluded: Set<string>; deviating: Set<string>; sources: Map<string, string>; retentionTexts: Map<string, string>;
-}) {
-  const saveName = useSaveDpaDisplayName();
-  const savedName = pc.prof?.display_name ?? "";
-  const [name, setName] = useState(savedName || pc.client.name);
-  const policyDays = pc.campaigns.map((k) => (k.has_retention ? k.retention_days : null)).filter((d): d is number => d != null);
-  const policyRange = policyDays.length === 0
-    ? "ingen politik"
-    : Math.min(...policyDays) === Math.max(...policyDays)
-      ? `${policyDays[0]} dage`
-      : `${Math.min(...policyDays)}–${Math.max(...policyDays)} dage`;
-  const warn = (text: string) => (
-    <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{text}</AlertDescription></Alert>
-  );
-  return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h3 className="text-lg font-semibold">{pc.client.name}</h3>
-        <div className="w-72">
-          <Label className="text-xs">Visningsnavn i tillægget</Label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => {
-              const v = name.trim() === pc.client.name ? "" : name;
-              if (v.trim() === savedName.trim()) return;
-              saveName.mutate({ clientId: pc.client.id, name: v }, { onSuccess: () => toast.success("Visningsnavn gemt"), onError: (e) => toast.error(errMsg(e)) });
-            }}
-          />
+          <div><Label htmlFor="f-notice">Varsel (dage)</Label><Input id="f-notice" type="number" min={0} value={p.notice_days} onChange={(e) => update({ notice_days: e.target.value })} onBlur={() => persist()} /></div>
         </div>
-      </div>
-      {pc.missingRetention.length > 0 && warn(`Mangler opbevaringspolitik: ${pc.missingRetention.map((k) => k.name).join(", ")}. Kampagnen står som "Ikke fastsat" i tillægget.`)}
-      {pc.defaultEmpty && warn('Kundens standard har ingen persondatafelter angivet — tilføj felter under "Persondata i Stork".')}
-      {pc.noFields.length > 0 && warn(`${pc.noFields.map((k) => k.name).join(", ")}: Kampagnen afviger fra standard, men har ingen persondatafelter angivet — tilføj felter, slå afvigelsen fra eller fjern kampagnen fra tillægget.`)}
-      {pc.fieldsConflict.length > 0 && warn(`${pc.fieldsConflict.map((k) => k.name).join(", ")}: Kampagnen har persondatafelter, men retentionspolitikken mangler periode — opbevaringen er ikke fastsat.`)}
-      <ClientDefaults
-        key={`${pc.prof?.data_source ?? ""}|${pc.prof?.retention_text ?? ""}`}
-        clientId={pc.client.id}
-        source={pc.prof?.data_source ?? ""}
-        retentionText={pc.prof?.retention_text ?? ""}
-        labels={pc.defaultFields}
-        policyRange={policyRange}
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Kampagner</CardTitle>
-          <CardDescription>Kampagner følger kundens standard. Sæt "Afviger fra standard" for at angive kampagnens egne felter, datakilde og opbevaring.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {pc.allCampaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
-          {pc.allCampaigns.map((k) => (
-            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} deviates={deviating.has(k.id)} source={sources.get(k.id) ?? ""} retentionText={retentionTexts.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
+      </Step>
+
+      <Step n={2} title="Brands og data" description="Én række pr. brand. Alle brandets kampagner følger rækken. Felterne gemmes, når du forlader dem.">
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[17%]">Brand</TableHead>
+                <TableHead className="w-[33%]">Oplysninger</TableHead>
+                <TableHead className="w-[22%]">Datakilde</TableHead>
+                <TableHead className="w-[22%]">Opbevaring</TableHead>
+                <TableHead className="w-[6%]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {brands.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">Ingen brands endnu.</TableCell></TableRow>
+              )}
+              {brands.map((b) => (
+                <BrandRow
+                  key={`${b.client.id}|${b.prof?.display_name ?? ""}|${b.prof?.data_source ?? ""}|${b.prof?.retention_text ?? ""}`}
+                  b={b}
+                  others={others(b.client.id)}
+                  isAnchor={b.client.id === partyId}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div id="f-add-brand" className="flex gap-2 max-w-lg">
+          <select className="h-9 rounded-md border bg-background px-2 text-sm flex-1" value={addId} onChange={(e) => setAddId(e.target.value)} aria-label="Vælg Stork-kunde">
+            <option value="">Vælg Stork-kunde…</option>
+            {candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <Button size="sm" variant="outline" disabled={!addId || setClientParty.isPending} onClick={() => {
+            const name = candidates.find((c) => c.id === addId)?.name;
+            setClientParty.mutate({ clientId: addId, partyId }, { onSuccess: () => { setAddId(""); toast.success(`${name} er tilføjet`); }, onError: (e) => toast.error(errMsg(e)) });
+          }}>
+            <Plus className="h-4 w-4 mr-1" /> Tilføj brand
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
+        </p>
+      </Step>
+
+      <Step n={3} title="Underdatabehandlere" description='Vælg hvilke der står i tillægget. Selve listen redigeres under "Underdatabehandlere" på oversigten.'>
+        <div id="f-subs" className="flex flex-wrap gap-6">
+          {subs.map((s) => (
+            <label key={s.id} className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={p.subprocessor_ids.includes(s.id)}
+                onCheckedChange={(v) => update({ subprocessor_ids: v ? [...p.subprocessor_ids, s.id] : p.subprocessor_ids.filter((x) => x !== s.id) }, true)}
+              />
+              {s.name}
+            </label>
           ))}
-          <p className="text-xs text-muted-foreground">
-            Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <div>
+          <Label htmlFor="f-other">Øvrige ændringer/præciseringer (valgfrit)</Label>
+          <Textarea id="f-other" rows={2} value={p.other_changes} onChange={(e) => update({ other_changes: e.target.value })} onBlur={() => persist()} />
+        </div>
+      </Step>
+
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {checklist.length > 0 && <span className="text-sm text-muted-foreground">Udfyld manglerne øverst for at generere.</span>}
+        <Button variant="outline" onClick={preview}><Eye className="h-4 w-4 mr-1" /> Forhåndsvis PDF</Button>
+        <Button onClick={onGenerate} disabled={checklist.length > 0 || generate.isPending || saveParty.isPending}>
+          <FilePlus2 className="h-4 w-4 mr-1" /> {generate.isPending ? "Genererer…" : "Generér version"}
+        </Button>
+      </div>
+
+      <section className="space-y-3">
+        <h3 className="text-lg font-semibold">Versioner</h3>
+        {versions.length === 0 && <p className="text-sm text-muted-foreground">Ingen versioner endnu.</p>}
+        {versions.map((v) => <VersionRow key={v.id} v={v} clientName={title} />)}
+      </section>
     </div>
   );
 }
 
-const policyText = (k: { has_retention: boolean; retention_days: number | null }) =>
-  k.has_retention && k.retention_days != null ? `${k.retention_days} dage` : "ingen politik";
-
-/** Kundens standard: felter, datakilde og opbevaring, der gælder alle ikke-afvigende kampagner. */
-function ClientDefaults({ clientId, source, retentionText, labels, policyRange }: { clientId: string; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[]; policyRange: string }) {
-  const add = useAddDpaClientField();
-  const remove = useRemoveDpaClientField();
+/** Én række i trin 2: et brand (Stork-kunde) med visningsnavn, oplysninger, datakilde og opbevaring. */
+function BrandRow({ b, others, isAnchor }: { b: BrandState; others: BrandState[]; isAnchor: boolean }) {
+  const saveName = useSaveDpaDisplayName();
   const saveDefault = useSaveDpaClientDefault();
-  const [src, setSrc] = useState(source);
-  const [ret, setRet] = useState(retentionText);
-  const [label, setLabel] = useState("");
-  const [desc, setDesc] = useState("");
-  const persist = (key: "data_source" | "retention_text", value: string, saved: string, msg: string) => {
-    if (value.trim() === saved.trim()) return;
-    saveDefault.mutate({ clientId, key, value }, { onSuccess: () => toast.success(msg), onError: (e) => toast.error(errMsg(e)) });
+  const remove = useRemoveDpaClientField();
+  const copy = useCopyDpaClientDefaults();
+  const setClientParty = useSetDpaClientParty();
+  const savedName = b.prof?.display_name ?? "";
+  const savedSrc = b.prof?.data_source ?? "";
+  const savedRet = b.prof?.retention_text ?? "";
+  const [name, setName] = useState(savedName || b.client.name);
+  const [src, setSrc] = useState(savedSrc);
+  const [ret, setRet] = useState(savedRet);
+  const onErr = (e: unknown) => toast.error(errMsg(e));
+  const persist = (key: "data_source" | "retention_text", value: string, saved: string) => {
+    if (value.trim() !== saved.trim()) saveDefault.mutate({ clientId: b.client.id, key, value }, { onError: onErr });
   };
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Persondata i Stork</CardTitle>
-        <CardDescription>Kundens standard. Gælder alle medtagne kampagner, der ikke er sat til at afvige.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {labels.length === 0 && <span className="text-sm text-muted-foreground">Ingen felter endnu.</span>}
-          {labels.map((l) => (
-            <Badge key={l.id} variant="secondary" className="gap-1">
+    <TableRow id={`brand-${b.client.id}`} className="align-top hover:bg-transparent">
+      <TableCell>
+        <Input
+          className="h-8 font-medium"
+          aria-label={`Visningsnavn for ${b.client.name}`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => {
+            const v = name.trim() === b.client.name ? "" : name;
+            if (v.trim() !== savedName.trim()) saveName.mutate({ clientId: b.client.id, name: v }, { onError: onErr });
+          }}
+        />
+        {name.trim() !== b.client.name && <p className="text-xs text-muted-foreground mt-1">{b.client.name}</p>}
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-wrap gap-1.5">
+          {b.fields.map((l) => (
+            <Badge key={l.id} variant="secondary" className="gap-1 font-normal">
               {l.business_label}{l.description ? ` (${l.description})` : ""}
-              <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
+              <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: onErr })}><X className="h-3 w-3" /></button>
             </Badge>
+          ))}
+          <AddFieldPopover clientId={b.client.id} existing={b.fields.map((f) => f.business_label)} />
+        </div>
+      </TableCell>
+      <TableCell>
+        <Input className="h-8" placeholder="fx Den dataansvarliges eget dialersystem" aria-label={`Datakilde for ${b.brand}`} value={src} onChange={(e) => setSrc(e.target.value)} onBlur={() => persist("data_source", src, savedSrc)} />
+      </TableCell>
+      <TableCell>
+        <Input className="h-8" placeholder="Tom = fra slettepolitikken" aria-label={`Opbevaring for ${b.brand}`} value={ret} onChange={(e) => setRet(e.target.value)} onBlur={() => persist("retention_text", ret, savedRet)} />
+        <p className="text-xs text-muted-foreground mt-1">Slettepolitik i Stork: {policyRangeOf(b.campaigns)}</p>
+      </TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Handlinger for ${b.brand}`}><MoreHorizontal className="h-4 w-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={others.length === 0}><Copy className="h-4 w-4 mr-2" /> Kopiér fra …</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {others.map((o) => (
+                  <DropdownMenuItem key={o.client.id} onSelect={() => {
+                    if (b.fields.length && !window.confirm(`Erstat oplysninger, datakilde og opbevaring for ${b.brand} med værdierne fra ${o.brand}?`)) return;
+                    copy.mutate({ fromClientId: o.client.id, toClientId: b.client.id }, { onSuccess: () => toast.success(`Kopieret fra ${o.brand}`), onError: onErr });
+                  }}>
+                    {o.brand}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={isAnchor}
+              onSelect={() => setClientParty.mutate({ clientId: b.client.id, partyId: b.client.id }, { onSuccess: () => toast.success(`${b.client.name} er fjernet fra aftaleparten`), onError: onErr })}
+            >
+              <LogOut className="h-4 w-4 mr-2" /> {isAnchor ? "Aftalepartens oprindelige kunde" : "Fjern fra aftalepart"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function AddFieldPopover({ clientId, existing }: { clientId: string; existing: string[] }) {
+  const add = useAddDpaClientField();
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [desc, setDesc] = useState("");
+  const onErr = (e: unknown) => toast.error(errMsg(e));
+  const has = (l: string) => existing.some((x) => x.trim().toLowerCase() === l.toLowerCase());
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-6 px-2 text-xs rounded-full"><Plus className="h-3 w-3 mr-1" /> Tilføj</Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 space-y-3">
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_FIELDS.map((q) => (
+            <Button key={q} size="sm" variant="secondary" className="h-7 text-xs" disabled={has(q) || add.isPending} onClick={() => add.mutate({ clientId, label: q }, { onError: onErr })}>
+              {q}
+            </Button>
           ))}
         </div>
         <form
-          className="flex gap-2"
+          className="space-y-2 border-t pt-3"
           onSubmit={(e) => {
             e.preventDefault();
             if (!label.trim()) return;
-            add.mutate({ clientId, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: (err) => toast.error(errMsg(err)) });
+            add.mutate({ clientId, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: onErr });
           }}
         >
-          <Input className="h-8" placeholder="Tilføj felt, fx Mødetype" value={label} onChange={(e) => setLabel(e.target.value)} />
-          <Input className="h-8" placeholder="Beskrivelse (valgfri), fx fysisk, online eller telefon" value={desc} onChange={(e) => setDesc(e.target.value)} />
-          <Button type="submit" size="sm" variant="outline" disabled={add.isPending}><Plus className="h-4 w-4" /></Button>
+          <Input className="h-8" placeholder="Andet felt" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input className="h-8" placeholder="Beskrivelse (valgfri)" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          <Button type="submit" size="sm" className="w-full" disabled={!label.trim() || add.isPending}>Tilføj felt</Button>
         </form>
-        <div className="grid md:grid-cols-2 gap-3">
-          <div>
-            <Label>Datakilde</Label>
-            <Input placeholder="fx Den dataansvarliges eget dialersystem" value={src} onChange={(e) => setSrc(e.target.value)} onBlur={() => persist("data_source", src, source, "Datakilde gemt")} />
-          </div>
-          <div>
-            <Label>Opbevaring (tekst i tillægget)</Label>
-            <Input placeholder="Tom = beregnes fra slettepolitikken" value={ret} onChange={(e) => setRet(e.target.value)} onBlur={() => persist("retention_text", ret, retentionText, "Opbevaring gemt")} />
-            <p className="text-xs text-muted-foreground mt-1">Slettepolitik i Stork: {policyRange}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CampaignFields({ campaign, included, deviates, source, retentionText, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; deviates: boolean; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[] }) {
-  const add = useAddDpaCampaignField();
-  const remove = useRemoveDpaCampaignField();
-  const setIncluded = useSetDpaCampaignIncluded();
-  const setDeviates = useSetDpaCampaignDeviates();
-  const saveSource = useSaveDpaCampaignSource();
-  const saveRetention = useSaveDpaCampaignRetentionText();
-  const [src, setSrc] = useState(source);
-  const [ret, setRet] = useState(retentionText);
-  const [label, setLabel] = useState("");
-  const [desc, setDesc] = useState("");
-  const header = (
-    <div className="flex flex-wrap justify-between gap-2 text-sm">
-      <span className="flex flex-wrap items-center gap-3">
-        <span className="font-medium">{campaign.name}</span>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Checkbox
-            checked={included}
-            disabled={setIncluded.isPending}
-            onCheckedChange={(v) => setIncluded.mutate({ campaignId: campaign.id, included: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
-          />
-          Medtag i tillægget
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Checkbox
-            checked={deviates}
-            disabled={setDeviates.isPending}
-            onCheckedChange={(v) => setDeviates.mutate({ campaignId: campaign.id, deviates: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
-          />
-          Afviger fra standard
-        </label>
-      </span>
-      <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
-        Slettepolitik: {policyText(campaign)}
-      </span>
-    </div>
-  );
-  if (!deviates) {
-    return <div className={`border rounded-md px-3 py-2 ${included ? "" : "opacity-60"}`}>{header}</div>;
-  }
-  return (
-    <div className={`border rounded-md p-3 space-y-2 ${included ? "" : "opacity-60"}`}>
-      {header}
-      <div className="flex flex-wrap gap-2">
-        {labels.map((l) => (
-          <Badge key={l.id} variant="secondary" className="gap-1">
-            {l.business_label}{l.description ? ` (${l.description})` : ""}
-            <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
-          </Badge>
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        <Label className="text-xs shrink-0">Datakilde</Label>
-        <Input
-          className="h-8"
-          placeholder="fx Den dataansvarliges eget dialersystem"
-          value={src}
-          onChange={(e) => setSrc(e.target.value)}
-          onBlur={() => {
-            if (src.trim() === source.trim()) return;
-            saveSource.mutate({ campaignId: campaign.id, source: src }, { onSuccess: () => toast.success("Datakilde gemt"), onError: (e) => toast.error(errMsg(e)) });
-          }}
-        />
-        <Label className="text-xs shrink-0">Opbevaring (tekst i tillægget)</Label>
-        <Input
-          className="h-8"
-          placeholder="Tom = beregnes fra slettepolitikken"
-          value={ret}
-          onChange={(e) => setRet(e.target.value)}
-          onBlur={() => {
-            if (ret.trim() === retentionText.trim()) return;
-            saveRetention.mutate({ campaignId: campaign.id, text: ret }, { onSuccess: () => toast.success("Opbevaring gemt"), onError: (e) => toast.error(errMsg(e)) });
-          }}
-        />
-      </div>
-      <p className="text-xs text-muted-foreground text-right">
-        Slettepolitik i Stork: {campaign.has_retention && campaign.retention_days != null ? `${campaign.retention_days} dage` : "ingen politik"}
-      </p>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!label.trim()) return;
-          add.mutate({ campaignId: campaign.id, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: (err) => toast.error(errMsg(err)) });
-        }}
-      >
-        <Input className="h-8" placeholder="Tilføj felt, fx Mødetype" value={label} onChange={(e) => setLabel(e.target.value)} />
-        <Input className="h-8" placeholder="Beskrivelse (valgfri), fx fysisk, online eller telefon" value={desc} onChange={(e) => setDesc(e.target.value)} />
-        <Button type="submit" size="sm" variant="outline" disabled={add.isPending}><Plus className="h-4 w-4" /></Button>
-      </form>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
