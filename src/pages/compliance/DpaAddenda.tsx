@@ -12,11 +12,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, ArrowLeft, Download, FilePlus2, Plus, Upload, X } from "lucide-react";
-import { toast } from "sonner";
-import {
-  useAddDpaCampaignField,
+import { AlertTriangle, ArrowLeft, Download, FilePlus2, Plus, Trash2, Upload, X } from "lucide-react";
+...
   useDownloadDpaFile,
+  useDeleteDpaAddendum,
   useDpaAddendaVersions,
   useDpaCampaignFields,
   useDpaClientProfiles,
@@ -433,6 +432,7 @@ function VersionRow({ v, clientName }: { v: DpaAddendum; clientName: string }) {
   const update = useUpdateDpaAddendumStatus();
   const uploadSigned = useUploadSignedDpaAddendum();
   const download = useDownloadDpaFile();
+  const del = useDeleteDpaAddendum();
   const fileRef = useRef<HTMLInputElement>(null);
   const [contact, setContact] = useState(v.approved_contact ?? "");
   const [date, setDate] = useState(today());
@@ -459,6 +459,19 @@ function VersionRow({ v, clientName }: { v: DpaAddendum; clientName: string }) {
           {v.signed_pdf_path && (
             <Button size="sm" variant="outline" onClick={() => download.mutate({ path: v.signed_pdf_path!, fileName: `Tillaeg_DPA_${safeName}_v${v.version}_underskrevet.pdf` }, { onError: onErr })}>
               <Download className="h-4 w-4 mr-1" /> Underskrevet
+            </Button>
+          )}
+          {v.status === "draft" && !v.sent_at && !v.approved_at && !v.signed_pdf_path && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={del.isPending}
+              onClick={() => {
+                if (!window.confirm(`Slet kladde v${v.version}? Det kan ikke fortrydes.`)) return;
+                del.mutate(v, { onSuccess: () => toast.success(`v${v.version} er slettet`), onError: onErr });
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Slet
             </Button>
           )}
         </div>
