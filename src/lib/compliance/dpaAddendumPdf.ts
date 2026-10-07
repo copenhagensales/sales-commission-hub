@@ -261,7 +261,8 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   } else {
     para("Dette tillæg supplerer parternes databehandleraftaler:");
     for (const a of agreements) {
-      const brand = "brand" in a && a.brand?.trim() ? ` (${a.brand.trim()})` : "";
+      const b = (a as { brand?: string | null }).brand?.trim();
+      const brand = b ? ` (${b})` : "";
       doc.setFont(FONT, "normal").setFontSize(10).setTextColor(...INK);
       const lines = doc.splitTextToSize(`"${a.title}" af ${fmtDate(a.date)}${brand}`, TW - 6) as string[];
       ensure(Math.min(lines.length, 2) * LH);
