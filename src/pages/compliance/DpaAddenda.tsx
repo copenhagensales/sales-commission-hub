@@ -19,6 +19,8 @@ import {
   useDownloadDpaFile,
   useDeleteDpaAddendum,
   useDpaCampaignExclusions,
+  useDpaCampaignSources,
+  useSaveDpaCampaignSource,
   useSetDpaCampaignIncluded,
   useDpaAddendaVersions,
   useDpaCampaignFields,
@@ -207,6 +209,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const { data: fields = [] } = useDpaCampaignFields();
   const { data: allVersions = [] } = useDpaAddendaVersions();
   const { data: excluded = new Set<string>() } = useDpaCampaignExclusions();
+  const { data: sources = new Map<string, string>() } = useDpaCampaignSources();
   const saveProfile = useSaveDpaClientProfile();
   const generate = useGenerateDpaAddendum();
 
@@ -287,6 +290,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
           fields: fields
             .filter((f) => f.client_campaign_id === k.id)
             .map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
+          data_source: sources.get(k.id) ?? null,
           retention_days: k.retention_days,
           missing_retention: !k.has_retention,
         })),
@@ -388,7 +392,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         <CardContent className="space-y-3">
           {allCampaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
           {allCampaigns.map((k) => (
-            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
+            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} source={sources.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
           ))}
           <p className="text-xs text-muted-foreground">
             Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
@@ -415,10 +419,12 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, included, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; labels: { id: string; business_label: string; description: string | null }[] }) {
+function CampaignFields({ campaign, included, source, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; source: string; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
   const setIncluded = useSetDpaCampaignIncluded();
+  const saveSource = useSaveDpaCampaignSource();
+  const [src, setSrc] = useState(source);
   const [label, setLabel] = useState("");
   const [desc, setDesc] = useState("");
   return (
@@ -446,6 +452,19 @@ function CampaignFields({ campaign, included, labels }: { campaign: { id: string
             <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
           </Badge>
         ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <Label className="text-xs shrink-0">Datakilde</Label>
+        <Input
+          className="h-8"
+          placeholder="fx Den dataansvarliges eget dialersystem"
+          value={src}
+          onChange={(e) => setSrc(e.target.value)}
+          onBlur={() => {
+            if (src.trim() === source.trim()) return;
+            saveSource.mutate({ campaignId: campaign.id, source: src }, { onSuccess: () => toast.success("Datakilde gemt"), onError: (e) => toast.error(errMsg(e)) });
+          }}
+        />
       </div>
       <form
         className="flex gap-2"
