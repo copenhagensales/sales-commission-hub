@@ -79,6 +79,7 @@ function DpaAddendaContent() {
   const { data: base, isLoading } = useDpaClientsAndCampaigns();
   const { data: profiles = [] } = useDpaClientProfiles();
   const { data: versions = [] } = useDpaAddendaVersions();
+  const { data: retentionTexts = new Map<string, string>() } = useDpaCampaignRetentionTexts();
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -120,7 +121,7 @@ function DpaAddendaContent() {
                 const v = versions.filter((x) => x.client_id === c.id);
                 const latest = v[0];
                 const camps = base.campaigns.filter((k) => k.client_id === c.id);
-                const missing = camps.some((k) => !k.has_retention);
+                const missing = camps.some((k) => !k.has_retention && !retentionTexts.get(k.id));
                 const inactive = profileMap.get(c.id)?.is_active === false;
                 return (
                   <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelected(c.id)}>
