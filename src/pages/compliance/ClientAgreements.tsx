@@ -152,11 +152,9 @@ export default function ClientAgreements() {
                   onClick={() =>
                     open.mutate(doc.storage_path, {
                       onError: (e) =>
-                        toast({
-                          title: "Kunne ikke åbne filen",
-                          description: e instanceof Error ? e.message : String(e),
-                          variant: "destructive",
-                        }),
+                        toast.error(
+                          `Kunne ikke åbne filen: ${e instanceof Error ? e.message : String(e)}`
+                        ),
                     })
                   }
                   className="flex items-center gap-1.5 text-left text-primary hover:underline min-w-0"
