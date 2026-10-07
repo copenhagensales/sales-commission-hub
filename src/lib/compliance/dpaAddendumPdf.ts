@@ -51,21 +51,23 @@ export function buildSection3Paragraphs(selectedNames: string[]): string[] {
     "Databehandlerens database hostes hos Supabase i EU-regionen Paris (eu-west-3), og oplysningerne opbevares i EU/EØS.",
   ];
   const us = [ms && "Microsoft", sb && "Supabase"].filter(Boolean) as string[];
+  const usAll = [ms && "Microsoft", sb && "Supabase", lv && "Lovable"].filter(Boolean) as string[];
   if (us.length) {
-    out.push(
-      `Flere af databehandlerens underdatabehandlere er amerikanske selskaber. Hos ${joinDa(us)} kan begrænset supportadgang fra USA ikke udelukkes.`,
-    );
+    const intro =
+      usAll.length === 1
+        ? `${usAll[0]} er et amerikansk selskab.`
+        : "Flere af databehandlerens underdatabehandlere er amerikanske selskaber.";
+    out.push(`${intro} Hos ${joinDa(us)} kan begrænset supportadgang fra USA ikke udelukkes.`);
   }
   if (lv) {
     out.push(
       "Databehandlerens udviklingsplatform Lovable kan i forbindelse med udvikling, fejlsøgning og drift af afregningssystemet få adgang til oplysninger fra USA.",
     );
   }
-  const scc = [ms && "Microsoft", sb && "Supabase", lv && "Lovable"].filter(Boolean) as string[];
-  if (scc.length) {
-    const dpf = ms ? "EU-US Data Privacy Framework (art. 45) for Microsoft og " : "";
+  if (usAll.length) {
+    const dpf = ms ? ", for Microsofts vedkommende tillige EU-US Data Privacy Framework (art. 45)" : "";
     out.push(
-      `Overførslerne sker på grundlag af ${dpf}EU-Kommissionens standardkontraktbestemmelser (art. 46) for ${joinDa(scc)}, jf. de respektive underdatabehandleres databehandleraftaler, som kan rekvireres hos databehandleren.`,
+      `Overførslerne sker på grundlag af EU-Kommissionens standardkontraktbestemmelser (art. 46) for ${joinDa(usAll)}${dpf}, jf. de respektive underdatabehandleres databehandleraftaler, som kan rekvireres hos databehandleren.`,
     );
   }
   return out;
