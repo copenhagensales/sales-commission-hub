@@ -266,7 +266,9 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         subprocessor_approval: { form: p.approval_form as "general" | "specific", notice_days: p.notice_days ? Number(p.notice_days) : null },
         campaigns: campaigns.map((k) => ({
           name: k.name,
-          fields: fields.filter((f) => f.client_campaign_id === k.id).map((f) => f.business_label),
+          fields: fields
+            .filter((f) => f.client_campaign_id === k.id)
+            .map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
           retention_days: k.retention_days,
           no_data_held: k.no_data_held === true,
           missing_retention: !k.has_retention,
@@ -303,14 +305,23 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         </Alert>
       )}
 
+      {fieldsConflict.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {fieldsConflict.map((k) => k.name).join(", ")}: Kampagnen har persondatafelter, men retentionspolitikken siger ingen data / mangler periode — opbevaringen er ikke fastsat.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
-        <CardHeader><CardTitle className="text-base">Kundeoplysninger og oprindelig aftale</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Kundeoplysninger og databehandleraftale</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-3">
           <div><Label>Juridisk navn</Label><Input value={p.legal_name} onChange={(e) => setP({ ...p, legal_name: e.target.value })} /></div>
           <div><Label>CVR</Label><Input value={p.cvr} onChange={(e) => setP({ ...p, cvr: e.target.value })} /></div>
           <div className="md:col-span-2"><Label>Adresse</Label><Input value={p.address} onChange={(e) => setP({ ...p, address: e.target.value })} /></div>
-          <div><Label>Oprindelig aftale – titel</Label><Input value={p.original_title} onChange={(e) => setP({ ...p, original_title: e.target.value })} /></div>
-          <div><Label>Oprindelig aftale – dato</Label><Input type="date" value={p.original_date} onChange={(e) => setP({ ...p, original_date: e.target.value })} /></div>
+          <div><Label>Databehandleraftalens titel</Label><Input value={p.original_title} onChange={(e) => setP({ ...p, original_title: e.target.value })} /></div>
+          <div><Label>Databehandleraftalens dato</Label><Input type="date" value={p.original_date} onChange={(e) => setP({ ...p, original_date: e.target.value })} /></div>
           <div>
             <Label>Godkendelse af underdatabehandlere</Label>
             <RadioGroup value={p.approval_form} onValueChange={(v) => setP({ ...p, approval_form: v as "general" | "specific" })} className="mt-2">

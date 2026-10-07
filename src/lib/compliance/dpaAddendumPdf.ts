@@ -102,36 +102,41 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
       "provisionsberegning og afstemning af annulleringer og fortrydelser mellem parterne.",
   );
   para("Databehandleren registrerer følgende oplysninger pr. kampagne:");
+  const anyFields = c.campaigns.some((k) => k.fields.length > 0);
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
     head: [["Kampagne", "Oplysninger der registreres", "Opbevaring"]],
-    body: c.campaigns.map((k) => [
-      k.name,
-      k.no_data_held ? "Ingen persondata registreres" : k.fields.length ? k.fields.join(", ") : "—",
-      k.no_data_held ? "—" : k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat",
-    ]),
+    body: c.campaigns.map((k) => {
+      if (k.fields.length > 0) {
+        return [k.name, k.fields.join(", "), !k.no_data_held && k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
+      }
+      if (k.no_data_held) return [k.name, "Ingen persondata registreres", "—"];
+      return [k.name, "—", k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
+    }),
     styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: 2 },
     headStyles: { fillColor: INK, textColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [245, 246, 247] },
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
-  para(
-    "Oplysningerne opbevares i det antal dage, der er angivet for kampagnen, og anonymiseres herefter irreversibelt. " +
-      "Ved anonymiseringen fjernes den dataansvarliges kundes persondata, mens salgsregistreringen og oplysninger om sælgeren bevares til afregningsbrug.",
-  );
+  if (anyFields) {
+    para(
+      "Oplysningerne opbevares i det antal dage, der er angivet for kampagnen, og anonymiseres herefter irreversibelt. " +
+        "Ved anonymiseringen fjernes den dataansvarliges kundes persondata, mens salgsregistreringen og oplysninger om sælgeren bevares til afregningsbrug.",
+    );
+  }
   para(
     "Databehandleren registrerer ikke navn, adresse, e-mail, fritekst, sælgernoter eller berigelsesdata om den dataansvarliges kunder.",
   );
-  para(
-    "Anonymiseringen er endelig, når databehandlerens backup-vindue på 14 dage er udløbet.",
-  );
+  if (anyFields) {
+    para("Anonymiseringen er endelig, når databehandlerens backup-vindue på 14 dage er udløbet.");
+  }
 
   heading("2. Underdatabehandlere");
   para(
     c.subprocessor_approval.form === "general"
-      ? `Den dataansvarlige har givet generel godkendelse af underdatabehandlere med et varsel på ${c.subprocessor_approval.notice_days ?? "—"} dage. Databehandleren benytter følgende underdatabehandlere:`
-      : "Den dataansvarlige har givet specifik godkendelse af følgende underdatabehandlere:",
+      ? `Den dataansvarlige har givet generel godkendelse af underdatabehandlere med et varsel på ${c.subprocessor_approval.notice_days ?? "—"} dage. Databehandleren benytter følgende underdatabehandlere, som hermed meddeles den dataansvarlige:`
+      : "Den dataansvarlige godkender ved underskrift af dette tillæg følgende underdatabehandlere:",
   );
   autoTable(doc, {
     startY: y,
