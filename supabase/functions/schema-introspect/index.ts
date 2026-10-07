@@ -1,5 +1,6 @@
 // Skrivebeskyttet skema-udtræk til ekstern revision.
-// Returnerer KUN databasens metadata via public.introspect_schema() — aldrig tabelrækker.
+// Returnerer KUN metadata via public.introspect_schema(), eller aggregeret brugsstatistik
+// via public.introspect_usage() ved ?part=usage — aldrig tabelrækker eller persondata.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -43,7 +44,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
-    const { data, error } = await svc.rpc("introspect_schema");
+    const part = new URL(req.url).searchParams.get("part");
+    if (part !== null && part !== "usage") return json(400, { error: "Invalid part" });
+    const fn = part === "usage" ? "introspect_usage" : "introspect_schema";
+    const { data, error } = await svc.rpc(fn);
     if (error) return json(500, { error: "Introspection failed" });
     return json(200, data);
   } catch {
