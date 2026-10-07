@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
@@ -406,18 +407,18 @@ function PartyForm({ partyId, anchorName, existing, subs, brands, candidates, ve
     };
   };
 
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Forhåndsvisning: genererer PDF'en i browseren. Intet gemmes eller låses.
   const preview = () => {
-    // Åbner fanen synkront (undgår popup-blokering), og fylder den med PDF'en. Intet gemmes eller låses.
-    const win = window.open("", "_blank");
     try {
-      const url = URL.createObjectURL(generateDpaAddendumPdf(buildContent((versions[0]?.version ?? 0) + 1)));
-      if (win) win.location.href = url;
-      else window.location.assign(url);
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setPreviewUrl(URL.createObjectURL(generateDpaAddendumPdf(buildContent((versions[0]?.version ?? 0) + 1))));
     } catch (e) {
-      win?.close();
       toast.error(errMsg(e));
     }
+  };
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
   };
 
   const onGenerate = async () => {
@@ -501,11 +502,11 @@ function PartyForm({ partyId, anchorName, existing, subs, brands, candidates, ve
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[17%]">Brand</TableHead>
-                <TableHead className="w-[33%]">Oplysninger</TableHead>
-                <TableHead className="w-[22%]">Datakilde</TableHead>
-                <TableHead className="w-[22%]">Opbevaring</TableHead>
-                <TableHead className="w-[6%]" />
+                <TableHead className="w-[15%]">Brand</TableHead>
+                <TableHead className="w-[31%]">Oplysninger</TableHead>
+                <TableHead className="w-[25%]">Datakilde</TableHead>
+                <TableHead className="w-[24%]">Opbevaring</TableHead>
+                <TableHead className="w-[5%]" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -566,6 +567,13 @@ function PartyForm({ partyId, anchorName, existing, subs, brands, candidates, ve
         </Button>
       </div>
 
+      <Dialog open={!!previewUrl} onOpenChange={(o) => !o && closePreview()}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+          <DialogHeader><DialogTitle>Forhåndsvisning – ikke gemt eller låst</DialogTitle></DialogHeader>
+          {previewUrl && <iframe title="Forhåndsvisning af tillæg" src={previewUrl} className="flex-1 w-full rounded-md border" />}
+        </DialogContent>
+      </Dialog>
+
       <section className="space-y-3">
         <h3 className="text-lg font-semibold">Versioner</h3>
         {versions.length === 0 && <p className="text-sm text-muted-foreground">Ingen versioner endnu.</p>}
@@ -619,10 +627,10 @@ function BrandRow({ b, others, isAnchor }: { b: BrandState; others: BrandState[]
         </div>
       </TableCell>
       <TableCell>
-        <Input className="h-8" placeholder="fx Den dataansvarliges eget dialersystem" aria-label={`Datakilde for ${b.brand}`} value={src} onChange={(e) => setSrc(e.target.value)} onBlur={() => persist("data_source", src, savedSrc)} />
+        <Textarea rows={2} className="min-h-0 resize-none text-sm" placeholder="fx Den dataansvarliges eget dialersystem" aria-label={`Datakilde for ${b.brand}`} value={src} onChange={(e) => setSrc(e.target.value)} onBlur={() => persist("data_source", src, savedSrc)} />
       </TableCell>
       <TableCell>
-        <Input className="h-8" placeholder="Tom = fra slettepolitikken" aria-label={`Opbevaring for ${b.brand}`} value={ret} onChange={(e) => setRet(e.target.value)} onBlur={() => persist("retention_text", ret, savedRet)} />
+        <Textarea rows={2} className="min-h-0 resize-none text-sm" placeholder="Tom = fra slettepolitikken" aria-label={`Opbevaring for ${b.brand}`} value={ret} onChange={(e) => setRet(e.target.value)} onBlur={() => persist("retention_text", ret, savedRet)} />
         <p className="text-xs text-muted-foreground mt-1">Slettepolitik i Stork: {policyRangeOf(b.campaigns)}</p>
       </TableCell>
       <TableCell className="text-right">
