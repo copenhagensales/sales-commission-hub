@@ -18055,6 +18055,7 @@ export type Database = {
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
+      compliance_check_dialer_identity: { Args: never; Returns: undefined }
       compliance_check_ingestion_filter: { Args: never; Returns: undefined }
       compliance_mail_payload: { Args: never; Returns: Json }
       compliance_raise: {
@@ -18150,6 +18151,20 @@ export type Database = {
         }
         Returns: Json
       }
+      gdpr_dialer_campaign_retention: {
+        Args: never
+        Returns: {
+          campaign_external_id: string
+          retention_days: number
+        }[]
+      }
+      gdpr_dialer_integration_retention: {
+        Args: never
+        Returns: {
+          integration_id: string
+          retention_days: number
+        }[]
+      }
       gdpr_freetext_field_hits: {
         Args: { p_payload: Json }
         Returns: {
@@ -18159,7 +18174,10 @@ export type Database = {
         }[]
       }
       gdpr_run_campaign_sales_cleanup: { Args: never; Returns: Json }
-      gdpr_run_dialer_calls_cleanup: { Args: never; Returns: Json }
+      gdpr_run_dialer_calls_cleanup: {
+        Args: { p_dry_run?: boolean }
+        Returns: Json
+      }
       gdpr_strip_blocked_fields_backfill: {
         Args: {
           p_after_id?: string
