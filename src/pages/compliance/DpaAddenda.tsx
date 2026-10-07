@@ -425,34 +425,109 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, included, source, retentionText, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[] }) {
+const policyText = (k: { has_retention: boolean; retention_days: number | null }) =>
+  k.has_retention && k.retention_days != null ? `${k.retention_days} dage` : "ingen politik";
+
+/** Kundens standard: felter, datakilde og opbevaring, der gælder alle ikke-afvigende kampagner. */
+function ClientDefaults({ clientId, source, retentionText, labels, policyRange }: { clientId: string; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[]; policyRange: string }) {
+  const add = useAddDpaClientField();
+  const remove = useRemoveDpaClientField();
+  const saveDefault = useSaveDpaClientDefault();
+  const [src, setSrc] = useState(source);
+  const [ret, setRet] = useState(retentionText);
+  const [label, setLabel] = useState("");
+  const [desc, setDesc] = useState("");
+  const persist = (key: "data_source" | "retention_text", value: string, saved: string, msg: string) => {
+    if (value.trim() === saved.trim()) return;
+    saveDefault.mutate({ clientId, key, value }, { onSuccess: () => toast.success(msg), onError: (e) => toast.error(errMsg(e)) });
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Persondata i Stork</CardTitle>
+        <CardDescription>Kundens standard. Gælder alle medtagne kampagner, der ikke er sat til at afvige.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {labels.length === 0 && <span className="text-sm text-muted-foreground">Ingen felter endnu.</span>}
+          {labels.map((l) => (
+            <Badge key={l.id} variant="secondary" className="gap-1">
+              {l.business_label}{l.description ? ` (${l.description})` : ""}
+              <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
+            </Badge>
+          ))}
+        </div>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!label.trim()) return;
+            add.mutate({ clientId, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: (err) => toast.error(errMsg(err)) });
+          }}
+        >
+          <Input className="h-8" placeholder="Tilføj felt, fx Mødetype" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input className="h-8" placeholder="Beskrivelse (valgfri), fx fysisk, online eller telefon" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          <Button type="submit" size="sm" variant="outline" disabled={add.isPending}><Plus className="h-4 w-4" /></Button>
+        </form>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <Label>Datakilde</Label>
+            <Input placeholder="fx Den dataansvarliges eget dialersystem" value={src} onChange={(e) => setSrc(e.target.value)} onBlur={() => persist("data_source", src, source, "Datakilde gemt")} />
+          </div>
+          <div>
+            <Label>Opbevaring (tekst i tillægget)</Label>
+            <Input placeholder="Tom = beregnes fra slettepolitikken" value={ret} onChange={(e) => setRet(e.target.value)} onBlur={() => persist("retention_text", ret, retentionText, "Opbevaring gemt")} />
+            <p className="text-xs text-muted-foreground mt-1">Slettepolitik i Stork: {policyRange}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CampaignFields({ campaign, included, deviates, source, retentionText, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; deviates: boolean; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
   const setIncluded = useSetDpaCampaignIncluded();
+  const setDeviates = useSetDpaCampaignDeviates();
   const saveSource = useSaveDpaCampaignSource();
   const saveRetention = useSaveDpaCampaignRetentionText();
   const [src, setSrc] = useState(source);
   const [ret, setRet] = useState(retentionText);
   const [label, setLabel] = useState("");
   const [desc, setDesc] = useState("");
+  const header = (
+    <div className="flex flex-wrap justify-between gap-2 text-sm">
+      <span className="flex flex-wrap items-center gap-3">
+        <span className="font-medium">{campaign.name}</span>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Checkbox
+            checked={included}
+            disabled={setIncluded.isPending}
+            onCheckedChange={(v) => setIncluded.mutate({ campaignId: campaign.id, included: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
+          />
+          Medtag i tillægget
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Checkbox
+            checked={deviates}
+            disabled={setDeviates.isPending}
+            onCheckedChange={(v) => setDeviates.mutate({ campaignId: campaign.id, deviates: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
+          />
+          Afviger fra standard
+        </label>
+      </span>
+      <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
+        Slettepolitik: {policyText(campaign)}
+      </span>
+    </div>
+  );
+  if (!deviates) {
+    return <div className={`border rounded-md px-3 py-2 ${included ? "" : "opacity-60"}`}>{header}</div>;
+  }
   return (
     <div className={`border rounded-md p-3 space-y-2 ${included ? "" : "opacity-60"}`}>
-      <div className="flex justify-between text-sm">
-        <span className="flex items-center gap-3">
-          <span className="font-medium">{campaign.name}</span>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Checkbox
-              checked={included}
-              disabled={setIncluded.isPending}
-              onCheckedChange={(v) => setIncluded.mutate({ campaignId: campaign.id, included: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
-            />
-            Medtag i tillægget
-          </label>
-        </span>
-        <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
-          {!campaign.has_retention ? "Mangler opbevaringspolitik" : campaign.retention_days == null ? "Periode ikke fastsat" : `${campaign.retention_days} dage → irreversibel anonymisering`}
-        </span>
-      </div>
+      {header}
       <div className="flex flex-wrap gap-2">
         {labels.map((l) => (
           <Badge key={l.id} variant="secondary" className="gap-1">
