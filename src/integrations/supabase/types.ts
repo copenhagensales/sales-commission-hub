@@ -6192,6 +6192,7 @@ export type Database = {
       dpa_parties: {
         Row: {
           address: string | null
+          agreements: Json
           approval_form: string | null
           created_at: string
           cvr: string | null
@@ -6208,6 +6209,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          agreements?: Json
           approval_form?: string | null
           created_at?: string
           cvr?: string | null
@@ -6224,6 +6226,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          agreements?: Json
           approval_form?: string | null
           created_at?: string
           cvr?: string | null
