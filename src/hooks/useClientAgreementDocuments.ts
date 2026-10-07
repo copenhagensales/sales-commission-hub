@@ -172,11 +172,24 @@ export function useDeleteClientAgreement() {
 export function useOpenClientAgreement() {
   return useMutation({
     mutationFn: async (storagePath: string) => {
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(storagePath, 60 * 10);
-      if (error) throw error;
-      if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
+      // Åbn fanen synkront ved klik, ellers blokerer browseren pop-up'en efter await.
+      const win = window.open("", "_blank");
+      try {
+        const { data, error } = await supabase.storage
+          .from(BUCKET)
+          .createSignedUrl(storagePath, 60 * 10);
+        if (error) throw error;
+        if (!data?.signedUrl) throw new Error("Kunne ikke oprette link til filen");
+        if (win) {
+          win.opener = null;
+          win.location.href = data.signedUrl;
+        } else {
+          window.location.href = data.signedUrl;
+        }
+      } catch (err) {
+        win?.close();
+        throw err;
+      }
     },
   });
 }
