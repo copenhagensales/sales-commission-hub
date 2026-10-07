@@ -6797,6 +6797,27 @@ export type Database = {
           },
         ]
       }
+      eea_ip_ranges: {
+        Row: {
+          batch: string
+          country: string
+          ip_end: unknown
+          ip_start: unknown
+        }
+        Insert: {
+          batch: string
+          country: string
+          ip_end: unknown
+          ip_start: unknown
+        }
+        Update: {
+          batch?: string
+          country?: string
+          ip_end?: unknown
+          ip_start?: unknown
+        }
+        Relationships: []
+      }
       eesy_fm_powerbi_imports: {
         Row: {
           created_at: string
@@ -9387,6 +9408,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      geo_login_denials: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       h2h_challenges: {
         Row: {
@@ -18350,6 +18392,8 @@ export type Database = {
         }[]
       }
       generate_access_code: { Args: never; Returns: string }
+      geo_eea_activate_batch: { Args: { _batch: string }; Returns: number }
+      geo_ip_in_eea: { Args: { _ip: string }; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
         Args: never
