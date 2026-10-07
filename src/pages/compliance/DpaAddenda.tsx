@@ -217,6 +217,9 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const campaigns = (base?.campaigns ?? []).filter((k) => k.client_id === client.id);
   const versions = allVersions.filter((v) => v.client_id === client.id);
   const missingRetention = campaigns.filter((k) => !k.has_retention);
+  const fieldsConflict = campaigns.filter(
+    (k) => k.has_retention && fields.some((f) => f.client_campaign_id === k.id) && (k.no_data_held === true || k.retention_days == null),
+  );
 
   const toRow = (): DpaClientProfile => ({
     client_id: client.id,
@@ -239,8 +242,8 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
     !p.legal_name.trim() && "juridisk navn",
     !p.cvr.trim() && "CVR",
     !p.address.trim() && "adresse",
-    !p.original_title.trim() && "oprindelig aftales titel",
-    !p.original_date && "oprindelig aftales dato",
+    !p.original_title.trim() && "databehandleraftalens titel",
+    !p.original_date && "databehandleraftalens dato",
     !p.approval_form && "godkendelsesform",
     p.approval_form === "general" && !p.notice_days && "varselsperiode",
     p.subprocessor_ids.length === 0 && "underdatabehandlere",
@@ -266,7 +269,9 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         subprocessor_approval: { form: p.approval_form as "general" | "specific", notice_days: p.notice_days ? Number(p.notice_days) : null },
         campaigns: campaigns.map((k) => ({
           name: k.name,
-          fields: fields.filter((f) => f.client_campaign_id === k.id).map((f) => f.business_label),
+          fields: fields
+            .filter((f) => f.client_campaign_id === k.id)
+            .map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
           retention_days: k.retention_days,
           no_data_held: k.no_data_held === true,
           missing_retention: !k.has_retention,
@@ -303,14 +308,23 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         </Alert>
       )}
 
+      {fieldsConflict.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {fieldsConflict.map((k) => k.name).join(", ")}: Kampagnen har persondatafelter, men retentionspolitikken siger ingen data / mangler periode — opbevaringen er ikke fastsat.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
-        <CardHeader><CardTitle className="text-base">Kundeoplysninger og oprindelig aftale</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Kundeoplysninger og databehandleraftale</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-3">
           <div><Label>Juridisk navn</Label><Input value={p.legal_name} onChange={(e) => setP({ ...p, legal_name: e.target.value })} /></div>
           <div><Label>CVR</Label><Input value={p.cvr} onChange={(e) => setP({ ...p, cvr: e.target.value })} /></div>
           <div className="md:col-span-2"><Label>Adresse</Label><Input value={p.address} onChange={(e) => setP({ ...p, address: e.target.value })} /></div>
-          <div><Label>Oprindelig aftale – titel</Label><Input value={p.original_title} onChange={(e) => setP({ ...p, original_title: e.target.value })} /></div>
-          <div><Label>Oprindelig aftale – dato</Label><Input type="date" value={p.original_date} onChange={(e) => setP({ ...p, original_date: e.target.value })} /></div>
+          <div><Label>Databehandleraftalens titel</Label><Input value={p.original_title} onChange={(e) => setP({ ...p, original_title: e.target.value })} /></div>
+          <div><Label>Databehandleraftalens dato</Label><Input type="date" value={p.original_date} onChange={(e) => setP({ ...p, original_date: e.target.value })} /></div>
           <div>
             <Label>Godkendelse af underdatabehandlere</Label>
             <RadioGroup value={p.approval_form} onValueChange={(v) => setP({ ...p, approval_form: v as "general" | "specific" })} className="mt-2">
@@ -378,10 +392,11 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean; no_data_held: boolean | null }; labels: { id: string; business_label: string }[] }) {
+function CampaignFields({ campaign, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean; no_data_held: boolean | null }; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
   const [label, setLabel] = useState("");
+  const [desc, setDesc] = useState("");
   return (
     <div className="border rounded-md p-3 space-y-2">
       <div className="flex justify-between text-sm">
@@ -393,7 +408,7 @@ function CampaignFields({ campaign, labels }: { campaign: { id: string; name: st
       <div className="flex flex-wrap gap-2">
         {labels.map((l) => (
           <Badge key={l.id} variant="secondary" className="gap-1">
-            {l.business_label}
+            {l.business_label}{l.description ? ` (${l.description})` : ""}
             <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
           </Badge>
         ))}
@@ -403,10 +418,11 @@ function CampaignFields({ campaign, labels }: { campaign: { id: string; name: st
         onSubmit={(e) => {
           e.preventDefault();
           if (!label.trim()) return;
-          add.mutate({ campaignId: campaign.id, label }, { onSuccess: () => setLabel(""), onError: (err) => toast.error(errMsg(err)) });
+          add.mutate({ campaignId: campaign.id, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: (err) => toast.error(errMsg(err)) });
         }}
       >
-        <Input className="h-8" placeholder="Tilføj felt, fx Telefonnummer" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input className="h-8" placeholder="Tilføj felt, fx Mødetype" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input className="h-8" placeholder="Beskrivelse (valgfri), fx fysisk, online eller telefon" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <Button type="submit" size="sm" variant="outline" disabled={add.isPending}><Plus className="h-4 w-4" /></Button>
       </form>
     </div>

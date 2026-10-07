@@ -144,10 +144,10 @@ export function useSaveDpaSubprocessor() {
 export function useAddDpaCampaignField() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ campaignId, label }: { campaignId: string; label: string }) => {
+    mutationFn: async ({ campaignId, label, description }: { campaignId: string; label: string; description?: string }) => {
       const { error } = await supabase
         .from("dpa_campaign_fields")
-        .insert({ client_campaign_id: campaignId, business_label: label.trim() });
+        .insert({ client_campaign_id: campaignId, business_label: label.trim(), description: description?.trim() || null });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.fields }),
