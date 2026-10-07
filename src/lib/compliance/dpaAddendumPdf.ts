@@ -35,6 +35,35 @@ export const PROCESSOR = {
 
 export const HOSTING_TEXT = "Supabase, EU-regionen Paris (eu-west-3)";
 
+/**
+ * Rækker til afsnit 1 uden kampagnenavne. Identiske rækker slås sammen; rækker med samme
+ * oplysninger og datakilde men forskellig (kendt) opbevaring vises som "X–Y dage afhængigt af aktivitet".
+ */
+export function buildSection1Rows(campaigns: DpaAddendumContent["campaigns"]): string[][] {
+  const groups = new Map<string, { fields: string; source: string; days: Array<number | null> }>();
+  for (const k of campaigns) {
+    if (k.fields.length === 0) continue;
+    const fields = k.fields.join(", ");
+    const source = k.data_source?.trim() || "—";
+    const key = `${fields}\u0000${source}`;
+    const g = groups.get(key) ?? { fields, source, days: [] };
+    if (!g.days.includes(k.retention_days)) g.days.push(k.retention_days);
+    groups.set(key, g);
+  }
+  const rows: string[][] = [];
+  for (const g of groups.values()) {
+    const known = g.days.filter((d): d is number => d != null).sort((a, b) => a - b);
+    const hasUnknown = g.days.some((d) => d == null);
+    if (known.length > 1) {
+      rows.push([g.fields, g.source, `${known[0]}–${known[known.length - 1]} dage afhængigt af aktivitet`]);
+    } else if (known.length === 1) {
+      rows.push([g.fields, g.source, `${known[0]} dage`]);
+    }
+    if (hasUnknown) rows.push([g.fields, g.source, "Ikke fastsat"]);
+  }
+  return rows;
+}
+
 /** Dansk opremsning: "A", "A og B", "A, B og C". */
 function joinDa(items: string[]): string {
   if (items.length <= 1) return items.join("");
@@ -140,24 +169,22 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     "Databehandleren registrerer oplysninger i afregningssystemet Stork med det formål at foretage afregning, " +
       "provisionsberegning og afstemning af annulleringer og fortrydelser mellem parterne.",
   );
-  para("Databehandleren registrerer følgende oplysninger pr. kampagne:");
+  para("Databehandleren registrerer følgende oplysninger:");
   const anyFields = c.campaigns.some((k) => k.fields.length > 0);
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
-    head: [["Kampagne", "Oplysninger der registreres", "Datakilde", "Opbevaring"]],
-    body: c.campaigns
-      .filter((k) => k.fields.length > 0)
-      .map((k) => [k.name, k.fields.join(", "), k.data_source?.trim() || "—", k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"]),
+    head: [["Oplysninger der registreres", "Datakilde", "Opbevaring"]],
+    body: buildSection1Rows(c.campaigns),
     styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: 2 },
     headStyles: { fillColor: INK, textColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [245, 246, 247] },
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
-  para("Oplysningerne hentes fra den kilde, der er angivet for kampagnen.");
+  para("Oplysningerne hentes fra den angivne datakilde.");
   if (anyFields) {
     para(
-      "Oplysningerne opbevares i det antal dage, der er angivet for kampagnen, og anonymiseres herefter irreversibelt. " +
+      "Oplysningerne opbevares i det angivne antal dage og anonymiseres herefter irreversibelt. " +
         "Ved anonymiseringen fjernes den dataansvarliges kundes persondata, mens salgsregistreringen og oplysninger om sælgeren bevares til afregningsbrug.",
     );
   }
