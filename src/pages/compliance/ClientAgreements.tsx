@@ -149,7 +149,14 @@ export default function ClientAgreements() {
               <li key={doc.id} className="flex items-center justify-between gap-2 text-xs">
                 <button
                   type="button"
-                  onClick={() => open.mutate(doc.storage_path)}
+                  onClick={() =>
+                    open.mutate(doc.storage_path, {
+                      onError: (e) =>
+                        toast.error(
+                          `Kunne ikke åbne filen: ${e instanceof Error ? e.message : String(e)}`
+                        ),
+                    })
+                  }
                   className="flex items-center gap-1.5 text-left text-primary hover:underline min-w-0"
                 >
                   <FileText className="h-3.5 w-3.5 shrink-0" />
