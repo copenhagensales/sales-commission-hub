@@ -6083,12 +6083,14 @@ export type Database = {
           created_at: string
           cvr: string | null
           data_source: string | null
+          display_name: string | null
           is_active: boolean
           legal_name: string | null
           notice_days: number | null
           original_date: string | null
           original_title: string | null
           other_changes: string | null
+          party_id: string | null
           retention_text: string | null
           subprocessor_ids: string[]
           updated_at: string
@@ -6101,12 +6103,14 @@ export type Database = {
           created_at?: string
           cvr?: string | null
           data_source?: string | null
+          display_name?: string | null
           is_active?: boolean
           legal_name?: string | null
           notice_days?: number | null
           original_date?: string | null
           original_title?: string | null
           other_changes?: string | null
+          party_id?: string | null
           retention_text?: string | null
           subprocessor_ids?: string[]
           updated_at?: string
@@ -6119,12 +6123,14 @@ export type Database = {
           created_at?: string
           cvr?: string | null
           data_source?: string | null
+          display_name?: string | null
           is_active?: boolean
           legal_name?: string | null
           notice_days?: number | null
           original_date?: string | null
           original_title?: string | null
           other_changes?: string | null
+          party_id?: string | null
           retention_text?: string | null
           subprocessor_ids?: string[]
           updated_at?: string
@@ -6136,6 +6142,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dpa_client_profiles_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "dpa_parties"
             referencedColumns: ["id"]
           },
         ]
@@ -6175,6 +6188,65 @@ export type Database = {
           vendor?: string
         }
         Relationships: []
+      }
+      dpa_parties: {
+        Row: {
+          address: string | null
+          approval_form: string | null
+          created_at: string
+          cvr: string | null
+          id: string
+          is_active: boolean
+          legal_name: string | null
+          notice_days: number | null
+          original_date: string | null
+          original_title: string | null
+          other_changes: string | null
+          subprocessor_ids: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address?: string | null
+          approval_form?: string | null
+          created_at?: string
+          cvr?: string | null
+          id: string
+          is_active?: boolean
+          legal_name?: string | null
+          notice_days?: number | null
+          original_date?: string | null
+          original_title?: string | null
+          other_changes?: string | null
+          subprocessor_ids?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address?: string | null
+          approval_form?: string | null
+          created_at?: string
+          cvr?: string | null
+          id?: string
+          is_active?: boolean
+          legal_name?: string | null
+          notice_days?: number | null
+          original_date?: string | null
+          original_title?: string | null
+          other_changes?: string | null
+          subprocessor_ids?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_parties_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dpa_subprocessors: {
         Row: {
