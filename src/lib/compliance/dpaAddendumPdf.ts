@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { FIGTREE_REGULAR, FIGTREE_EXTRABOLD } from "./fonts/figtree";
 
 /** Låst indhold for én version af tillægget. Gemmes 1:1 som JSON i dpa_addenda.content. */
 export interface DpaAddendumContent {
@@ -47,7 +48,7 @@ export function buildSection1Rows(campaigns: DpaAddendumContent["campaigns"]): s
   for (const k of campaigns) {
     if (k.fields.length === 0) continue;
     const fields = k.fields.join(", ");
-    const source = k.data_source?.trim() || "—";
+    const source = k.data_source?.trim() || "–";
     const manual = k.retention_text?.trim() || null;
     const key = `${fields}\u0000${source}\u0000${manual ?? "\u0001auto"}`;
     const g = groups.get(key) ?? { fields, source, manual, days: [] };
@@ -110,54 +111,128 @@ export function buildSection3Paragraphs(selectedNames: string[]): string[] {
   return out;
 }
 
-// Brandfarver (fra designsystemet: mørk skifer + grøn accent)
-const INK: [number, number, number] = [47, 50, 55];
-const ACCENT: [number, number, number] = [52, 215, 127];
+// Copenhagen Sales' designregler for kontraktdokumenter: Onyx til tekst, Emerald kun som tynd accentlinje.
+const INK: [number, number, number] = [46, 49, 54]; // Onyx #2E3136
+const ACCENT: [number, number, number] = [59, 224, 134]; // Emerald #3BE086
 const MUTED: [number, number, number] = [110, 114, 120];
+const ROW_ALT: [number, number, number] = [246, 247, 248];
+const LINE: [number, number, number] = [214, 217, 221];
+const FONT = "Figtree";
 
 function fmtDate(iso: string): string {
-  if (!iso) return "—";
+  if (!iso) return "–";
   return new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function registerFonts(doc: jsPDF) {
+  doc.addFileToVFS("Figtree-Regular.ttf", FIGTREE_REGULAR);
+  doc.addFont("Figtree-Regular.ttf", FONT, "normal");
+  doc.addFileToVFS("Figtree-ExtraBold.ttf", FIGTREE_EXTRABOLD);
+  doc.addFont("Figtree-ExtraBold.ttf", FONT, "bold");
 }
 
 export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  registerFonts(doc);
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const M = 22;
+  const M = 22; // sidemargin
+  const TOP = 28; // indholdsstart under sidehoved
+  const BOTTOM = H - 22; // indholdsgrænse over sidefod
   const TW = W - M * 2;
-  let y = 30;
+  const LH = 5.2; // linjehøjde brødtekst
+  const PARA_GAP = 2.5;
+  const SECTION_GAP = 7;
+  let y = TOP;
 
+  const newPage = () => {
+    doc.addPage();
+    y = TOP;
+  };
   const ensure = (h: number) => {
-    if (y + h > H - 22) {
-      doc.addPage();
-      y = 28;
-    }
+    if (y + h > BOTTOM) newPage();
   };
-  const heading = (t: string) => {
-    ensure(14);
-    y += 4;
-    doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(...INK);
+  const textLines = (t: string, size: number, bold = false) => {
+    doc.setFont(FONT, bold ? "bold" : "normal").setFontSize(size);
+    return doc.splitTextToSize(t, TW) as string[];
+  };
+  /** Sektionsoverskrift med tynd accentlinje; holdes sammen med mindst `keep` mm efterfølgende indhold. */
+  const heading = (t: string, keep = 3 * LH) => {
+    y += SECTION_GAP;
+    ensure(10 + keep);
+    doc.setFont(FONT, "bold").setFontSize(11.5).setTextColor(...INK);
     doc.text(t, M, y);
-    y += 6;
+    y += 2.2;
+    doc.setDrawColor(...ACCENT).setLineWidth(0.4).line(M, y, M + 18, y);
+    y += 5.5;
   };
-  const para = (t: string, opts: { bold?: boolean; size?: number } = {}) => {
-    doc.setFont("helvetica", opts.bold ? "bold" : "normal").setFontSize(opts.size ?? 10).setTextColor(...INK);
-    const lines = doc.splitTextToSize(t, TW) as string[];
+  const para = (t: string, opts: { bold?: boolean } = {}) => {
+    const lines = textLines(t, 10, opts.bold);
+    doc.setTextColor(...INK);
+    // Undgå én forældreløs linje nederst: kræv mindst to linjer (eller hele afsnittet) på siden.
+    ensure(Math.min(lines.length, 2) * LH);
     for (const line of lines) {
-      ensure(5.2);
+      ensure(LH);
       doc.text(line, M, y);
-      y += 5.2;
+      y += LH;
     }
-    y += 1.5;
+    y += PARA_GAP;
+  };
+  /**
+   * Kolonnebredder: hver kolonne får mindst plads til sit længste ord (så ord ikke brydes midt i),
+   * resten fordeles efter vægte.
+   */
+  const colWidths = (head: string[], body: string[][], weights: number[], size: number, pad: number) => {
+    const longest = (t: string, bold: boolean) => {
+      doc.setFont(FONT, bold ? "bold" : "normal").setFontSize(size);
+      return Math.max(0, ...t.split(/\s+/).map((w) => doc.getTextWidth(w)));
+    };
+    const mins = head.map((h, i) => Math.max(longest(h, true), ...body.map((r) => longest(r[i] ?? "", false))) + pad * 2 + 0.6);
+    const minSum = mins.reduce((a, b) => a + b, 0);
+    const wSum = weights.reduce((a, b) => a + b, 0);
+    const rest = Math.max(0, TW - minSum);
+    const widths = mins.map((m, i) => m + (rest * weights[i]) / wSum);
+    const scale = TW / widths.reduce((a, b) => a + b, 0);
+    return Object.fromEntries(widths.map((w, i) => [i, { cellWidth: w * scale }])) as Record<number, { cellWidth: number }>;
+  };
+  const table = (head: string[], body: string[][], weights: number[], size = 8.5) => {
+    const pad = 2;
+    const rows = body.length ? body : [head.map(() => "–")];
+    const columnStyles = colWidths(head, rows, weights, size, pad);
+    autoTable(doc, {
+      startY: y,
+      margin: { left: M, right: M, top: TOP, bottom: H - BOTTOM },
+      head: [head],
+      body: rows,
+      theme: "grid",
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
+      columnStyles,
+      styles: {
+        font: FONT,
+        fontStyle: "normal",
+        fontSize: size,
+        textColor: INK,
+        cellPadding: { top: 2.2, bottom: 2.2, left: pad, right: pad },
+        lineColor: LINE,
+        lineWidth: 0.15,
+        valign: "top",
+        overflow: "linebreak",
+      },
+      headStyles: { font: FONT, fontStyle: "bold", fillColor: INK, textColor: [255, 255, 255], lineColor: INK },
+      bodyStyles: { fillColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: ROW_ALT },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 7;
   };
 
   // Titel
-  doc.setFont("helvetica", "bold").setFontSize(18).setTextColor(...INK);
+  y = 40;
+  doc.setFont(FONT, "bold").setFontSize(19).setTextColor(...INK);
   doc.text("Tillæg (allonge) til databehandleraftale", M, y);
-  y += 4;
-  doc.setDrawColor(...ACCENT).setLineWidth(0.8).line(M, y, M + 40, y);
-  y += 10;
+  y += 3.5;
+  doc.setDrawColor(...ACCENT).setLineWidth(0.6).line(M, y, M + 30, y);
+  y += 6;
 
   heading("Parter");
   para(`${c.client.legal_name}, CVR ${c.client.cvr}, ${c.client.address}`, { bold: true });
@@ -177,22 +252,14 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     "Databehandleren registrerer oplysninger i afregningssystemet Stork med det formål at foretage afregning, " +
       "provisionsberegning og afstemning af annulleringer og fortrydelser mellem parterne.",
   );
+  ensure(LH + 22); // indledning + tabelhoved + første række holdes samlet
   para("Databehandleren registrerer følgende oplysninger:");
   const anyFields = c.campaigns.some((k) => k.fields.length > 0);
-  autoTable(doc, {
-    startY: y,
-    margin: { left: M, right: M },
-    head: [["Oplysninger der registreres", "Datakilde", "Opbevaring"]],
-    body: buildSection1Rows(c.campaigns),
-    styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: 2 },
-    headStyles: { fillColor: INK, textColor: [255, 255, 255] },
-    alternateRowStyles: { fillColor: [245, 246, 247] },
-  });
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
+  table(["Oplysninger der registreres", "Datakilde", "Opbevaring"], buildSection1Rows(c.campaigns), [5, 3, 3]);
   para("Oplysningerne hentes fra den angivne datakilde.");
   if (anyFields) {
     para(
-      "Oplysningerne opbevares i det angivne antal dage og anonymiseres herefter irreversibelt. " +
+      "Oplysningerne opbevares i den angivne periode og anonymiseres herefter irreversibelt. " +
         "Ved anonymiseringen fjernes den dataansvarliges kundes persondata, mens salgsregistreringen og oplysninger om sælgeren bevares til afregningsbrug.",
     );
   }
@@ -203,22 +270,18 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     para("Anonymiseringen er endelig, når databehandlerens backup-vindue på 14 dage er udløbet.");
   }
 
-  heading("2. Underdatabehandlere");
+  heading("2. Underdatabehandlere", 4 * LH + 22);
   para(
     c.subprocessor_approval.form === "general"
-      ? `Den dataansvarlige har givet generel godkendelse af underdatabehandlere med et varsel på ${c.subprocessor_approval.notice_days ?? "—"} dage. Databehandleren benytter følgende underdatabehandlere, som hermed meddeles den dataansvarlige:`
+      ? `Den dataansvarlige har givet generel godkendelse af underdatabehandlere med et varsel på ${c.subprocessor_approval.notice_days ?? "–"} dage. Databehandleren benytter følgende underdatabehandlere, som hermed meddeles den dataansvarlige:`
       : "Den dataansvarlige godkender ved underskrift af dette tillæg følgende underdatabehandlere:",
   );
-  autoTable(doc, {
-    startY: y,
-    margin: { left: M, right: M },
-    head: [["Navn", "CVR/registrering", "Behandling", "Lokation", "Overførselsgrundlag"]],
-    body: c.subprocessors.map((s) => [s.name, s.registration || "—", s.processing || "—", s.location || "—", s.transfer_basis || "—"]),
-    styles: { font: "helvetica", fontSize: 8.5, textColor: INK, cellPadding: 2 },
-    headStyles: { fillColor: INK, textColor: [255, 255, 255] },
-    alternateRowStyles: { fillColor: [245, 246, 247] },
-  });
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
+  table(
+    ["Navn", "CVR/registrering", "Behandling", "Lokation", "Overførselsgrundlag"],
+    c.subprocessors.map((s) => [s.name, s.registration || "–", s.processing || "–", s.location || "–", s.transfer_basis || "–"]),
+    [0, 4, 3, 1, 4],
+    8,
+  );
 
   heading("3. Lokation og overførsel til tredjelande");
   buildSection3Paragraphs(c.subprocessors.map((s) => s.name)).forEach((p) => para(p));
@@ -226,46 +289,55 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   let n = 4;
   if (c.other_changes && c.other_changes.trim()) {
     heading(`${n}. Øvrige ændringer`);
-    para(c.other_changes.trim());
+    c.other_changes
+      .trim()
+      .split(/\n\s*\n/)
+      .forEach((p) => para(p.replace(/\s*\n\s*/g, " ")));
     n++;
   }
 
-  heading(`${n}. Slutbestemmelse`);
-  para("Aftalen er i øvrigt uændret. Tillægget træder i kraft ved begge parters underskrift.");
+  // Slutbestemmelse og underskrifter holdes samlet på samme side.
+  const colW = (TW - 14) / 2;
+  const partyLines = (party: string) => {
+    doc.setFont(FONT, "normal").setFontSize(9);
+    return doc.splitTextToSize(party, colW) as string[];
+  };
+  const maxParty = Math.max(partyLines(c.client.legal_name).length, partyLines(PROCESSOR.name).length);
+  const signH = 6 + maxParty * 4.5 + 3 * 13 + 4;
+  const finalText = "Aftalen er i øvrigt uændret. Tillægget træder i kraft ved begge parters underskrift.";
+  const finalH = textLines(finalText, 10).length * LH + PARA_GAP;
+  heading(`${n}. Slutbestemmelse`, finalH + 12 + signH);
+  para(finalText);
 
-  // Underskrifter
-  ensure(58);
-  y += 8;
-  const colW = (TW - 12) / 2;
+  y += 12;
+  const top = y;
   const sign = (x: number, title: string, party: string) => {
-    let yy = y;
-    doc.setFont("helvetica", "bold").setFontSize(10).setTextColor(...INK).text(title, x, yy);
+    let yy = top;
+    doc.setFont(FONT, "bold").setFontSize(10).setTextColor(...INK).text(title, x, yy);
     yy += 5;
-    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...MUTED);
-    (doc.splitTextToSize(party, colW) as string[]).forEach((l) => {
-      doc.text(l, x, yy);
-      yy += 4.5;
-    });
-    yy += 6;
-    for (const label of ["Navn", "Dato", "Underskrift"]) {
-      yy += 9;
-      doc.setDrawColor(...MUTED).setLineWidth(0.2).line(x, yy, x + colW, yy);
-      doc.setFontSize(8).text(label, x, yy + 4);
+    doc.setFont(FONT, "normal").setFontSize(9).setTextColor(...INK);
+    partyLines(party).forEach((l, i) => doc.text(l, x, yy + i * 4.5));
+    yy += maxParty * 4.5;
+    for (const label of ["Navn:", "Dato:", "Underskrift:"]) {
+      yy += 13;
+      doc.setFont(FONT, "normal").setFontSize(9).setTextColor(...INK).text(label, x, yy - 1.2);
+      const lx = x + 22;
+      doc.setDrawColor(...MUTED).setLineWidth(0.2).line(lx, yy, x + colW, yy);
     }
   };
   sign(M, "For den dataansvarlige", c.client.legal_name);
-  sign(M + colW + 12, "For databehandleren", PROCESSOR.name);
+  sign(M + colW + 14, "For databehandleren", PROCESSOR.name);
 
-  // Sidehoved og -fod
+  // Sidehoved og -fod (diskret version og dato)
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(...MUTED);
-    doc.text(`${PROCESSOR.name} · Tillæg til databehandleraftale · ${c.client.legal_name}`, M, 14);
-    doc.text(`Version v${c.version}`, W - M, 14, { align: "right" });
+    doc.setFont(FONT, "normal").setFontSize(7.5).setTextColor(...MUTED);
+    doc.text(`${PROCESSOR.name} · Tillæg til databehandleraftale · ${c.client.legal_name}`, M, 13);
+    doc.text(`Version v${c.version}`, W - M, 13, { align: "right" });
     doc.setDrawColor(...ACCENT).setLineWidth(0.3).line(M, 16, W - M, 16);
-    doc.text(`Genereret ${fmtDate(c.generated_at)}`, M, H - 10);
-    doc.text(`Side ${i} af ${pages}`, W - M, H - 10, { align: "right" });
+    doc.text(`Genereret ${fmtDate(c.generated_at)}`, M, H - 11);
+    doc.text(`Side ${i} af ${pages}`, W - M, H - 11, { align: "right" });
   }
 
   return doc.output("blob");
