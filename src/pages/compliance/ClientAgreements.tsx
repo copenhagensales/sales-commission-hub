@@ -150,7 +150,7 @@ export default function ClientAgreements() {
                 <button
                   type="button"
                   onClick={() =>
-                    open.mutate(doc.storage_path, {
+                    open.mutate({ storagePath: doc.storage_path, fileName: doc.file_name }, {
                       onError: (e) =>
                         toast.error(
                           `Kunne ikke åbne filen: ${e instanceof Error ? e.message : String(e)}`

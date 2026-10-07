@@ -168,28 +168,24 @@ export function useDeleteClientAgreement() {
   });
 }
 
-/** Åbner en arkiveret kundeaftale via midlertidigt signeret link. */
+/**
+ * Henter en arkiveret kundeaftale som fil og downloader den lokalt.
+ * Undgår navigation til eksternt lager-domæne, som Chrome kan blokere.
+ */
 export function useOpenClientAgreement() {
   return useMutation({
-    mutationFn: async (storagePath: string) => {
-      // Åbn fanen synkront ved klik, ellers blokerer browseren pop-up'en efter await.
-      const win = window.open("", "_blank");
-      try {
-        const { data, error } = await supabase.storage
-          .from(BUCKET)
-          .createSignedUrl(storagePath, 60 * 10);
-        if (error) throw error;
-        if (!data?.signedUrl) throw new Error("Kunne ikke oprette link til filen");
-        if (win) {
-          win.opener = null;
-          win.location.href = data.signedUrl;
-        } else {
-          window.location.href = data.signedUrl;
-        }
-      } catch (err) {
-        win?.close();
-        throw err;
-      }
+    mutationFn: async ({ storagePath, fileName }: { storagePath: string; fileName?: string }) => {
+      const { data, error } = await supabase.storage.from(BUCKET).download(storagePath);
+      if (error) throw error;
+      if (!data) throw new Error("Kunne ikke hente filen");
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || storagePath.split("/").pop() || "aftale";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     },
   });
 }
