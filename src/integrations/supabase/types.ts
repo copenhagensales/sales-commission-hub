@@ -18057,6 +18057,7 @@ export type Database = {
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
       compliance_check_dialer_identity: { Args: never; Returns: undefined }
       compliance_check_ingestion_filter: { Args: never; Returns: undefined }
+      compliance_check_unmapped_sales: { Args: never; Returns: undefined }
       compliance_mail_payload: { Args: never; Returns: Json }
       compliance_raise: {
         Args: {
@@ -18151,6 +18152,10 @@ export type Database = {
         }
         Returns: Json
       }
+      gdpr_clean_unmapped_sales: {
+        Args: { p_dry_run?: boolean }
+        Returns: Json
+      }
       gdpr_dialer_campaign_retention: {
         Args: never
         Returns: {
@@ -18193,6 +18198,14 @@ export type Database = {
       gdpr_strip_freetext_sales: {
         Args: { p_days?: number; p_dry_run?: boolean }
         Returns: Json
+      }
+      gdpr_unmapped_sales_retention: {
+        Args: never
+        Returns: {
+          client_id: string
+          retention_days: number
+          sale_id: string
+        }[]
       }
       generate_access_code: { Args: never; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
