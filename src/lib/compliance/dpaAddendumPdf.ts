@@ -9,8 +9,12 @@ export interface DpaAddendumContent {
   client: { name: string; legal_name: string; cvr: string; address: string };
   original_agreement: { title: string; date: string };
   subprocessor_approval: { form: "general" | "specific"; notice_days: number | null };
+  /** Sand når aftaleparten har flere Stork-kunder; tabellen i afsnit 1 får da kolonnen "Brand". */
+  multi_brand?: boolean;
   campaigns: Array<{
     name: string;
+    /** Kundens visningsnavn i tillægget (brand). Valgfri for ældre versioner. */
+    brand?: string;
     fields: string[];
     /** Datakilde (fritekst). Valgfri for bagudkompatibilitet med ældre versioner. */
     data_source?: string | null;
@@ -43,34 +47,38 @@ export const HOSTING_TEXT = "Supabase, EU-regionen Paris (eu-west-3)";
  * oplysninger og datakilde men forskellig (kendt) opbevaring vises som "X–Y dage afhængigt af aktivitet".
  * En manuel opbevaringstekst bruges 1:1 og er selv en del af sammenligningen.
  */
-export function buildSection1Rows(campaigns: DpaAddendumContent["campaigns"]): string[][] {
-  const groups = new Map<string, { fields: string; source: string; manual: string | null; days: Array<number | null> }>();
+export function buildSection1Rows(campaigns: DpaAddendumContent["campaigns"], multiBrand = false): string[][] {
+  const groups = new Map<string, { brand: string; fields: string; source: string; manual: string | null; days: Array<number | null> }>();
   for (const k of campaigns) {
     if (k.fields.length === 0) continue;
+    const brand = multiBrand ? k.brand?.trim() || k.name : "";
     const fields = k.fields.join(", ");
     const source = k.data_source?.trim() || "–";
     const manual = k.retention_text?.trim() || null;
-    const key = `${fields}\u0000${source}\u0000${manual ?? "\u0001auto"}`;
-    const g = groups.get(key) ?? { fields, source, manual, days: [] };
+    // Rækker slås kun sammen inden for samme brand.
+    const key = `${brand}\u0000${fields}\u0000${source}\u0000${manual ?? "\u0001auto"}`;
+    const g = groups.get(key) ?? { brand, fields, source, manual, days: [] };
     if (!g.days.includes(k.retention_days)) g.days.push(k.retention_days);
     groups.set(key, g);
   }
-  const rows: string[][] = [];
+  const rows: Array<{ brand: string; cells: string[] }> = [];
+  const push = (g: { brand: string; fields: string; source: string }, ret: string) => rows.push({ brand: g.brand, cells: [g.fields, g.source, ret] });
   for (const g of groups.values()) {
     if (g.manual) {
-      rows.push([g.fields, g.source, g.manual]);
+      push(g, g.manual);
       continue;
     }
     const known = g.days.filter((d): d is number => d != null).sort((a, b) => a - b);
     const hasUnknown = g.days.some((d) => d == null);
-    if (known.length > 1) {
-      rows.push([g.fields, g.source, `${known[0]}–${known[known.length - 1]} dage afhængigt af aktivitet`]);
-    } else if (known.length === 1) {
-      rows.push([g.fields, g.source, `${known[0]} dage`]);
-    }
-    if (hasUnknown) rows.push([g.fields, g.source, "Ikke fastsat"]);
+    if (known.length > 1) push(g, `${known[0]}–${known[known.length - 1]} dage afhængigt af aktivitet`);
+    else if (known.length === 1) push(g, `${known[0]} dage`);
+    if (hasUnknown) push(g, "Ikke fastsat");
   }
-  return rows;
+  if (!multiBrand) return rows.map((r) => r.cells);
+  return rows
+    .map((r, i) => ({ ...r, i }))
+    .sort((a, b) => a.brand.localeCompare(b.brand, "da") || a.i - b.i)
+    .map((r) => [r.brand, ...r.cells]);
 }
 
 /** Dansk opremsning: "A", "A og B", "A, B og C". */
@@ -267,7 +275,12 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   ensure(LH + 22); // indledning + tabelhoved + første række holdes samlet
   para("Databehandleren registrerer følgende oplysninger:");
   const anyFields = c.campaigns.some((k) => k.fields.length > 0);
-  table(["Oplysninger der registreres", "Datakilde", "Opbevaring"], buildSection1Rows(c.campaigns), [5, 3, 3]);
+  const multi = c.multi_brand === true;
+  table(
+    multi ? ["Brand", "Oplysninger der registreres", "Datakilde", "Opbevaring"] : ["Oplysninger der registreres", "Datakilde", "Opbevaring"],
+    buildSection1Rows(c.campaigns, multi),
+    multi ? [1, 5, 3, 3] : [5, 3, 3],
+  );
   para("Oplysningerne hentes fra den angivne datakilde.");
   if (anyFields) {
     para(
