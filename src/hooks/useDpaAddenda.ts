@@ -425,3 +425,73 @@ export function useSetDpaCampaignDeviates() {
     onSuccess: () => qc.invalidateQueries({ queryKey: DEVIATIONS_KEY }),
   });
 }
+
+// ---- Aftalepart: juridisk part i tillægget, samler én eller flere Stork-kunder ----
+// Aftalepartens id er id'et på den kunde, den blev oprettet ud fra; versioner gemmes på det id (dpa_addenda.client_id).
+export type DpaParty = Database["public"]["Tables"]["dpa_parties"]["Row"];
+const PARTIES_KEY = ["dpa-parties"] as const;
+
+export function useDpaParties() {
+  return useQuery({
+    queryKey: PARTIES_KEY,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("dpa_parties").select("*");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useSaveDpaParty() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (party: Database["public"]["Tables"]["dpa_parties"]["Insert"]) => {
+      const { error } = await supabase.from("dpa_parties").upsert({ ...party, updated_by: user?.id ?? null }, { onConflict: "id" });
+      if (error) throw error;
+      // Ankerkunden peger altid på sin egen aftalepart.
+      const { error: pErr } = await supabase
+        .from("dpa_client_profiles")
+        .upsert({ client_id: party.id, party_id: party.id }, { onConflict: "client_id" });
+      if (pErr) throw pErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PARTIES_KEY });
+      qc.invalidateQueries({ queryKey: KEYS.profiles });
+    },
+  });
+}
+
+/** Flytter en kunde ind under en aftalepart (partyId) eller ud til sin egen (partyId = clientId). */
+export function useSetDpaClientParty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ clientId, partyId }: { clientId: string; partyId: string }) => {
+      if (partyId === clientId) {
+        const { error } = await supabase.from("dpa_parties").upsert({ id: clientId }, { onConflict: "id", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      const { error } = await supabase
+        .from("dpa_client_profiles")
+        .upsert({ client_id: clientId, party_id: partyId }, { onConflict: "client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PARTIES_KEY });
+      qc.invalidateQueries({ queryKey: KEYS.profiles });
+    },
+  });
+}
+
+export function useSaveDpaDisplayName() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ clientId, name }: { clientId: string; name: string }) => {
+      const { error } = await supabase
+        .from("dpa_client_profiles")
+        .upsert({ client_id: clientId, display_name: name.trim() || null }, { onConflict: "client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.profiles }),
+  });
+}
