@@ -495,3 +495,34 @@ export function useSaveDpaDisplayName() {
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.profiles }),
   });
 }
+
+/** Kopierer oplysninger, datakilde og opbevaring fra én kunde til en anden (erstatter målets standard). */
+export function useCopyDpaClientDefaults() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fromClientId, toClientId }: { fromClientId: string; toClientId: string }) => {
+      const [fieldsRes, profRes] = await Promise.all([
+        supabase.from("dpa_client_fields").select("business_label, description, sort_order").eq("client_id", fromClientId),
+        supabase.from("dpa_client_profiles").select("data_source, retention_text").eq("client_id", fromClientId).maybeSingle(),
+      ]);
+      if (fieldsRes.error) throw fieldsRes.error;
+      if (profRes.error) throw profRes.error;
+      const { error: delErr } = await supabase.from("dpa_client_fields").delete().eq("client_id", toClientId);
+      if (delErr) throw delErr;
+      const rows = (fieldsRes.data ?? []).map((f) => ({ ...f, client_id: toClientId }));
+      if (rows.length) {
+        const { error } = await supabase.from("dpa_client_fields").insert(rows);
+        if (error) throw error;
+      }
+      const { error } = await supabase.from("dpa_client_profiles").upsert(
+        { client_id: toClientId, data_source: profRes.data?.data_source ?? null, retention_text: profRes.data?.retention_text ?? null },
+        { onConflict: "client_id" },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CLIENT_FIELDS_KEY });
+      qc.invalidateQueries({ queryKey: KEYS.profiles });
+    },
+  });
+}
