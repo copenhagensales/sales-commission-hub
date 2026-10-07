@@ -109,7 +109,7 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     head: [["Kampagne", "Oplysninger der registreres", "Opbevaring"]],
     body: c.campaigns.map((k) => {
       if (k.fields.length > 0) {
-        return [k.name, k.fields.join(", "), !k.no_data_held && k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
+        return [k.name, k.fields.join(", "), k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
       }
       if (k.no_data_held) return [k.name, "Ingen persondata registreres", "—"];
       return [k.name, "—", k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
