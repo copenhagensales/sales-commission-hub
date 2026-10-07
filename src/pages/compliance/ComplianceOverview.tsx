@@ -173,6 +173,16 @@ export default function ComplianceOverview() {
       href: "/compliance/documents/client-agreements",
       permKey: "menu_compliance_admin",
     },
+    {
+      title: "Kundeaftaler – tillæg",
+      description:
+        "Tillæg (allonge) til databehandleraftalen pr. kunde som låst, versioneret PDF. Kun superadmin.",
+      icon: FileText,
+      badge: "Kunder",
+      badgeColor: "bg-sky-500/10 text-sky-700 border-sky-500/30",
+      href: "/compliance/dpa-addenda",
+      permKey: "menu_compliance_admin",
+    },
   ];
 
   const visibleDocuments = documents.filter((doc) => p.canView(doc.permKey));
