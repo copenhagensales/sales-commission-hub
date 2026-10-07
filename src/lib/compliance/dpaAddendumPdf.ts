@@ -178,12 +178,32 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     }
     y += PARA_GAP;
   };
-  const table = (head: string[], body: string[][], columnStyles: Record<number, { cellWidth: number }>) => {
+  /**
+   * Kolonnebredder: hver kolonne får mindst plads til sit længste ord (så ord ikke brydes midt i),
+   * resten fordeles efter vægte.
+   */
+  const colWidths = (head: string[], body: string[][], weights: number[], size: number, pad: number) => {
+    const longest = (t: string, bold: boolean) => {
+      doc.setFont(FONT, bold ? "bold" : "normal").setFontSize(size);
+      return Math.max(0, ...t.split(/\s+/).map((w) => doc.getTextWidth(w)));
+    };
+    const mins = head.map((h, i) => Math.max(longest(h, true), ...body.map((r) => longest(r[i] ?? "", false))) + pad * 2 + 0.6);
+    const minSum = mins.reduce((a, b) => a + b, 0);
+    const wSum = weights.reduce((a, b) => a + b, 0);
+    const rest = Math.max(0, TW - minSum);
+    const widths = mins.map((m, i) => m + (rest * weights[i]) / wSum);
+    const scale = TW / widths.reduce((a, b) => a + b, 0);
+    return Object.fromEntries(widths.map((w, i) => [i, { cellWidth: w * scale }])) as Record<number, { cellWidth: number }>;
+  };
+  const table = (head: string[], body: string[][], weights: number[], size = 8.5) => {
+    const pad = 2;
+    const rows = body.length ? body : [head.map(() => "–")];
+    const columnStyles = colWidths(head, rows, weights, size, pad);
     autoTable(doc, {
       startY: y,
       margin: { left: M, right: M, top: TOP, bottom: H - BOTTOM },
       head: [head],
-      body: body.length ? body : [head.map(() => "–")],
+      body: rows,
       theme: "grid",
       showHead: "everyPage",
       rowPageBreak: "avoid",
@@ -191,9 +211,9 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
       styles: {
         font: FONT,
         fontStyle: "normal",
-        fontSize: 8.5,
+        fontSize: size,
         textColor: INK,
-        cellPadding: { top: 2.2, bottom: 2.2, left: 2.2, right: 2.2 },
+        cellPadding: { top: 2.2, bottom: 2.2, left: pad, right: pad },
         lineColor: LINE,
         lineWidth: 0.15,
         valign: "top",
@@ -203,7 +223,7 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
       bodyStyles: { fillColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: ROW_ALT },
     });
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 7;
   };
 
   // Titel
@@ -235,11 +255,7 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   ensure(LH + 22); // indledning + tabelhoved + første række holdes samlet
   para("Databehandleren registrerer følgende oplysninger:");
   const anyFields = c.campaigns.some((k) => k.fields.length > 0);
-  table(["Oplysninger der registreres", "Datakilde", "Opbevaring"], buildSection1Rows(c.campaigns), {
-    0: { cellWidth: 74 },
-    1: { cellWidth: 50 },
-    2: { cellWidth: TW - 124 },
-  });
+  table(["Oplysninger der registreres", "Datakilde", "Opbevaring"], buildSection1Rows(c.campaigns), [5, 3, 3]);
   para("Oplysningerne hentes fra den angivne datakilde.");
   if (anyFields) {
     para(
@@ -263,13 +279,8 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   table(
     ["Navn", "CVR/registrering", "Behandling", "Lokation", "Overførselsgrundlag"],
     c.subprocessors.map((s) => [s.name, s.registration || "–", s.processing || "–", s.location || "–", s.transfer_basis || "–"]),
-    {
-      0: { cellWidth: 20 },
-      1: { cellWidth: 38 },
-      2: { cellWidth: 39 },
-      3: { cellWidth: 27 },
-      4: { cellWidth: TW - 124 },
-    },
+    [0, 3, 3, 1, 3],
+    8,
   );
 
   heading("3. Lokation og overførsel til tredjelande");
@@ -305,10 +316,8 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     doc.setFont(FONT, "bold").setFontSize(10).setTextColor(...INK).text(title, x, yy);
     yy += 5;
     doc.setFont(FONT, "normal").setFontSize(9).setTextColor(...INK);
-    partyLines(party).forEach((l) => {
-      doc.text(l, x, yy);
-      yy += 4.5;
-    });
+    partyLines(party).forEach((l, i) => doc.text(l, x, yy + i * 4.5));
+    yy += maxParty * 4.5;
     for (const label of ["Navn:", "Dato:", "Underskrift:"]) {
       yy += 13;
       doc.setFont(FONT, "normal").setFontSize(9).setTextColor(...INK).text(label, x, yy - 1.2);
