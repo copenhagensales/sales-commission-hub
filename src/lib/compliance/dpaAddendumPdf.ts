@@ -104,7 +104,6 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   );
   para("Databehandleren registrerer følgende oplysninger pr. kampagne:");
   const anyFields = c.campaigns.some((k) => k.fields.length > 0);
-  para("Oplysningerne hentes fra den kilde, der er angivet for kampagnen.");
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
@@ -117,6 +116,7 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     alternateRowStyles: { fillColor: [245, 246, 247] },
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
+  para("Oplysningerne hentes fra den kilde, der er angivet for kampagnen.");
   if (anyFields) {
     para(
       "Oplysningerne opbevares i det antal dage, der er angivet for kampagnen, og anonymiseres herefter irreversibelt. " +
