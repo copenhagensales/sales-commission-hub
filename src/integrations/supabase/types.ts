@@ -5830,6 +5830,156 @@ export type Database = {
           },
         ]
       }
+      dpa_addenda: {
+        Row: {
+          approved_at: string | null
+          approved_contact: string | null
+          client_id: string
+          content: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          pdf_path: string
+          rejected_at: string | null
+          sent_at: string | null
+          signed_pdf_path: string | null
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_contact?: string | null
+          client_id: string
+          content: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pdf_path: string
+          rejected_at?: string | null
+          sent_at?: string | null
+          signed_pdf_path?: string | null
+          status?: string
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_contact?: string | null
+          client_id?: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pdf_path?: string
+          rejected_at?: string | null
+          sent_at?: string | null
+          signed_pdf_path?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_addenda_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dpa_campaign_fields: {
+        Row: {
+          business_label: string
+          client_campaign_id: string
+          created_at: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          business_label: string
+          client_campaign_id: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          business_label?: string
+          client_campaign_id?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_campaign_fields_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dpa_client_profiles: {
+        Row: {
+          address: string | null
+          approval_form: string | null
+          client_id: string
+          created_at: string
+          cvr: string | null
+          is_active: boolean
+          legal_name: string | null
+          notice_days: number | null
+          original_date: string | null
+          original_title: string | null
+          other_changes: string | null
+          subprocessor_ids: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address?: string | null
+          approval_form?: string | null
+          client_id: string
+          created_at?: string
+          cvr?: string | null
+          is_active?: boolean
+          legal_name?: string | null
+          notice_days?: number | null
+          original_date?: string | null
+          original_title?: string | null
+          other_changes?: string | null
+          subprocessor_ids?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address?: string | null
+          approval_form?: string | null
+          client_id?: string
+          created_at?: string
+          cvr?: string | null
+          is_active?: boolean
+          legal_name?: string | null
+          notice_days?: number | null
+          original_date?: string | null
+          original_title?: string | null
+          other_changes?: string | null
+          subprocessor_ids?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_client_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dpa_documents: {
         Row: {
           content_type: string | null
@@ -5863,6 +6013,42 @@ export type Database = {
           storage_path?: string
           uploaded_by?: string | null
           vendor?: string
+        }
+        Relationships: []
+      }
+      dpa_subprocessors: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          processing: string | null
+          registration: string | null
+          sort_order: number
+          transfer_basis: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          processing?: string | null
+          registration?: string | null
+          sort_order?: number
+          transfer_basis?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          processing?: string | null
+          registration?: string | null
+          sort_order?: number
+          transfer_basis?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

@@ -255,6 +255,7 @@ export const ComplianceBackupPolicy = lazyPage(() => import("@/pages/compliance/
 export const ComplianceProcessingRegistry = lazyPage(() => import("@/pages/compliance/ProcessingRegistry"));
 export const ComplianceDpaOverview = lazyPage(() => import("@/pages/compliance/DpaOverview"));
 export const ComplianceClientAgreements = lazyPage(() => import("@/pages/compliance/ClientAgreements"));
+export const ComplianceDpaAddenda = lazyPage(() => import("@/pages/compliance/DpaAddenda"));
 
 export const ShortLinkRedirect = lazyPage(() => import("@/pages/ShortLinkRedirect"));
 export const MenuEditor = lazyPage(() => import("@/pages/MenuEditor"));
