@@ -14,6 +14,8 @@ export interface DpaAddendumContent {
     /** Datakilde (fritekst). Valgfri for bagudkompatibilitet med ældre versioner. */
     data_source?: string | null;
     retention_days: number | null;
+    /** Manuel opbevaringstekst; bruges 1:1 frem for retention_days. Valgfri for ældre versioner. */
+    retention_text?: string | null;
     missing_retention: boolean;
   }>;
   subprocessors: Array<{
@@ -38,20 +40,26 @@ export const HOSTING_TEXT = "Supabase, EU-regionen Paris (eu-west-3)";
 /**
  * Rækker til afsnit 1 uden kampagnenavne. Identiske rækker slås sammen; rækker med samme
  * oplysninger og datakilde men forskellig (kendt) opbevaring vises som "X–Y dage afhængigt af aktivitet".
+ * En manuel opbevaringstekst bruges 1:1 og er selv en del af sammenligningen.
  */
 export function buildSection1Rows(campaigns: DpaAddendumContent["campaigns"]): string[][] {
-  const groups = new Map<string, { fields: string; source: string; days: Array<number | null> }>();
+  const groups = new Map<string, { fields: string; source: string; manual: string | null; days: Array<number | null> }>();
   for (const k of campaigns) {
     if (k.fields.length === 0) continue;
     const fields = k.fields.join(", ");
     const source = k.data_source?.trim() || "—";
-    const key = `${fields}\u0000${source}`;
-    const g = groups.get(key) ?? { fields, source, days: [] };
+    const manual = k.retention_text?.trim() || null;
+    const key = `${fields}\u0000${source}\u0000${manual ?? "\u0001auto"}`;
+    const g = groups.get(key) ?? { fields, source, manual, days: [] };
     if (!g.days.includes(k.retention_days)) g.days.push(k.retention_days);
     groups.set(key, g);
   }
   const rows: string[][] = [];
   for (const g of groups.values()) {
+    if (g.manual) {
+      rows.push([g.fields, g.source, g.manual]);
+      continue;
+    }
     const known = g.days.filter((d): d is number => d != null).sort((a, b) => a - b);
     const hasUnknown = g.days.some((d) => d == null);
     if (known.length > 1) {

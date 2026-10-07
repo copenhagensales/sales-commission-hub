@@ -5950,6 +5950,38 @@ export type Database = {
           },
         ]
       }
+      dpa_campaign_retention_texts: {
+        Row: {
+          client_campaign_id: string
+          created_at: string
+          retention_text: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_campaign_id: string
+          created_at?: string
+          retention_text: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          client_campaign_id?: string
+          created_at?: string
+          retention_text?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dpa_campaign_retention_texts_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: true
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dpa_campaign_sources: {
         Row: {
           client_campaign_id: string

@@ -21,6 +21,8 @@ import {
   useDpaCampaignExclusions,
   useDpaCampaignSources,
   useSaveDpaCampaignSource,
+  useDpaCampaignRetentionTexts,
+  useSaveDpaCampaignRetentionText,
   useSetDpaCampaignIncluded,
   useDpaAddendaVersions,
   useDpaCampaignFields,
@@ -77,6 +79,7 @@ function DpaAddendaContent() {
   const { data: base, isLoading } = useDpaClientsAndCampaigns();
   const { data: profiles = [] } = useDpaClientProfiles();
   const { data: versions = [] } = useDpaAddendaVersions();
+  const { data: retentionTexts = new Map<string, string>() } = useDpaCampaignRetentionTexts();
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -118,7 +121,7 @@ function DpaAddendaContent() {
                 const v = versions.filter((x) => x.client_id === c.id);
                 const latest = v[0];
                 const camps = base.campaigns.filter((k) => k.client_id === c.id);
-                const missing = camps.some((k) => !k.has_retention);
+                const missing = camps.some((k) => !k.has_retention && !retentionTexts.get(k.id));
                 const inactive = profileMap.get(c.id)?.is_active === false;
                 return (
                   <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelected(c.id)}>
@@ -210,6 +213,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const { data: allVersions = [] } = useDpaAddendaVersions();
   const { data: excluded = new Set<string>() } = useDpaCampaignExclusions();
   const { data: sources = new Map<string, string>() } = useDpaCampaignSources();
+  const { data: retentionTexts = new Map<string, string>() } = useDpaCampaignRetentionTexts();
   const saveProfile = useSaveDpaClientProfile();
   const generate = useGenerateDpaAddendum();
 
@@ -232,9 +236,10 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const campaigns = allCampaigns.filter((k) => !excluded.has(k.id));
   const noFields = campaigns.filter((k) => !fields.some((f) => f.client_campaign_id === k.id));
   const versions = allVersions.filter((v) => v.client_id === client.id);
-  const missingRetention = campaigns.filter((k) => !k.has_retention);
+  // En manuel opbevaringstekst erstatter politikken i tillægget, så kampagnen advares ikke.
+  const missingRetention = campaigns.filter((k) => !k.has_retention && !retentionTexts.get(k.id));
   const fieldsConflict = campaigns.filter(
-    (k) => k.has_retention && fields.some((f) => f.client_campaign_id === k.id) && k.retention_days == null,
+    (k) => k.has_retention && !retentionTexts.get(k.id) && fields.some((f) => f.client_campaign_id === k.id) && k.retention_days == null,
   );
 
   const toRow = (): DpaClientProfile => ({
@@ -292,6 +297,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
             .map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
           data_source: sources.get(k.id) ?? null,
           retention_days: k.retention_days,
+          retention_text: retentionTexts.get(k.id) ?? null,
           missing_retention: !k.has_retention,
         })),
         subprocessors: subs
@@ -392,7 +398,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         <CardContent className="space-y-3">
           {allCampaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
           {allCampaigns.map((k) => (
-            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} source={sources.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
+            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} source={sources.get(k.id) ?? ""} retentionText={retentionTexts.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
           ))}
           <p className="text-xs text-muted-foreground">
             Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
@@ -419,12 +425,14 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, included, source, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; source: string; labels: { id: string; business_label: string; description: string | null }[] }) {
+function CampaignFields({ campaign, included, source, retentionText, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
   const setIncluded = useSetDpaCampaignIncluded();
   const saveSource = useSaveDpaCampaignSource();
+  const saveRetention = useSaveDpaCampaignRetentionText();
   const [src, setSrc] = useState(source);
+  const [ret, setRet] = useState(retentionText);
   const [label, setLabel] = useState("");
   const [desc, setDesc] = useState("");
   return (
@@ -465,7 +473,21 @@ function CampaignFields({ campaign, included, source, labels }: { campaign: { id
             saveSource.mutate({ campaignId: campaign.id, source: src }, { onSuccess: () => toast.success("Datakilde gemt"), onError: (e) => toast.error(errMsg(e)) });
           }}
         />
+        <Label className="text-xs shrink-0">Opbevaring (tekst i tillægget)</Label>
+        <Input
+          className="h-8"
+          placeholder="Tom = beregnes fra slettepolitikken"
+          value={ret}
+          onChange={(e) => setRet(e.target.value)}
+          onBlur={() => {
+            if (ret.trim() === retentionText.trim()) return;
+            saveRetention.mutate({ campaignId: campaign.id, text: ret }, { onSuccess: () => toast.success("Opbevaring gemt"), onError: (e) => toast.error(errMsg(e)) });
+          }}
+        />
       </div>
+      <p className="text-xs text-muted-foreground text-right">
+        Slettepolitik i Stork: {campaign.has_retention && campaign.retention_days != null ? `${campaign.retention_days} dage` : "ingen politik"}
+      </p>
       <form
         className="flex gap-2"
         onSubmit={(e) => {
