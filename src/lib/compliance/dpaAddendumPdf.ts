@@ -251,13 +251,14 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   para(
     "Stork er Copenhagen Sales' eget interne system, som er udviklet til og alene anvendes af Copenhagen Sales. " +
       "Systemet anvendes til registrering af gennemførte salg og møder, beregning af provision til Copenhagen Sales' medarbejdere " +
-      "samt afregning og afstemning af annulleringer med den dataansvarlige. Stork modtager ikke kontaktlister eller leads, " +
-      "men alene oplysninger om gennemførte salg og møder. Systemet er ikke tilgængeligt for tredjeparter, og adgang sker " +
+      "samt afregning og afstemning af annulleringer med den dataansvarlige. Stork modtager ikke kontaktlister, " +
+      "men alene oplysninger om gennemførte salg og møder samt opkaldsstatistik. Systemet er ikke tilgængeligt for tredjeparter, og adgang sker " +
       "udelukkende for Copenhagen Sales' medarbejdere via personligt Microsoft-login og er begrænset efter rolle.",
   );
   para(
     "Behandlingen i Stork omfatter alene den dataansvarliges kunder og medlemmer, som har indgået aftale eller booket møde " +
-      "via databehandleren. Oplysninger om øvrige kontakter på den dataansvarliges lister overføres ikke til Stork.",
+      "via databehandleren. For øvrige kontakter, der er ringet op, registreres alene et teknisk lead-id sammen med opkaldsstatistik. " +
+      "Det fjernes sammen med de øvrige oplysninger efter den angivne periode.",
   );
   para(
     "Databehandleren registrerer oplysninger i afregningssystemet Stork med det formål at foretage afregning, " +
