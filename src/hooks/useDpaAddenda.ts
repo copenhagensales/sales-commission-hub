@@ -346,3 +346,82 @@ export function useDownloadDpaFile() {
     },
   });
 }
+
+// ---- Kundeniveau: standard for felter, datakilde og opbevaring ----
+export type DpaClientField = Database["public"]["Tables"]["dpa_client_fields"]["Row"];
+const CLIENT_FIELDS_KEY = ["dpa-client-fields"] as const;
+const DEVIATIONS_KEY = ["dpa-campaign-deviations"] as const;
+
+export function useDpaClientFields() {
+  return useQuery({
+    queryKey: CLIENT_FIELDS_KEY,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("dpa_client_fields").select("*").order("sort_order").order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useAddDpaClientField() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ clientId, label, description }: { clientId: string; label: string; description?: string }) => {
+      const { error } = await supabase
+        .from("dpa_client_fields")
+        .insert({ client_id: clientId, business_label: label.trim(), description: description?.trim() || null });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLIENT_FIELDS_KEY }),
+  });
+}
+
+export function useRemoveDpaClientField() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("dpa_client_fields").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLIENT_FIELDS_KEY }),
+  });
+}
+
+/** Gemmer kundens standard-datakilde eller -opbevaringstekst (tom = null). */
+export function useSaveDpaClientDefault() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ clientId, key, value }: { clientId: string; key: "data_source" | "retention_text"; value: string }) => {
+      const { error } = await supabase
+        .from("dpa_client_profiles")
+        .upsert({ client_id: clientId, [key]: value.trim() || null }, { onConflict: "client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.profiles }),
+  });
+}
+
+/** Kampagner der afviger fra kundens standard (standard = følger kunden). */
+export function useDpaCampaignDeviations() {
+  return useQuery({
+    queryKey: DEVIATIONS_KEY,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("dpa_campaign_deviations").select("client_campaign_id, deviates");
+      if (error) throw error;
+      return new Set((data ?? []).filter((r) => r.deviates).map((r) => r.client_campaign_id));
+    },
+  });
+}
+
+export function useSetDpaCampaignDeviates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ campaignId, deviates }: { campaignId: string; deviates: boolean }) => {
+      const { error } = await supabase
+        .from("dpa_campaign_deviations")
+        .upsert({ client_campaign_id: campaignId, deviates, updated_at: new Date().toISOString() }, { onConflict: "client_campaign_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: DEVIATIONS_KEY }),
+  });
+}
