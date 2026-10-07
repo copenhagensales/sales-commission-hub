@@ -24,7 +24,6 @@ export interface DpaCampaign {
   name: string;
   retention_days: number | null;
   cleanup_mode: string | null;
-  no_data_held: boolean | null;
   has_retention: boolean;
 }
 
@@ -34,6 +33,7 @@ const KEYS = {
   fields: ["dpa-campaign-fields"] as const,
   subprocessors: ["dpa-subprocessors"] as const,
   versions: ["dpa-addenda-versions"] as const,
+  exclusions: ["dpa-campaign-exclusions"] as const,
 };
 
 /** Kunder + kampagner + aktive retentionspolitikker (kun metadata). */
@@ -46,7 +46,7 @@ export function useDpaClientsAndCampaigns() {
         supabase.from("client_campaigns").select("id, client_id, name").order("name"),
         supabase
           .from("campaign_retention_policies")
-          .select("client_campaign_id, retention_days, cleanup_mode, no_data_held")
+          .select("client_campaign_id, retention_days, cleanup_mode")
           .eq("is_active", true),
       ]);
       if (clientsRes.error) throw clientsRes.error;
@@ -60,10 +60,8 @@ export function useDpaClientsAndCampaigns() {
           client_id: c.client_id,
           name: c.name,
           // Samme regel som oprydningsjobbet (gdpr-data-cleanup): aktiv politik med retention_days > 0.
-          // no_data_held betyder "ingen dialer-data" på Slettepolitikker og påvirker ikke perioden.
           retention_days: r?.retention_days && r.retention_days > 0 ? r.retention_days : null,
           cleanup_mode: r?.cleanup_mode ?? null,
-          no_data_held: r?.no_data_held ?? null,
           has_retention: !!r,
         };
       });
@@ -103,6 +101,31 @@ export function useDpaCampaignFields() {
       if (error) throw error;
       return data ?? [];
     },
+  });
+}
+
+/** Kampagner fravalgt i tillægget (standard = medtag). */
+export function useDpaCampaignExclusions() {
+  return useQuery({
+    queryKey: KEYS.exclusions,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("dpa_campaign_exclusions").select("client_campaign_id");
+      if (error) throw error;
+      return new Set((data ?? []).map((r) => r.client_campaign_id));
+    },
+  });
+}
+
+export function useSetDpaCampaignIncluded() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ campaignId, included }: { campaignId: string; included: boolean }) => {
+      const { error } = included
+        ? await supabase.from("dpa_campaign_exclusions").delete().eq("client_campaign_id", campaignId)
+        : await supabase.from("dpa_campaign_exclusions").insert({ client_campaign_id: campaignId });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.exclusions }),
   });
 }
 

@@ -12,7 +12,6 @@ export interface DpaAddendumContent {
     name: string;
     fields: string[];
     retention_days: number | null;
-    no_data_held: boolean;
     missing_retention: boolean;
   }>;
   subprocessors: Array<{
@@ -107,13 +106,9 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
     startY: y,
     margin: { left: M, right: M },
     head: [["Kampagne", "Oplysninger der registreres", "Opbevaring"]],
-    body: c.campaigns.map((k) => {
-      if (k.fields.length > 0) {
-        return [k.name, k.fields.join(", "), k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
-      }
-      if (k.no_data_held) return [k.name, "Ingen persondata registreres", "—"];
-      return [k.name, "—", k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"];
-    }),
+    body: c.campaigns
+      .filter((k) => k.fields.length > 0)
+      .map((k) => [k.name, k.fields.join(", "), k.retention_days != null ? `${k.retention_days} dage` : "Ikke fastsat"]),
     styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: 2 },
     headStyles: { fillColor: INK, textColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [245, 246, 247] },
