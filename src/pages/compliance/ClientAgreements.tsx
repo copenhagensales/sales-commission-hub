@@ -87,23 +87,29 @@ export default function ClientAgreements() {
   const docsFor = (clientId: string, docType: ClientAgreementType) =>
     documents.filter((d) => d.client_id === clientId && d.doc_type === docType);
 
-  const handleFile = async (
+  const handleFiles = async (
     clientId: string,
     docType: ClientAgreementType,
-    file: File | undefined
+    fileList: FileList | null
   ) => {
-    if (!file) return;
-    if (file.size > 25 * 1024 * 1024) {
-      toast.error("Filen er for stor. Maks. 25 MB.");
-      return;
-    }
+    const files = Array.from(fileList ?? []);
+    if (files.length === 0) return;
     const key = `${clientId}-${docType}`;
+    const tooBig = files.filter((f) => f.size > 25 * 1024 * 1024);
+    if (tooBig.length) toast.error(`For store (maks. 25 MB): ${tooBig.map((f) => f.name).join(", ")}`);
+    const ok = files.filter((f) => f.size <= 25 * 1024 * 1024);
     setBusyKey(key);
+    let success = 0;
     try {
-      await upload.mutateAsync({ clientId, docType, file });
-      toast.success(`${TYPE_LABEL[docType]} arkiveret`);
-    } catch {
-      toast.error("Filen kunne ikke uploades");
+      for (const file of ok) {
+        try {
+          await upload.mutateAsync({ clientId, docType, file });
+          success++;
+        } catch {
+          toast.error(`${file.name} kunne ikke uploades`);
+        }
+      }
+      if (success) toast.success(`${success} fil${success > 1 ? "er" : ""} arkiveret`);
     } finally {
       setBusyKey(null);
       const input = inputRefs.current[key];
@@ -187,8 +193,9 @@ export default function ClientAgreements() {
                 inputRefs.current[key] = el;
               }}
               type="file"
+              multiple
               className="hidden"
-              onChange={(e) => handleFile(clientId, docType, e.target.files?.[0])}
+              onChange={(e) => handleFiles(clientId, docType, e.target.files)}
             />
             <Button
               variant="outline"
@@ -198,7 +205,7 @@ export default function ClientAgreements() {
               onClick={() => inputRefs.current[key]?.click()}
             >
               <Upload className="h-3.5 w-3.5 mr-1.5" />
-              {busyKey === key ? "Uploader..." : "Upload fil"}
+              {busyKey === key ? "Uploader..." : docs.length > 0 ? "Tilføj flere filer" : "Upload filer"}
             </Button>
           </>
         )}
