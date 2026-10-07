@@ -16,7 +16,7 @@ export type DpaSubprocessor = Database["public"]["Tables"]["dpa_subprocessors"][
 export type DpaClientProfile = Database["public"]["Tables"]["dpa_client_profiles"]["Row"];
 export type DpaCampaignField = Database["public"]["Tables"]["dpa_campaign_fields"]["Row"];
 export type DpaAddendum = Database["public"]["Tables"]["dpa_addenda"]["Row"];
-export type DpaAddendumStatus = "draft" | "sent" | "approved" | "rejected";
+export type DpaAddendumStatus = "draft" | "sent" | "approved" | "rejected" | "superseded";
 
 export interface DpaCampaign {
   id: string;
@@ -193,10 +193,20 @@ export function useGenerateDpaAddendum() {
 export function useUpdateDpaAddendumStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (patch: Pick<DpaAddendum, "id"> & Partial<Pick<DpaAddendum, "status" | "sent_at" | "approved_at" | "approved_contact" | "rejected_at">>) => {
-      const { id, ...rest } = patch;
+    mutationFn: async (patch: Pick<DpaAddendum, "id"> & { client_id?: string } & Partial<Pick<DpaAddendum, "status" | "sent_at" | "approved_at" | "approved_contact" | "rejected_at">>) => {
+      const { id, client_id, ...rest } = patch;
       const { error } = await supabase.from("dpa_addenda").update(rest).eq("id", id);
       if (error) throw error;
+      // En ny godkendt version erstatter tidligere godkendte versioner for samme kunde.
+      if (rest.status === "approved" && client_id) {
+        const { error: supErr } = await supabase
+          .from("dpa_addenda")
+          .update({ status: "superseded" })
+          .eq("client_id", client_id)
+          .eq("status", "approved")
+          .neq("id", id);
+        if (supErr) throw supErr;
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.versions }),
   });
