@@ -12,17 +12,38 @@ export function useGeoLoginGuard() {
   const checked = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    const isUnauthorized = (err: unknown) =>
+      (err as { context?: { status?: number } } | null)?.context?.status === 401;
+
     const validate = async (userId: string) => {
       if (checked.current.has(userId)) return;
       checked.current.add(userId);
-      const { data, error } = await supabase.functions.invoke("geo-login-guard");
-      if (!error && data?.allowed === true) return;
-      checked.current.delete(userId);
-      await supabase.auth.signOut();
-      toast.error("Login afvist", {
-        description: data?.message || "Stork kan kun bruges fra EU/EØS",
-        duration: 12000,
-      });
+      try {
+        let res = await supabase.functions.invoke("geo-login-guard");
+        // Udløbet/forældet token ved app-åbning: forny én gang og prøv igen.
+        if (res.error && isUnauthorized(res.error)) {
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            checked.current.delete(userId);
+            await supabase.auth.signOut();
+            return;
+          }
+          res = await supabase.functions.invoke("geo-login-guard");
+        }
+        const { data, error } = res;
+        if (!error && data?.allowed === true) return;
+        checked.current.delete(userId);
+        await supabase.auth.signOut();
+        if (error && isUnauthorized(error)) return; // ugyldig session, ikke geo-afvisning
+        toast.error("Login afvist", {
+          description: data?.message || "Stork kan kun bruges fra EU/EØS",
+          duration: 12000,
+        });
+      } catch {
+        checked.current.delete(userId);
+        await supabase.auth.signOut();
+        toast.error("Login afvist", { description: "Stork kan kun bruges fra EU/EØS", duration: 12000 });
+      }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
