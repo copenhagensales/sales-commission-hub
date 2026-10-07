@@ -169,27 +169,33 @@ function SubprocessorRow({ sub }: { sub: DpaSubprocessor }) {
     location: sub.location ?? "",
     transfer_basis: sub.transfer_basis ?? "",
   });
+  const saved = {
+    registration: sub.registration ?? "",
+    processing: sub.processing ?? "",
+    location: sub.location ?? "",
+    transfer_basis: sub.transfer_basis ?? "",
+  };
+  const dirty = (Object.keys(saved) as (keyof typeof saved)[]).some((k) => saved[k] !== v[k]);
+  // Gemmer automatisk, når man forlader et felt.
+  const persist = () => {
+    if (!dirty || save.isPending) return;
+    save.mutate(
+      { id: sub.id, registration: v.registration.trim() || null, processing: v.processing.trim() || null, location: v.location.trim() || null, transfer_basis: v.transfer_basis.trim() || null },
+      { onSuccess: () => toast.success(`${sub.name} gemt`), onError: (e) => toast.error(errMsg(e)) },
+    );
+  };
   return (
     <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end border-b pb-3">
       <div className="font-medium">{sub.name}</div>
       {(["registration", "processing", "location", "transfer_basis"] as const).map((k) => (
         <div key={k}>
           <Label className="text-xs">{{ registration: "CVR/registrering", processing: "Behandling", location: "Lokation", transfer_basis: "Overførselsgrundlag" }[k]}</Label>
-          <Input value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+          <Input value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} onBlur={persist} />
         </div>
       ))}
-      <Button
-        size="sm"
-        disabled={save.isPending}
-        onClick={() =>
-          save.mutate(
-            { id: sub.id, registration: v.registration || null, processing: v.processing || null, location: v.location || null, transfer_basis: v.transfer_basis || null },
-            { onSuccess: () => toast.success(`${sub.name} gemt`), onError: (e) => toast.error(errMsg(e)) },
-          )
-        }
-      >
-        Gem
-      </Button>
+      <span className={`text-xs ${dirty ? "text-destructive" : "text-muted-foreground"}`}>
+        {save.isPending ? "Gemmer…" : dirty ? "Ikke gemt" : "Gemt"}
+      </span>
     </div>
   );
 }
