@@ -217,6 +217,9 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const campaigns = (base?.campaigns ?? []).filter((k) => k.client_id === client.id);
   const versions = allVersions.filter((v) => v.client_id === client.id);
   const missingRetention = campaigns.filter((k) => !k.has_retention);
+  const fieldsConflict = campaigns.filter(
+    (k) => k.has_retention && fields.some((f) => f.client_campaign_id === k.id) && (k.no_data_held === true || k.retention_days == null),
+  );
 
   const toRow = (): DpaClientProfile => ({
     client_id: client.id,
@@ -239,8 +242,8 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
     !p.legal_name.trim() && "juridisk navn",
     !p.cvr.trim() && "CVR",
     !p.address.trim() && "adresse",
-    !p.original_title.trim() && "oprindelig aftales titel",
-    !p.original_date && "oprindelig aftales dato",
+    !p.original_title.trim() && "databehandleraftalens titel",
+    !p.original_date && "databehandleraftalens dato",
     !p.approval_form && "godkendelsesform",
     p.approval_form === "general" && !p.notice_days && "varselsperiode",
     p.subprocessor_ids.length === 0 && "underdatabehandlere",
