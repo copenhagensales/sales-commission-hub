@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791380275543,
+      "tag": "0000_eea_login_geo_guard",
+      "breakpoints": true
+    }
+  ]
+}

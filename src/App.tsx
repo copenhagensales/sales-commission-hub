@@ -79,10 +79,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { useMgTestRealtimeSync } from "@/hooks/useMgTestRealtimeSync";
 import { useMicrosoftLoginGuard } from "@/hooks/useMicrosoftLoginGuard";
+import { useGeoLoginGuard } from "@/hooks/useGeoLoginGuard";
 
 const RealtimeListeners = () => {
   useMgTestRealtimeSync();
   useMicrosoftLoginGuard();
+  useGeoLoginGuard();
   return null;
 };
 
