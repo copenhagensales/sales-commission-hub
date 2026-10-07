@@ -18393,6 +18393,10 @@ export type Database = {
       }
       generate_access_code: { Args: never; Returns: string }
       geo_eea_activate_batch: { Args: { _batch: string }; Returns: number }
+      geo_eea_ingest_chunk: {
+        Args: { _batch: string; _csv: string }
+        Returns: number
+      }
       geo_ip_in_eea: { Args: { _ip: string }; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {

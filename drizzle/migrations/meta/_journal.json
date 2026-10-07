@@ -8,6 +8,13 @@
       "when": 1791380275543,
       "tag": "0000_eea_login_geo_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791380601497,
+      "tag": "0001_eea_ingest_chunk",
+      "breakpoints": true
     }
   ]
 }
