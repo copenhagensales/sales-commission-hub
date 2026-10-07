@@ -59,7 +59,9 @@ export function useDpaClientsAndCampaigns() {
           id: c.id,
           client_id: c.client_id,
           name: c.name,
-          retention_days: r?.retention_days ?? null,
+          // Samme regel som oprydningsjobbet (gdpr-data-cleanup): aktiv politik med retention_days > 0.
+          // no_data_held betyder "ingen dialer-data" på Slettepolitikker og påvirker ikke perioden.
+          retention_days: r?.retention_days && r.retention_days > 0 ? r.retention_days : null,
           cleanup_mode: r?.cleanup_mode ?? null,
           no_data_held: r?.no_data_held ?? null,
           has_retention: !!r,

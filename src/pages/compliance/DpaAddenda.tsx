@@ -219,7 +219,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const versions = allVersions.filter((v) => v.client_id === client.id);
   const missingRetention = campaigns.filter((k) => !k.has_retention);
   const fieldsConflict = campaigns.filter(
-    (k) => k.has_retention && fields.some((f) => f.client_campaign_id === k.id) && (k.no_data_held === true || k.retention_days == null),
+    (k) => k.has_retention && fields.some((f) => f.client_campaign_id === k.id) && k.retention_days == null,
   );
 
   const toRow = (): DpaClientProfile => ({
@@ -313,7 +313,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {fieldsConflict.map((k) => k.name).join(", ")}: Kampagnen har persondatafelter, men retentionspolitikken siger ingen data / mangler periode — opbevaringen er ikke fastsat.
+            {fieldsConflict.map((k) => k.name).join(", ")}: Kampagnen har persondatafelter, men retentionspolitikken mangler periode — opbevaringen er ikke fastsat.
           </AlertDescription>
         </Alert>
       )}
@@ -403,7 +403,7 @@ function CampaignFields({ campaign, labels }: { campaign: { id: string; name: st
       <div className="flex justify-between text-sm">
         <span className="font-medium">{campaign.name}</span>
         <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
-          {!campaign.has_retention ? "Mangler opbevaringspolitik" : campaign.no_data_held ? "Ingen persondata" : `${campaign.retention_days} dage → irreversibel anonymisering`}
+          {!campaign.has_retention ? "Mangler opbevaringspolitik" : campaign.retention_days == null ? "Periode ikke fastsat" : `${campaign.retention_days} dage → irreversibel anonymisering`}{campaign.no_data_held ? " · ingen dialer-data" : ""}
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
