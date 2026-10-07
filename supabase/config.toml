@@ -261,3 +261,6 @@ verify_jwt = false
 
 [functions.weekly-lead-closure-report]
 verify_jwt = false
+
+[functions.schema-introspect]
+verify_jwt = false
