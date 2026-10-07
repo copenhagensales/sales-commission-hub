@@ -35,6 +35,42 @@ export const PROCESSOR = {
 
 export const HOSTING_TEXT = "Supabase, EU-regionen Paris (eu-west-3)";
 
+/** Dansk opremsning: "A", "A og B", "A, B og C". */
+function joinDa(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} og ${items[items.length - 1]}`;
+}
+
+/** Afsnit 3 bygges ud fra de underdatabehandlere, der er valgt for kunden. */
+export function buildSection3Paragraphs(selectedNames: string[]): string[] {
+  const has = (n: string) => selectedNames.some((s) => s.trim().toLowerCase() === n.toLowerCase());
+  const ms = has("Microsoft");
+  const sb = has("Supabase");
+  const lv = has("Lovable");
+  const out = [
+    "Databehandlerens database hostes hos Supabase i EU-regionen Paris (eu-west-3), og oplysningerne opbevares i EU/EØS.",
+  ];
+  const us = [ms && "Microsoft", sb && "Supabase"].filter(Boolean) as string[];
+  if (us.length) {
+    out.push(
+      `Flere af databehandlerens underdatabehandlere er amerikanske selskaber. Hos ${joinDa(us)} kan begrænset supportadgang fra USA ikke udelukkes.`,
+    );
+  }
+  if (lv) {
+    out.push(
+      "Databehandlerens udviklingsplatform Lovable kan i forbindelse med udvikling, fejlsøgning og drift af afregningssystemet få adgang til oplysninger fra USA.",
+    );
+  }
+  const scc = [ms && "Microsoft", sb && "Supabase", lv && "Lovable"].filter(Boolean) as string[];
+  if (scc.length) {
+    const dpf = ms ? "EU-US Data Privacy Framework (art. 45) for Microsoft og " : "";
+    out.push(
+      `Overførslerne sker på grundlag af ${dpf}EU-Kommissionens standardkontraktbestemmelser (art. 46) for ${joinDa(scc)}, jf. de respektive underdatabehandleres databehandleraftaler, som kan rekvireres hos databehandleren.`,
+    );
+  }
+  return out;
+}
+
 // Brandfarver (fra designsystemet: mørk skifer + grøn accent)
 const INK: [number, number, number] = [47, 50, 55];
 const ACCENT: [number, number, number] = [52, 215, 127];
@@ -147,8 +183,8 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
 
-  heading("3. Præcisering af lokation");
-  para(`Databehandlerens database hostes hos ${c.hosting}. Oplysningerne forbliver i EU/EØS.`);
+  heading("3. Lokation og overførsel til tredjelande");
+  buildSection3Paragraphs(c.subprocessors.map((s) => s.name)).forEach((p) => para(p));
 
   let n = 4;
   if (c.other_changes && c.other_changes.trim()) {
