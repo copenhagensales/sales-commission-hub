@@ -279,7 +279,7 @@ export function generateDpaAddendumPdf(c: DpaAddendumContent): Blob {
   table(
     ["Navn", "CVR/registrering", "Behandling", "Lokation", "Overførselsgrundlag"],
     c.subprocessors.map((s) => [s.name, s.registration || "–", s.processing || "–", s.location || "–", s.transfer_basis || "–"]),
-    [0, 3, 3, 1, 3],
+    [0, 4, 3, 1, 4],
     8,
   );
 
