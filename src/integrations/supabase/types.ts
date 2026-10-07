@@ -5894,6 +5894,7 @@ export type Database = {
           business_label: string
           client_campaign_id: string
           created_at: string
+          description: string | null
           id: string
           sort_order: number
         }
@@ -5901,6 +5902,7 @@ export type Database = {
           business_label: string
           client_campaign_id: string
           created_at?: string
+          description?: string | null
           id?: string
           sort_order?: number
         }
@@ -5908,6 +5910,7 @@ export type Database = {
           business_label?: string
           client_campaign_id?: string
           created_at?: string
+          description?: string | null
           id?: string
           sort_order?: number
         }
