@@ -149,8 +149,10 @@ export default function ProcessingRegistry() {
               mangler arkivering (tjek onboarding-dokumenter / rekvirér).
             </li>
             <li>
-              Tidligere datakilde: den dataansvarliges (Trygs) eget dialersystem.
-              Copenhagen Sales anvender det ikke længere. Allerede hentede
+              Enreach er de dataansvarliges eget dialersystem (Tryg, Ase, ALKA og
+              Eesy). Copenhagen Sales har ingen aftale med Enreach og henter
+              oplysninger derfra via API efter den dataansvarliges instruks.
+              Enreach er derfor ikke databehandler for Copenhagen Sales. Hentede
               oplysninger anonymiseres efter kampagnens slettepolitik.
             </li>
             <li>
