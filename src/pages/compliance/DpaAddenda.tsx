@@ -416,7 +416,7 @@ function CampaignFields({ campaign, included, labels }: { campaign: { id: string
   const [label, setLabel] = useState("");
   const [desc, setDesc] = useState("");
   return (
-    <div className="border rounded-md p-3 space-y-2">
+    <div className={`border rounded-md p-3 space-y-2 ${included ? "" : "opacity-60"}`}>
       <div className="flex justify-between text-sm">
         <span className="flex items-center gap-3">
           <span className="font-medium">{campaign.name}</span>
