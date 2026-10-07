@@ -18741,6 +18741,7 @@ export type Database = {
         }[]
       }
       ingestion_scan_fields: { Args: { p_days?: number }; Returns: number }
+      introspect_schema: { Args: never; Returns: Json }
       is_active_employee: { Args: { _uid: string }; Returns: boolean }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }
