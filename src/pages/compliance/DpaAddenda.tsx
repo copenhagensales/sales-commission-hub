@@ -16,6 +16,12 @@ import { AlertTriangle, ArrowLeft, Download, FilePlus2, Plus, Trash2, Upload, X 
 import { toast } from "sonner";
 import {
   useAddDpaCampaignField,
+  useAddDpaClientField,
+  useRemoveDpaClientField,
+  useSaveDpaClientDefault,
+  useDpaClientFields,
+  useDpaCampaignDeviations,
+  useSetDpaCampaignDeviates,
   useDownloadDpaFile,
   useDeleteDpaAddendum,
   useDpaCampaignExclusions,
@@ -214,6 +220,8 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const { data: excluded = new Set<string>() } = useDpaCampaignExclusions();
   const { data: sources = new Map<string, string>() } = useDpaCampaignSources();
   const { data: retentionTexts = new Map<string, string>() } = useDpaCampaignRetentionTexts();
+  const { data: clientFields = [] } = useDpaClientFields();
+  const { data: deviating = new Set<string>() } = useDpaCampaignDeviations();
   const saveProfile = useSaveDpaClientProfile();
   const generate = useGenerateDpaAddendum();
 
@@ -234,15 +242,26 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   const allCampaigns = (base?.campaigns ?? []).filter((k) => k.client_id === client.id);
   // Kun medtagne kampagner indgår i tillægget, advarsler og blokering.
   const campaigns = allCampaigns.filter((k) => !excluded.has(k.id));
-  const noFields = campaigns.filter((k) => !fields.some((f) => f.client_campaign_id === k.id));
+  const defaultFields = clientFields.filter((f) => f.client_id === client.id);
+  // Effektive værdier: afvigende kampagner bruger egne værdier, øvrige kundens standard.
+  const effRetText = (id: string) => (deviating.has(id) ? retentionTexts.get(id) : existing?.retention_text) ?? "";
+  const effHasFields = (id: string) => (deviating.has(id) ? fields.some((f) => f.client_campaign_id === id) : defaultFields.length > 0);
+  const defaultEmpty = defaultFields.length === 0 && campaigns.some((k) => !deviating.has(k.id));
+  const noFields = campaigns.filter((k) => deviating.has(k.id) && !fields.some((f) => f.client_campaign_id === k.id));
   const versions = allVersions.filter((v) => v.client_id === client.id);
   // En manuel opbevaringstekst erstatter politikken i tillægget, så kampagnen advares ikke.
-  const missingRetention = campaigns.filter((k) => !k.has_retention && !retentionTexts.get(k.id));
+  const missingRetention = campaigns.filter((k) => !k.has_retention && !effRetText(k.id));
   const fieldsConflict = campaigns.filter(
-    (k) => k.has_retention && !retentionTexts.get(k.id) && fields.some((f) => f.client_campaign_id === k.id) && k.retention_days == null,
+    (k) => k.has_retention && !effRetText(k.id) && effHasFields(k.id) && k.retention_days == null,
   );
+  const policyDays = campaigns.map((k) => (k.has_retention ? k.retention_days : null)).filter((d): d is number => d != null);
+  const policyRange = policyDays.length === 0
+    ? "ingen politik"
+    : Math.min(...policyDays) === Math.max(...policyDays)
+      ? `${policyDays[0]} dage`
+      : `${Math.min(...policyDays)}–${Math.max(...policyDays)} dage`;
 
-  const toRow = (): DpaClientProfile => ({
+  const toRow = (): Omit<DpaClientProfile, "data_source" | "retention_text"> => ({
     client_id: client.id,
     is_active: p.is_active,
     legal_name: p.legal_name.trim() || null,
@@ -269,6 +288,7 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
     p.approval_form === "general" && !p.notice_days && "varselsperiode",
     p.subprocessor_ids.length === 0 && "underdatabehandlere",
     campaigns.length === 0 && "mindst én medtaget kampagne",
+    defaultEmpty && "persondatafelter i kundens standard",
     noFields.length > 0 && `persondatafelter på ${noFields.map((k) => k.name).join(", ")} (eller fravælg kampagnen)`,
   ].filter(Boolean) as string[];
 
@@ -290,16 +310,18 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         client: { name: client.name, legal_name: p.legal_name.trim(), cvr: p.cvr.trim(), address: p.address.trim() },
         original_agreement: { title: p.original_title.trim(), date: p.original_date },
         subprocessor_approval: { form: p.approval_form as "general" | "specific", notice_days: p.notice_days ? Number(p.notice_days) : null },
-        campaigns: campaigns.map((k) => ({
-          name: k.name,
-          fields: fields
-            .filter((f) => f.client_campaign_id === k.id)
-            .map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
-          data_source: sources.get(k.id) ?? null,
-          retention_days: k.retention_days,
-          retention_text: retentionTexts.get(k.id) ?? null,
-          missing_retention: !k.has_retention,
-        })),
+        campaigns: campaigns.map((k) => {
+          const own = deviating.has(k.id);
+          const src = own ? fields.filter((f) => f.client_campaign_id === k.id) : defaultFields;
+          return {
+            name: k.name,
+            fields: src.map((f) => (f.description?.trim() ? `${f.business_label} (${f.description.trim()})` : f.business_label)),
+            data_source: own ? sources.get(k.id) ?? null : existing?.data_source ?? null,
+            retention_days: k.retention_days,
+            retention_text: own ? retentionTexts.get(k.id) ?? null : existing?.retention_text ?? null,
+            missing_retention: !k.has_retention,
+          };
+        }),
         subprocessors: subs
           .filter((s) => p.subprocessor_ids.includes(s.id))
           .map((s) => ({ name: s.name, registration: s.registration ?? "", processing: s.processing ?? "", location: s.location ?? "", transfer_basis: s.transfer_basis ?? "" })),
@@ -332,11 +354,20 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         </Alert>
       )}
 
+      {defaultEmpty && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Kundens standard har ingen persondatafelter angivet — tilføj felter under "Persondata i Stork".
+          </AlertDescription>
+        </Alert>
+      )}
+
       {noFields.length > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {noFields.map((k) => k.name).join(", ")}: Kampagnen har ingen persondatafelter angivet — tilføj felter eller fjern kampagnen fra tillægget.
+            {noFields.map((k) => k.name).join(", ")}: Kampagnen afviger fra standard, men har ingen persondatafelter angivet — tilføj felter, slå afvigelsen fra eller fjern kampagnen fra tillægget.
           </AlertDescription>
         </Alert>
       )}
@@ -390,15 +421,24 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
         </CardContent>
       </Card>
 
+      <ClientDefaults
+        key={`${existing?.data_source ?? ""}|${existing?.retention_text ?? ""}`}
+        clientId={client.id}
+        source={existing?.data_source ?? ""}
+        retentionText={existing?.retention_text ?? ""}
+        labels={clientFields.filter((f) => f.client_id === client.id)}
+        policyRange={policyRange}
+      />
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Kampagner, persondatafelter og opbevaring</CardTitle>
-          <CardDescription>Vælg selv de persondatafelter, der indgår pr. kampagne, med forretningsnavn (fx "Telefonnummer").</CardDescription>
+          <CardTitle className="text-base">Kampagner</CardTitle>
+          <CardDescription>Kampagner følger kundens standard. Sæt "Afviger fra standard" for at angive kampagnens egne felter, datakilde og opbevaring.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           {allCampaigns.length === 0 && <p className="text-sm text-muted-foreground">Ingen kampagner.</p>}
           {allCampaigns.map((k) => (
-            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} source={sources.get(k.id) ?? ""} retentionText={retentionTexts.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
+            <CampaignFields key={k.id} campaign={k} included={!excluded.has(k.id)} deviates={deviating.has(k.id)} source={sources.get(k.id) ?? ""} retentionText={retentionTexts.get(k.id) ?? ""} labels={fields.filter((f) => f.client_campaign_id === k.id)} />
           ))}
           <p className="text-xs text-muted-foreground">
             Fast tekst i tillægget: ingen navn, adresse, e-mail, fritekst/sælgernoter eller berigelsesdata; anonymisering er endelig efter backup-vinduet på 14 dage. Hosting: {HOSTING_TEXT}.
@@ -425,34 +465,109 @@ function ClientDetail({ client, onBack }: { client: { id: string; name: string }
   );
 }
 
-function CampaignFields({ campaign, included, source, retentionText, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[] }) {
+const policyText = (k: { has_retention: boolean; retention_days: number | null }) =>
+  k.has_retention && k.retention_days != null ? `${k.retention_days} dage` : "ingen politik";
+
+/** Kundens standard: felter, datakilde og opbevaring, der gælder alle ikke-afvigende kampagner. */
+function ClientDefaults({ clientId, source, retentionText, labels, policyRange }: { clientId: string; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[]; policyRange: string }) {
+  const add = useAddDpaClientField();
+  const remove = useRemoveDpaClientField();
+  const saveDefault = useSaveDpaClientDefault();
+  const [src, setSrc] = useState(source);
+  const [ret, setRet] = useState(retentionText);
+  const [label, setLabel] = useState("");
+  const [desc, setDesc] = useState("");
+  const persist = (key: "data_source" | "retention_text", value: string, saved: string, msg: string) => {
+    if (value.trim() === saved.trim()) return;
+    saveDefault.mutate({ clientId, key, value }, { onSuccess: () => toast.success(msg), onError: (e) => toast.error(errMsg(e)) });
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Persondata i Stork</CardTitle>
+        <CardDescription>Kundens standard. Gælder alle medtagne kampagner, der ikke er sat til at afvige.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {labels.length === 0 && <span className="text-sm text-muted-foreground">Ingen felter endnu.</span>}
+          {labels.map((l) => (
+            <Badge key={l.id} variant="secondary" className="gap-1">
+              {l.business_label}{l.description ? ` (${l.description})` : ""}
+              <button aria-label={`Fjern ${l.business_label}`} onClick={() => remove.mutate(l.id, { onError: (e) => toast.error(errMsg(e)) })}><X className="h-3 w-3" /></button>
+            </Badge>
+          ))}
+        </div>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!label.trim()) return;
+            add.mutate({ clientId, label, description: desc }, { onSuccess: () => { setLabel(""); setDesc(""); }, onError: (err) => toast.error(errMsg(err)) });
+          }}
+        >
+          <Input className="h-8" placeholder="Tilføj felt, fx Mødetype" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input className="h-8" placeholder="Beskrivelse (valgfri), fx fysisk, online eller telefon" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          <Button type="submit" size="sm" variant="outline" disabled={add.isPending}><Plus className="h-4 w-4" /></Button>
+        </form>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <Label>Datakilde</Label>
+            <Input placeholder="fx Den dataansvarliges eget dialersystem" value={src} onChange={(e) => setSrc(e.target.value)} onBlur={() => persist("data_source", src, source, "Datakilde gemt")} />
+          </div>
+          <div>
+            <Label>Opbevaring (tekst i tillægget)</Label>
+            <Input placeholder="Tom = beregnes fra slettepolitikken" value={ret} onChange={(e) => setRet(e.target.value)} onBlur={() => persist("retention_text", ret, retentionText, "Opbevaring gemt")} />
+            <p className="text-xs text-muted-foreground mt-1">Slettepolitik i Stork: {policyRange}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CampaignFields({ campaign, included, deviates, source, retentionText, labels }: { campaign: { id: string; name: string; retention_days: number | null; has_retention: boolean }; included: boolean; deviates: boolean; source: string; retentionText: string; labels: { id: string; business_label: string; description: string | null }[] }) {
   const add = useAddDpaCampaignField();
   const remove = useRemoveDpaCampaignField();
   const setIncluded = useSetDpaCampaignIncluded();
+  const setDeviates = useSetDpaCampaignDeviates();
   const saveSource = useSaveDpaCampaignSource();
   const saveRetention = useSaveDpaCampaignRetentionText();
   const [src, setSrc] = useState(source);
   const [ret, setRet] = useState(retentionText);
   const [label, setLabel] = useState("");
   const [desc, setDesc] = useState("");
+  const header = (
+    <div className="flex flex-wrap justify-between gap-2 text-sm">
+      <span className="flex flex-wrap items-center gap-3">
+        <span className="font-medium">{campaign.name}</span>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Checkbox
+            checked={included}
+            disabled={setIncluded.isPending}
+            onCheckedChange={(v) => setIncluded.mutate({ campaignId: campaign.id, included: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
+          />
+          Medtag i tillægget
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Checkbox
+            checked={deviates}
+            disabled={setDeviates.isPending}
+            onCheckedChange={(v) => setDeviates.mutate({ campaignId: campaign.id, deviates: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
+          />
+          Afviger fra standard
+        </label>
+      </span>
+      <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
+        Slettepolitik: {policyText(campaign)}
+      </span>
+    </div>
+  );
+  if (!deviates) {
+    return <div className={`border rounded-md px-3 py-2 ${included ? "" : "opacity-60"}`}>{header}</div>;
+  }
   return (
     <div className={`border rounded-md p-3 space-y-2 ${included ? "" : "opacity-60"}`}>
-      <div className="flex justify-between text-sm">
-        <span className="flex items-center gap-3">
-          <span className="font-medium">{campaign.name}</span>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Checkbox
-              checked={included}
-              disabled={setIncluded.isPending}
-              onCheckedChange={(v) => setIncluded.mutate({ campaignId: campaign.id, included: v === true }, { onError: (e) => toast.error(errMsg(e)) })}
-            />
-            Medtag i tillægget
-          </label>
-        </span>
-        <span className={campaign.has_retention ? "text-muted-foreground" : "text-destructive"}>
-          {!campaign.has_retention ? "Mangler opbevaringspolitik" : campaign.retention_days == null ? "Periode ikke fastsat" : `${campaign.retention_days} dage → irreversibel anonymisering`}
-        </span>
-      </div>
+      {header}
       <div className="flex flex-wrap gap-2">
         {labels.map((l) => (
           <Badge key={l.id} variant="secondary" className="gap-1">
