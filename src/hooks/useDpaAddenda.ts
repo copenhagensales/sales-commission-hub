@@ -156,6 +156,41 @@ export function useSaveDpaCampaignSource() {
   });
 }
 
+const RETENTION_TEXTS_KEY = ["dpa-campaign-retention-texts"] as const;
+
+/** Manuel opbevaringstekst pr. kampagne til tillægget, map campaignId → tekst. */
+export function useDpaCampaignRetentionTexts() {
+  return useQuery({
+    queryKey: RETENTION_TEXTS_KEY,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("dpa_campaign_retention_texts")
+        .select("client_campaign_id, retention_text");
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.client_campaign_id, r.retention_text]));
+    },
+  });
+}
+
+export function useSaveDpaCampaignRetentionText() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ campaignId, text }: { campaignId: string; text: string }) => {
+      const v = text.trim();
+      const { error } = v
+        ? await supabase
+            .from("dpa_campaign_retention_texts")
+            .upsert(
+              { client_campaign_id: campaignId, retention_text: v, updated_at: new Date().toISOString() },
+              { onConflict: "client_campaign_id" },
+            )
+        : await supabase.from("dpa_campaign_retention_texts").delete().eq("client_campaign_id", campaignId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: RETENTION_TEXTS_KEY }),
+  });
+}
+
 export function useDpaAddendaVersions() {
   return useQuery({
     queryKey: KEYS.versions,
