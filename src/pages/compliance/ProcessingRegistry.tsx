@@ -149,8 +149,9 @@ export default function ProcessingRegistry() {
               mangler arkivering (tjek onboarding-dokumenter / rekvirér).
             </li>
             <li>
-              Enreach — dialer/telefoniintegration. Se DPA-oversigten; status:
-              mangler arkivering (tjek onboarding-dokumenter).
+              Tidligere datakilde: den dataansvarliges (Trygs) eget dialersystem.
+              Copenhagen Sales anvender det ikke længere. Allerede hentede
+              oplysninger anonymiseres efter kampagnens slettepolitik.
             </li>
             <li>
               Twilio — SMS og telefoni. Se DPA-oversigten; status: mangler
