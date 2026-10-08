@@ -1,5 +1,6 @@
 // EU/EØS-spærre ved login. Slår klientens IP op i eea_ip_ranges.
-// Ikke EU/EØS eller ukendt land -> sessionen tilbagekaldes server-side.
+// IP uden for EU/EØS-listen -> sessionen tilbagekaldes server-side.
+// Ingen IP eller fejl i opslaget -> lukkes ind (tvivl kommer brugeren til gode).
 // IP-adressen gemmes ikke.
 import { requireAuthenticated, sharedCorsHeaders } from "../_shared/auth.ts";
 
@@ -45,6 +46,8 @@ Deno.serve(async (req) => {
   }
 
   if (country) return json(200, { allowed: true, country });
+  // Tvivl (ingen IP eller opslag fejlede) = luk ind. Kun påvist udenfor afvises.
+  if (reason !== "outside_eea") return json(200, { allowed: true, reason });
 
   await svc.from("geo_login_denials").insert({ user_id: userId, reason });
   if (!testIp) await svc.auth.admin.signOut(token, "global");

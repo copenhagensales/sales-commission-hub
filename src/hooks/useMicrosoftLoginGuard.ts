@@ -22,6 +22,9 @@ export function useMicrosoftLoginGuard() {
       checkedTokens.current.add(accessToken);
 
       try {
+        // Kald kun funktionen med en session serveren accepterer (undgår 401).
+        const { data: u, error: uErr } = await supabase.auth.getUser();
+        if (cancelled || uErr || !u.user) return;
         const { data, error } = await supabase.functions.invoke("microsoft-login-guard");
         if (cancelled || error) return;
         if (data && data.allowed === false) {
