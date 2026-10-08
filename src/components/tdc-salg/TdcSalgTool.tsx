@@ -49,7 +49,7 @@ export function TdcSalgTool() {
     if (next === "mail") {
       const candidate: IdriftPrefill = {
         subscriptions: prefill.mailSubscriptions,
-        subsidyAmount: Math.round((prefill.subsidy * (subsidyPct ?? 100)) / 100) || undefined,
+        subsidyAmount: subsidyPct === null ? undefined : Math.round((prefill.subsidy * subsidyPct) / 100) || undefined,
         subsidyProducts: prefill.hardware,
         fiveG: Object.entries(products).some(([id, n]) => id.startsWith("mbb-") && n > 0),
         ...(mbbChoice && (mbbChoice.noMbb || mbbChoice.mbbType)
