@@ -34,6 +34,8 @@ type SaleRow = {
   agent_email: string | null;
   agent_name: string | null;
   customer_phone: string | null;
+  /** Telefonnummer fra dialerens stamdata (fx AKA), når salget ikke har ét. */
+  raw_phone: string | null;
   client_campaign_id: string | null;
 };
 
@@ -48,8 +50,8 @@ type ItemRow = {
   products: { name: string | null } | null;
 };
 
-const SALE_FIELDS =
-  "id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id";
+const SALE_FIELDS: string =
+  "id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id, raw_phone:raw_payload->masterDataFields->>Telefonnummer";
 const ITEM_FIELDS =
   "id, sale_id, product_id, quantity, mapped_commission, mapped_revenue, matched_pricing_rule_id, products(name)";
 
@@ -160,12 +162,12 @@ export function useUnitedSales(day: Date, enabled = true) {
       if (noCampaignError) throw noCampaignError;
 
       const saleById = new Map<string, SaleRow>();
-      for (const s of (salesByCampaign || []) as SaleRow[]) saleById.set(s.id, s);
-      const unmappedSaleIds = ((salesWithoutCampaign || []) as SaleRow[]).map(
+      for (const s of (salesByCampaign || []) as unknown as SaleRow[]) saleById.set(s.id, s);
+      const unmappedSaleIds = ((salesWithoutCampaign || []) as unknown as SaleRow[]).map(
         (s) => s.id
       );
       const saleByIdUnmapped = new Map<string, SaleRow>(
-        ((salesWithoutCampaign || []) as SaleRow[]).map((s) => [s.id, s])
+        ((salesWithoutCampaign || []) as unknown as SaleRow[]).map((s) => [s.id, s])
       );
 
       const items = new Map<string, ItemRow>();
@@ -233,7 +235,7 @@ export function useUnitedSales(day: Date, enabled = true) {
               sale.agent_name ||
               sale.agent_email ||
               "Ukendt",
-            customerPhone: sale.customer_phone || null,
+            customerPhone: sale.customer_phone || sale.raw_phone || null,
             quantity: Number(r.quantity ?? 0),
             productName: r.products?.name || "Ukendt produkt",
             clientName,
