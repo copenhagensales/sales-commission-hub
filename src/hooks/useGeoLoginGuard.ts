@@ -31,18 +31,16 @@ export function useGeoLoginGuard() {
           res = await supabase.functions.invoke("geo-login-guard");
         }
         const { data, error } = res;
-        if (!error && data?.allowed === true) return;
+        // Kun en klar afvisning fra serveren lukker ude. Fejl/tvivl = luk ind.
+        if (error || data?.allowed !== false) return;
         checked.current.delete(userId);
         await supabase.auth.signOut();
-        if (error && isUnauthorized(error)) return; // ugyldig session, ikke geo-afvisning
         toast.error("Login afvist", {
           description: data?.message || "Stork kan kun bruges fra EU/EØS",
           duration: 12000,
         });
       } catch {
-        checked.current.delete(userId);
-        await supabase.auth.signOut();
-        toast.error("Login afvist", { description: "Stork kan kun bruges fra EU/EØS", duration: 12000 });
+        // Netværksfejl: tvivl kommer brugeren til gode.
       }
     };
 
