@@ -1,1 +1,1 @@
-- EU/EØS-adgang håndhæves ved login af edge-funktionen geo-login-guard mod tabellen eea_ip_ranges (DB-IP Lite); ukendt land afvises og sessionen tilbagekaldes server-side. Why: login-hooks får ikke request-headers, og backend leverer kun IP, ikke land.
+- EU/EØS-adgang håndhæves ved login af edge-funktionen geo-login-guard mod eea_ip_ranges og non_eea_ip_ranges (DB-IP Lite); kun IP'er der beviseligt er uden for EU/EØS afvises (session tilbagekaldes server-side), ukendt land/fejl lukkes ind. Why: login-hooks får ikke request-headers, og backend leverer kun IP, ikke land.

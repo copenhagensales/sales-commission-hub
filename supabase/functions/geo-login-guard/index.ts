@@ -42,11 +42,15 @@ Deno.serve(async (req) => {
     const { data, error } = await svc.rpc("geo_ip_in_eea", { _ip: ip });
     if (error) reason = "lookup_failed";
     else if (data) country = data as string;
-    else reason = "outside_eea";
+    else {
+      // Ikke i EU/EØS-listen: afvis kun hvis adressen beviseligt hører til et andet land.
+      const { data: outside, error: oErr } = await svc.rpc("geo_ip_outside_eea", { _ip: ip });
+      reason = !oErr && outside ? "outside_eea" : "unknown_country";
+    }
   }
 
   if (country) return json(200, { allowed: true, country });
-  // Tvivl (ingen IP eller opslag fejlede) = luk ind. Kun påvist udenfor afvises.
+  // Tvivl (ingen IP, ukendt land eller fejl i opslaget) = luk ind.
   if (reason !== "outside_eea") return json(200, { allowed: true, reason });
 
   await svc.from("geo_login_denials").insert({ user_id: userId, reason });
