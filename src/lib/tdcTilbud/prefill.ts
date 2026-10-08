@@ -52,13 +52,11 @@ const kr = (n: number) => n.toLocaleString("da-DK", { maximumFractionDigits: 2 }
 /** Indsætter tilbudsdata i opsummeringens pladsholdere (kun dansk tekst). */
 export function applyPrefillToSummary(lines: SummaryLine[], p: TilbudPrefill | undefined): SummaryLine[] {
   if (!p) return lines;
-  const otherLine = p.otherText
-    ? { text: `Derudover får du ${p.otherText} til en samlet månedlig pris på ${kr(p.otherPrice)} kr. ekskl. moms.` }
-    : null;
-  let otherInserted = false;
+  const firstText = [p.mobileText, p.otherText].filter(Boolean).join(", ") || null;
+  const firstPrice = p.mobilePrice + p.otherPrice;
   const mapped = lines.map((l) => {
-    if (l.text.startsWith("Du får (antal + fulde produktnavn + datamængde)") && p.mobileText)
-      return { text: `Du får ${p.mobileText} til en samlet månedlig pris på ${kr(p.mobilePrice)} kr. ekskl. moms.` };
+    if (l.text.startsWith("Du får (antal + fulde produktnavn + datamængde)") && firstText)
+      return { text: `Du får ${firstText} til en samlet månedlig pris på ${kr(firstPrice)} kr. ekskl. moms.` };
     if (l.text.startsWith("Du får (antal + fulde produktnavn + hastighedsbegrænsning)") && p.mbbText)
       return { text: `Du får ${p.mbbText} til en samlet månedlig pris på ${kr(p.mbbPrice)} kr. ekskl. moms.` };
     if (l.text.startsWith("Du får et tilskud på (beløb)") && p.subsidy > 0)
@@ -67,12 +65,5 @@ export function applyPrefillToSummary(lines: SummaryLine[], p: TilbudPrefill | u
       return { text: p.hardware.join(", ") };
     return l;
   });
-  if (!otherLine) return mapped;
-  // Indsæt efter sidste mobil-/MBB-linje
-  const out: SummaryLine[] = [];
-  let anchor = -1;
-  mapped.forEach((l, i) => { if (l.text.startsWith("Du får ") && l.text.includes("samlet månedlig pris")) anchor = i; });
-  mapped.forEach((l, i) => { out.push(l); if (i === anchor) { out.push(otherLine); otherInserted = true; } });
-  if (!otherInserted) out.unshift(otherLine);
-  return out;
+  return mapped;
 }
