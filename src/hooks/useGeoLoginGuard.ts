@@ -52,9 +52,20 @@ export function useGeoLoginGuard() {
       setTimeout(() => validate(session.user.id), 0);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) validate(session.user.id);
-    });
+    // Ved app-åbning: bekræft først at den gemte session stadig er gyldig,
+    // så et forældet token ikke giver et 401-kald til funktionen.
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return;
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          await supabase.auth.signOut();
+          return;
+        }
+      }
+      validate(session.user.id);
+    }).catch(() => undefined);
 
     return () => subscription.unsubscribe();
   }, []);
