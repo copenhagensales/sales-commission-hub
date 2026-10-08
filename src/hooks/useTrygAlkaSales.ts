@@ -34,6 +34,8 @@ type SaleRow = {
   agent_email: string | null;
   agent_name: string | null;
   customer_phone: string | null;
+  /** Telefonnummer fra dialerens stamdata (fx AKA), når salget ikke har ét. */
+  raw_phone: string | null;
   client_campaign_id: string | null;
 };
 
@@ -49,7 +51,7 @@ type ItemRow = {
 };
 
 const SALE_FIELDS =
-  "id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id";
+  "id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id, raw_phone:raw_payload->masterDataFields->>Telefonnummer";
 const ITEM_FIELDS =
   "id, sale_id, product_id, quantity, mapped_commission, mapped_revenue, matched_pricing_rule_id, products(name)";
 
@@ -199,7 +201,7 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
               sale.agent_name ||
               sale.agent_email ||
               "Ukendt",
-            customerPhone: sale.customer_phone || null,
+            customerPhone: sale.customer_phone || sale.raw_phone || null,
             quantity: Number(r.quantity ?? 0),
             productName: r.products?.name || "Ukendt produkt",
             clientName,
