@@ -152,7 +152,7 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('send-recruitment-sms', {
         body: {
-          candidateId: candidate.id,
+          candidateId: candidate.id || undefined,
           phoneNumber: candidate.phone,
           message: message.trim(),
         }

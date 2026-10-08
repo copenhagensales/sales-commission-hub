@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
+import { useMessageCandidates, useMessageEmployees, last8 } from "@/hooks/useMessageContacts";
 
 type MessageType = "sms" | "email" | "call" | "sent";
 
@@ -102,17 +103,20 @@ export default function Messages() {
     },
   });
 
-  const { data: candidates = [] } = useQuery({
-    queryKey: ["candidates"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select("id, first_name, last_name, phone, email, applied_position");
-      
-      if (error) throw error;
-      return data as Candidate[];
-    },
-  });
+  // Alle kandidater – tidligere ramte forespørgslen 1000-rækkers grænsen, så nyere kandidater manglede navn
+  const { data: candidates = [] } = useMessageCandidates();
+  const { data: employees = [] } = useMessageEmployees();
+
+  const candidatesByPhone = new Map<string, Candidate>();
+  for (const c of candidates) {
+    const k = last8(c.phone);
+    if (k && !candidatesByPhone.has(k)) candidatesByPhone.set(k, c);
+  }
+  const employeesByPhone = new Map<string, (typeof employees)[number]>();
+  for (const e of employees) {
+    const k = last8(e.private_phone);
+    if (k && !employeesByPhone.has(k)) employeesByPhone.set(k, e);
+  }
 
   // Subscribe to realtime updates
   useEffect(() => {
@@ -171,18 +175,19 @@ export default function Messages() {
       const latestMsg = msgs[0]; // Already sorted desc from query
       const unreadCount = msgs.filter(m => !m.read && m.direction === 'inbound').length;
       
-      // Try to find matching candidate
-      const normalizedPhone = phone.replace(/\D/g, '').slice(-8);
-      const matchedCandidate = candidates.find(c => 
-        c.phone?.replace(/\D/g, '').slice(-8) === normalizedPhone
-      );
+      // Try to find matching candidate, then employee as fallback
+      const normalizedPhone = last8(phone);
+      const matchedCandidate = normalizedPhone ? candidatesByPhone.get(normalizedPhone) : undefined;
+      const matchedEmployee = !matchedCandidate && normalizedPhone ? employeesByPhone.get(normalizedPhone) : undefined;
 
       return {
         phone_number: phone,
         candidate_id: matchedCandidate?.id || null,
         candidate_name: matchedCandidate 
           ? `${matchedCandidate.first_name} ${matchedCandidate.last_name}`
-          : phone,
+          : matchedEmployee
+            ? `${matchedEmployee.first_name ?? ""} ${matchedEmployee.last_name ?? ""}`.trim() || phone
+            : phone,
         last_message: latestMsg?.content || '',
         last_message_time: latestMsg?.created_at || '',
         unread_count: unreadCount,
@@ -721,11 +726,16 @@ export default function Messages() {
                     className="w-full"
                     onClick={() => {
                       const candidate = candidates.find(c => 
-                        c.phone?.replace(/\D/g, '').slice(-8) === selectedConversation.phone_number.replace(/\D/g, '').slice(-8)
+                        last8(c.phone) === last8(selectedConversation.phone_number)
                       );
-                      if (candidate) {
-                        handleStartNewSms(candidate);
-                      }
+                      handleStartNewSms(candidate ?? {
+                        id: "",
+                        first_name: selectedConversation.candidate_name,
+                        last_name: "",
+                        phone: selectedConversation.phone_number,
+                        email: null,
+                        applied_position: null,
+                      });
                     }}
                   >
                     <Send className="h-4 w-4 mr-2" />
