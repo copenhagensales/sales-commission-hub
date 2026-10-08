@@ -11777,6 +11777,24 @@ export type Database = {
         }
         Relationships: []
       }
+      non_eea_ip_ranges: {
+        Row: {
+          country: string
+          ip_end: unknown
+          ip_start: unknown
+        }
+        Insert: {
+          country: string
+          ip_end: unknown
+          ip_start: unknown
+        }
+        Update: {
+          country?: string
+          ip_end?: unknown
+          ip_start?: unknown
+        }
+        Relationships: []
+      }
       onboarding_coaching_tasks: {
         Row: {
           assigned_drill_id: string | null
@@ -18398,6 +18416,7 @@ export type Database = {
         Returns: number
       }
       geo_ip_in_eea: { Args: { _ip: string }; Returns: string }
+      geo_ip_outside_eea: { Args: { _ip: string }; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
         Args: never
