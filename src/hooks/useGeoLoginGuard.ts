@@ -19,16 +19,16 @@ export function useGeoLoginGuard() {
       if (checked.current.has(userId)) return;
       checked.current.add(userId);
       try {
-        let res = await supabase.functions.invoke("geo-login-guard");
-        // Udløbet/forældet token ved app-åbning: forny én gang og prøv igen.
+        // Kald kun funktionen med en session serveren accepterer (undgår 401).
+        const { data: u, error: uErr } = await supabase.auth.getUser();
+        if (uErr || !u.user) {
+          checked.current.delete(userId);
+          return;
+        }
+        const res = await supabase.functions.invoke("geo-login-guard");
         if (res.error && isUnauthorized(res.error)) {
-          const { error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshError) {
-            checked.current.delete(userId);
-            await supabase.auth.signOut();
-            return;
-          }
-          res = await supabase.functions.invoke("geo-login-guard");
+          checked.current.delete(userId);
+          return;
         }
         const { data, error } = res;
         // Kun en klar afvisning fra serveren lukker ude. Fejl/tvivl = luk ind.
