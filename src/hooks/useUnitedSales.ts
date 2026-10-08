@@ -50,7 +50,7 @@ type ItemRow = {
   products: { name: string | null } | null;
 };
 
-const SALE_FIELDS =
+const SALE_FIELDS: string =
   "id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id, raw_phone:raw_payload->masterDataFields->>Telefonnummer";
 const ITEM_FIELDS =
   "id, sale_id, product_id, quantity, mapped_commission, mapped_revenue, matched_pricing_rule_id, products(name)";
