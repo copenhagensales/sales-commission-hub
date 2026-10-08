@@ -110,7 +110,7 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
 
       // 3) Salgslinjer for spor A (via sale_id) og spor B (via product_id + dato)
       const saleById = new Map<string, SaleRow>();
-      for (const s of (salesByCampaign || []) as SaleRow[]) saleById.set(s.id, s);
+      for (const s of (salesByCampaign || []) as unknown as SaleRow[]) saleById.set(s.id, s);
 
       const items = new Map<string, ItemRow>();
 
@@ -154,7 +154,7 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
         );
         for (const res of extra) {
           if (res.error) throw res.error;
-          for (const s of (res.data || []) as SaleRow[]) saleById.set(s.id, s);
+          for (const s of (res.data || []) as unknown as SaleRow[]) saleById.set(s.id, s);
         }
       }
 

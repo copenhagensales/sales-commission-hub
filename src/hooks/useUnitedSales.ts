@@ -162,12 +162,12 @@ export function useUnitedSales(day: Date, enabled = true) {
       if (noCampaignError) throw noCampaignError;
 
       const saleById = new Map<string, SaleRow>();
-      for (const s of (salesByCampaign || []) as SaleRow[]) saleById.set(s.id, s);
-      const unmappedSaleIds = ((salesWithoutCampaign || []) as SaleRow[]).map(
+      for (const s of (salesByCampaign || []) as unknown as SaleRow[]) saleById.set(s.id, s);
+      const unmappedSaleIds = ((salesWithoutCampaign || []) as unknown as SaleRow[]).map(
         (s) => s.id
       );
       const saleByIdUnmapped = new Map<string, SaleRow>(
-        ((salesWithoutCampaign || []) as SaleRow[]).map((s) => [s.id, s])
+        ((salesWithoutCampaign || []) as unknown as SaleRow[]).map((s) => [s.id, s])
       );
 
       const items = new Map<string, ItemRow>();
