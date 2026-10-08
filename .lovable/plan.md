@@ -1,40 +1,19 @@
-# Kundeaftaler – tillæg (allonge) til databehandleraftale
+# Opsummering: få alle produkter og den rigtige pris med fra tilbuddet
 
-## Konklusion
-Byggeriet kan laves uden at læse kundepersondata. Der er dog fire huller i dagens data, som ordren forudsætter findes. De skal besluttes før byggeriet går i gang (se "Beslutninger").
+## Årsag (bekræftet i koden)
+`src/lib/tdcTilbud/prefill.ts` (`buildPrefill`) sender kun to grupper videre til opsummeringen:
+- mobilabonnementer (Mobilpakker og Kun EU)
+- 5G-bredbånd/fiber
 
-## Fund (kun metadata læst)
-- 16 kunder, 24 kampagner, 23 retentionspolitikker. Mindst én kampagne mangler altså en politik.
-- `ingestion_known_fields` har kolonnerne integration, container, field_label, decision og note. Der er 97 felter med UAFKLARET.
-  - Feltregistret er pr. **integration** (dialerkonto), ikke pr. kampagne.
-  - Der findes ingen markering af "er persondata" og intet forretningsnavn.
-- Hostingregionen findes ikke som data. Den står som fast tekst i `ProcessingRegistry.tsx:138`, `DpaOverview.tsx:53` og `BackupPolicy.tsx:29`.
-- `dpa_documents` har kun vendor og fil. Der er ingen CVR, ingen lokation og intet overførselsgrundlag. Leverandørlisten `DPA_REQUIRED_VENDORS` ligger i koden (`complianceDocuments.ts:49`).
-- Siden `/compliance/documents/client-agreements` ("Kundeaftaler", filarkiv) findes allerede. Den nye side får derfor en anden rute og et andet navn.
+Produkter under **Omstilling** og **Diverse** (fx Professionel/Standard omstilling, DDI nummer, MB hovednummer, IOT, Internetfilter, Passivt nummer, Extra datakort) bliver sprunget over. De tælles med i tilbuddets pris, men ikke i opsummeringen. Derfor bliver prisen på side 2 lavere end på side 1.
 
-## Beslutninger (A/B pr. punkt)
-1. **Felter pr. kampagne.** A: Vis BEHOLD-felter for kampagnens dialerintegration (alle kampagner på samme konto får de samme felter). B: Tilføj en ny mapping fra kampagne til felt, som skal vedligeholdes manuelt.
-2. **Persondata og forretningsnavn.** A: Tilføj de nye kolonnerne `is_personal_data` og `business_label` til `ingestion_known_fields`. Det er kun en tilføjelse, og ingestion læser dem ikke. Superadmin udfylder dem. B: Brug en separat tabel `dpa_field_labels`, så feltregistret ikke røres.
-3. **Hostingregion som én kilde.** A: Opret en ny lille tabel `compliance_facts` (key/value) med `hosting_region = eu-west-3 (Paris)`. Art. 30-siden og allongen læser derfra. Det kræver en lille ændring af `ProcessingRegistry.tsx`, og ordren siger "ingen ændring af eksisterende compliance-dokumenter". B: Konstanten flyttes til `complianceDocuments.ts` og bruges begge steder. Det er stadig kode, men kun ét sted.
-4. **Underdatabehandlere (CVR, lokation, grundlag).** Ny tabel `dpa_subprocessors`, seedet med Lovable, Supabase, Microsoft og Adversus. Kasper skal levere eller bekræfte CVR/registrering og overførselsgrundlag. Jeg finder ikke på værdier.
+## Ændring
+- I opsummeringen tilføjes en linje lige efter mobil- og bredbåndslinjerne, når der er valgt Omstilling- eller Diverse-produkter:
+  "Derudover får du 1 x Professionel omstilling, 2 x DDI nummer … til en samlet månedlig pris på X kr. ekskl. moms."
+- Summen af alle linjer i opsummeringen bliver dermed den samme som tilbuddets "Pris pr. måned ekskl. moms".
+- Produkter uden kendt pris (MBB 200/40) vises med navn, ligesom i dag.
 
-## Byggeri (efter beslutninger)
-**Database (én migration, RLS kun for superadmin via `am_i_superadmin`-mønstret):**
-- `dpa_client_profiles`: kunde, juridisk navn, CVR, adresse, oprindelig aftaletitel og -dato, godkendelsesform, varseldage, valgte underdatabehandlere og fritekst.
-- `dpa_addenda`: kunde, version, `content` jsonb, `pdf_path`, oprettet af og tidspunkt, status, sendt-dato, godkendt-dato og -kontakt, afvist og `signed_pdf_path`.
-  - En trigger blokerer ændring af `version`, `content` og `pdf_path`. Kun status-, dato- og signeret-felter kan ændres. Sletning er blokeret.
-- Status "Erstattet" sættes automatisk på ældre versioner, når en nyere bliver Godkendt.
-- Privat lagerplads `dpa-addenda`, kun for superadmin.
-- Ny kontrol `compliance_check_dpa_addenda()`, som kaldes fra `compliance_run_checks`. Den sammenligner det godkendte snapshot med live-opsætningen og rejser en alarm med niveauet HOEJ. Kunder uden godkendt version giver ingen alarm.
-
-**Frontend:**
-- Hook `useDpaAddenda.ts` (React Query), som samler data fra kunder, kampagner, retention, feltregister, underdatabehandlere og hostingregion.
-- Side `/compliance/dpa-addenda` "Kundeaftaler – tillæg" med listen: Kunde | Seneste version | Status | Sendt | Godkendt | Afviger.
-- Kundedetalje med de manuelle felter, det automatiske indhold og advarsler.
-  - Generér-knappen er deaktiveret ved UAFKLARET eller manglende retention.
-  - Hver version har knapperne Sendt, Godkendt, Afvist, upload af underskrevet kopi og download.
-- PDF genereres i browseren med jsPDF og brandfarver, i samme stil som `contractPdfGenerator.ts`. Sidehoved og -fod viser version, dato og sidetal. Teksten følger ordrens afsnit 1–4 og slutbestemmelse.
-
-## Risici
-- `compliance_run_checks` ligger i rød zone. Ændringen er kun et ekstra kald, og eksisterende kontroller røres ikke.
-- De 97 UAFKLARET-felter kan blokere PDF for mange kunder, indtil de er afklaret i feltregistret.
+## Tekniske detaljer
+- `prefill.ts`: tilføj `otherText` og `otherPrice` for `kind === "other"` i `buildPrefill`. `applyPrefillToSummary` indsætter den ekstra linje efter mobil- eller MBB-linjen.
+- Test i `calc.test.ts` (eller i den nye `prefill.test.ts`): summen af mobil-, MBB- og øvrige priser skal være lig med `calcTilbud(...).price`.
+- Ingen database, løn eller provision berøres. Grøn/gul zone.
