@@ -52,18 +52,19 @@ const kr = (n: number) => n.toLocaleString("da-DK", { maximumFractionDigits: 2 }
 /** Indsætter tilbudsdata i opsummeringens pladsholdere (kun dansk tekst). */
 export function applyPrefillToSummary(lines: SummaryLine[], p: TilbudPrefill | undefined): SummaryLine[] {
   if (!p) return lines;
-  const firstText = [p.mobileText, p.otherText].filter(Boolean).join(", ") || null;
-  const firstPrice = p.mobilePrice + p.otherPrice;
+  const firstText = [p.mobileText, p.mbbText, p.otherText].filter(Boolean).join(", ") || null;
+  const firstPrice = p.mobilePrice + p.mbbPrice + p.otherPrice;
   const mapped = lines.map((l) => {
     if (l.text.startsWith("Du får (antal + fulde produktnavn + datamængde)") && firstText)
       return { text: `Du får ${firstText} til en samlet månedlig pris på ${kr(firstPrice)} kr. ekskl. moms.` };
-    if (l.text.startsWith("Du får (antal + fulde produktnavn + hastighedsbegrænsning)") && p.mbbText)
-      return { text: `Du får ${p.mbbText} til en samlet månedlig pris på ${kr(p.mbbPrice)} kr. ekskl. moms.` };
     if (l.text.startsWith("Du får et tilskud på (beløb)") && p.subsidy > 0)
       return { ...l, text: l.text.replace("(beløb)", fmtKr(p.subsidy)) };
     if (l.text.startsWith("(Nævn produkt og gigabyte") && p.hardware.length)
       return { text: p.hardware.join(", ") };
     return l;
   });
-  return mapped;
+  // Bredbånd er nu med i første "Du får"-linje; fjern den separate pladsholder
+  return p.mbbText
+    ? mapped.filter((l) => !l.text.startsWith("Du får (antal + fulde produktnavn + hastighedsbegrænsning)"))
+    : mapped;
 }
