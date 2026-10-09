@@ -19,7 +19,7 @@ export function supportGroup(member: RampTeamMember, trend: Trend): SupportGroup
 }
 
 /** Salg i ugen ift. ugens forventning, seneste uge mod ugen foer. */
-export function expectationTrend(member: RampTeamMember): Trend {
+export function expectationTrend(member: { weeks: { sales: number; expected?: number | null }[] }): Trend {
   const w = member.weeks.filter((x) => Number(x.expected ?? 0) > 0);
   if (w.length < 2) return "unknown";
   const a = w[w.length - 2];
@@ -35,7 +35,7 @@ export function fmtSales(v: number): string {
 }
 
 /** Hvor mange hele salg der mangler for at naa forventningen i dag. */
-export function missingSales(m: RampTeamMember): number {
+export function missingSales(m: { cum_sales: number; expected_today?: number | null }): number {
   return Math.max(0, Math.ceil(Number(m.expected_today ?? 0) - m.cum_sales - 1e-9));
 }
 

@@ -66,10 +66,10 @@ export interface RampTeamMember {
   p75: number | null;
   status: RampStatus;
   /** Forventet kumuleret salg i dag (ramp_expected_at). */
-  expected_today: number | null;
+  expected_today?: number | null;
   /** cum_sales / expected_today * 100. */
-  expected_pct: number | null;
-  expectation_status: RampExpectationStatus;
+  expected_pct?: number | null;
+  expectation_status?: RampExpectationStatus;
   flag_id: string | null;
   flag_created_at: string | null;
   flag_days_open: number | null;
@@ -102,7 +102,7 @@ export interface RampFullWeekPoint {
  * i de foerste 40 arbejdsdage. Ingen norm og ingen risikoflag — kun tal og
  * ugens faste forloeb.
  */
-export interface RampFullTeamMember extends Omit<RampTeamMember, "weeks" | "expected_today" | "expected_pct" | "expectation_status"> {
+export interface RampFullTeamMember extends Omit<RampTeamMember, "weeks"> {
   weeks: RampFullWeekPoint[];
 }
 
