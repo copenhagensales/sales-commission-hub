@@ -46,7 +46,12 @@ export interface RampWeekPoint {
   p25: number;
   p50: number;
   p75: number;
+  /** Forventet salg i ugen (minimumskravene fordelt pr. arbejdsdag). */
+  expected?: number | null;
 }
+
+/** Maalestok: forventning = minimumskrav pr. opstartsuge fordelt pr. arbejdsdag (ramp_expected_at). */
+export type RampExpectationStatus = "under" | "on_track" | "ukendt";
 
 export interface RampTeamMember {
   employee_id: string;
@@ -60,6 +65,11 @@ export interface RampTeamMember {
   p50: number | null;
   p75: number | null;
   status: RampStatus;
+  /** Forventet kumuleret salg i dag (ramp_expected_at). */
+  expected_today: number | null;
+  /** cum_sales / expected_today * 100. */
+  expected_pct: number | null;
+  expectation_status: RampExpectationStatus;
   flag_id: string | null;
   flag_created_at: string | null;
   flag_days_open: number | null;
