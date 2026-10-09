@@ -46,7 +46,7 @@ const KIND_ACTION: Record<SessionKind, string> = {
   listen: RAMP_WEEKLY_LISTEN,
 };
 
-const RED = "#c13b32";
+const RED = "#d4453c";
 const RED_TEXT = "#c13b32";
 const AMBER = "#e0b64a";
 const AMBER_STRIP = "#e08a2e";
