@@ -85,6 +85,13 @@
       "when": 1791550232368,
       "tag": "0011_data_import_column_excluded",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791553287901,
+      "tag": "0012_ramp_weekly_min_targets",
+      "breakpoints": true
     }
   ]
 }

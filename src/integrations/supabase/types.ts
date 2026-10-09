@@ -14385,6 +14385,7 @@ export type Database = {
           id: string
           lookback_months: number
           updated_at: string
+          weekly_min_targets: Json
           weekly_program_start_date: string | null
         }
         Insert: {
@@ -14394,6 +14395,7 @@ export type Database = {
           id?: string
           lookback_months?: number
           updated_at?: string
+          weekly_min_targets?: Json
           weekly_program_start_date?: string | null
         }
         Update: {
@@ -14403,6 +14405,7 @@ export type Database = {
           id?: string
           lookback_months?: number
           updated_at?: string
+          weekly_min_targets?: Json
           weekly_program_start_date?: string | null
         }
         Relationships: []
@@ -18902,6 +18905,7 @@ export type Database = {
       get_ramp_full_team: { Args: never; Returns: Json }
       get_ramp_risk_flags: { Args: never; Returns: Json }
       get_ramp_team_overview: { Args: never; Returns: Json }
+      get_ramp_weekly_min_targets: { Args: never; Returns: Json }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
@@ -19350,6 +19354,10 @@ export type Database = {
       search_sales: {
         Args: { max_results?: number; search_query: string }
         Returns: string[]
+      }
+      set_ramp_weekly_min_targets: {
+        Args: { _targets: Json }
+        Returns: undefined
       }
       shares_team_with_user: {
         Args: { _target_employee_id: string; _user_id: string }
