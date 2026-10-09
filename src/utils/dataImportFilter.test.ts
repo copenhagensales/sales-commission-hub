@@ -20,4 +20,15 @@ describe("filterUploadedRow", () => {
     const r = filterUploadedRow({ "Employee Name": "a", Subscription: "b", _product_rows: [] }, new Set(), protectedCols);
     expect(r.dropped).toEqual([]);
   });
+
+  it("fjerner kolonner markeret 'Importeres ikke' uden at advare", () => {
+    const r = filterUploadedRow({ age: 30, "Phone Number": "1" }, defined, protectedCols, new Set(["age"]));
+    expect(r.row).toEqual({ "Phone Number": "1" });
+    expect(r.dropped).toEqual([]);
+  });
+
+  it("bevarer en matching-kolonne selv om den er markeret 'Importeres ikke'", () => {
+    const r = filterUploadedRow({ "Employee Name": "a" }, new Set(), protectedCols, new Set(["employee name"]));
+    expect(r.row).toEqual({ "Employee Name": "a" });
+  });
 });
