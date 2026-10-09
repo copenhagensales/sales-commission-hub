@@ -1,0 +1,1 @@
+CREATE POLICY "TV link permission can manage" ON public.tv_board_access FOR ALL TO authenticated USING (public.has_page_permission(auth.uid(), 'action_tv_link_manage', true)) WITH CHECK (public.has_page_permission(auth.uid(), 'action_tv_link_manage', true));

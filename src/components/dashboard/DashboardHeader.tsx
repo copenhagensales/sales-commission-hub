@@ -37,8 +37,8 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   
   // Use team-based dashboard permissions instead of role-based permissions
   const { data: accessibleDashboards = [] } = useAccessibleDashboards();
-  const { isOwner, isTeamleder } = useUnifiedPermissions();
-  const canCreateTvLink = isOwner || isTeamleder;
+  const { isOwner, isTeamleder, canEdit } = useUnifiedPermissions();
+  const canCreateTvLink = isOwner || isTeamleder || canEdit("action_tv_link_manage");
 
 
   const currentDashboardSlug = useMemo(() => {
