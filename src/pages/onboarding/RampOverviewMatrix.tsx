@@ -1,22 +1,42 @@
 import type { RampTeamMember } from "@/hooks/useRampTeam";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_WEEKLY_MIN_TARGETS, minCumulativeAt } from "@/lib/rampMinTarget";
-
-const MIN_COLOR = "#6b3fa0";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { DEFAULT_WEEKLY_MIN_TARGETS, weeklyTarget } from "@/lib/rampMinTarget";
 
 /**
  * Overblik: hvem ligger hvor? Ren visning af data fra get_ramp_team_overview.
- * Grupperingen bruger sidens eksisterende definition: status "under" = under
- * typisk; "midt"/"over" = paa eller over. "ukendt" vises ikke (ingen norm endnu).
+ * Maalestokken er forventningen (minimumskrav pr. opstartsuge fordelt pr.
+ * arbejdsdag, beregnet i databasen af ramp_expected_at). expectation_status
+ * "under" = under 100 %, "on_track" = paa eller over. "ukendt" vises ikke.
  */
 
 export type SupportGroup = "start" | "hold" | "track";
-type Trend = "up" | "down" | "flat" | "unknown";
+export type Trend = "up" | "down" | "flat" | "unknown";
 
 export function supportGroup(member: RampTeamMember, trend: Trend): SupportGroup | null {
-  if (member.status === "under") return trend === "up" ? "hold" : "start";
-  if (member.status === "midt" || member.status === "over") return "track";
+  if (member.expectation_status === "under") return trend === "up" ? "hold" : "start";
+  if (member.expectation_status === "on_track") return "track";
   return null;
+}
+
+/** Salg i ugen ift. ugens forventning, seneste uge mod ugen foer. */
+export function expectationTrend(member: RampTeamMember): Trend {
+  const w = member.weeks.filter((x) => Number(x.expected ?? 0) > 0);
+  if (w.length < 2) return "unknown";
+  const a = w[w.length - 2];
+  const b = w[w.length - 1];
+  const diff = b.sales / Number(b.expected) - a.sales / Number(a.expected);
+  return diff > 1e-9 ? "up" : diff < -1e-9 ? "down" : "flat";
+}
+
+/** Formaterer et salgstal med hoejst én decimal (dansk komma). */
+export function fmtSales(v: number): string {
+  const r = Math.round(v * 10) / 10;
+  return String(r).replace(".", ",");
+}
+
+/** Hvor mange hele salg der mangler for at naa forventningen i dag. */
+export function missingSales(m: RampTeamMember): number {
+  return Math.max(0, Math.ceil(Number(m.expected_today ?? 0) - m.cum_sales - 1e-9));
 }
 
 const RED = "#c13b32";
@@ -25,38 +45,32 @@ const YELLOW_TEXT = "#7a5508";
 const YELLOW_LIGHT = "#fbefcc";
 const GREEN = "#177a4d";
 const GREEN_LIGHT = "#d9f0e3";
+const DARK = "#1b1f1d";
 const Y_MAX = 2;
+const DAYS = 40;
+const WEEK_DAYS = 5;
 
 const GROUP_INFO: Record<
   SupportGroup,
-  { no: number; title: string; rule: string; text: string; bg: string; fg: string; border: string }
+  { no: number; title: string; rule: string; text: string }
 > = {
   start: {
     no: 1,
     title: "Start her",
-    rule: "Under typisk og flad/faldende",
+    rule: "Under forventning og flad/faldende",
     text: "Størst risiko for at de stopper. 1-1 og medlyt denne uge.",
-    bg: RED,
-    fg: "#ffffff",
-    border: RED,
   },
   hold: {
     no: 2,
     title: "Hold fast",
-    rule: "Under typisk, men stigende",
+    rule: "Under forventning, men stigende",
     text: "På vej. Anerkend fremgangen, og hold rytmen.",
-    bg: YELLOW_LIGHT,
-    fg: YELLOW_TEXT,
-    border: YELLOW,
   },
   track: {
     no: 3,
     title: "På sporet",
-    rule: "På eller over typisk",
+    rule: "På eller over forventning",
     text: "Ugens faste 1-1 — og brug dem som makker for nr. 1.",
-    bg: GREEN_LIGHT,
-    fg: "#0f5a38",
-    border: "#a9dcc3",
   },
 };
 
@@ -84,6 +98,10 @@ function median(values: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+function pctOf(m: RampTeamMember): number {
+  return Number(m.expected_pct ?? 0);
+}
+
 export function RampOverviewMatrix({
   members,
   trendOf,
@@ -92,6 +110,7 @@ export function RampOverviewMatrix({
   onSelectGroup,
   onSelectMember,
   minTargets = DEFAULT_WEEKLY_MIN_TARGETS,
+  footer,
 }: {
   members: RampTeamMember[];
   trendOf: (m: RampTeamMember) => Trend;
@@ -100,15 +119,15 @@ export function RampOverviewMatrix({
   onSelectGroup: (g: SupportGroup) => void;
   onSelectMember: (employeeId: string) => void;
   minTargets?: number[];
+  footer?: ReactNode;
 }) {
+  const [showBand, setShowBand] = useState(false);
   const points = members
     .map((m) => {
       const trend = trendOf(m);
       const group = supportGroup(m, trend);
       if (!group) return null;
-      const p50 = m.p50 ?? 0;
-      const ratio = p50 > 0 ? m.cum_sales / p50 : m.cum_sales > 0 ? Y_MAX : 1;
-      return { m, trend, group, y: Math.min(Y_MAX, Math.max(0, ratio)) };
+      return { m, trend, group, y: Math.min(Y_MAX, Math.max(0, pctOf(m) / 100)) };
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
@@ -122,22 +141,23 @@ export function RampOverviewMatrix({
     return () => ro.disconnect();
   }, []);
 
-  // Typisk spaend vist som median af hver saelgers egen p25/p50 og p75/p50.
-  const withNorm = members.filter((m) => (m.p50 ?? 0) > 0);
-  const bandLow = median(withNorm.map((m) => (m.p25 ?? 0) / (m.p50 as number))) ?? 0.75;
-  const bandHigh = median(withNorm.map((m) => (m.p75 ?? 0) / (m.p50 as number))) ?? 1.25;
+  // Hold: arbejdsdage med 2+ saelgere (etiket over grafen).
+  const cohortsRaw = useMemo(() => {
+    const byDay = new Map<number, number>();
+    points.forEach((p) => byDay.set(p.m.day_no, (byDay.get(p.m.day_no) ?? 0) + 1));
+    return [...byDay.entries()].filter(([, n]) => n >= 2).sort((a, b) => a[0] - b[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.map((p) => p.m.day_no).join(",")]);
 
-  const H = 460;
-  const gutter = width >= 640;
-  const PAD = { l: 40, r: gutter ? 150 : 16, t: 20, b: 76 };
+  const H = 480;
+  const PAD = { l: 52, r: 16, t: 46, b: 70 };
   const R = 9;
   const GAP = 4;
   const plotW = width - PAD.l - PAD.r;
   const plotH = H - PAD.t - PAD.b;
-  const maxY = Math.max(bandHigh, 1.2, ...points.map((p) => p.y));
-  const yTop = Math.min(Y_MAX, Math.ceil((maxY + 0.15) * 4) / 4);
-  const ys = (v: number) => PAD.t + plotH - (Math.min(yTop, Math.max(0, v)) / yTop) * plotH;
-  const xs = (d: number) => PAD.l + ((Math.min(40, Math.max(1, d)) - 0.5) / 40) * plotW;
+  const ys = (v: number) => PAD.t + plotH - (Math.min(Y_MAX, Math.max(0, v)) / Y_MAX) * plotH;
+  const xs = (d: number) => PAD.l + ((Math.min(DAYS, Math.max(1, d)) - 0.5) / DAYS) * plotW;
+  const xEdge = (d: number) => PAD.l + (d / DAYS) * plotW; // d = antal dage efter venstre kant
 
   // Beeswarm: y er fast, kun x flyttes mindst muligt indtil ingen overlap.
   const placed = useMemo(() => {
@@ -160,7 +180,7 @@ export function RampOverviewMatrix({
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points.map((p) => `${p.m.employee_id}:${p.y}:${p.m.day_no}`).join("|"), width, yTop]);
+  }, [points.map((p) => `${p.m.employee_id}:${p.y}:${p.m.day_no}`).join("|"), width]);
 
   // Labels kun for "Start her", uden overlap (flyttes lodret, tynd streg ud).
   const labels = useMemo(() => {
@@ -180,7 +200,7 @@ export function RampOverviewMatrix({
         for (const right of [true, false]) {
           const bx = right ? o.x + R + 6 : o.x - R - 6 - w;
           const by = o.y + dy - h / 2;
-          if (bx < 0 || bx + w > width || by < 0 || by + h > H - PAD.b) continue;
+          if (bx < PAD.l || bx + w > width - PAD.r || by < PAD.t || by + h > H - PAD.b) continue;
           const b = { x: bx, y: by, w, h };
           if (!hit(b)) {
             boxes.push(b);
@@ -192,15 +212,12 @@ export function RampOverviewMatrix({
       }
     }
     return res;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed, width]);
 
-  // Hold: arbejdsdage med 2+ saelgere.
   const cohorts = useMemo(() => {
-    const byDay = new Map<number, number>();
-    points.forEach((p) => byDay.set(p.m.day_no, (byDay.get(p.m.day_no) ?? 0) + 1));
-    const list = [...byDay.entries()].filter(([, n]) => n >= 2).sort((a, b) => a[0] - b[0]);
     let lastEnd = [-Infinity, -Infinity];
-    return list.map(([day, n]) => {
+    return cohortsRaw.map(([day, n]) => {
       const text = `Hold · dag ${day} (${n})`;
       const w = text.length * 5.8;
       const x = xs(day);
@@ -209,33 +226,46 @@ export function RampOverviewMatrix({
       return { day, n, text, x, row };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points.map((p) => p.m.day_no).join(","), width]);
+  }, [cohortsRaw, width]);
 
-  const yTicks = [0, 0.5, 1, 1.5, 2].filter((t) => t <= yTop + 1e-9);
-  const dim = (g: SupportGroup) => (activeGroup && activeGroup !== g ? 0.2 : 1);
-  const tip = (o: (typeof placed)[number]) =>
-    `${o.p.m.employee_name} · dag ${o.p.m.day_no} · ${o.p.y.toFixed(2).replace(".", ",")}x normal${o.p.y >= Y_MAX ? "+" : ""} · ${o.p.m.cum_sales} salg, minimum ${String(Math.round(minCumulativeAt(o.p.m.day_no, minTargets) * 10) / 10).replace(".", ",")} i dag · ${STATUS_LABEL[o.p.group]} · ${TREND_LABEL[o.p.trend]}`;
-
-  // Minimumsstreg: kumulativt minimum / median for dagen, pr. arbejdsdag med kendt median.
-  const minPts = (() => {
-    const byDay = new Map<number, number[]>();
+  // Typisk spaend (historik) omregnet til samme akse: p25/p50/p75 ÷ forventning pr. arbejdsdag.
+  const band = useMemo(() => {
+    const byDay = new Map<number, { lo: number[]; mid: number[]; hi: number[] }>();
     members.forEach((m) => {
-      if ((m.p50 ?? 0) > 0 && m.day_no >= 1 && m.day_no <= 40) {
-        const arr = byDay.get(m.day_no) ?? [];
-        arr.push(m.p50 as number);
-        byDay.set(m.day_no, arr);
-      }
+      const e = Number(m.expected_today ?? 0);
+      if (e <= 0 || m.p50 == null || m.day_no < 1 || m.day_no > DAYS) return;
+      const b = byDay.get(m.day_no) ?? { lo: [], mid: [], hi: [] };
+      b.lo.push((m.p25 ?? 0) / e);
+      b.mid.push(m.p50 / e);
+      b.hi.push((m.p75 ?? 0) / e);
+      byDay.set(m.day_no, b);
     });
     return [...byDay.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([d, p]) => ({ d, r: Math.min(Y_MAX, minCumulativeAt(d, minTargets) / (median(p) as number)) }));
-  })();
-  const minPath = minPts.length
-    ? minPts.map((p, i) => `${i ? "L" : "M"}${xs(p.d).toFixed(1)},${ys(p.r).toFixed(1)}`).join(" ")
-    : null;
-  const minLabelY = minPts.length ? ys(minPts[minPts.length - 1].r) : null;
+      .map(([d, b]) => ({ d, lo: median(b.lo) as number, mid: median(b.mid) as number, hi: median(b.hi) as number }));
+  }, [members]);
+
+  const weeks = Math.ceil(DAYS / WEEK_DAYS);
+  const yTicks = [0, 0.5, 1, 1.5, 2];
+  const dim = (g: SupportGroup) => (activeGroup && activeGroup !== g ? 0.2 : 1);
+  const tipText = (m: RampTeamMember) =>
+    `${m.cum_sales} salg · forventet ${fmtSales(Number(m.expected_today ?? 0))} i dag (${Math.round(pctOf(m))} %)`;
+  const tip = (o: (typeof placed)[number]) =>
+    `${o.p.m.employee_name} · dag ${o.p.m.day_no} · ${tipText(o.p.m)} · ${STATUS_LABEL[o.p.group]} · ${TREND_LABEL[o.p.trend]}`;
   const [hover, setHover] = useState<string | null>(null);
   const hovered = placed.find((o) => o.p.m.employee_id === hover);
+
+  const startList = useMemo(
+    () => members.filter((m) => supportGroup(m, trendOf(m)) === "start").sort((a, b) => pctOf(a) - pctOf(b)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [members],
+  );
+
+  const bandPath = (key: "lo" | "mid" | "hi") =>
+    band.map((p, i) => `${i ? "L" : "M"}${xs(p.d).toFixed(1)},${ys(p[key]).toFixed(1)}`).join(" ");
+  const bandArea = band.length
+    ? `${bandPath("hi")} ${[...band].reverse().map((p) => `L${xs(p.d).toFixed(1)},${ys(p.lo).toFixed(1)}`).join(" ")} Z`
+    : null;
 
   return (
     <div className="grid gap-4">
@@ -258,8 +288,8 @@ export function RampOverviewMatrix({
                 className="flex items-center gap-4 rounded-[18px] border-2 px-5 py-5 text-left transition-shadow hover:shadow-[0_4px_14px_rgba(0,0,0,.08)]"
                 style={{
                   background: filled ? RED : "#ffffff",
-                  color: filled ? "#ffffff" : "#1b1f1d",
-                  borderColor: active ? "#1b1f1d" : "transparent",
+                  color: filled ? "#ffffff" : DARK,
+                  borderColor: active ? DARK : "transparent",
                   opacity: activeGroup && !active ? 0.6 : 1,
                 }}
               >
@@ -291,133 +321,236 @@ export function RampOverviewMatrix({
           })}
         </div>
       </div>
-    <section
-      className="rounded-[20px] bg-white p-5 sm:p-8"
-      style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-      aria-label="Overblik: hvem ligger hvor?"
-    >
-      <p className="text-[22px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
-        Overblik: hvem ligger hvor?
-      </p>
-      <div className="mt-4">
-        <div className="min-w-0">
-          <div ref={wrapRef} className="relative w-full">
-            <svg width={width} height={H} role="img" aria-label="Prikdiagram: arbejdsdag og niveau ift. normal">
-              <rect x={PAD.l} y={ys(bandLow)} width={plotW} height={plotH + PAD.t - ys(bandLow)} fill={RED} opacity={0.07} />
-              <text x={PAD.l + 6} y={H - PAD.b - 6} fontSize={10} fontWeight={800} fill={RED} letterSpacing=".08em">START HER</text>
-              <rect x={PAD.l} y={ys(bandHigh)} width={plotW} height={ys(bandLow) - ys(bandHigh)} fill="rgba(27,31,29,.08)" />
-              {yTicks.map((t) => (
-                <g key={t}>
-                  <line x1={PAD.l} x2={width - PAD.r} y1={ys(t)} y2={ys(t)} stroke="rgba(27,31,29,.06)" />
-                  <text x={PAD.l - 6} y={ys(t) + 3} fontSize={10} textAnchor="end" fill="#7b857f">
-                    {t === Y_MAX ? "2x+" : `${String(t).replace(".", ",")}`}
+      <section
+        className="rounded-[20px] bg-white p-5 sm:p-8"
+        style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+        aria-label="Overblik: hvem ligger hvor?"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[22px] font-extrabold" style={{ color: DARK, letterSpacing: "-.02em" }}>
+            Overblik: hvem ligger hvor?
+          </p>
+          <label className="flex cursor-pointer items-center gap-2 text-[13px] font-bold" style={{ color: "#57635e" }}>
+            <input
+              type="checkbox"
+              checked={showBand}
+              onChange={(e) => setShowBand(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Vis typisk spænd (historik)
+          </label>
+        </div>
+        <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0">
+            <div ref={wrapRef} className="relative w-full">
+              <svg width={width} height={H} role="img" aria-label="Prikdiagram: arbejdsdag og salg ift. forventning">
+                <rect x={PAD.l} y={PAD.t} width={plotW} height={ys(1) - PAD.t} fill={GREEN} opacity={0.07} />
+                <rect x={PAD.l} y={ys(1)} width={plotW} height={H - PAD.b - ys(1)} fill={RED} opacity={0.07} />
+                <text x={PAD.l + 8} y={PAD.t + 16} fontSize={10} fontWeight={800} fill={GREEN} letterSpacing=".08em">
+                  OVER FORVENTNING
+                </text>
+                <text x={PAD.l + 8} y={H - PAD.b - 8} fontSize={10} fontWeight={800} fill={RED} letterSpacing=".08em">
+                  UNDER FORVENTNING
+                </text>
+                {yTicks.map((t) => (
+                  <g key={t}>
+                    {t !== 1 && (
+                      <line x1={PAD.l} x2={width - PAD.r} y1={ys(t)} y2={ys(t)} stroke="rgba(27,31,29,.06)" />
+                    )}
+                    <text x={PAD.l - 6} y={ys(t) + 3} fontSize={10} textAnchor="end" fill="#7b857f">
+                      {t === Y_MAX ? "200 %+" : `${Math.round(t * 100)} %`}
+                    </text>
+                  </g>
+                ))}
+                {Array.from({ length: weeks - 1 }, (_, i) => (i + 1) * WEEK_DAYS).map((d) => (
+                  <line key={d} x1={xEdge(d)} x2={xEdge(d)} y1={PAD.t} y2={H - PAD.b + 36} stroke="rgba(27,31,29,.08)" />
+                ))}
+                {showBand && bandArea && (
+                  <g pointerEvents="none">
+                    <path d={bandArea} fill="rgba(27,31,29,.10)" />
+                    <path d={bandPath("mid")} fill="none" stroke="#57635e" strokeWidth={1.5} strokeDasharray="4 3" />
+                    {band.length > 0 && (
+                      <text
+                        x={Math.min(width - PAD.r - 4, xs(band[band.length - 1].d) + 6)}
+                        y={ys(band[band.length - 1].mid) - 4}
+                        fontSize={10}
+                        fontWeight={700}
+                        textAnchor={xs(band[band.length - 1].d) > width - 140 ? "end" : "start"}
+                        fill="#57635e"
+                      >
+                        Normal · typisk spænd (historik)
+                      </text>
+                    )}
+                  </g>
+                )}
+                <line x1={PAD.l} x2={width - PAD.r} y1={ys(1)} y2={ys(1)} stroke={DARK} strokeWidth={2.5} />
+                <g>
+                  <rect x={width - PAD.r - 82} y={ys(1) - 20} width={82} height={17} rx={4} fill={DARK} />
+                  <text x={width - PAD.r - 41} y={ys(1) - 8} fontSize={11} fontWeight={800} textAnchor="middle" fill="#ffffff">
+                    Forventning
                   </text>
                 </g>
-              ))}
-              <line x1={PAD.l} x2={width - PAD.r} y1={ys(1)} y2={ys(1)} stroke="#1b1f1d" strokeWidth={2} />
-              {minPath && (
-                <path d={minPath} fill="none" stroke={MIN_COLOR} strokeWidth={2.5} strokeDasharray="6 4" aria-label="Minimum (dit krav)" />
-              )}
-              {gutter ? (
-                <g fontSize={12}>
-                  <line x1={width - PAD.r + 8} x2={width - PAD.r + 8} y1={ys(bandHigh)} y2={ys(bandLow)} stroke="#9aa39e" strokeWidth={2} />
-                  <line x1={width - PAD.r + 8} x2={width - PAD.r + 8} y1={ys(bandLow) + 4} y2={H - PAD.b} stroke={RED} strokeOpacity={0.4} strokeWidth={2} />
-                  <text x={width - PAD.r + 18} y={ys(1) - 2} fontWeight={800} fill="#1b1f1d">Normal</text>
-                  <text x={width - PAD.r + 18} y={ys(1) + 13} fontSize={11} fill="#57635e">(median for dagen)</text>
-                  <text x={width - PAD.r + 18} y={Math.max(ys(1) + 40, (ys(bandHigh) + ys(bandLow)) / 2 + 30)} fontWeight={700} fill="#57635e">Typisk spænd</text>
-                  <text x={width - PAD.r + 18} y={(ys(bandLow) + H - PAD.b) / 2 + 4} fontWeight={800} fill={RED}>Start her-zone</text>
-                  {minLabelY !== null && (
-                    <text x={width - PAD.r + 18} y={minLabelY + 4} fontWeight={800} fill={MIN_COLOR}>Minimum (dit krav)</text>
-                  )}
-                </g>
-              ) : (
-                <text x={width - PAD.r} y={ys(1) - 5} fontSize={10} fontWeight={800} textAnchor="end" fill="#1b1f1d">Normal</text>
-              )}
-              <line x1={PAD.l} x2={width - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="#c9cfcb" />
-              {[1, 5, 10, 15, 20, 25, 30, 35, 40].map((d) => (
-                <text key={d} x={xs(d)} y={H - PAD.b + 16} fontSize={11} textAnchor="middle" fill="#7b857f">{d}</text>
-              ))}
-              {cohorts.map((c) => (
-                <g key={c.day}>
-                  <line x1={c.x} x2={c.x} y1={PAD.t} y2={H - PAD.b} stroke="#c9cfcb" strokeDasharray="2 4" />
-                  <text x={c.x} y={H - PAD.b + 40 + c.row * 15} fontSize={12} fontWeight={700} textAnchor="middle" fill="#1b1f1d">{c.text}</text>
-                </g>
-              ))}
-              <text x={PAD.l + plotW / 2} y={H - 4} fontSize={11} textAnchor="middle" fill="#7b857f">Arbejdsdag</text>
-              {labels.map((l) => {
-                const o = placed.find((q) => q.p.m.employee_id === l.id);
-                const far = Math.abs(l.ly - l.dy) > 3;
-                return (
-                  <g key={l.id} opacity={dim("start")} pointerEvents="none">
-                    {far && <line x1={l.dx + (l.anchorRight ? R : -R)} y1={l.dy} x2={l.lx} y2={l.ly} stroke={RED} strokeWidth={0.8} />}
-                    <text x={l.lx + (l.anchorRight ? 2 : -2)} y={l.ly + 4} fontSize={11} fontWeight={700} textAnchor={l.anchorRight ? "start" : "end"} fill="#1b1f1d">
-                      {l.text}
+                <line x1={PAD.l} x2={width - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="#c9cfcb" />
+                {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => {
+                  const cx = xEdge((w - 0.5) * WEEK_DAYS);
+                  return (
+                    <g key={w}>
+                      <text x={cx} y={H - PAD.b + 16} fontSize={11} fontWeight={800} textAnchor="middle" fill={DARK}>
+                        Uge {w}
+                      </text>
+                      <text x={cx} y={H - PAD.b + 30} fontSize={11} textAnchor="middle" fill="#57635e">
+                        {weeklyTarget(w, minTargets)} salg
+                      </text>
+                    </g>
+                  );
+                })}
+                <text x={PAD.l + plotW / 2} y={H - 6} fontSize={11} textAnchor="middle" fill="#7b857f">
+                  Arbejdsdag · opstartsuge og forventede salg pr. uge
+                </text>
+                {cohorts.map((c) => (
+                  <g key={c.day}>
+                    <line x1={c.x} x2={c.x} y1={PAD.t - 4} y2={H - PAD.b} stroke="#9aa39e" strokeDasharray="2 4" />
+                    <text x={c.x} y={PAD.t - 10 - c.row * 15} fontSize={12} fontWeight={700} textAnchor="middle" fill={DARK}>
+                      {c.text}
                     </text>
-                    {!o && null}
                   </g>
-                );
-              })}
-              {placed.map((o) => {
-                const g = o.p.group;
-                const style =
-                  g === "start"
-                    ? { fill: RED, stroke: RED, sw: 1.5 }
-                    : g === "hold"
-                      ? { fill: "#ffffff", stroke: YELLOW, sw: 3 }
-                      : { fill: GREEN_LIGHT, stroke: GREEN, sw: 1.5 };
-                const label = tip(o);
-                return (
-                  <circle
-                    key={o.p.m.employee_id}
-                    cx={o.x}
-                    cy={o.y}
-                    r={R - style.sw / 2}
-                    fill={style.fill}
-                    stroke={style.stroke}
-                    strokeWidth={style.sw}
-                    opacity={dim(g)}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={label}
-                    className="cursor-pointer outline-none focus-visible:[stroke:#1b1f1d]"
-                    onMouseEnter={() => setHover(o.p.m.employee_id)}
-                    onMouseLeave={() => setHover(null)}
-                    onFocus={() => setHover(o.p.m.employee_id)}
-                    onBlur={() => setHover(null)}
-                    onClick={() => onSelectMember(o.p.m.employee_id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onSelectMember(o.p.m.employee_id);
-                      }
-                    }}
-                  >
-                    <title>{label}</title>
-                  </circle>
-                );
-              })}
-            </svg>
-            {hovered && (
-              <div
-                className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold"
-                style={{
-                  left: Math.min(width - 10, Math.max(10, hovered.x)),
-                  top: hovered.y - R - 8,
-                  transform: `translate(${hovered.x > width - 120 ? "-100%" : hovered.x < 120 ? "0" : "-50%"}, -100%)`,
-                  background: "#1b1f1d",
-                  color: "#ffffff",
-                }}
-              >
-                {hovered.p.m.employee_name} · dag {hovered.p.m.day_no} · {hovered.p.m.cum_sales} salg · minimum{" "}
-                {String(Math.round(minCumulativeAt(hovered.p.m.day_no, minTargets) * 10) / 10).replace(".", ",")} i dag
-              </div>
-            )}
+                ))}
+                {labels.map((l) => {
+                  const far = Math.abs(l.ly - l.dy) > 3;
+                  return (
+                    <g key={l.id} opacity={dim("start")} pointerEvents="none">
+                      {far && <line x1={l.dx + (l.anchorRight ? R : -R)} y1={l.dy} x2={l.lx} y2={l.ly} stroke={RED} strokeWidth={0.8} />}
+                      <text x={l.lx + (l.anchorRight ? 2 : -2)} y={l.ly + 4} fontSize={11} fontWeight={700} textAnchor={l.anchorRight ? "start" : "end"} fill={DARK}>
+                        {l.text}
+                      </text>
+                    </g>
+                  );
+                })}
+                {placed.map((o) => {
+                  const g = o.p.group;
+                  const style =
+                    g === "start"
+                      ? { fill: RED, stroke: RED, sw: 1.5 }
+                      : g === "hold"
+                        ? { fill: "#ffffff", stroke: YELLOW, sw: 3 }
+                        : { fill: GREEN_LIGHT, stroke: GREEN, sw: 1.5 };
+                  const label = tip(o);
+                  return (
+                    <circle
+                      key={o.p.m.employee_id}
+                      cx={o.x}
+                      cy={o.y}
+                      r={R - style.sw / 2}
+                      fill={style.fill}
+                      stroke={style.stroke}
+                      strokeWidth={style.sw}
+                      opacity={dim(g)}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={label}
+                      className="cursor-pointer outline-none focus-visible:[stroke:#1b1f1d]"
+                      onMouseEnter={() => setHover(o.p.m.employee_id)}
+                      onMouseLeave={() => setHover(null)}
+                      onFocus={() => setHover(o.p.m.employee_id)}
+                      onBlur={() => setHover(null)}
+                      onClick={() => onSelectMember(o.p.m.employee_id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectMember(o.p.m.employee_id);
+                        }
+                      }}
+                    >
+                      <title>{label}</title>
+                    </circle>
+                  );
+                })}
+              </svg>
+              {hovered && (
+                <div
+                  className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold"
+                  style={{
+                    left: Math.min(width - 10, Math.max(10, hovered.x)),
+                    top: hovered.y - R - 8,
+                    transform: `translate(${hovered.x > width - 160 ? "-100%" : hovered.x < 160 ? "0" : "-50%"}, -100%)`,
+                    background: DARK,
+                    color: "#ffffff",
+                  }}
+                >
+                  {hovered.p.m.employee_name} · dag {hovered.p.m.day_no} · {tipText(hovered.p.m)}
+                </div>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-full" style={{ background: RED }} /> Start her
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-full border-[3px]" style={{ borderColor: YELLOW }} /> Hold fast
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-full border" style={{ background: GREEN_LIGHT, borderColor: GREEN }} /> På sporet
+              </span>
+            </div>
+            <p className="mt-2 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+              Vandret: arbejdsdag fra startdato, delt i opstartsuger. Lodret: salg til og med i dag ift. forventet antal på
+              samme dag (100 % = præcis på forventning). Over 200 % vises øverst.
+            </p>
+            {footer && <div className="mt-4">{footer}</div>}
           </div>
-          <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
-            Vandret: arbejdsdag. Lodret: salg ift. det typiske for dagen (Normal = 1,0). Over 2x vises øverst.
-          </p>
+
+          <aside aria-label="Start her i dag" className="min-w-0">
+            <p className="text-[12px] font-extrabold uppercase" style={{ color: RED, letterSpacing: ".1em" }}>
+              Start her · i dag
+            </p>
+            <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+              Salg til og med i dag mod forventning
+            </p>
+            {startList.length === 0 ? (
+              <p className="mt-4 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                Ingen i Start her lige nu.
+              </p>
+            ) : (
+              <ul className="mt-3 grid gap-2.5">
+                {startList.map((m) => {
+                  const exp = Number(m.expected_today ?? 0);
+                  const share = exp > 0 ? Math.min(1, m.cum_sales / exp) : 0;
+                  return (
+                    <li key={m.employee_id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectMember(m.employee_id)}
+                        className="w-full rounded-[12px] px-3 py-2.5 text-left hover:bg-[#f6f8f7]"
+                      >
+                        <span className="flex items-baseline justify-between gap-2 text-[13px]">
+                          <span className="min-w-0 truncate font-extrabold" style={{ color: DARK }}>
+                            {m.employee_name} <span className="font-semibold" style={{ color: "#7b857f" }}>· dag {m.day_no}</span>
+                          </span>
+                          <span className="shrink-0 font-bold tabular-nums" style={{ color: DARK }}>
+                            {m.cum_sales} af {fmtSales(exp)} salg
+                          </span>
+                        </span>
+                        <span
+                          className="mt-1.5 block h-2.5 w-full overflow-hidden rounded-full"
+                          style={{ background: "#ece9e8" }}
+                          aria-hidden
+                        >
+                          <span className="block h-full rounded-full" style={{ width: `${share * 100}%`, background: RED }} />
+                        </span>
+                        <span className="mt-1 block text-[12px] font-bold" style={{ color: RED }}>
+                          Mangler {missingSales(m)} salg
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+              Hele baren = forventet antal salg i dag.
+            </p>
+          </aside>
         </div>
-      </div>
       </section>
     </div>
   );
