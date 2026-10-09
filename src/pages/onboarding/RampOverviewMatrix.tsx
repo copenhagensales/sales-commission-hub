@@ -386,6 +386,7 @@ export function RampOverviewMatrix({
             Vandret: arbejdsdag. Lodret: salg ift. det typiske for dagen (Normal = 1,0). Over 2x vises øverst.
           </p>
         </div>
+      </div>
       </section>
     </div>
   );
