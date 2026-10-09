@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useCanEditRampMinTargets, useSetRampMinTargets } from "@/hooks/useRampTeam";
 
-const LABELS = ["Uge 1", "Uge 2", "Uge 3", "Uge 4", "Uge 5 og frem"];
+const LABELS = ["Uge 1", "Uge 2", "Uge 3", "Uge 4", "Uge 5+"];
 
+/** Forventning pr. opstartsuge. Alle med adgang til siden ser den; kun ejere kan rette. */
 export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
   const { data: canEdit } = useCanEditRampMinTargets();
   const save = useSetRampMinTargets();
@@ -13,25 +14,37 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
     setValues(LABELS.map((_, i) => String(targets[Math.min(i, targets.length - 1)] ?? 0)));
   }, [targets]);
 
-  if (!canEdit) return null;
   const parsed = values.map((v) => Number(v));
   const valid = parsed.every((n) => Number.isInteger(n) && n >= 0);
+  const shown = LABELS.map((l, i) => ({ l, v: targets[Math.min(i, targets.length - 1)] ?? 0 }));
 
   return (
-    <div className="rounded-[16px] bg-white px-5 py-3" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between text-left text-[14px] font-extrabold"
-        style={{ color: "#1b1f1d" }}
-      >
-        <span>Minimumskrav · salg pr. uge</span>
-        <span className="text-[12px] font-bold" style={{ color: "#57635e" }}>
-          {targets.join(" / ")} · {open ? "Luk" : "Ret"}
+    <div className="rounded-[12px] px-4 py-2.5" style={{ background: "#f6f8f7" }}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+        <span className="font-extrabold" style={{ color: "#1b1f1d" }}>
+          Forventning · salg pr. uge
         </span>
-      </button>
-      {open && (
+        <span className="font-semibold tabular-nums" style={{ color: "#3c4743" }}>
+          {shown.map((s, i) => (
+            <span key={s.l}>
+              {i > 0 && " · "}
+              {s.l} <strong>{s.v}</strong>
+            </span>
+          ))}
+        </span>
+        {canEdit && (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="ml-auto rounded-full px-3 py-1 text-[12px] font-bold"
+            style={{ background: "#ffffff", color: "#1b1f1d" }}
+          >
+            {open ? "Luk" : "Ret"}
+          </button>
+        )}
+      </div>
+      {canEdit && open && (
         <div className="mt-3 flex flex-wrap items-end gap-3">
           {LABELS.map((l, i) => (
             <label key={l} className="grid gap-1 text-[12px] font-bold" style={{ color: "#57635e" }}>
@@ -57,8 +70,8 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
             {save.isPending ? "Gemmer…" : "Gem"}
           </button>
           <p className="basis-full text-[12px] font-semibold" style={{ color: "#57635e" }}>
-            Kravet fordeles på de 5 arbejdsdage i ugen (fx 5 salg = 1 pr. dag) og vises som stiplet streg i grafen.
-            Grupper og alarmer ændres ikke.
+            Kravet fordeles på de 5 arbejdsdage i ugen (fx 5 salg = 1 pr. dag). Grafen, grupperne og alarmerne på dag 10 og
+            15 måles mod det.
           </p>
         </div>
       )}
