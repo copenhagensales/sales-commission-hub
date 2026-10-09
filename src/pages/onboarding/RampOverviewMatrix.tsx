@@ -1,5 +1,8 @@
 import type { RampTeamMember } from "@/hooks/useRampTeam";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_WEEKLY_MIN_TARGETS, minCumulativeAt } from "@/lib/rampMinTarget";
+
+const MIN_COLOR = "#2b5fd9";
 
 /**
  * Overblik: hvem ligger hvor? Ren visning af data fra get_ramp_team_overview.
@@ -88,6 +91,7 @@ export function RampOverviewMatrix({
   activeGroup,
   onSelectGroup,
   onSelectMember,
+  minTargets = DEFAULT_WEEKLY_MIN_TARGETS,
 }: {
   members: RampTeamMember[];
   trendOf: (m: RampTeamMember) => Trend;
@@ -95,6 +99,7 @@ export function RampOverviewMatrix({
   activeGroup: SupportGroup | null;
   onSelectGroup: (g: SupportGroup) => void;
   onSelectMember: (employeeId: string) => void;
+  minTargets?: number[];
 }) {
   const points = members
     .map((m) => {
@@ -209,7 +214,26 @@ export function RampOverviewMatrix({
   const yTicks = [0, 0.5, 1, 1.5, 2].filter((t) => t <= yTop + 1e-9);
   const dim = (g: SupportGroup) => (activeGroup && activeGroup !== g ? 0.2 : 1);
   const tip = (o: (typeof placed)[number]) =>
-    `${o.p.m.employee_name} · dag ${o.p.m.day_no} · ${o.p.y.toFixed(2).replace(".", ",")}x normal${o.p.y >= Y_MAX ? "+" : ""} · ${STATUS_LABEL[o.p.group]} · ${TREND_LABEL[o.p.trend]}`;
+    `${o.p.m.employee_name} · dag ${o.p.m.day_no} · ${o.p.y.toFixed(2).replace(".", ",")}x normal${o.p.y >= Y_MAX ? "+" : ""} · ${o.p.m.cum_sales} salg, minimum ${String(Math.round(minCumulativeAt(o.p.m.day_no, minTargets) * 10) / 10).replace(".", ",")} i dag · ${STATUS_LABEL[o.p.group]} · ${TREND_LABEL[o.p.trend]}`;
+
+  // Minimumsstreg: kumulativt minimum / median for dagen, pr. arbejdsdag med kendt median.
+  const minPts = (() => {
+    const byDay = new Map<number, number[]>();
+    members.forEach((m) => {
+      if ((m.p50 ?? 0) > 0 && m.day_no >= 1 && m.day_no <= 40) {
+        const arr = byDay.get(m.day_no) ?? [];
+        arr.push(m.p50 as number);
+        byDay.set(m.day_no, arr);
+      }
+    });
+    return [...byDay.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([d, p]) => ({ d, r: Math.min(Y_MAX, minCumulativeAt(d, minTargets) / (median(p) as number)) }));
+  })();
+  const minPath = minPts.length
+    ? minPts.map((p, i) => `${i ? "L" : "M"}${xs(p.d).toFixed(1)},${ys(p.r).toFixed(1)}`).join(" ")
+    : null;
+  const minLabelY = minPts.length ? ys(minPts[minPts.length - 1].r) : null;
   const [hover, setHover] = useState<string | null>(null);
   const hovered = placed.find((o) => o.p.m.employee_id === hover);
 
@@ -291,6 +315,9 @@ export function RampOverviewMatrix({
                 </g>
               ))}
               <line x1={PAD.l} x2={width - PAD.r} y1={ys(1)} y2={ys(1)} stroke="#1b1f1d" strokeWidth={2} />
+              {minPath && (
+                <path d={minPath} fill="none" stroke={MIN_COLOR} strokeWidth={2.5} strokeDasharray="6 4" aria-label="Minimum (dit krav)" />
+              )}
               {gutter ? (
                 <g fontSize={12}>
                   <line x1={width - PAD.r + 8} x2={width - PAD.r + 8} y1={ys(bandHigh)} y2={ys(bandLow)} stroke="#9aa39e" strokeWidth={2} />
@@ -299,6 +326,9 @@ export function RampOverviewMatrix({
                   <text x={width - PAD.r + 18} y={ys(1) + 13} fontSize={11} fill="#57635e">(median for dagen)</text>
                   <text x={width - PAD.r + 18} y={Math.max(ys(1) + 40, (ys(bandHigh) + ys(bandLow)) / 2 + 30)} fontWeight={700} fill="#57635e">Typisk spænd</text>
                   <text x={width - PAD.r + 18} y={(ys(bandLow) + H - PAD.b) / 2 + 4} fontWeight={800} fill={RED}>Start her-zone</text>
+                  {minLabelY !== null && (
+                    <text x={width - PAD.r + 18} y={minLabelY + 4} fontWeight={800} fill={MIN_COLOR}>Minimum (dit krav)</text>
+                  )}
                 </g>
               ) : (
                 <text x={width - PAD.r} y={ys(1) - 5} fontSize={10} fontWeight={800} textAnchor="end" fill="#1b1f1d">Normal</text>
@@ -378,7 +408,8 @@ export function RampOverviewMatrix({
                   color: "#ffffff",
                 }}
               >
-                {hovered.p.m.employee_name} · dag {hovered.p.m.day_no} · {hovered.p.y.toFixed(2).replace(".", ",")}x
+                {hovered.p.m.employee_name} · dag {hovered.p.m.day_no} · {hovered.p.m.cum_sales} salg · minimum{" "}
+                {String(Math.round(minCumulativeAt(hovered.p.m.day_no, minTargets) * 10) / 10).replace(".", ",")} i dag
               </div>
             )}
           </div>
