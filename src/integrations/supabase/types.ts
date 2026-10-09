@@ -18338,6 +18338,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      can_edit_ramp_min_targets: { Args: never; Returns: boolean }
       can_edit_report_templates: {
         Args: { _user_id: string }
         Returns: boolean
