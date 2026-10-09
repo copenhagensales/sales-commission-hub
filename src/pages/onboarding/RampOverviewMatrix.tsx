@@ -123,7 +123,8 @@ export function RampOverviewMatrix({
   const bandHigh = median(withNorm.map((m) => (m.p75 ?? 0) / (m.p50 as number))) ?? 1.25;
 
   const H = 460;
-  const PAD = { l: 40, r: 16, t: 14, b: 58 };
+  const gutter = width >= 640;
+  const PAD = { l: 40, r: gutter ? 150 : 16, t: 20, b: 76 };
   const R = 9;
   const GAP = 4;
   const plotW = width - PAD.l - PAD.r;
@@ -213,16 +214,69 @@ export function RampOverviewMatrix({
   const hovered = placed.find((o) => o.p.m.employee_id === hover);
 
   return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-[12px] font-extrabold uppercase" style={{ color: "#57635e", letterSpacing: ".1em" }}>
+          Hvor starter du?
+        </p>
+        <div className="mt-2.5 grid gap-3 md:grid-cols-3">
+          {(["start", "hold", "track"] as SupportGroup[]).map((g) => {
+            const info = GROUP_INFO[g];
+            const active = activeGroup === g;
+            const filled = g === "start";
+            const accent = g === "start" ? RED : g === "hold" ? YELLOW_TEXT : GREEN;
+            return (
+              <button
+                key={g}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onSelectGroup(g)}
+                className="flex items-center gap-4 rounded-[18px] border-2 px-5 py-5 text-left transition-shadow hover:shadow-[0_4px_14px_rgba(0,0,0,.08)]"
+                style={{
+                  background: filled ? RED : "#ffffff",
+                  color: filled ? "#ffffff" : "#1b1f1d",
+                  borderColor: active ? "#1b1f1d" : "transparent",
+                  opacity: activeGroup && !active ? 0.6 : 1,
+                }}
+              >
+                <span
+                  className="text-[52px] font-extrabold leading-none tabular-nums"
+                  style={{ color: filled ? "#ffffff" : accent, letterSpacing: "-.04em" }}
+                >
+                  {counts[g]}
+                </span>
+                <span className="min-w-0">
+                  <span
+                    className="flex items-center gap-1.5 text-[12px] font-extrabold uppercase"
+                    style={{ letterSpacing: ".08em", color: filled ? "#ffffff" : accent }}
+                  >
+                    <span
+                      aria-hidden
+                      className="inline-block h-3 w-3 rounded-full border-2"
+                      style={{ borderColor: filled ? "#ffffff" : accent }}
+                    />
+                    {info.no} · {info.title}
+                  </span>
+                  <span className="mt-1 block text-[15px] font-extrabold">{info.rule}</span>
+                  <span className="mt-0.5 block text-[13px] font-semibold" style={{ opacity: filled ? 0.92 : 0.75 }}>
+                    {info.text}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     <section
-      className="rounded-[20px] bg-white p-5 sm:p-6"
+      className="rounded-[20px] bg-white p-5 sm:p-8"
       style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
       aria-label="Overblik: hvem ligger hvor?"
     >
-      <p className="text-[19px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
+      <p className="text-[22px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
         Overblik: hvem ligger hvor?
       </p>
-      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="order-2 min-w-0 lg:order-1">
+      <div className="mt-4">
+        <div className="min-w-0">
           <div ref={wrapRef} className="relative w-full">
             <svg width={width} height={H} role="img" aria-label="Prikdiagram: arbejdsdag og niveau ift. normal">
               <rect x={PAD.l} y={ys(bandLow)} width={plotW} height={plotH + PAD.t - ys(bandLow)} fill={RED} opacity={0.07} />
@@ -237,18 +291,29 @@ export function RampOverviewMatrix({
                 </g>
               ))}
               <line x1={PAD.l} x2={width - PAD.r} y1={ys(1)} y2={ys(1)} stroke="#1b1f1d" strokeWidth={2} />
-              <text x={width - PAD.r} y={ys(1) - 5} fontSize={10} fontWeight={800} textAnchor="end" fill="#1b1f1d">Normal</text>
+              {gutter ? (
+                <g fontSize={12}>
+                  <line x1={width - PAD.r + 8} x2={width - PAD.r + 8} y1={ys(bandHigh)} y2={ys(bandLow)} stroke="#9aa39e" strokeWidth={2} />
+                  <line x1={width - PAD.r + 8} x2={width - PAD.r + 8} y1={ys(bandLow) + 4} y2={H - PAD.b} stroke={RED} strokeOpacity={0.4} strokeWidth={2} />
+                  <text x={width - PAD.r + 18} y={ys(1) - 2} fontWeight={800} fill="#1b1f1d">Normal</text>
+                  <text x={width - PAD.r + 18} y={ys(1) + 13} fontSize={11} fill="#57635e">(median for dagen)</text>
+                  <text x={width - PAD.r + 18} y={Math.max(ys(1) + 40, (ys(bandHigh) + ys(bandLow)) / 2 + 30)} fontWeight={700} fill="#57635e">Typisk spænd</text>
+                  <text x={width - PAD.r + 18} y={(ys(bandLow) + H - PAD.b) / 2 + 4} fontWeight={800} fill={RED}>Start her-zone</text>
+                </g>
+              ) : (
+                <text x={width - PAD.r} y={ys(1) - 5} fontSize={10} fontWeight={800} textAnchor="end" fill="#1b1f1d">Normal</text>
+              )}
               <line x1={PAD.l} x2={width - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="#c9cfcb" />
               {[1, 5, 10, 15, 20, 25, 30, 35, 40].map((d) => (
-                <text key={d} x={xs(d)} y={H - PAD.b + 13} fontSize={10} textAnchor="middle" fill="#7b857f">{d}</text>
+                <text key={d} x={xs(d)} y={H - PAD.b + 16} fontSize={11} textAnchor="middle" fill="#7b857f">{d}</text>
               ))}
               {cohorts.map((c) => (
                 <g key={c.day}>
-                  <line x1={c.x} x2={c.x} y1={H - PAD.b + 17} y2={H - PAD.b + 22 + c.row * 13} stroke="#9aa39e" />
-                  <text x={c.x} y={H - PAD.b + 31 + c.row * 13} fontSize={9.5} fontWeight={700} textAnchor="middle" fill="#57635e">{c.text}</text>
+                  <line x1={c.x} x2={c.x} y1={PAD.t} y2={H - PAD.b} stroke="#c9cfcb" strokeDasharray="2 4" />
+                  <text x={c.x} y={H - PAD.b + 40 + c.row * 15} fontSize={12} fontWeight={700} textAnchor="middle" fill="#1b1f1d">{c.text}</text>
                 </g>
               ))}
-              <text x={PAD.l + plotW / 2} y={H - 2} fontSize={10} textAnchor="middle" fill="#7b857f">Arbejdsdag</text>
+              <text x={PAD.l + plotW / 2} y={H - 4} fontSize={11} textAnchor="middle" fill="#7b857f">Arbejdsdag</text>
               {labels.map((l) => {
                 const o = placed.find((q) => q.p.m.employee_id === l.id);
                 const far = Math.abs(l.ly - l.dy) > 3;
@@ -317,78 +382,11 @@ export function RampOverviewMatrix({
               </div>
             )}
           </div>
-          <div
-            className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] font-semibold"
-            style={{ color: "#57635e" }}
-          >
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-[2px] w-4" style={{ background: "#1b1f1d" }} />
-              Normal (median for dagen)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-4" style={{ background: "rgba(27,31,29,.12)" }} />
-              Typisk spænd
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ background: RED }} />
-              Under typisk, flad/faldende
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full border-2 bg-white" style={{ borderColor: YELLOW }} />
-              Under typisk, stigende
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full border-2" style={{ background: GREEN_LIGHT, borderColor: GREEN }} />
-              På eller over typisk
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-4" style={{ background: "rgba(193,59,50,.14)" }} />
-              Start her-zone
-            </span>
-            <span>Vandret: arbejdsdag. Lodret: salg ift. det typiske for dagen (Normal = 1,0). Over 2x vises øverst.</span>
-          </div>
-        </div>
-
-        <div className="order-1 lg:order-2">
-          <p
-            className="text-[12px] font-extrabold uppercase"
-            style={{ color: "#57635e", letterSpacing: ".1em" }}
-          >
-            Hvor starter du?
+          <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+            Vandret: arbejdsdag. Lodret: salg ift. det typiske for dagen (Normal = 1,0). Over 2x vises øverst.
           </p>
-          <div className="mt-3 grid gap-2.5">
-            {(["start", "hold", "track"] as SupportGroup[]).map((g) => {
-              const info = GROUP_INFO[g];
-              const active = activeGroup === g;
-              return (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => onSelectGroup(g)}
-                  className="rounded-[14px] border-2 px-4 py-3 text-left transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,.08)]"
-                  style={{
-                    background: info.bg,
-                    color: info.fg,
-                    borderColor: active ? "#1b1f1d" : info.border,
-                  }}
-                >
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="text-[14px] font-extrabold uppercase" style={{ letterSpacing: ".04em" }}>
-                      {info.no} · {info.title}
-                    </span>
-                    <span className="text-[24px] font-extrabold tabular-nums leading-none">
-                      {counts[g]}
-                    </span>
-                  </span>
-                  <span className="mt-1 block text-[12px] font-bold opacity-90">{info.rule}</span>
-                  <span className="mt-0.5 block text-[12px] font-semibold opacity-90">{info.text}</span>
-                </button>
-              );
-            })}
-          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
