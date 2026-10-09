@@ -1456,7 +1456,7 @@ export default function RampTeam() {
     <MainLayout>
       <div className="ramp-page" style={{ background: "#e6efec" }}>
         <div className="mx-auto max-w-[1080px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
-          <header className="flex flex-wrap items-end justify-between gap-4">
+          <header className="flex flex-col gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <h1
@@ -1482,7 +1482,7 @@ export default function RampTeam() {
                   type="button"
                   aria-pressed={discreet}
                   onClick={toggleDiscreet}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-[12px] font-bold"
+                  className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-[5px] text-[12px] font-bold"
                   style={{
                     background: discreet ? "#1b1f1d" : "#ffffff",
                     color: discreet ? "#ffffff" : "#1b1f1d",
@@ -1508,14 +1508,16 @@ export default function RampTeam() {
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-1 rounded-full bg-white p-1" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}>
               {(
                 [
-                  { mode: "all" as FilterMode, label: `Alle nye · ${counts.total}` },
-                  { mode: "danger" as FilterMode, label: `Ekstra støtte · ${counts.danger}` },
+                  { mode: "all" as FilterMode, label: "Alle nye", n: counts.total },
+                  { mode: "danger" as FilterMode, label: "Ekstra støtte", n: counts.danger },
                   {
                     mode: "missing" as FilterMode,
-                    label: `Mangler forløb i uge ${isoWeek ?? "-"} · ${counts.missing}`,
+                    label: `Mangler forløb i uge ${isoWeek ?? "-"}`,
+                    n: counts.missing,
                   },
                 ]
               ).map((tab) => {
@@ -1527,24 +1529,33 @@ export default function RampTeam() {
                     key={tab.mode}
                     type="button"
                     onClick={() => setFilter(tab.mode)}
-                    className="rounded-full px-4 py-2.5 text-[14px] font-bold"
+                    className="flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-bold"
                     style={{
-                      background: active ? "#1b1f1d" : "#ffffff",
+                      background: active ? "#1b1f1d" : "transparent",
                       color: active ? "#ffffff" : "#1b1f1d",
-                      boxShadow: "0 1px 2px rgba(0,0,0,.06)",
                     }}
                   >
                     {tab.mode === "danger" && (
                       <span
                         aria-hidden
-                        className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                        className="inline-block h-2 w-2 rounded-full"
                         style={{ background: RED }}
                       />
                     )}
                     {tab.label}
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[11px] font-extrabold tabular-nums"
+                      style={{
+                        background: active ? "rgba(255,255,255,.18)" : "#eef2f0",
+                        color: active ? "#ffffff" : "#4a5651",
+                      }}
+                    >
+                      {tab.n}
+                    </span>
                   </button>
                 );
               })}
+              </div>
               <div className="relative ml-auto">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
