@@ -713,6 +713,23 @@ function DeviationsPanel({
     }
   };
 
+  const handleExportClaims = async () => {
+    const rows = claimRows.map((sale) => ({
+      Salgsdato: format(new Date(sale.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da }),
+      Sælger: sale.sellerName || "",
+      Mobil: sale.phone || "",
+      Tastselv: sale.productName || "",
+      Notat: sale.note || "",
+      Status: sale.approved
+        ? `Godkendt${sale.approvedAt ? ` · ${format(new Date(sale.approvedAt), "dd/MM", { locale: da })}` : ""}${sale.approvedByName ? ` · ${sale.approvedByName}` : ""}`
+        : "Afventer",
+    }));
+    const stamp = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : "alle");
+    await downloadExcel(`claims-reimport-${stamp(fromDate)}-${stamp(toDate)}.xlsx`, [
+      { name: "Claims-Reimport", rows, columnWidths: [18, 28, 14, 40, 40, 36] },
+    ]);
+  };
+
   const handleExportMissing = async () => {
     const rows = deviationRows.map((row) => ({
       Salgsdato: format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da }),
@@ -819,6 +836,16 @@ function DeviationsPanel({
                 {opt.label}
               </Button>
             ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto h-8 gap-1.5"
+              disabled={claimRows.length === 0}
+              onClick={handleExportClaims}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Eksportér til Excel
+            </Button>
           </div>
         )}
 
