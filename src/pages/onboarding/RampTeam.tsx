@@ -52,10 +52,9 @@ const AMBER = "#e0b64a";
 const AMBER_STRIP = "#e08a2e";
 const AMBER_TEXT = "#9a6216";
 const GREEN = "#177a4d";
-/** Blaa = ekstra stoette (saelgerens status). Roed bruges ikke om saelgere. */
-const BLUE = "#2f6fb5";
-const BLUE_TEXT = "#1d4f87";
-const BLUE_FLAT = "#e6effa";
+/** Saelgerstatus: roed = start her, gul = hold fast, groen = paa sporet. */
+const RED_FLAT = "#fbe4e1";
+const YELLOW = "#d9a21b";
 const GREY_PILL = "#f1f4f3";
 
 /** Fokusomraader lederen kan vaelge til ugens fokus. */
@@ -156,7 +155,9 @@ function derive(member: AnyMember): Derived {
     urgency,
     stripColor:
       member.status === "under"
-        ? BLUE
+        ? trend === "up"
+          ? YELLOW
+          : RED
         : member.status === "midt" || member.status === "over"
           ? GREEN
           : NEUTRAL,
@@ -364,8 +365,8 @@ function WeeklyBars({
             style={{
               top: H - px(bandHigh),
               height: Math.max(2, px(bandHigh) - px(bandLow)),
-              borderColor: "#b5cdea",
-              background: "rgba(47,111,181,.12)",
+              borderColor: "#c3ccc8",
+              background: "rgba(27,31,29,.07)",
             }}
           />
         )}
@@ -376,7 +377,7 @@ function WeeklyBars({
           />
         )}
         {weeks.map((w) => {
-          const color = w.sales >= w.p25 ? BLUE : "#c3ccc8";
+          const color = stripColor;
           return (
             <div
               key={weekKey(w.iso_year, w.iso_week)}
@@ -384,7 +385,7 @@ function WeeklyBars({
             >
               <span
                 className="text-[12px] font-extrabold tabular-nums"
-                style={{ color: w.sales >= w.p25 ? BLUE_TEXT : "#57635e" }}
+                style={{ color: "#1b1f1d" }}
               >
                 {w.sales}
               </span>
@@ -577,7 +578,7 @@ function MemberCard({
               </Pill>
             )}
             {!discreet && member.status === "under" && (
-              <Pill bg={BLUE_FLAT} color={BLUE_TEXT}>
+              <Pill bg={RED_FLAT} color={RED_TEXT}>
                 Ekstra støtte
               </Pill>
             )}
@@ -628,7 +629,7 @@ function MemberCard({
               className="block h-full rounded-[4px]"
               style={{
                 width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
-                background: BLUE,
+                background: discreet ? NEUTRAL : d.stripColor,
               }}
             />
           </span>
@@ -1533,6 +1534,13 @@ export default function RampTeam() {
                       boxShadow: "0 1px 2px rgba(0,0,0,.06)",
                     }}
                   >
+                    {tab.mode === "danger" && (
+                      <span
+                        aria-hidden
+                        className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                        style={{ background: RED }}
+                      />
+                    )}
                     {tab.label}
                   </button>
                 );
@@ -1580,12 +1588,12 @@ export default function RampTeam() {
           <div className="grid gap-3.5 sm:grid-cols-3">
             {[
               {
-                strip: BLUE,
+                strip: RED,
                 label: "Ekstra støtte",
                 value: counts.danger,
                 sub: `af ${counts.total} sælgere`,
                 extra: "Under typisk niveau — giv dem mest tid i denne uge",
-                extraColor: BLUE_TEXT,
+                extraColor: RED_TEXT,
               },
               {
                 strip: GREEN,
@@ -1652,7 +1660,7 @@ export default function RampTeam() {
           {stats.length > 0 && (
             <section
               className="rounded-[16px] border-l-[5px] bg-white px-[22px] py-4"
-              style={{ borderColor: BLUE, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+              style={{ borderColor: RED, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
             >
               <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
                 <div className="min-w-[200px] flex-1">
@@ -1666,7 +1674,7 @@ export default function RampTeam() {
                     {day10 && day10.n_below > 0 && day10.n_above > 0 ? (
                       <>
                         Ligger en ny under typisk på dag 10, stopper{" "}
-                        <strong style={{ color: BLUE_TEXT }}>
+                        <strong style={{ color: RED_TEXT }}>
                           {Math.round((day10.n_below_stopped / day10.n_below) * 100)} %
                         </strong>{" "}
                         inden dag 40 — mod{" "}
