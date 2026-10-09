@@ -105,3 +105,25 @@ export function useDeleteColumn() {
     onError,
   });
 }
+
+/**
+ * Henter definerede kolonner og kolonner som produktbetingelserne bruger for en kunde.
+ * Bruges af annulleringsuploaden lige før data gemmes.
+ */
+export async function fetchUploadFilterSets(definitionKey: string, clientId: string) {
+  const { data: def, error } = await supabase
+    .from("data_import_definitions").select("id").eq("key", definitionKey).maybeSingle();
+  if (error) throw error;
+  const defined = new Set<string>();
+  if (def) {
+    const { data: rules, error: e2 } = await supabase
+      .from("data_import_column_rules").select("column_name, category_id").eq("definition_id", def.id);
+    if (e2) throw e2;
+    for (const r of rules ?? []) if (r.category_id) defined.add(normalizeColumnName(r.column_name));
+  }
+  const { data: conds, error: e3 } = await supabase
+    .from("cancellation_product_conditions").select("column_name").eq("client_id", clientId);
+  if (e3) throw e3;
+  const conditionCols = (conds ?? []).map((c) => normalizeColumnName(c.column_name));
+  return { defined, conditionCols, hasDefinition: !!def && defined.size > 0 };
+}
