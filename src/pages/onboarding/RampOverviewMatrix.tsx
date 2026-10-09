@@ -2,7 +2,7 @@ import type { RampTeamMember } from "@/hooks/useRampTeam";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_WEEKLY_MIN_TARGETS, minCumulativeAt } from "@/lib/rampMinTarget";
 
-const MIN_COLOR = "#2b5fd9";
+const MIN_COLOR = "#6b3fa0";
 
 /**
  * Overblik: hvem ligger hvor? Ren visning af data fra get_ramp_team_overview.
