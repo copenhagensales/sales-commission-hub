@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, AlertTriangle, Trash2, Plus, FileSpreadsheet, Loader2 } from "lucide-react";
 import { parseExcelFile } from "@/utils/excel";
+import { isProtectedColumn } from "@/utils/dataImportFilter";
 import { toast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 import {
   useDataImportDefinitions, useCreateDefinition, useClientOptions,
   type DataImportDefinition,
-  useDataImportRules, useSaveCategory, useDeleteCategory, useAddColumns, useSetColumnCategory, useDeleteColumn,
+  useDataImportRules, useMatchingColumns, useSaveCategory, useDeleteCategory, useAddColumns, useSetColumnCategory, useDeleteColumn,
 } from "@/hooks/useDataImportRules";
 
 function CategoriesCard({ def }: { def: DataImportDefinition }) {
@@ -77,6 +78,7 @@ function CategoriesCard({ def }: { def: DataImportDefinition }) {
 
 function ColumnsCard({ def }: { def: DataImportDefinition }) {
   const { data } = useDataImportRules(def.id);
+  const { data: matchingCols } = useMatchingColumns(def.client_id);
   const addCols = useAddColumns();
   const setCat = useSetColumnCategory();
   const delCol = useDeleteColumn();
@@ -105,7 +107,7 @@ function ColumnsCard({ def }: { def: DataImportDefinition }) {
   });
 
   const catById = new Map(categories.map((c) => [c.id, c]));
-  const missing = rules.filter((r) => !r.category_id || catById.get(r.category_id)?.retention_days == null).length;
+  const missing = rules.filter((r) => !r.excluded && (!r.category_id || catById.get(r.category_id)?.retention_days == null)).length;
 
   return (
     <Card>
@@ -140,15 +142,22 @@ function ColumnsCard({ def }: { def: DataImportDefinition }) {
             return (
               <div key={r.id} className="flex flex-wrap items-center gap-3 p-2">
                 <span className="min-w-48 flex-1 font-mono text-sm">{r.column_name}</span>
-                <Select value={r.category_id ?? ""} onValueChange={(v) => setCat.mutate({ id: r.id, categoryId: v })}>
+                <Select value={r.excluded ? "__excluded" : r.category_id ?? ""}
+                  onValueChange={(v) => setCat.mutate(v === "__excluded" ? { id: r.id, categoryId: null, excluded: true } : { id: r.id, categoryId: v })}>
                   <SelectTrigger className="w-64"><SelectValue placeholder="Vælg kategori" /></SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    <SelectItem value="__excluded">Importeres ikke</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="w-32 text-sm text-muted-foreground">
-                  {cat?.retention_days != null ? `Slettes efter ${cat.retention_days} dage` : <Badge variant="destructive">Mangler</Badge>}
+                <span className="w-40 text-sm text-muted-foreground">
+                  {r.excluded
+                    ? <Badge variant="secondary">Gemmes ikke</Badge>
+                    : cat?.retention_days != null ? `Slettes efter ${cat.retention_days} dage` : <Badge variant="destructive">Mangler</Badge>}
                 </span>
+                {r.excluded && matchingCols && isProtectedColumn(r.column_name, matchingCols) && (
+                  <span className="w-full text-xs text-warning">Bruges af matchingen og gemmes derfor alligevel.</span>
+                )}
                 <Button variant="ghost" size="icon" aria-label="Fjern kolonne" onClick={() => delCol.mutate(r.id)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             );

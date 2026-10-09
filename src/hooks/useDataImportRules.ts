@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
-import { normalizeColumnName } from "@/utils/dataImportFilter";
+import { normalizeColumnName, buildProtectedColumns } from "@/utils/dataImportFilter";
 
 export type DataImportCategory = Database["public"]["Tables"]["data_import_categories"]["Row"];
 export type DataImportColumnRule = Database["public"]["Tables"]["data_import_column_rules"]["Row"];
@@ -117,8 +117,9 @@ export function useAddColumns() {
 export function useSetColumnCategory() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async ({ id, categoryId }: { id: string; categoryId: string | null }) => {
-      const { error } = await supabase.from("data_import_column_rules").update({ category_id: categoryId }).eq("id", id);
+    mutationFn: async ({ id, categoryId, excluded = false }: { id: string; categoryId: string | null; excluded?: boolean }) => {
+      const { error } = await supabase.from("data_import_column_rules")
+        .update({ category_id: excluded ? null : categoryId, excluded }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: inv,
@@ -147,15 +148,36 @@ export async function fetchUploadFilterSets(definitionKey: string, clientId: str
     .from("data_import_definitions").select("id").eq("key", definitionKey).maybeSingle();
   if (error) throw error;
   const defined = new Set<string>();
+  const excluded = new Set<string>();
   if (def) {
     const { data: rules, error: e2 } = await supabase
-      .from("data_import_column_rules").select("column_name, category_id").eq("definition_id", def.id);
+      .from("data_import_column_rules").select("column_name, category_id, excluded").eq("definition_id", def.id);
     if (e2) throw e2;
-    for (const r of rules ?? []) if (r.category_id) defined.add(normalizeColumnName(r.column_name));
+    for (const r of rules ?? []) {
+      if (r.excluded) excluded.add(normalizeColumnName(r.column_name));
+      else if (r.category_id) defined.add(normalizeColumnName(r.column_name));
+    }
   }
   const { data: conds, error: e3 } = await supabase
     .from("cancellation_product_conditions").select("column_name").eq("client_id", clientId);
   if (e3) throw e3;
   const conditionCols = (conds ?? []).map((c) => normalizeColumnName(c.column_name));
-  return { defined, conditionCols, hasDefinition: !!def && defined.size > 0 };
+  return { defined, excluded, conditionCols, hasDefinition: !!def && defined.size + excluded.size > 0 };
+}
+
+/** Kolonner som matchingen læser for kundens standard-upload-opsætning (til visning på Data import). */
+export function useMatchingColumns(clientId: string | null) {
+  return useQuery({
+    queryKey: [KEY, "matching-columns", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data: cfg, error } = await supabase.from("cancellation_upload_configs")
+        .select("*").eq("client_id", clientId!).order("is_default", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      const { data: conds, error: e2 } = await supabase
+        .from("cancellation_product_conditions").select("column_name").eq("client_id", clientId!);
+      if (e2) throw e2;
+      return buildProtectedColumns(cfg as unknown as Record<string, unknown> | null, (conds ?? []).map((c) => c.column_name));
+    },
+  });
 }

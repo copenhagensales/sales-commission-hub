@@ -5431,6 +5431,7 @@ export type Database = {
           column_name: string
           created_at: string
           definition_id: string
+          excluded: boolean
           id: string
         }
         Insert: {
@@ -5438,6 +5439,7 @@ export type Database = {
           column_name: string
           created_at?: string
           definition_id: string
+          excluded?: boolean
           id?: string
         }
         Update: {
@@ -5445,6 +5447,7 @@ export type Database = {
           column_name?: string
           created_at?: string
           definition_id?: string
+          excluded?: boolean
           id?: string
         }
         Relationships: [

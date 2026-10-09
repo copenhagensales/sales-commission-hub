@@ -9,7 +9,7 @@ import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseExcelFile } from "@/utils/excel";
-import { filterUploadedRow, normalizeColumnName } from "@/utils/dataImportFilter";
+import { filterUploadedRow, buildProtectedColumns } from "@/utils/dataImportFilter";
 import { fetchUploadFilterSets, EESY_TM_BASKET_KEY } from "@/hooks/useDataImportRules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2388,17 +2388,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       if (applyDataRules) {
         const sets = await fetchUploadFilterSets(EESY_TM_BASKET_KEY, selectedClientId!);
         dataRulesMissing = !sets.hasDefinition;
-        const cfg = activeQueueConfig as unknown as Record<string, unknown> | null | undefined;
-        const protectedCols = new Set<string>(sets.conditionCols);
-        for (const key of ["phone_column", "company_column", "opp_column", "revenue_column", "commission_column", "member_number_column", "filter_column", "seller_column", "date_column", "type_detection_column"]) {
-          const v = cfg?.[key];
-          if (typeof v === "string" && v) protectedCols.add(normalizeColumnName(v));
-        }
-        const productCols = cfg?.product_columns;
-        if (Array.isArray(productCols)) for (const p of productCols) if (typeof p === "string") protectedCols.add(normalizeColumnName(p));
-        protectedCols.add(normalizeColumnName("Annulled Sales"));
+        const protectedCols = buildProtectedColumns(activeQueueConfig as unknown as Record<string, unknown> | null | undefined, sets.conditionCols);
         filterRow = (row) => {
-          const r = filterUploadedRow(row, sets.defined, protectedCols);
+          const r = filterUploadedRow(row, sets.defined, protectedCols, sets.excluded);
           r.dropped.forEach((d) => droppedColumns.add(d));
           return r.row;
         };

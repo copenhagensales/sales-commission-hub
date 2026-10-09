@@ -78,6 +78,13 @@
       "when": 1791549886097,
       "tag": "0010_data_import_definition_scoped_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791550232368,
+      "tag": "0011_data_import_column_excluded",
+      "breakpoints": true
     }
   ]
 }
