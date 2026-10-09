@@ -1,0 +1,1 @@
+ALTER TABLE public.data_import_column_rules ADD COLUMN excluded boolean NOT NULL DEFAULT false;
