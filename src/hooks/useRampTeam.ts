@@ -110,6 +110,45 @@ export interface RampRiskStat {
 }
 
 
+export function useCanEditRampMinTargets() {
+  return useQuery({
+    queryKey: ["can-edit-ramp-min-targets"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_edit_ramp_min_targets");
+      if (error) return false;
+      return data === true;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useRampMinTargets() {
+  return useQuery({
+    queryKey: ["ramp-min-targets"],
+    queryFn: async (): Promise<number[]> => {
+      const { data, error } = await supabase.rpc("get_ramp_weekly_min_targets");
+      if (error) throw error;
+      return Array.isArray(data) ? (data as unknown[]).map(Number) : [5, 8, 11, 14, 17];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSetRampMinTargets() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (targets: number[]) => {
+      const { error } = await supabase.rpc("set_ramp_weekly_min_targets", { _targets: targets });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ramp-min-targets"] });
+      toast.success("Minimumskrav gemt");
+    },
+    onError: (e: Error) => toast.error(e.message || "Kunne ikke gemme minimumskrav"),
+  });
+}
+
 export function useCanViewRampTeam() {
   return useQuery({
     queryKey: ["can-view-ramp-team"],
