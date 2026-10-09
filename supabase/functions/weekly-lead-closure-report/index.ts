@@ -1226,9 +1226,11 @@ async function enqueueTasks(
   config: Config,
   runId: string,
   weeks: string[],
+  onlyAccounts: string[] | null = null,
 ): Promise<number> {
   const tasks: Record<string, unknown>[] = [];
   for (const account of ACCOUNTS) {
+    if (onlyAccounts && !onlyAccounts.includes(account.key)) continue;
     for (const campaign of campaignsFor(account.key, config)) {
       for (const week of weeks) {
         tasks.push({
@@ -1408,6 +1410,8 @@ Deno.serve(async (req) => {
       test_recipient?: string;
       week_start?: string;
       run_ids?: string[];
+      /** Valgfrit: kun disse konti lægges i køen (fx ["enreach"]). */
+      accounts?: string[];
     };
 
     if (body.action === "status") {
@@ -1522,7 +1526,13 @@ Deno.serve(async (req) => {
         forceMail: body.force_mail === true,
         triggeredBy,
       };
-      const tasks = await enqueueTasks(svc, config, runId, weeks);
+      const onlyAccounts = Array.isArray(body.accounts) && body.accounts.length > 0
+        ? body.accounts.map((a) => safeString(a))
+        : null;
+      if (onlyAccounts?.some((a) => !ACCOUNTS.some((acc) => acc.key === a))) {
+        throw new Error(`Ukendt konto i accounts: ${onlyAccounts.join(", ")}`);
+      }
+      const tasks = await enqueueTasks(svc, config, runId, weeks, onlyAccounts);
       await chainNext(state);
       return json(200, { stage: "startet", runId, weeks, tasks });
     }
