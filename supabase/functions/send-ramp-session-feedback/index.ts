@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getRampCcRecipients } from "../_shared/rampCcRecipients.ts";
 import { requireAuthenticated, sharedCorsHeaders } from "../_shared/auth.ts";
 import {
   buildLeaderMail,
@@ -181,6 +182,18 @@ Deno.serve(async (req) => {
         employeeId: leader.employee_id,
         email: leader.email,
         name: leader.name,
+        subject: mail.subject,
+        content: mail.html,
+      });
+    }
+
+    for (const cc of await getRampCcRecipients(svc)) {
+      if (mails.some((m) => m.email.toLowerCase() === cc.email)) continue;
+      const mail = buildLeaderMail(mailInput, cc.name);
+      mails.push({
+        employeeId: cc.employeeId ?? info.seller.employee_id,
+        email: cc.email,
+        name: cc.name,
         subject: mail.subject,
         content: mail.html,
       });

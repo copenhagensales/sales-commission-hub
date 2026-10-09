@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getRampCcRecipients } from "../_shared/rampCcRecipients.ts";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
 const APP_URL = "https://stork.copenhagensales.dk";
@@ -172,6 +173,49 @@ Deno.serve(async (req) => {
       });
       if (insertError) throw insertError;
       queued++;
+    }
+
+    // Faste kopimodtagere faar en samlet mail med alle saelgere fra lederne.
+    const seen = new Set<string>();
+    const allSellers = leaders
+      .flatMap((l) => l.sellers)
+      .filter((s) => {
+        const key = `${s.employee_name}|${s.day_no}|${s.campaign_name ?? ""}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    if (allSellers.length > 0) {
+      for (const cc of await getRampCcRecipients(supabase)) {
+        const { count } = await supabase
+          .from("scheduled_emails")
+          .select("id", { count: "exact", head: true })
+          .eq("template_key", TEMPLATE_KEY)
+          .eq("recipient_email", cc.email)
+          .gte("created_at", since);
+        if ((count ?? 0) > 0) {
+          skipped++;
+          continue;
+        }
+        const { error: ccError } = await supabase.from("scheduled_emails").insert({
+          employee_id: cc.employeeId,
+          recipient_email: cc.email,
+          recipient_name: cc.name,
+          subject: template?.subject ?? `Nye sælgere der har brug for en hånd (${allSellers.length})`,
+          content: buildContent({
+            leader_id: cc.employeeId ?? "",
+            leader_name: cc.name,
+            leader_email: cc.email,
+            stats: leaders[0].stats,
+            sellers: allSellers,
+          }),
+          template_key: TEMPLATE_KEY,
+          scheduled_at: new Date().toISOString(),
+          status: "pending",
+        });
+        if (ccError) throw ccError;
+        queued++;
+      }
     }
 
     return new Response(

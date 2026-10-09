@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getRampCcRecipients } from "../_shared/rampCcRecipients.ts";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
 /**
@@ -173,6 +174,55 @@ Deno.serve(async (req) => {
       });
       if (insertError) throw insertError;
       queued++;
+    }
+
+    // Faste kopimodtagere faar den samlede oversigt over alle saelgere.
+    const seen = new Set<string>();
+    const allSellers = recipients
+      .flatMap((r) => r.sellers)
+      .filter((s) => {
+        const key = `${s.employee_name}|${s.team_name ?? ""}|${s.day_no}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    if (allSellers.length > 0) {
+      for (const cc of await getRampCcRecipients(supabase)) {
+        if (recipients.some((r) => (r.recipient_email ?? "").toLowerCase() === cc.email)) continue;
+        const { count } = await supabase
+          .from("scheduled_emails")
+          .select("id", { count: "exact", head: true })
+          .eq("template_key", TEMPLATE_KEY)
+          .eq("recipient_email", cc.email)
+          .gte("created_at", monday.toISOString());
+        if ((count ?? 0) > 0) {
+          skipped++;
+          continue;
+        }
+        const { error: ccError } = await supabase.from("scheduled_emails").insert({
+          employee_id: cc.employeeId,
+          recipient_email: cc.email,
+          recipient_name: cc.name,
+          subject:
+            template?.subject ??
+            `Ugens faste forløb mangler for ${allSellers.length} nye sælgere (uge ${week})`,
+          content: buildContent(
+            {
+              recipient_id: cc.employeeId ?? "",
+              recipient_name: cc.name,
+              recipient_email: cc.email,
+              is_escalation: true,
+              sellers: allSellers,
+            },
+            week,
+          ),
+          template_key: TEMPLATE_KEY,
+          scheduled_at: new Date().toISOString(),
+          status: "pending",
+        });
+        if (ccError) throw ccError;
+        queued++;
+      }
     }
 
     return new Response(
