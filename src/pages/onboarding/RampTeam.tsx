@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Loader2, Check, X, Plus, Search } from "lucide-react";
+import { Loader2, Check, X, Plus, Search, Lock, EyeOff } from "lucide-react";
 import {
   RAMP_WEEKLY_ABSENCE,
   RAMP_WEEKLY_COACHING,
@@ -20,16 +20,18 @@ import {
   type RampWeekPoint,
 } from "@/hooks/useRampTeam";
 import { getInitials } from "@/utils/formatting";
+import { useAuth } from "@/hooks/useAuth";
+import { RampOverviewMatrix, supportGroup, type SupportGroup } from "./RampOverviewMatrix";
 
 /**
- * Opstartshold — lederrettet side efter Kaspers Farezone-design.
+ * Opstart — lederrettet side ("Ekstra støtte"-design).
  *
  * Al adgang haandhaeves i databasen. Siden viser kun det lederen selv kan se,
  * og et forloeb kan aldrig vinges af uden feedback: klik aabner altid dialogen,
  * og registreringen sker paa serveren efter mailen er lagt i koen.
  */
 
-type FilterMode = "all" | "danger" | "missing";
+type FilterMode = "all" | "danger" | "missing" | SupportGroup;
 /** Opstartere har en norm; hele holdet har ikke. Alt faelles arbejder paa begge. */
 type AnyMember = RampTeamMember | RampFullTeamMember;
 type SessionKind = "coaching" | "listen";
@@ -50,6 +52,11 @@ const AMBER = "#e0b64a";
 const AMBER_STRIP = "#e08a2e";
 const AMBER_TEXT = "#9a6216";
 const GREEN = "#177a4d";
+/** Blaa = ekstra stoette (saelgerens status). Roed bruges ikke om saelgere. */
+const BLUE = "#2f6fb5";
+const BLUE_TEXT = "#1d4f87";
+const BLUE_FLAT = "#e6effa";
+const GREY_PILL = "#f1f4f3";
 
 /** Fokusomraader lederen kan vaelge til ugens fokus. */
 const FOCUS_AREAS = [
@@ -147,7 +154,12 @@ function derive(member: AnyMember): Derived {
     missedWeeks,
     trend,
     urgency,
-    stripColor: gap >= 4 ? RED : AMBER_STRIP,
+    stripColor:
+      member.status === "under"
+        ? BLUE
+        : member.status === "midt" || member.status === "over"
+          ? GREEN
+          : NEUTRAL,
     weekActions,
     feedbackLog: member.actions.filter((a) => a.note && a.note.trim().length > 0),
   };
@@ -164,17 +176,17 @@ function priorityBand(member: AnyMember, d: Derived) {
   }
   if (d.missedWeeks >= 2) {
     return {
-      tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
+      tone: { bg: "#fdf2e3", icon: AMBER_STRIP, text: "#7a4e11" },
       mark: "!",
-      title: `Session mangler — ${d.missedWeeks} uger i træk`,
-      sub: "Sæt en 1-1 session i kalenderen i dag",
+      title: "Din opgave: hold en 1-1 i dag",
+      sub: `Ingen session de sidste ${d.missedWeeks} uger. Han/hun har mest brug for tid med dig lige nu.`,
     };
   }
   if (member.week_required && d.sessionsThisWeek === 0) {
     return {
-      tone: { bg: "#fbe9e8", icon: RED_TEXT, text: "#8f2a23" },
+      tone: { bg: "#fdf2e3", icon: AMBER_STRIP, text: "#7a4e11" },
       mark: "!",
-      title: `Ugens 1-1 session mangler i uge ${member.iso_week}`,
+      title: `Din opgave: ugens 1-1 i uge ${member.iso_week}`,
       sub: "Der skal holdes mindst én session denne uge",
     };
   }
@@ -198,7 +210,7 @@ function priorityBand(member: AnyMember, d: Derived) {
     tone: { bg: "#e7f4ed", icon: GREEN, text: "#0f5a38" },
     mark: "✓",
     title: "Forløb kørt — og salget stiger",
-    sub: "Hold kadencen indtil de er i spændet",
+    sub: "Hold kadencen indtil de er i det typiske spænd",
   };
 }
 
@@ -352,13 +364,19 @@ function WeeklyBars({
             style={{
               top: H - px(bandHigh),
               height: Math.max(2, px(bandHigh) - px(bandLow)),
-              borderColor: "#bcd6c8",
-              background: "rgba(23,122,77,.07)",
+              borderColor: "#b5cdea",
+              background: "rgba(47,111,181,.12)",
             }}
           />
         )}
+        {last && last.p50 > 0 && (
+          <div
+            className="pointer-events-none absolute inset-x-0"
+            style={{ top: H - px(last.p50), height: 2, background: "#1b1f1d" }}
+          />
+        )}
         {weeks.map((w) => {
-          const color = w.sales >= w.p25 ? GREEN : w.sales >= w.p25 - 3 ? AMBER : stripColor;
+          const color = w.sales >= w.p25 ? BLUE : "#c3ccc8";
           return (
             <div
               key={weekKey(w.iso_year, w.iso_week)}
@@ -366,7 +384,7 @@ function WeeklyBars({
             >
               <span
                 className="text-[12px] font-extrabold tabular-nums"
-                style={{ color: w.sales >= w.p25 ? GREEN : "#57635e" }}
+                style={{ color: w.sales >= w.p25 ? BLUE_TEXT : "#57635e" }}
               >
                 {w.sales}
               </span>
@@ -385,8 +403,8 @@ function WeeklyBars({
       <WeekLabels weeks={weeks} currentWeek={currentWeek} />
       {last && (
         <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
-          Stiplet felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · median{" "}
-          {Math.round(last.p50)}
+          Blåt felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · sort streg =
+          median {Math.round(last.p50)}
         </p>
       )}
     </div>
@@ -457,7 +475,7 @@ function HistoryBars({ member, d }: { member: AnyMember; d: Derived }) {
         {member.weeks.map((w) => {
           const entry = d.weekActions.get(weekKey(w.iso_year, w.iso_week));
           const count = entry?.sessions ?? 0;
-          const color = entry?.absence ? "#e7eeeb" : count >= 1 ? GREEN : "#e3908b";
+          const color = entry?.absence ? "#e7eeeb" : count >= 1 ? GREEN : "#c9d2dc";
           const label = entry?.absence
             ? `Uge ${w.iso_week}: fravær hele ugen`
             : count === 1
@@ -500,10 +518,12 @@ function MemberCard({
   member,
   onOpen,
   onExclude,
+  discreet,
 }: {
   member: RampTeamMember;
   onOpen: (member: RampTeamMember, kind: SessionKind, done: boolean) => void;
   onExclude: (member: RampTeamMember) => void;
+  discreet: boolean;
 }) {
   const logAction = useLogRampAction();
   const d = derive(member);
@@ -513,17 +533,18 @@ function MemberCard({
     d.trend === "up"
       ? { text: "↑ Stigende", bg: "#e7f4ed", color: "#0f5a38" }
       : d.trend === "down"
-        ? { text: "↓ Faldende", bg: "#fbe9e8", color: "#8f2a23" }
+        ? { text: "↓ Faldende", bg: GREY_PILL, color: "#4a5651" }
         : { text: "→ Flad", bg: "#f1f4f3", color: "#57635e" };
 
   return (
     <article
-      className="relative overflow-hidden rounded-[20px] bg-white"
+      id={`ramp-member-${member.employee_id}`}
+      className="relative scroll-mt-24 overflow-hidden rounded-[20px] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
     >
       <span
         className="absolute bottom-0 left-0 top-0 w-[5px]"
-        style={{ background: d.stripColor }}
+        style={{ background: discreet ? NEUTRAL : d.stripColor }}
       />
 
       <div className="px-5 pt-5 sm:px-[26px]">
@@ -550,15 +571,19 @@ function MemberCard({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Pill bg={trendPill.bg} color={trendPill.color}>
-              {trendPill.text}
-            </Pill>
-            {d.gap > 0 && (
-              <Pill
-                bg={d.stripColor === RED ? "#fbe9e8" : "#fdf2e3"}
-                color={d.stripColor === RED ? RED_TEXT : AMBER_TEXT}
-              >
-                {d.gap} under spændet
+            {!discreet && (
+              <Pill bg={trendPill.bg} color={trendPill.color}>
+                {trendPill.text}
+              </Pill>
+            )}
+            {!discreet && member.status === "under" && (
+              <Pill bg={BLUE_FLAT} color={BLUE_TEXT}>
+                Ekstra støtte
+              </Pill>
+            )}
+            {!discreet && d.gap > 0 && (
+              <Pill bg={GREY_PILL} color="#57635e">
+                {d.gap} under typisk spænd
               </Pill>
             )}
             <ExcludeButton onClick={() => onExclude(member)} />
@@ -603,7 +628,7 @@ function MemberCard({
               className="block h-full rounded-[4px]"
               style={{
                 width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
-                background: d.stripColor,
+                background: BLUE,
               }}
             />
           </span>
@@ -620,7 +645,13 @@ function MemberCard({
         className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
         style={{ borderColor: "#eef2f0" }}
       >
-        <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} currentWeek={member.iso_week} />
+        {discreet ? (
+          <p className="text-[13px] font-semibold" style={{ color: "#57635e" }}>
+            Produktgrafen er skjult i diskret visning.
+          </p>
+        ) : (
+          <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} currentWeek={member.iso_week} />
+        )}
 
         <div
           className="rounded-[16px] border px-5 py-[18px]"
@@ -687,6 +718,17 @@ function MemberCard({
               </button>
             </div>
           )}
+
+          <div
+            className="mt-3 rounded-[12px] border px-3.5 py-3 text-[12px] font-semibold"
+            style={{ background: "#ffffff", borderColor: "#e0e7e4", color: "#4a5651" }}
+          >
+            <span className="font-extrabold" style={{ color: "#1b1f1d" }}>
+              Fokus i samtalen:
+            </span>{" "}
+            Start med trivsel, ikke tal: Hvordan er det at være ny? Hvad driller mest lige nu? Find
+            én ting at øve sammen inden næste uge.
+          </div>
 
           <HistoryBars member={member} d={d} />
 
@@ -755,10 +797,12 @@ function FullTeamMemberCard({
   member,
   onOpen,
   onExclude,
+  discreet,
 }: {
   member: RampFullTeamMember;
   onOpen: (member: RampFullTeamMember, kind: SessionKind, done: boolean) => void;
   onExclude: (member: RampFullTeamMember) => void;
+  discreet: boolean;
 }) {
   const logAction = useLogRampAction();
   const d = derive(member);
@@ -798,9 +842,11 @@ function FullTeamMemberCard({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Pill bg="#f1f4f3" color="#1b1f1d">
-              {weekSum} produkter på 6 uger
-            </Pill>
+            {!discreet && (
+              <Pill bg="#f1f4f3" color="#1b1f1d">
+                {weekSum} produkter på 6 uger
+              </Pill>
+            )}
             <ExcludeButton onClick={() => onExclude(member)} />
           </div>
         </div>
@@ -810,7 +856,13 @@ function FullTeamMemberCard({
         className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
         style={{ borderColor: "#eef2f0" }}
       >
-        <PlainWeeklyBars weeks={member.weeks} currentWeek={member.iso_week} />
+        {discreet ? (
+          <p className="text-[13px] font-semibold" style={{ color: "#57635e" }}>
+            Produktgrafen er skjult i diskret visning.
+          </p>
+        ) : (
+          <PlainWeeklyBars weeks={member.weeks} currentWeek={member.iso_week} />
+        )}
 
         <div
           className="rounded-[16px] border px-5 py-[18px]"
