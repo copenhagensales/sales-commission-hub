@@ -18587,6 +18587,25 @@ export type Database = {
           total_duration: number
         }[]
       }
+      get_cancellation_candidate_sales: {
+        Args: {
+          _campaign_ids: string[]
+          _limit?: number
+          _null_campaign_eesy_enreach?: boolean
+          _offset?: number
+        }
+        Returns: {
+          agent_email: string
+          agent_name: string
+          customer_company: string
+          customer_phone: string
+          id: string
+          normalized_data: Json
+          raw_payload: Json
+          sale_datetime: string
+          validation_status: string
+        }[]
+      }
       get_churn_30d_monthly_trend:
         | { Args: { p_as_of_date?: string; p_months?: number }; Returns: Json }
         | {

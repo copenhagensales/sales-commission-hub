@@ -34,6 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import type { Database } from "@/integrations/supabase/types";
 import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart, Pencil, Plus, Trash2, Layers, CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1213,63 +1214,31 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       let allMatched: any[] = [];
       const existingIds = new Set<string>();
 
+      // Kandidatsalg hentes via RPC: samme felter/filtre/adgang som RLS på sales,
+      // men adgangstjekket evalueres én gang i stedet for pr. række (undgår statement timeout).
       const fetchCandidateSales = async () => {
-        const candidates: any[] = [];
-        let from = 0;
+        const candidates: Database["public"]["Functions"]["get_cancellation_candidate_sales"]["Returns"] = [];
         const pageSize = 1000;
-        while (true) {
-          const { data, error } = await supabase
-            .from("sales")
-            .select(`
-              id,
-              sale_datetime,
-              customer_phone,
-              customer_company,
-              validation_status,
-              agent_name,
-              agent_email,
-              raw_payload,
-              normalized_data
-            `)
-            .in("client_campaign_id", campaignIds)
-            .neq("validation_status", "cancelled")
-            .order("sale_datetime", { ascending: false })
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          if (!data || data.length === 0) break;
-          candidates.push(...data);
-          if (data.length < pageSize) break;
-          from += pageSize;
-        }
+        const fetchAll = async (nullCampaignEesy: boolean) => {
+          let from = 0;
+          while (true) {
+            const { data, error } = await supabase.rpc("get_cancellation_candidate_sales", {
+              _campaign_ids: campaignIds,
+              _null_campaign_eesy_enreach: nullCampaignEesy,
+              _offset: from,
+              _limit: pageSize,
+            });
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            candidates.push(...data);
+            if (data.length < pageSize) break;
+            from += pageSize;
+          }
+        };
+        await fetchAll(false);
         // Fallback: for Eesy TM, also fetch sales with NULL campaign (unmapped enreach sales)
         if (selectedClientId === CLIENT_IDS["Eesy TM"]) {
-          let from2 = 0;
-          while (true) {
-            const { data: nullData, error: nullError } = await supabase
-              .from("sales")
-              .select(`
-                id,
-                sale_datetime,
-                customer_phone,
-                customer_company,
-                validation_status,
-                agent_name,
-                agent_email,
-                raw_payload,
-                normalized_data
-              `)
-              .is("client_campaign_id", null)
-              .eq("source", "Eesy")
-              .eq("integration_type", "enreach")
-              .neq("validation_status", "cancelled")
-              .order("sale_datetime", { ascending: false })
-              .range(from2, from2 + pageSize - 1);
-            if (nullError) throw nullError;
-            if (!nullData || nullData.length === 0) break;
-            candidates.push(...nullData);
-            if (nullData.length < pageSize) break;
-            from2 += pageSize;
-          }
+          await fetchAll(true);
         }
         return candidates;
       };
@@ -2325,7 +2294,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     } catch (error) {
       toast({
         title: "Fejl ved matching",
-        description: error instanceof Error ? error.message : "Ukendt fejl",
+        description: error instanceof Error
+          ? error.message
+          : (typeof error === "object" && error !== null && "message" in error && typeof (error as { message: unknown }).message === "string")
+            ? (error as { message: string }).message
+            : "Ukendt fejl",
         variant: "destructive",
       });
     } finally {
