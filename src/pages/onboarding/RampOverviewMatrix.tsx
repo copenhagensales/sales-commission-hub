@@ -322,7 +322,7 @@ export function RampOverviewMatrix({
             style={{ color: "#57635e" }}
           >
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-[2px]" style={{ background: "#1b1f1d" }} />
+              <span className="inline-block h-[2px] w-4" style={{ background: "#1b1f1d" }} />
               Normal (median for dagen)
             </span>
             <span className="flex items-center gap-1.5">
