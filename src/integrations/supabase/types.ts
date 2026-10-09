@@ -2584,6 +2584,7 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string
+          data_rule_applied_at: string | null
           deduction_date: string | null
           id: string
           import_id: string
@@ -2599,6 +2600,7 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string
+          data_rule_applied_at?: string | null
           deduction_date?: string | null
           id?: string
           import_id: string
@@ -2614,6 +2616,7 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string
+          data_rule_applied_at?: string | null
           deduction_date?: string | null
           id?: string
           import_id?: string
@@ -5381,6 +5384,96 @@ export type Database = {
           is_required?: boolean
           retention_days?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      data_import_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          retention_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      data_import_column_rules: {
+        Row: {
+          category_id: string | null
+          column_name: string
+          created_at: string
+          definition_id: string
+          id: string
+        }
+        Insert: {
+          category_id?: string | null
+          column_name: string
+          created_at?: string
+          definition_id: string
+          id?: string
+        }
+        Update: {
+          category_id?: string | null
+          column_name?: string
+          created_at?: string
+          definition_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_import_column_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "data_import_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_import_column_rules_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "data_import_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_import_definitions: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          key: string
+          name: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          key: string
+          name: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          key?: string
+          name?: string
         }
         Relationships: []
       }
@@ -18320,6 +18413,7 @@ export type Database = {
         Args: { p_employee_id: string; p_start_date?: string }
         Returns: number
       }
+      data_import_retention_run: { Args: { _dry_run?: boolean }; Returns: Json }
       effective_auth_user_id: { Args: never; Returns: string }
       effective_employee_id: { Args: never; Returns: string }
       effective_has_app_role: { Args: { _role: string }; Returns: boolean }

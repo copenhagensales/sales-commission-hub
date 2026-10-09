@@ -9,6 +9,8 @@ import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseExcelFile } from "@/utils/excel";
+import { filterUploadedRow, normalizeColumnName } from "@/utils/dataImportFilter";
+import { fetchUploadFilterSets, EESY_TM_BASKET_KEY } from "@/hooks/useDataImportRules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2377,6 +2379,31 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       console.log(`[sendToQueue] using mergedMatchedSales: ${mergedMatchedSales.length}, merged away: ${dedupRemoved}`);
 
       // Build queue items from deduplicated sales
+      // Data import-regler: kun Eesy TM kurv/kombineret upload. Udefinerede kolonner gemmes ikke;
+      // kolonner som matchingen/godkendelsen bruger bevares altid, så matching er uændret.
+      const applyDataRules = selectedClientId === CLIENT_IDS["Eesy TM"] && (uploadType === "basket_difference" || uploadType === "both");
+      const droppedColumns = new Set<string>();
+      let dataRulesMissing = false;
+      let filterRow: ((row: Record<string, unknown>) => Record<string, unknown>) | null = null;
+      if (applyDataRules) {
+        const sets = await fetchUploadFilterSets(EESY_TM_BASKET_KEY, selectedClientId!);
+        dataRulesMissing = !sets.hasDefinition;
+        const cfg = activeQueueConfig as unknown as Record<string, unknown> | null | undefined;
+        const protectedCols = new Set<string>(sets.conditionCols);
+        for (const key of ["phone_column", "company_column", "opp_column", "revenue_column", "commission_column", "member_number_column", "filter_column", "seller_column", "date_column", "type_detection_column"]) {
+          const v = cfg?.[key];
+          if (typeof v === "string" && v) protectedCols.add(normalizeColumnName(v));
+        }
+        const productCols = cfg?.product_columns;
+        if (Array.isArray(productCols)) for (const p of productCols) if (typeof p === "string") protectedCols.add(normalizeColumnName(p));
+        protectedCols.add(normalizeColumnName("Annulled Sales"));
+        filterRow = (row) => {
+          const r = filterUploadedRow(row, sets.defined, protectedCols);
+          r.dropped.forEach((d) => droppedColumns.add(d));
+          return r.row;
+        };
+      }
+
       const queueItems = mergedMatchedSales.map(sale => {
         let rowUploadType = uploadType as string;
         if (uploadType === "both") {
@@ -2416,7 +2443,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           sale_id: sale.saleId,
           upload_type: rowUploadType,
           status: rowUploadType === "correct_match" ? "approved" : "pending",
-          uploaded_data: sale.uploadedRowData || null,
+          uploaded_data: sale.uploadedRowData ? (filterRow ? filterRow(sale.uploadedRowData) : sale.uploadedRowData) : null,
+          ...(filterRow ? { data_rule_applied_at: new Date().toISOString() } : {}),
           opp_group: sale.oppNumber || null,
           client_id: selectedClientId || null,
           target_product_name: sale.targetProductName || null,
@@ -2449,9 +2477,19 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         count: inserted,
         dedupRemoved: mergedAwayEntries.length,
         skippedAsDuplicate,
+        droppedColumns: [...droppedColumns],
+        dataRulesMissing,
       };
     },
-    onSuccess: ({ count, dedupRemoved, skippedAsDuplicate }) => {
+    onSuccess: ({ count, dedupRemoved, skippedAsDuplicate, droppedColumns, dataRulesMissing }) => {
+      if (dataRulesMissing || droppedColumns.length > 0) {
+        toast({
+          title: "Nogle kolonner blev ikke gemt",
+          description: dataRulesMissing
+            ? "Kolonnerne for Eesy TM kurvrettelser er ikke defineret under MG → Data import. Kun de kolonner, matchingen bruger, blev gemt."
+            : `${droppedColumns.length} kolonner blev ikke gemt, fordi de ikke er defineret: ${droppedColumns.join(", ")}. Definér dem under MG → Data import.`,
+        });
+      }
       const parts: string[] = [`${count} salg er sendt til godkendelseskøen.`];
       if (dedupRemoved > 0) {
         parts.push(`${dedupRemoved} dubletter (samme telefonnummer) blev fjernet.`);
