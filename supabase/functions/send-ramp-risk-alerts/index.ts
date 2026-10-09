@@ -62,6 +62,23 @@ function buildStatSentence(stat: RiskStat): string {
   return parts.join(" ");
 }
 
+/**
+ * Flag oprettet fra dette tidspunkt maales mod forventningen (minimumskrav pr.
+ * opstartsuge, ramp_expected_at). Aeldre flag blev maalt mod typisk niveau (p25)
+ * og vises derfor som historik, saa mailen ikke kalder et gammelt tal for forventning.
+ */
+const EXPECTATION_MEASURE_FROM = "2026-10-09T14:00:00Z";
+
+function measureCell(s: { cum_sales: number; threshold_value: number; created_at: string }): string {
+  const t = Number(s.threshold_value);
+  if (new Date(s.created_at).getTime() >= new Date(EXPECTATION_MEASURE_FROM).getTime()) {
+    const pct = t > 0 ? Math.round((Number(s.cum_sales) / t) * 100) : 0;
+    const exp = String(Math.round(t * 10) / 10).replace(".", ",");
+    return `${s.cum_sales} salg · forventet ${exp} (${pct} %)`;
+  }
+  return `${s.cum_sales} salg · typisk fra ${Math.round(t)} (historik)`;
+}
+
 function buildContent(payload: LeaderPayload): string {
   const rows = payload.sellers
     .sort((a, b) => a.day_no - b.day_no)
@@ -71,14 +88,13 @@ function buildContent(payload: LeaderPayload): string {
           <td style="padding:8px 12px;border-bottom:1px solid #eee;">${escapeHtml(s.employee_name)}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;">${escapeHtml(s.campaign_name ?? "-")}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;">Dag ${s.day_no}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.cum_sales} salg</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;">Typisk fra ${Math.round(Number(s.threshold_value))}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #eee;">${measureCell(s)}</td>
         </tr>`,
     )
     .join("");
 
   const stats = (payload.stats ?? [])
-    .map((stat) => `<p><strong>${buildStatSentence(stat)}</strong></p>`)
+    .map((stat) => `<p><strong>${buildStatSentence(stat)}</strong> <em>(historik, målt mod typisk niveau)</em></p>`)
     .join("");
 
   return `
@@ -93,8 +109,7 @@ function buildContent(payload: LeaderPayload): string {
           <th style="padding:8px 12px;">Sælger</th>
           <th style="padding:8px 12px;">Kampagne</th>
           <th style="padding:8px 12px;">Måledag</th>
-          <th style="padding:8px 12px;">Egne salg</th>
-          <th style="padding:8px 12px;">Typisk niveau</th>
+          <th style="padding:8px 12px;">Salg mod forventning</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>

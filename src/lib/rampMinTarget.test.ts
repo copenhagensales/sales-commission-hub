@@ -20,3 +20,16 @@ describe("rampMinTarget", () => {
   });
   it("day 0 is 0", () => expect(minCumulativeAt(0, T)).toBe(0));
 });
+
+describe("minCumulativeAt matcher databasens ramp_expected_at", () => {
+  it("giver samme værdier som SQL for 5/8/11/14/17", () => {
+    const t = [5, 8, 11, 14, 17];
+    // Værdier hentet fra ramp_expected_at i databasen 9. okt 2026.
+    expect(minCumulativeAt(1, t)).toBe(1);
+    expect(minCumulativeAt(9, t)).toBe(11.4);
+    expect(minCumulativeAt(10, t)).toBe(13);
+    expect(minCumulativeAt(15, t)).toBe(24);
+    expect(minCumulativeAt(29, t)).toBe(68.6);
+    expect(minCumulativeAt(40, t)).toBe(106);
+  });
+});
