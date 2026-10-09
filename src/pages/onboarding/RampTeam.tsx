@@ -46,14 +46,13 @@ const KIND_ACTION: Record<SessionKind, string> = {
   listen: RAMP_WEEKLY_LISTEN,
 };
 
-const RED = "#d4453c";
+const RED = "#c13b32";
 const RED_TEXT = "#c13b32";
 const AMBER = "#e0b64a";
 const AMBER_STRIP = "#e08a2e";
 const AMBER_TEXT = "#9a6216";
 const GREEN = "#177a4d";
 /** Saelgerstatus: roed = start her, gul = hold fast, groen = paa sporet. */
-const RED = "#c13b32";
 const RED_FLAT = "#fbe4e1";
 const YELLOW = "#d9a21b";
 const GREY_PILL = "#f1f4f3";
