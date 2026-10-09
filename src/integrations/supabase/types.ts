@@ -5390,6 +5390,7 @@ export type Database = {
       data_import_categories: {
         Row: {
           created_at: string
+          definition_id: string | null
           description: string | null
           id: string
           name: string
@@ -5398,6 +5399,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          definition_id?: string | null
           description?: string | null
           id?: string
           name: string
@@ -5406,13 +5408,22 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          definition_id?: string | null
           description?: string | null
           id?: string
           name?: string
           retention_days?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "data_import_categories_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "data_import_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       data_import_column_rules: {
         Row: {
@@ -5457,23 +5468,29 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string
+          description: string | null
           id: string
           key: string
           name: string
+          upload_linked: boolean
         }
         Insert: {
           client_id?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           key: string
           name: string
+          upload_linked?: boolean
         }
         Update: {
           client_id?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           key?: string
           name?: string
+          upload_linked?: boolean
         }
         Relationships: []
       }

@@ -11,24 +11,56 @@ export type DataImportDefinition = Database["public"]["Tables"]["data_import_def
 export const EESY_TM_BASKET_KEY = "eesy_tm_basket";
 const KEY = "data-import-rules";
 
-export function useDataImportRules(definitionKey: string = EESY_TM_BASKET_KEY) {
+export function useDataImportDefinitions() {
   return useQuery({
-    queryKey: [KEY, definitionKey],
+    queryKey: [KEY, "definitions"],
     queryFn: async () => {
-      const { data: def, error: e1 } = await supabase
-        .from("data_import_definitions").select("*").eq("key", definitionKey).maybeSingle();
-      if (e1) throw e1;
+      const { data, error } = await supabase.from("data_import_definitions").select("*").order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useDataImportRules(definitionId: string | null) {
+  return useQuery({
+    queryKey: [KEY, "detail", definitionId],
+    enabled: !!definitionId,
+    queryFn: async () => {
       const { data: categories, error: e2 } = await supabase
-        .from("data_import_categories").select("*").order("name");
+        .from("data_import_categories").select("*").eq("definition_id", definitionId!).order("name");
       if (e2) throw e2;
-      let rules: DataImportColumnRule[] = [];
-      if (def) {
-        const { data, error } = await supabase
-          .from("data_import_column_rules").select("*").eq("definition_id", def.id).order("column_name");
-        if (error) throw error;
-        rules = data ?? [];
-      }
-      return { definition: def as DataImportDefinition | null, categories: categories ?? [], rules };
+      const { data: rules, error } = await supabase
+        .from("data_import_column_rules").select("*").eq("definition_id", definitionId!).order("column_name");
+      if (error) throw error;
+      return { categories: categories ?? [], rules: rules ?? [] };
+    },
+  });
+}
+
+export function useCreateDefinition() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (d: { name: string; client_id: string | null; description: string | null }) => {
+      const key = d.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") + "_" + Date.now().toString(36);
+      const { data, error } = await supabase.from("data_import_definitions")
+        .insert({ key, name: d.name.trim(), client_id: d.client_id, description: d.description })
+        .select("id").single();
+      if (error) throw error;
+      return data.id;
+    },
+    onSuccess: inv,
+    onError: (err: Error) => toast({ title: "Fejl", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useClientOptions() {
+  return useQuery({
+    queryKey: ["clients-options"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clients").select("id, name").order("name");
+      if (error) throw error;
+      return data ?? [];
     },
   });
 }
@@ -43,8 +75,8 @@ const onError = (err: Error) => toast({ title: "Fejl", description: err.message,
 export function useSaveCategory() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (c: { id?: string; name: string; description: string | null; retention_days: number | null }) => {
-      const payload = { name: c.name.trim(), description: c.description, retention_days: c.retention_days, updated_at: new Date().toISOString() };
+    mutationFn: async (c: { id?: string; definition_id: string; name: string; description: string | null; retention_days: number | null }) => {
+      const payload = { definition_id: c.definition_id, name: c.name.trim(), description: c.description, retention_days: c.retention_days, updated_at: new Date().toISOString() };
       const { error } = c.id
         ? await supabase.from("data_import_categories").update(payload).eq("id", c.id)
         : await supabase.from("data_import_categories").insert(payload);
