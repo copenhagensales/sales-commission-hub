@@ -18238,6 +18238,7 @@ export type Database = {
       }
       can_manage_event_gallery: { Args: { _user_id: string }; Returns: boolean }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
+      can_view_eesy_tm_reconciliation: { Args: never; Returns: boolean }
       can_view_employee: {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
