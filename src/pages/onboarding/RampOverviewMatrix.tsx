@@ -150,7 +150,7 @@ export function RampOverviewMatrix({
   }, [points.map((p) => p.m.day_no).join(",")]);
 
   const H = 480;
-  const PAD = { l: 52, r: 16, t: 46, b: 70 };
+  const PAD = { l: 52, r: 92, t: 46, b: 70 };
   const R = 9;
   const GAP = 4;
   const plotW = width - PAD.l - PAD.r;
@@ -220,7 +220,7 @@ export function RampOverviewMatrix({
     return cohortsRaw.map(([day, n]) => {
       const text = `Hold · dag ${day} (${n})`;
       const w = text.length * 5.8;
-      const x = xs(day);
+      const x = Math.min(width - w / 2 - 2, Math.max(PAD.l + w / 2, xs(day)));
       const row = x - w / 2 > lastEnd[0] + 6 ? 0 : x - w / 2 > lastEnd[1] + 6 ? 1 : 0;
       lastEnd[row] = x + w / 2;
       return { day, n, text, x, row };
@@ -385,8 +385,8 @@ export function RampOverviewMatrix({
                 )}
                 <line x1={PAD.l} x2={width - PAD.r} y1={ys(1)} y2={ys(1)} stroke={DARK} strokeWidth={2.5} />
                 <g>
-                  <rect x={width - PAD.r - 82} y={ys(1) - 20} width={82} height={17} rx={4} fill={DARK} />
-                  <text x={width - PAD.r - 41} y={ys(1) - 8} fontSize={11} fontWeight={800} textAnchor="middle" fill="#ffffff">
+                  <rect x={width - PAD.r + 6} y={ys(1) - 9} width={82} height={18} rx={4} fill={DARK} />
+                  <text x={width - PAD.r + 47} y={ys(1) + 4} fontSize={11} fontWeight={800} textAnchor="middle" fill="#ffffff">
                     Forventning
                   </text>
                 </g>
@@ -409,7 +409,7 @@ export function RampOverviewMatrix({
                 </text>
                 {cohorts.map((c) => (
                   <g key={c.day}>
-                    <line x1={c.x} x2={c.x} y1={PAD.t - 4} y2={H - PAD.b} stroke="#9aa39e" strokeDasharray="2 4" />
+                    <line x1={xs(c.day)} x2={xs(c.day)} y1={PAD.t - 4} y2={H - PAD.b} stroke="#9aa39e" strokeDasharray="2 4" />
                     <text x={c.x} y={PAD.t - 10 - c.row * 15} fontSize={12} fontWeight={700} textAnchor="middle" fill={DARK}>
                       {c.text}
                     </text>
