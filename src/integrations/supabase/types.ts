@@ -14268,6 +14268,7 @@ export type Database = {
         Row: {
           cc_recipient_emails: string[]
           created_at: string
+          extra_viewer_employee_ids: string[]
           id: string
           lookback_months: number
           updated_at: string
@@ -14276,6 +14277,7 @@ export type Database = {
         Insert: {
           cc_recipient_emails?: string[]
           created_at?: string
+          extra_viewer_employee_ids?: string[]
           id?: string
           lookback_months?: number
           updated_at?: string
@@ -14284,6 +14286,7 @@ export type Database = {
         Update: {
           cc_recipient_emails?: string[]
           created_at?: string
+          extra_viewer_employee_ids?: string[]
           id?: string
           lookback_months?: number
           updated_at?: string
@@ -19049,6 +19052,7 @@ export type Database = {
         Returns: boolean
       }
       is_quality_controller: { Args: { _user_id?: string }; Returns: boolean }
+      is_ramp_extra_viewer: { Args: never; Returns: boolean }
       is_rekruttering: { Args: { _user_id: string }; Returns: boolean }
       is_some: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id?: string }; Returns: boolean }
