@@ -14266,6 +14266,7 @@ export type Database = {
       }
       ramp_settings: {
         Row: {
+          cc_recipient_emails: string[]
           created_at: string
           id: string
           lookback_months: number
@@ -14273,6 +14274,7 @@ export type Database = {
           weekly_program_start_date: string | null
         }
         Insert: {
+          cc_recipient_emails?: string[]
           created_at?: string
           id?: string
           lookback_months?: number
@@ -14280,6 +14282,7 @@ export type Database = {
           weekly_program_start_date?: string | null
         }
         Update: {
+          cc_recipient_emails?: string[]
           created_at?: string
           id?: string
           lookback_months?: number
