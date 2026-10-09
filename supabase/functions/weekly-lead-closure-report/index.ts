@@ -268,6 +268,12 @@ function invalidReason(account: AccountKey, lead: Record<string, unknown>): stri
  */
 const ENREACH_MCR_STATUS = "Depleted";
 
+/** Dialerens egne lukninger i Enreach (rå status i små bogstaver → nøgle). */
+const ENREACH_DIALER_STATUS: Record<string, string> = {
+  abandoned: "enreach_abandoned",
+  expired: "enreach_expired",
+};
+
 /**
  * Henter én kampagnes emner med kampagnefilter og sender dem videre side for
  * side. Emnerne holdes IKKE i hukommelsen efter optællingen — kun id'et bruges
@@ -835,10 +841,18 @@ async function processEnreachTask(
       counts.set(mcrKey, (counts.get(mcrKey) ?? 0) + 1);
       return;
     }
+    // Svaret indeholder kun afsluttede emner (AllClosedStatuses), så intet må
+    // forsvinde stille. Uden sælgerudfald er det dialerens egen lukning:
+    // Abandoned/Expired får faste nøgler, ukendte statusser gemmes råt som
+    // "enreach_<status>", så de kan ses og afklares. Uden sælgerfilter, som MCR.
+    if (!lead.closure || lead.closure === "NotSet") {
+      const raw = lead.status.trim().toLowerCase() || UNKNOWN_BUCKET;
+      const dialerKey = ENREACH_DIALER_STATUS[raw] ?? `enreach_${raw}`;
+      const key = `${weekStart}|enreach|${lead.campaignId}||${dialerKey}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      return;
+    }
     if (!lead.user.endsWith(OUR_DOMAIN)) return; // kun vores egne sælgere
-    // Kun emner der faktisk er afsluttet af en sælger tælles med. Emner uden
-    // udfald ("NotSet") er stadig åbne og hører ikke i opgørelsen.
-    if (!lead.closure || lead.closure === "NotSet") return;
     const status = config.alias.get(lead.closure) ?? lead.closure ?? UNKNOWN_BUCKET;
     const key = `${weekStart}|enreach|${lead.campaignId}|${lead.user}|${status}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -1212,9 +1226,11 @@ async function enqueueTasks(
   config: Config,
   runId: string,
   weeks: string[],
+  onlyAccounts: string[] | null = null,
 ): Promise<number> {
   const tasks: Record<string, unknown>[] = [];
   for (const account of ACCOUNTS) {
+    if (onlyAccounts && !onlyAccounts.includes(account.key)) continue;
     for (const campaign of campaignsFor(account.key, config)) {
       for (const week of weeks) {
         tasks.push({
@@ -1394,6 +1410,8 @@ Deno.serve(async (req) => {
       test_recipient?: string;
       week_start?: string;
       run_ids?: string[];
+      /** Valgfrit: kun disse konti lægges i køen (fx ["enreach"]). */
+      accounts?: string[];
     };
 
     if (body.action === "status") {
@@ -1508,7 +1526,13 @@ Deno.serve(async (req) => {
         forceMail: body.force_mail === true,
         triggeredBy,
       };
-      const tasks = await enqueueTasks(svc, config, runId, weeks);
+      const onlyAccounts = Array.isArray(body.accounts) && body.accounts.length > 0
+        ? body.accounts.map((a) => safeString(a))
+        : null;
+      if (onlyAccounts?.some((a) => !ACCOUNTS.some((acc) => acc.key === a))) {
+        throw new Error(`Ukendt konto i accounts: ${onlyAccounts.join(", ")}`);
+      }
+      const tasks = await enqueueTasks(svc, config, runId, weeks, onlyAccounts);
       await chainNext(state);
       return json(200, { stage: "startet", runId, weeks, tasks });
     }
