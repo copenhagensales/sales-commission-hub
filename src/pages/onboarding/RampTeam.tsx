@@ -24,7 +24,13 @@ import { DEFAULT_WEEKLY_MIN_TARGETS } from "@/lib/rampMinTarget";
 import { RampMinTargetsEditor } from "./RampMinTargetsEditor";
 import { getInitials } from "@/utils/formatting";
 import { useAuth } from "@/hooks/useAuth";
-import { RampOverviewMatrix, supportGroup, type SupportGroup } from "./RampOverviewMatrix";
+import {
+  RampOverviewMatrix,
+  expectationTrend,
+  missingSales,
+  supportGroup,
+  type SupportGroup,
+} from "./RampOverviewMatrix";
 
 /**
  * Opstart — lederrettet side ("Ekstra støtte"-design).
@@ -116,7 +122,7 @@ function derive(member: AnyMember): Derived {
     weekActions.set(key, entry);
   }
 
-  const gap = member.p25 === null ? 0 : Math.max(0, Math.round(member.p25 - member.cum_sales));
+  const gap = missingSales(member);
   const countedThisWeek = weekActions.get(weekKey(member.iso_year, member.iso_week))?.sessions ?? 0;
   const sessionsThisWeek =
     member.has_coaching || member.has_listen ? Math.max(1, countedThisWeek) : countedThisWeek;
@@ -137,12 +143,8 @@ function derive(member: AnyMember): Derived {
     }
   }
 
-  const sales = member.weeks.map((w) => w.sales);
-  let trend: Derived["trend"] = "unknown";
-  if (sales.length >= 2) {
-    const diff = sales[sales.length - 1] - sales[sales.length - 2];
-    trend = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
-  }
+  // Trend: ugens salg ift. ugens forventning, seneste uge mod ugen foer.
+  const trend: Derived["trend"] = expectationTrend(member);
 
   const urgency =
     (missedWeeks >= 2 ? 100 : 0) +
@@ -157,11 +159,11 @@ function derive(member: AnyMember): Derived {
     trend,
     urgency,
     stripColor:
-      member.status === "under"
+      member.expectation_status === "under"
         ? trend === "up"
           ? YELLOW
           : RED
-        : member.status === "midt" || member.status === "over"
+        : member.expectation_status === "on_track"
           ? GREEN
           : NEUTRAL,
     weekActions,
@@ -580,14 +582,14 @@ function MemberCard({
                 {trendPill.text}
               </Pill>
             )}
-            {!discreet && member.status === "under" && (
+            {!discreet && member.expectation_status === "under" && (
               <Pill bg={RED_FLAT} color={RED_TEXT}>
                 Ekstra støtte
               </Pill>
             )}
             {!discreet && d.gap > 0 && (
               <Pill bg={GREY_PILL} color="#57635e">
-                {d.gap} under typisk spænd
+                Mangler {d.gap} salg
               </Pill>
             )}
             <ExcludeButton onClick={() => onExclude(member)} />
@@ -1374,7 +1376,7 @@ export default function RampTeam() {
     [members],
   );
 
-  const dangerList = useMemo(() => allList.filter((m) => m.status === "under"), [allList]);
+  const dangerList = useMemo(() => allList.filter((m) => m.expectation_status === "under"), [allList]);
   const groupLists = useMemo(() => {
     const map: Record<SupportGroup, RampTeamMember[]> = { start: [], hold: [], track: [] };
     for (const m of allList) {
@@ -1393,8 +1395,8 @@ export default function RampTeam() {
   );
 
   const counts = useMemo(() => {
-    const good = members.filter((m) => m.status === "midt" || m.status === "over").length;
-    const pending = members.filter((m) => m.status === "ukendt").length;
+    const good = members.filter((m) => m.expectation_status === "on_track").length;
+    const pending = members.filter((m) => m.expectation_status === "ukendt").length;
     return {
       danger: dangerList.length,
       good,
@@ -1600,8 +1602,7 @@ export default function RampTeam() {
                 onSelectGroup={(g) => setFilter(filter === g ? "all" : g)}
                 onSelectMember={scrollToMember}
                 minTargets={minTargets}
-              />
-              <RampMinTargetsEditor targets={minTargets}
+                footer={<RampMinTargetsEditor targets={minTargets} />}
               />
           <div className="grid gap-3.5 sm:grid-cols-3">
             {[
@@ -1610,14 +1611,14 @@ export default function RampTeam() {
                 label: "Ekstra støtte",
                 value: counts.danger,
                 sub: `af ${counts.total} sælgere`,
-                extra: "Under typisk niveau — giv dem mest tid i denne uge",
+                extra: "Under forventning — giv dem mest tid i denne uge",
                 extraColor: RED_TEXT,
               },
               {
                 strip: GREEN,
                 label: "På sporet",
                 value: counts.good,
-                sub: "på eller over typisk",
+                sub: "på eller over forventning",
                 extra: "Skal stadig have ugens forløb",
                 extraColor: "#0f5a38",
               },
@@ -1683,7 +1684,10 @@ export default function RampTeam() {
               <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
                 <div className="min-w-[200px] flex-1">
                   <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                    Hvorfor ekstra støtte?
+                    Hvorfor ekstra støtte?{" "}
+                    <span className="text-[12px] font-bold" style={{ color: "#7b857f" }}>
+                      Historik · målt mod typisk niveau
+                    </span>
                   </p>
                   <p
                     className="mt-1 text-[14px] font-semibold"
