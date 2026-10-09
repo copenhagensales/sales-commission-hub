@@ -1,6 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ManualUploadRules } from "@/components/data-import/ManualUploadRules";
 
 const TABS = [
   { value: "manual-upload", label: "Manuelle data upload" },
@@ -19,7 +20,10 @@ export default function DataImport() {
               <TabsTrigger key={t.value} value={t.value} className="cursor-pointer rounded-md border border-border bg-background px-5 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary/50 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">{t.label}</TabsTrigger>
             ))}
           </TabsList>
-          {TABS.map((t) => (
+          <TabsContent value="manual-upload">
+            <ManualUploadRules />
+          </TabsContent>
+          {TABS.slice(1).map((t) => (
             <TabsContent key={t.value} value={t.value}>
               <Card>
                 <CardContent className="pt-6 text-muted-foreground">Indhold kommer snart.</CardContent>
