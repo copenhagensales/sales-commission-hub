@@ -8,6 +8,7 @@ import {
   Sales,
   Settings,
   MgTest,
+  MgDataImport,
   TdcErhvervDashboard,
   RelatelDashboard,
   RelatelProductsDashboard,
@@ -231,6 +232,7 @@ export const routes: RouteConfig[] = [
   { path: "/sales", component: Sales, access: "role", positionPermission: "menu_sales" },
 
   { path: "/mg-test", component: MgTest, access: "role", positionPermission: "menu_mg_test" },
+  { path: "/mg/data-import", component: MgDataImport, access: "role", positionPermission: "menu_mg_data_import" },
 
   { path: "/logikker", component: Logikker, access: "role", positionPermission: "menu_logics" },
   { path: "/employees", component: EmployeeMasterData, access: "role", positionPermission: "menu_employees" },

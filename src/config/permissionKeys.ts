@@ -156,6 +156,7 @@ export const PERMISSION_KEYS = {
   menu_relatel_dashboard: { label: 'Relatel Dashboard', section: 'mg', parent: 'menu_section_mg' },
   menu_codan: { label: 'Codan', section: 'mg', parent: 'menu_section_mg' },
   menu_mg_test: { label: 'MG Test', section: 'mg', parent: 'menu_section_mg' },
+  menu_mg_data_import: { label: 'Data import', section: 'mg', parent: 'menu_section_mg' },
   menu_test_dashboard: { label: 'MG Test Dashboard', section: 'mg', parent: 'menu_section_mg' },
   menu_dialer_data: { label: 'Dialer data', section: 'mg', parent: 'menu_section_mg' },
   menu_calls_data: { label: 'Opkaldsdata', section: 'mg', parent: 'menu_section_mg' },

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag, Upload } from "lucide-react";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -451,7 +451,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
   
   // Check if any MG menu items are visible (requires section permission)
-  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
+  const canViewMgDataImport = p.canView("menu_mg_data_import");
+  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && (p.canViewMgTest || canViewMgDataImport);
   
   const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
 
@@ -1354,6 +1355,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Percent className="h-4 w-4" />
                     {t("sidebar.mgTest")}
+                  </NavLink>
+                )}
+                {canViewMgDataImport && (
+                  <NavLink to="/mg/data-import" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/mg/data-import" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Upload className="h-4 w-4" />
+                    Data import
                   </NavLink>
                 )}
               </CollapsibleContent>
