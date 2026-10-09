@@ -16,9 +16,10 @@ export function supportGroup(member: RampTeamMember, trend: Trend): SupportGroup
   return null;
 }
 
-const BLUE = "#2f6fb5";
-const BLUE_TEXT = "#1d4f87";
-const BLUE_LIGHT = "#dbe8f7";
+const RED = "#c13b32";
+const YELLOW = "#d9a21b";
+const YELLOW_TEXT = "#7a5508";
+const YELLOW_LIGHT = "#fbefcc";
 const GREEN = "#177a4d";
 const GREEN_LIGHT = "#d9f0e3";
 const Y_MAX = 2;
@@ -32,18 +33,18 @@ const GROUP_INFO: Record<
     title: "Start her",
     rule: "Under typisk og flad/faldende",
     text: "Størst risiko for at de stopper. 1-1 og medlyt denne uge.",
-    bg: BLUE,
+    bg: RED,
     fg: "#ffffff",
-    border: BLUE,
+    border: RED,
   },
   hold: {
     no: 2,
     title: "Hold fast",
     rule: "Under typisk, men stigende",
     text: "På vej. Anerkend fremgangen, og hold rytmen.",
-    bg: BLUE_LIGHT,
-    fg: BLUE_TEXT,
-    border: "#b5cdea",
+    bg: YELLOW_LIGHT,
+    fg: YELLOW_TEXT,
+    border: YELLOW,
   },
   track: {
     no: 3,
@@ -170,11 +171,11 @@ export function RampOverviewMatrix({
                       const label = `${m.employee_name} · dag ${m.day_no} · ${STATUS_LABEL[group]} · ${TREND_LABEL[trend]}`;
                       const dot =
                         group === "start"
-                          ? { background: BLUE, border: `2px solid ${BLUE}` }
+                          ? { background: RED, border: `2px solid ${RED}` }
                           : group === "hold"
-                            ? { background: "#ffffff", border: `2px solid ${BLUE}` }
+                            ? { background: "#ffffff", border: `3px solid ${YELLOW}` }
                             : { background: GREEN_LIGHT, border: `2px solid ${GREEN}` };
-                      const lineColor = group === "track" ? GREEN : BLUE;
+                      const lineColor = group === "track" ? GREEN : group === "hold" ? YELLOW : RED;
                       const lo = Math.min(xPct(1), xPct(y));
                       const hi = Math.max(xPct(1), xPct(y));
                       return (
@@ -236,11 +237,11 @@ export function RampOverviewMatrix({
               Typisk spænd
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ background: BLUE }} />
+              <span className="inline-block h-3 w-3 rounded-full" style={{ background: RED }} />
               Under typisk, flad/faldende
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full border-2 bg-white" style={{ borderColor: BLUE }} />
+              <span className="inline-block h-3 w-3 rounded-full border-2 bg-white" style={{ borderColor: YELLOW }} />
               Under typisk, stigende
             </span>
             <span className="flex items-center gap-1.5">
