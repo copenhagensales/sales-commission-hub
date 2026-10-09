@@ -34,6 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import type { Database } from "@/integrations/supabase/types";
 import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart, Pencil, Plus, Trash2, Layers, CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -2293,7 +2294,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     } catch (error) {
       toast({
         title: "Fejl ved matching",
-        description: error instanceof Error ? error.message : "Ukendt fejl",
+        description: error instanceof Error
+          ? error.message
+          : (typeof error === "object" && error !== null && "message" in error && typeof (error as { message: unknown }).message === "string")
+            ? (error as { message: string }).message
+            : "Ukendt fejl",
         variant: "destructive",
       });
     } finally {
