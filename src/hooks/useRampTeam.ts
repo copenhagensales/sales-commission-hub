@@ -102,7 +102,7 @@ export interface RampFullWeekPoint {
  * i de foerste 40 arbejdsdage. Ingen norm og ingen risikoflag — kun tal og
  * ugens faste forloeb.
  */
-export interface RampFullTeamMember extends Omit<RampTeamMember, "weeks"> {
+export interface RampFullTeamMember extends Omit<RampTeamMember, "weeks" | "expected_today" | "expected_pct" | "expectation_status"> {
   weeks: RampFullWeekPoint[];
 }
 
