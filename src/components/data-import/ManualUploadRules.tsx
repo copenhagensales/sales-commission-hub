@@ -8,12 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CheckCircle2, AlertTriangle, Trash2, Plus, FileSpreadsheet, Loader2 } from "lucide-react";
 import { parseExcelFile } from "@/utils/excel";
 import { toast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
+  useDataImportDefinitions, useCreateDefinition, useClientOptions,
+  type DataImportDefinition,
   useDataImportRules, useSaveCategory, useDeleteCategory, useAddColumns, useSetColumnCategory, useDeleteColumn,
 } from "@/hooks/useDataImportRules";
 
-function CategoriesCard() {
-  const { data } = useDataImportRules();
+function CategoriesCard({ def }: { def: DataImportDefinition }) {
+  const { data } = useDataImportRules(def.id);
   const save = useSaveCategory();
   const del = useDeleteCategory();
   const [name, setName] = useState("");
@@ -30,7 +35,7 @@ function CategoriesCard() {
       toast({ title: "Ugyldigt antal dage", variant: "destructive" });
       return;
     }
-    save.mutate({ name, description: desc || null, retention_days: n }, { onSuccess: () => { setName(""); setDesc(""); setDays(""); } });
+    save.mutate({ definition_id: def.id, name, description: desc || null, retention_days: n }, { onSuccess: () => { setName(""); setDesc(""); setDays(""); } });
   };
 
   return (
@@ -43,13 +48,13 @@ function CategoriesCard() {
         {categories.map((c) => (
           <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
             <Input className="w-56" defaultValue={c.name}
-              onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && save.mutate({ id: c.id, name: e.target.value, description: c.description, retention_days: c.retention_days })} />
+              onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && save.mutate({ id: c.id, definition_id: def.id, name: e.target.value, description: c.description, retention_days: c.retention_days })} />
             <Input className="flex-1 min-w-48" placeholder="Beskrivelse" defaultValue={c.description ?? ""}
-              onBlur={(e) => e.target.value !== (c.description ?? "") && save.mutate({ id: c.id, name: c.name, description: e.target.value || null, retention_days: c.retention_days })} />
+              onBlur={(e) => e.target.value !== (c.description ?? "") && save.mutate({ id: c.id, definition_id: def.id, name: c.name, description: e.target.value || null, retention_days: c.retention_days })} />
             <Input className="w-28" type="number" min={1} placeholder="Dage" defaultValue={c.retention_days ?? ""}
               onBlur={(e) => {
                 const v = e.target.value ? Number(e.target.value) : null;
-                if (v !== c.retention_days && (v === null || (Number.isInteger(v) && v > 0))) save.mutate({ id: c.id, name: c.name, description: c.description, retention_days: v });
+                if (v !== c.retention_days && (v === null || (Number.isInteger(v) && v > 0))) save.mutate({ id: c.id, definition_id: def.id, name: c.name, description: c.description, retention_days: v });
               }} />
             <span className="text-sm text-muted-foreground">dage</span>
             {c.retention_days == null && <Badge variant="destructive">Mangler sletteregel</Badge>}
@@ -70,24 +75,22 @@ function CategoriesCard() {
   );
 }
 
-function ColumnsCard() {
-  const { data } = useDataImportRules();
+function ColumnsCard({ def }: { def: DataImportDefinition }) {
+  const { data } = useDataImportRules(def.id);
   const addCols = useAddColumns();
   const setCat = useSetColumnCategory();
   const delCol = useDeleteColumn();
   const [newCol, setNewCol] = useState("");
   const [reading, setReading] = useState(false);
-  const def = data?.definition;
   const categories = data?.categories ?? [];
   const rules = data?.rules ?? [];
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
     maxFiles: 1,
-    disabled: !def,
     onDrop: async (files) => {
       const f = files[0];
-      if (!f || !def) return;
+      if (!f) return;
       setReading(true);
       try {
         const { columns } = await parseExcelFile(await f.arrayBuffer());
@@ -101,15 +104,14 @@ function ColumnsCard() {
     },
   });
 
-  if (!def) return null;
   const catById = new Map(categories.map((c) => [c.id, c]));
   const missing = rules.filter((r) => !r.category_id || catById.get(r.category_id)?.retention_days == null).length;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{def.name}</CardTitle>
-        <CardDescription>Arket uploades på Annulleringer for Eesy TM. Kun kolonner, der er defineret her, bliver gemt.</CardDescription>
+        <CardTitle>Kolonner på arket</CardTitle>
+        <CardDescription>Hver kolonne knyttes til en kategori. Kun kolonner, der er defineret her, bliver gemt.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className={`flex items-center gap-2 rounded-md p-3 text-sm ${missing === 0 && rules.length > 0 ? "bg-success/10 text-foreground" : "bg-warning/10 text-foreground"}`}>
@@ -157,11 +159,76 @@ function ColumnsCard() {
   );
 }
 
-export function ManualUploadRules() {
+function NewDefinitionForm({ onCreated }: { onCreated: (id: string) => void }) {
+  const create = useCreateDefinition();
+  const { data: clients } = useClientOptions();
+  const [name, setName] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [desc, setDesc] = useState("");
   return (
-    <div className="space-y-6">
-      <CategoriesCard />
-      <ColumnsCard />
+    <Card>
+      <CardHeader><CardTitle>Ny definition</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1"><Label>Navn</Label>
+          <Input placeholder="Fx TDC Erhverv kurvrettelser" value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="space-y-1"><Label>Kunde</Label>
+          <Select value={clientId} onValueChange={setClientId}>
+            <SelectTrigger><SelectValue placeholder="Vælg kunde" /></SelectTrigger>
+            <SelectContent>{(clients ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+          </Select></div>
+        <div className="space-y-1"><Label>Beskrivelse</Label>
+          <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+        <Button disabled={!name.trim() || create.isPending}
+          onClick={() => create.mutate({ name, client_id: clientId || null, description: desc || null }, { onSuccess: (id) => { setName(""); setDesc(""); setClientId(""); onCreated(id); } })}>
+          Opret definition
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ManualUploadRules() {
+  const { data: defs = [] } = useDataImportDefinitions();
+  const { data: clients } = useClientOptions();
+  const [selected, setSelected] = useState<string | "new" | null>(null);
+  const active = selected === "new" ? null : defs.find((d) => d.id === selected) ?? defs[0] ?? null;
+  const clientName = (id: string | null) => clients?.find((c) => c.id === id)?.name;
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <div className="space-y-2">
+        <p className="text-sm font-semibold text-muted-foreground">Upload-definitioner</p>
+        {defs.map((d) => (
+          <button key={d.id} onClick={() => setSelected(d.id)}
+            className={cn("w-full rounded-md border p-3 text-left transition-colors hover:border-primary/50",
+              active?.id === d.id && selected !== "new" ? "border-primary bg-primary/5" : "border-border bg-background")}>
+            <div className="text-sm font-medium">{d.name}</div>
+            <div className="text-xs text-muted-foreground">{clientName(d.client_id) ?? "Ingen kunde"}</div>
+          </button>
+        ))}
+        <Button variant="outline" className="w-full" onClick={() => setSelected("new")}><Plus className="mr-1 h-4 w-4" />Ny definition</Button>
+      </div>
+      <div className="space-y-6">
+        {selected === "new" ? (
+          <NewDefinitionForm onCreated={(id) => setSelected(id)} />
+        ) : active ? (
+          <>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold">{active.name}</h2>
+                {active.upload_linked
+                  ? <Badge variant="secondary">Koblet til upload</Badge>
+                  : <Badge variant="outline">Ikke koblet til upload endnu</Badge>}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {clientName(active.client_id) ?? "Ingen kunde"}{active.description ? ` · ${active.description}` : ""}
+              </p>
+            </div>
+            <CategoriesCard key={`c-${active.id}`} def={active} />
+            <ColumnsCard key={`k-${active.id}`} def={active} />
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
