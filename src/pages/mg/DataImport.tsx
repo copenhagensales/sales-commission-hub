@@ -14,9 +14,9 @@ export default function DataImport() {
       <div className="space-y-6 p-6">
         <h1 className="text-2xl font-bold text-foreground">Data import</h1>
         <Tabs defaultValue={TABS[0].value}>
-          <TabsList>
+          <TabsList className="h-auto gap-2 bg-muted p-1.5">
             {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+              <TabsTrigger key={t.value} value={t.value} className="cursor-pointer rounded-md border border-border bg-background px-5 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary/50 hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">{t.label}</TabsTrigger>
             ))}
           </TabsList>
           {TABS.map((t) => (
