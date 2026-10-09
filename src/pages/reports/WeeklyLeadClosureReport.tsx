@@ -71,6 +71,7 @@ const MCR_STATUS = "max_call_reach";
 /** Enreach: efterladte og udløbne emner, lukket af dialeren uden kontakt. */
 const ABANDONED_STATUS = "enreach_abandoned";
 const EXPIRED_STATUS = "enreach_expired";
+const REMOVED_STATUS = "enreach_removed";
 
 
 /** Tærskler for farvemarkering — justér her. */
@@ -235,6 +236,7 @@ function UnreachableBreakdown({
   mcr,
   abandoned = 0,
   expired = 0,
+  removed = 0,
   reasons,
 }: {
   source: ReasonSource;
@@ -242,9 +244,10 @@ function UnreachableBreakdown({
   mcr: number;
   abandoned?: number;
   expired?: number;
+  removed?: number;
   reasons: { reason: string | null; count: number }[];
 }) {
-  const total = invalid + mcr + abandoned + expired;
+  const total = invalid + mcr + abandoned + expired + removed;
   if (source === "enreach") {
     return (
       <div className="ml-auto max-w-xs space-y-0.5 text-xs">
@@ -254,6 +257,9 @@ function UnreachableBreakdown({
         )}
         {expired > 0 && (
           <BreakdownLine label="Udløbet (lukket af dialeren)" count={expired} whole={total} />
+        )}
+        {removed > 0 && (
+          <BreakdownLine label="Fjernet (lukket af dialeren)" count={removed} whole={total} />
         )}
         <BreakdownLine label="Ugyldig" count={invalid} whole={total} />
       </div>
@@ -714,7 +720,8 @@ export default function WeeklyLeadClosureReport() {
                                 invalid +
                                 row.mcr +
                                 (row.extras[ABANDONED_STATUS] ?? 0) +
-                                (row.extras[EXPIRED_STATUS] ?? 0);
+                                (row.extras[EXPIRED_STATUS] ?? 0) +
+                                (row.extras[REMOVED_STATUS] ?? 0);
                               const unreachablePct = pctValue(unreachable, row.closedTotal);
                               const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
                               const unqualifiedPct = pctValue(unqualified, row.closedTotal);
@@ -892,6 +899,7 @@ export default function WeeklyLeadClosureReport() {
                                 mcr={row.mcr}
                                 abandoned={row.extras[ABANDONED_STATUS] ?? 0}
                                 expired={row.extras[EXPIRED_STATUS] ?? 0}
+                                removed={row.extras[REMOVED_STATUS] ?? 0}
                                 reasons={reasonsByLine.get(row.reportLine) ?? []}
                               />
                             </TableCell>

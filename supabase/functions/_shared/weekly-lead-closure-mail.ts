@@ -190,7 +190,7 @@ function hitrateCell(booked: number, decided: number): string {
 const INVALID = "invalid";
 const UNQUALIFIED = "unqualified";
 /** Enreach-emner lukket af dialeren uden kontakt (indgår i Ikke kontaktbare). */
-const DIALER_CLOSED = ["enreach_abandoned", "enreach_expired"] as const;
+const DIALER_CLOSED = ["enreach_abandoned", "enreach_expired", "enreach_removed"] as const;
 const dialerClosed = (l: LineTotals) => DIALER_CLOSED.reduce((s, k) => s + (l.extras[k] ?? 0), 0);
 /** Årsag gemt for uger hentet før opdelingen, som ikke kunne genskabes. */
 const NOT_SPLIT = "Ikke opgjort";
@@ -272,10 +272,12 @@ function unreachableBreakdown(l: LineView): string {
     const mcr = l.source.mcr ?? 0;
     const abandoned = l.source.extras["enreach_abandoned"] ?? 0;
     const expired = l.source.extras["enreach_expired"] ?? 0;
+    const removed = l.source.extras["enreach_removed"] ?? 0;
     rows += line("Max call (lukket af dialeren)", mcr, total, true);
     if (abandoned) rows += line("Efterladt (lukket af dialeren)", abandoned, total, true);
     if (expired) rows += line("Udløbet (lukket af dialeren)", expired, total, true);
-    rows += line("Ugyldig", total - mcr - abandoned - expired, total, true);
+    if (removed) rows += line("Fjernet (lukket af dialeren)", removed, total, true);
+    rows += line("Ugyldig", total - mcr - abandoned - expired - removed, total, true);
   } else if (source === "adversus") {
     const reasons = l.source.invalidReasons ?? [];
     const marked = reasons.filter((r) => r.reason && r.reason !== NOT_SPLIT).sort((a, b) => b.count - a.count);
