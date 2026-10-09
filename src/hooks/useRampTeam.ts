@@ -110,6 +110,18 @@ export interface RampRiskStat {
 }
 
 
+export function useCanEditRampMinTargets() {
+  return useQuery({
+    queryKey: ["can-edit-ramp-min-targets"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_edit_ramp_min_targets");
+      if (error) return false;
+      return data === true;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useRampMinTargets() {
   return useQuery({
     queryKey: ["ramp-min-targets"],

@@ -19,6 +19,9 @@ import {
   type RampTeamMember,
   type RampWeekPoint,
 } from "@/hooks/useRampTeam";
+import { useRampMinTargets } from "@/hooks/useRampTeam";
+import { DEFAULT_WEEKLY_MIN_TARGETS } from "@/lib/rampMinTarget";
+import { RampMinTargetsEditor } from "./RampMinTargetsEditor";
 import { getInitials } from "@/utils/formatting";
 import { useAuth } from "@/hooks/useAuth";
 import { RampOverviewMatrix, supportGroup, type SupportGroup } from "./RampOverviewMatrix";
@@ -1285,6 +1288,7 @@ export default function RampTeam() {
   const { data: allFullTeam = [], isLoading: fullTeamLoading } = useRampFullTeam();
   const { data: stats = [] } = useRampRiskStats();
   const { data: exclusions = [] } = useRampFeedbackExclusions();
+  const { data: minTargets = DEFAULT_WEEKLY_MIN_TARGETS } = useRampMinTargets();
   const setExclusion = useSetRampFeedbackExclusion();
 
   const excludedIds = useMemo(
@@ -1595,6 +1599,9 @@ export default function RampTeam() {
                 activeGroup={filter === "start" || filter === "hold" || filter === "track" ? filter : null}
                 onSelectGroup={(g) => setFilter(filter === g ? "all" : g)}
                 onSelectMember={scrollToMember}
+                minTargets={minTargets}
+              />
+              <RampMinTargetsEditor targets={minTargets}
               />
           <div className="grid gap-3.5 sm:grid-cols-3">
             {[
