@@ -68,6 +68,10 @@ const UNQUALIFIED_STATUS = "unqualified";
 /** Egen nøgle for Max Call Reach — indgår i "Ikke kontaktbare". */
 const MCR_STATUS = "max_call_reach";
 
+/** Enreach: efterladte og udløbne emner, lukket af dialeren uden kontakt. */
+const ABANDONED_STATUS = "enreach_abandoned";
+const EXPIRED_STATUS = "enreach_expired";
+
 
 /** Tærskler for farvemarkering — justér her. */
 const UNREACHABLE_WARN_PCT = 25;
@@ -229,18 +233,28 @@ function UnreachableBreakdown({
   source,
   invalid,
   mcr,
+  abandoned = 0,
+  expired = 0,
   reasons,
 }: {
   source: ReasonSource;
   invalid: number;
   mcr: number;
+  abandoned?: number;
+  expired?: number;
   reasons: { reason: string | null; count: number }[];
 }) {
-  const total = invalid + mcr;
+  const total = invalid + mcr + abandoned + expired;
   if (source === "enreach") {
     return (
       <div className="ml-auto max-w-xs space-y-0.5 text-xs">
         <BreakdownLine label="Max call (lukket af dialeren)" count={mcr} whole={total} />
+        {abandoned > 0 && (
+          <BreakdownLine label="Efterladt (lukket af dialeren)" count={abandoned} whole={total} />
+        )}
+        {expired > 0 && (
+          <BreakdownLine label="Udløbet (lukket af dialeren)" count={expired} whole={total} />
+        )}
         <BreakdownLine label="Ugyldig" count={invalid} whole={total} />
       </div>
     );
@@ -696,7 +710,11 @@ export default function WeeklyLeadClosureReport() {
                                * kontaktforsøg. På Adversus ligger lukningerne allerede i ugyldige
                                * (mcr = 0), så begrebet er ens på tværs af systemer.
                                */
-                              const unreachable = invalid + row.mcr;
+                              const unreachable =
+                                invalid +
+                                row.mcr +
+                                (row.extras[ABANDONED_STATUS] ?? 0) +
+                                (row.extras[EXPIRED_STATUS] ?? 0);
                               const unreachablePct = pctValue(unreachable, row.closedTotal);
                               const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
                               const unqualifiedPct = pctValue(unqualified, row.closedTotal);
@@ -872,6 +890,8 @@ export default function WeeklyLeadClosureReport() {
                                 source={reasonSourceOf(row.reportLine)}
                                 invalid={row.extras[INVALID_STATUS] ?? 0}
                                 mcr={row.mcr}
+                                abandoned={row.extras[ABANDONED_STATUS] ?? 0}
+                                expired={row.extras[EXPIRED_STATUS] ?? 0}
                                 reasons={reasonsByLine.get(row.reportLine) ?? []}
                               />
                             </TableCell>
