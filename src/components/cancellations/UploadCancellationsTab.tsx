@@ -2388,7 +2388,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       if (applyDataRules) {
         const sets = await fetchUploadFilterSets(EESY_TM_BASKET_KEY, selectedClientId!);
         dataRulesMissing = !sets.hasDefinition;
-        const cfg = activeQueueConfig as Record<string, unknown> | null | undefined;
+        const cfg = activeQueueConfig as unknown as Record<string, unknown> | null | undefined;
         const protectedCols = new Set<string>(sets.conditionCols);
         for (const key of ["phone_column", "company_column", "opp_column", "revenue_column", "commission_column", "member_number_column", "filter_column", "seller_column", "date_column", "type_detection_column"]) {
           const v = cfg?.[key];
