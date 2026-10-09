@@ -1482,7 +1482,7 @@ export default function RampTeam() {
                   type="button"
                   aria-pressed={discreet}
                   onClick={toggleDiscreet}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-[12px] font-bold"
+                  className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-[5px] text-[12px] font-bold"
                   style={{
                     background: discreet ? "#1b1f1d" : "#ffffff",
                     color: discreet ? "#ffffff" : "#1b1f1d",
@@ -1555,6 +1555,7 @@ export default function RampTeam() {
                   </button>
                 );
               })}
+              </div>
               <div className="relative ml-auto">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
