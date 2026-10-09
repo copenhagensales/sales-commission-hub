@@ -50,6 +50,13 @@
       "when": 1791541904701,
       "tag": "0006_ramp_cc_recipients",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791542198001,
+      "tag": "0007_migration",
+      "breakpoints": true
     }
   ]
 }
