@@ -13,6 +13,7 @@ export const Sales = lazyPage(() => import("@/pages/Sales"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
 
 export const MgTest = lazyPage(() => import("@/pages/MgTest"));
+export const MgDataImport = lazyPage(() => import("@/pages/mg/DataImport"));
 
 export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const RelatelDashboard = lazyPage(() => import("@/pages/RelatelDashboard"));
