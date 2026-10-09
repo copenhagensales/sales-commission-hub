@@ -1,5 +1,5 @@
 import type { RampTeamMember } from "@/hooks/useRampTeam";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Overblik: hvem ligger hvor? Ren visning af data fra get_ramp_team_overview.
@@ -69,6 +69,11 @@ const TREND_LABEL: Record<Trend, string> = {
   unknown: "ingen trend endnu",
 };
 
+function formatShort(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : name;
+}
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const s = [...values].sort((a, b) => a - b);
@@ -102,20 +107,110 @@ export function RampOverviewMatrix({
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
-  const [openOverride, setOpenOverride] = useState<Partial<Record<SupportGroup, boolean>>>({});
-  useEffect(() => setOpenOverride({}), [activeGroup]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(640);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWidth(Math.max(280, Math.floor(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Typisk spaend vist som median af hver saelgers egen p25/p50 og p75/p50.
   const withNorm = members.filter((m) => (m.p50 ?? 0) > 0);
   const bandLow = median(withNorm.map((m) => (m.p25 ?? 0) / (m.p50 as number))) ?? 0.75;
   const bandHigh = median(withNorm.map((m) => (m.p75 ?? 0) / (m.p50 as number))) ?? 1.25;
 
-  const xPct = (v: number) => (Math.min(Y_MAX, Math.max(0, v)) / Y_MAX) * 100;
-  const order: SupportGroup[] = ["start", "hold", "track"];
-  const isOpen = (g: SupportGroup) =>
-    activeGroup ? g === activeGroup : (openOverride[g] ?? g !== "track");
-  const toggle = (g: SupportGroup) => setOpenOverride((o) => ({ ...o, [g]: !isOpen(g) }));
-  const arrow: Record<Trend, string> = { up: "↑", flat: "→", down: "↓", unknown: "" };
+  const H = 460;
+  const PAD = { l: 40, r: 16, t: 14, b: 58 };
+  const R = 9;
+  const GAP = 4;
+  const plotW = width - PAD.l - PAD.r;
+  const plotH = H - PAD.t - PAD.b;
+  const maxY = Math.max(bandHigh, 1.2, ...points.map((p) => p.y));
+  const yTop = Math.min(Y_MAX, Math.ceil((maxY + 0.15) * 4) / 4);
+  const ys = (v: number) => PAD.t + plotH - (Math.min(yTop, Math.max(0, v)) / yTop) * plotH;
+  const xs = (d: number) => PAD.l + ((Math.min(40, Math.max(1, d)) - 0.5) / 40) * plotW;
+
+  // Beeswarm: y er fast, kun x flyttes mindst muligt indtil ingen overlap.
+  const placed = useMemo(() => {
+    const out: { p: (typeof points)[number]; x: number; y: number }[] = [];
+    const minD = 2 * R + GAP;
+    const sorted = [...points].sort((a, b) => a.m.day_no - b.m.day_no || a.y - b.y);
+    for (const p of sorted) {
+      const y = ys(p.y);
+      const x0 = xs(p.m.day_no);
+      let x = x0;
+      for (let k = 0; k < 2000; k++) {
+        const off = Math.ceil(k / 2) * (k % 2 ? 1 : -1);
+        const cx = Math.min(width - PAD.r - R, Math.max(PAD.l + R, x0 + off));
+        if (out.every((o) => Math.hypot(o.x - cx, o.y - y) >= minD)) {
+          x = cx;
+          break;
+        }
+      }
+      out.push({ p, x, y });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.map((p) => `${p.m.employee_id}:${p.y}:${p.m.day_no}`).join("|"), width, yTop]);
+
+  // Labels kun for "Start her", uden overlap (flyttes lodret, tynd streg ud).
+  const labels = useMemo(() => {
+    const boxes: { x: number; y: number; w: number; h: number }[] = placed.map((o) => ({
+      x: o.x - R, y: o.y - R, w: 2 * R, h: 2 * R,
+    }));
+    const hit = (b: { x: number; y: number; w: number; h: number }) =>
+      boxes.some((o) => b.x < o.x + o.w + 2 && b.x + b.w + 2 > o.x && b.y < o.y + o.h + 1 && b.y + b.h + 1 > o.y);
+    const res: { id: string; text: string; dx: number; dy: number; lx: number; ly: number; anchorRight: boolean }[] = [];
+    for (const o of placed.filter((q) => q.p.group === "start").sort((a, b) => a.y - b.y)) {
+      const text = formatShort(o.p.m.employee_name);
+      const w = text.length * 6.6 + 4;
+      const h = 14;
+      let done = false;
+      for (let k = 0; k < 80 && !done; k++) {
+        const dy = Math.ceil(k / 2) * (k % 2 ? 1 : -1) * 4;
+        for (const right of [true, false]) {
+          const bx = right ? o.x + R + 6 : o.x - R - 6 - w;
+          const by = o.y + dy - h / 2;
+          if (bx < 0 || bx + w > width || by < 0 || by + h > H - PAD.b) continue;
+          const b = { x: bx, y: by, w, h };
+          if (!hit(b)) {
+            boxes.push(b);
+            res.push({ id: o.p.m.employee_id, text, dx: o.x, dy: o.y, lx: right ? bx : bx + w, ly: by + h / 2, anchorRight: right });
+            done = true;
+            break;
+          }
+        }
+      }
+    }
+    return res;
+  }, [placed, width]);
+
+  // Hold: arbejdsdage med 2+ saelgere.
+  const cohorts = useMemo(() => {
+    const byDay = new Map<number, number>();
+    points.forEach((p) => byDay.set(p.m.day_no, (byDay.get(p.m.day_no) ?? 0) + 1));
+    const list = [...byDay.entries()].filter(([, n]) => n >= 2).sort((a, b) => a[0] - b[0]);
+    let lastEnd = [-Infinity, -Infinity];
+    return list.map(([day, n]) => {
+      const text = `Hold · dag ${day} (${n})`;
+      const w = text.length * 5.8;
+      const x = xs(day);
+      const row = x - w / 2 > lastEnd[0] + 6 ? 0 : x - w / 2 > lastEnd[1] + 6 ? 1 : 0;
+      lastEnd[row] = x + w / 2;
+      return { day, n, text, x, row };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.map((p) => p.m.day_no).join(","), width]);
+
+  const yTicks = [0, 0.5, 1, 1.5, 2].filter((t) => t <= yTop + 1e-9);
+  const dim = (g: SupportGroup) => (activeGroup && activeGroup !== g ? 0.2 : 1);
+  const tip = (o: (typeof placed)[number]) =>
+    `${o.p.m.employee_name} · dag ${o.p.m.day_no} · ${o.p.y.toFixed(2).replace(".", ",")}x normal${o.p.y >= Y_MAX ? "+" : ""} · ${STATUS_LABEL[o.p.group]} · ${TREND_LABEL[o.p.trend]}`;
+  const [hover, setHover] = useState<string | null>(null);
+  const hovered = placed.find((o) => o.p.m.employee_id === hover);
 
   return (
     <section
@@ -128,108 +223,106 @@ export function RampOverviewMatrix({
       </p>
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="order-2 min-w-0 lg:order-1">
-          <div className="flex text-[10px] font-bold" style={{ color: "#7b857f" }}>
-            <div className="w-[140px] shrink-0 sm:w-[220px]" />
-            <div className="relative h-4 flex-1">
-              <span className="absolute left-0">0</span>
-              <span className="absolute -translate-x-1/2" style={{ left: `${xPct(1)}%`, color: "#1b1f1d" }}>
-                Normal
-              </span>
-              <span className="absolute right-0">2x+</span>
-            </div>
-          </div>
-          <div className="relative mt-1">
-            <div className="pointer-events-none absolute inset-y-0 left-[140px] right-0 sm:left-[220px]">
-              <div
-                className="absolute inset-y-0"
-                style={{
-                  left: `${xPct(bandLow)}%`,
-                  width: `${xPct(bandHigh) - xPct(bandLow)}%`,
-                  background: "rgba(27,31,29,.07)",
-                }}
-              />
-              <div className="absolute inset-y-0 z-[1]" style={{ left: `${xPct(1)}%`, width: 2, background: "#1b1f1d" }} />
-            </div>
-            {order.map((g) => {
-              const info = GROUP_INFO[g];
-              const rows = points.filter((p) => p.group === g).sort((a, b) => a.y - b.y);
-              const open = isOpen(g);
-              return (
-                <div key={g} className="relative">
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => toggle(g)}
-                    className="relative z-[2] mt-2 flex w-full items-center justify-between rounded-[8px] px-3 py-1.5 text-left text-[12px] font-extrabold uppercase"
-                    style={{ background: info.bg, color: info.fg, letterSpacing: ".04em" }}
+          <div ref={wrapRef} className="relative w-full">
+            <svg width={width} height={H} role="img" aria-label="Prikdiagram: arbejdsdag og niveau ift. normal">
+              <rect x={PAD.l} y={ys(bandLow)} width={plotW} height={plotH + PAD.t - ys(bandLow)} fill={RED} opacity={0.07} />
+              <text x={PAD.l + 6} y={H - PAD.b - 6} fontSize={10} fontWeight={800} fill={RED} letterSpacing=".08em">START HER</text>
+              <rect x={PAD.l} y={ys(bandHigh)} width={plotW} height={ys(bandLow) - ys(bandHigh)} fill="rgba(27,31,29,.08)" />
+              {yTicks.map((t) => (
+                <g key={t}>
+                  <line x1={PAD.l} x2={width - PAD.r} y1={ys(t)} y2={ys(t)} stroke="rgba(27,31,29,.06)" />
+                  <text x={PAD.l - 6} y={ys(t) + 3} fontSize={10} textAnchor="end" fill="#7b857f">
+                    {t === Y_MAX ? "2x+" : `${String(t).replace(".", ",")}`}
+                  </text>
+                </g>
+              ))}
+              <line x1={PAD.l} x2={width - PAD.r} y1={ys(1)} y2={ys(1)} stroke="#1b1f1d" strokeWidth={2} />
+              <text x={width - PAD.r} y={ys(1) - 5} fontSize={10} fontWeight={800} textAnchor="end" fill="#1b1f1d">Normal</text>
+              <line x1={PAD.l} x2={width - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="#c9cfcb" />
+              {[1, 5, 10, 15, 20, 25, 30, 35, 40].map((d) => (
+                <text key={d} x={xs(d)} y={H - PAD.b + 13} fontSize={10} textAnchor="middle" fill="#7b857f">{d}</text>
+              ))}
+              {cohorts.map((c) => (
+                <g key={c.day}>
+                  <line x1={c.x} x2={c.x} y1={H - PAD.b + 17} y2={H - PAD.b + 22 + c.row * 13} stroke="#9aa39e" />
+                  <text x={c.x} y={H - PAD.b + 31 + c.row * 13} fontSize={9.5} fontWeight={700} textAnchor="middle" fill="#57635e">{c.text}</text>
+                </g>
+              ))}
+              <text x={PAD.l + plotW / 2} y={H - 2} fontSize={10} textAnchor="middle" fill="#7b857f">Arbejdsdag</text>
+              {labels.map((l) => {
+                const o = placed.find((q) => q.p.m.employee_id === l.id);
+                const far = Math.abs(l.ly - l.dy) > 3;
+                return (
+                  <g key={l.id} opacity={dim("start")} pointerEvents="none">
+                    {far && <line x1={l.dx + (l.anchorRight ? R : -R)} y1={l.dy} x2={l.lx} y2={l.ly} stroke={RED} strokeWidth={0.8} />}
+                    <text x={l.lx + (l.anchorRight ? 2 : -2)} y={l.ly + 4} fontSize={11} fontWeight={700} textAnchor={l.anchorRight ? "start" : "end"} fill="#1b1f1d">
+                      {l.text}
+                    </text>
+                    {!o && null}
+                  </g>
+                );
+              })}
+              {placed.map((o) => {
+                const g = o.p.group;
+                const style =
+                  g === "start"
+                    ? { fill: RED, stroke: RED, sw: 1.5 }
+                    : g === "hold"
+                      ? { fill: "#ffffff", stroke: YELLOW, sw: 3 }
+                      : { fill: GREEN_LIGHT, stroke: GREEN, sw: 1.5 };
+                const label = tip(o);
+                return (
+                  <circle
+                    key={o.p.m.employee_id}
+                    cx={o.x}
+                    cy={o.y}
+                    r={R - style.sw / 2}
+                    fill={style.fill}
+                    stroke={style.stroke}
+                    strokeWidth={style.sw}
+                    opacity={dim(g)}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={label}
+                    className="cursor-pointer outline-none focus-visible:[stroke:#1b1f1d]"
+                    onMouseEnter={() => setHover(o.p.m.employee_id)}
+                    onMouseLeave={() => setHover(null)}
+                    onFocus={() => setHover(o.p.m.employee_id)}
+                    onBlur={() => setHover(null)}
+                    onClick={() => onSelectMember(o.p.m.employee_id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectMember(o.p.m.employee_id);
+                      }
+                    }}
                   >
-                    <span>{info.no} · {info.title} · {rows.length}</span>
-                    <span className="text-[11px] normal-case">{open ? "Skjul" : "Vis alle"}</span>
-                  </button>
-                  {open &&
-                    rows.map(({ m, trend, group, y }, i) => {
-                      const label = `${m.employee_name} · dag ${m.day_no} · ${STATUS_LABEL[group]} · ${TREND_LABEL[trend]}`;
-                      const dot =
-                        group === "start"
-                          ? { background: RED, border: `2px solid ${RED}` }
-                          : group === "hold"
-                            ? { background: "#ffffff", border: `3px solid ${YELLOW}` }
-                            : { background: GREEN_LIGHT, border: `2px solid ${GREEN}` };
-                      const lineColor = group === "track" ? GREEN : group === "hold" ? YELLOW : RED;
-                      const lo = Math.min(xPct(1), xPct(y));
-                      const hi = Math.max(xPct(1), xPct(y));
-                      return (
-                        <button
-                          key={m.employee_id}
-                          type="button"
-                          title={label}
-                          aria-label={label}
-                          onClick={() => onSelectMember(m.employee_id)}
-                          className="flex h-8 w-full items-center text-left hover:bg-black/[.04]"
-                          style={{ background: i % 2 ? "rgba(27,31,29,.025)" : undefined }}
-                        >
-                          <span className="flex w-[140px] shrink-0 items-baseline gap-1.5 truncate pl-3 pr-2 sm:w-[220px]">
-                            <span className="truncate text-[13px] font-bold" style={{ color: "#1b1f1d" }}>
-                              {m.employee_name}
-                            </span>
-                            <span className="shrink-0 text-[11px] font-semibold" style={{ color: "#7b857f" }}>
-                              dag {m.day_no}
-                            </span>
-                          </span>
-                          <span className="relative h-full flex-1">
-                            <span
-                              className="absolute top-1/2 z-[2] h-[2px] -translate-y-1/2"
-                              style={{ left: `${lo}%`, width: `${hi - lo}%`, background: lineColor, opacity: 0.5 }}
-                            />
-                            <span
-                              className="absolute top-1/2 z-[3] h-[14px] w-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-                              style={{ left: `${xPct(y)}%`, ...dot }}
-                            />
-                            {arrow[trend] && (
-                              <span
-                                className="absolute top-1/2 z-[3] -translate-y-1/2 text-[12px] font-extrabold"
-                                style={{
-                                  left: `calc(${xPct(y)}% + ${xPct(y) > 92 ? -22 : 10}px)`,
-                                  color: lineColor,
-                                }}
-                              >
-                                {arrow[trend]}
-                              </span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                </div>
-              );
-            })}
+                    <title>{label}</title>
+                  </circle>
+                );
+              })}
+            </svg>
+            {hovered && (
+              <div
+                className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold"
+                style={{
+                  left: Math.min(width - 10, Math.max(10, hovered.x)),
+                  top: hovered.y - R - 8,
+                  transform: `translate(${hovered.x > width - 120 ? "-100%" : hovered.x < 120 ? "0" : "-50%"}, -100%)`,
+                  background: "#1b1f1d",
+                  color: "#ffffff",
+                }}
+              >
+                {hovered.p.m.employee_name} · dag {hovered.p.m.day_no} · {hovered.p.y.toFixed(2).replace(".", ",")}x
+              </div>
+            )}
           </div>
           <div
             className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] font-semibold"
             style={{ color: "#57635e" }}
           >
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-[2px]" style={{ background: "#1b1f1d" }} />
+              <span className="inline-block h-[2px] w-4" style={{ background: "#1b1f1d" }} />
               Normal (median for dagen)
             </span>
             <span className="flex items-center gap-1.5">
@@ -248,7 +341,11 @@ export function RampOverviewMatrix({
               <span className="inline-block h-3 w-3 rounded-full border-2" style={{ background: GREEN_LIGHT, borderColor: GREEN }} />
               På eller over typisk
             </span>
-            <span>Vandret: salg ift. det typiske for sælgerens dag (Normal = 1,0). Over 2x vises yderst.</span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-4" style={{ background: "rgba(193,59,50,.14)" }} />
+              Start her-zone
+            </span>
+            <span>Vandret: arbejdsdag. Lodret: salg ift. det typiske for dagen (Normal = 1,0). Over 2x vises øverst.</span>
           </div>
         </div>
 
