@@ -264,3 +264,6 @@ verify_jwt = false
 
 [functions.schema-introspect]
 verify_jwt = false
+
+[functions.enreach-closure-diagnose]
+verify_jwt = false
