@@ -216,7 +216,7 @@ function priorityBand(member: AnyMember, d: Derived) {
     tone: { bg: "#e7f4ed", icon: GREEN, text: "#0f5a38" },
     mark: "✓",
     title: "Forløb kørt — og salget stiger",
-    sub: "Hold kadencen indtil de er i det typiske spænd",
+    sub: "Hold kadencen indtil de er på forventning",
   };
 }
 
@@ -1890,7 +1890,7 @@ export default function RampTeam() {
           )}
 
           <p className="pb-4 text-[12px]" style={{ color: "#57635e" }}>
-            Forløbet kører indtil sælgeren er inde i det typiske spænd. Det er en samtale der
+            Forløbet kører indtil sælgeren er på forventning. Det er en samtale der
             mangler — ikke en vurdering af sælgeren.
           </p>
         </div>
