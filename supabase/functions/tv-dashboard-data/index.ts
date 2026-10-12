@@ -2625,6 +2625,12 @@ const FIBER_BOARD_POINTS_EF: Record<string, number> = {
   "34518fa2-0d01-41f5-9cf4-be8aeda803ff": 0.5, // Lukket salg VOK
   "25e393c0-95ea-4508-925e-0449c79cb023": 1.0, // Fuldt salg VOK
   "bd6ae50b-1516-4692-be9e-09b2317bf612": 0.5, // Lead Provi VOK
+  "59f00afb-ce48-4da1-a21c-8fefa93eb11a": 0.5, // Lukket salg HAP (Inkl. Mobilevoice salg)
+  "adc508fa-d2ba-4fe9-abe4-b0121cb0481f": 1.0, // Fuldt salg HAP (Inkl. Mobilevoice salg)
+  "4ecf9122-5b57-497f-96b7-adbce0fb6652": 0.5, // Lead Provi HAP (Inkl. Mobilevoice salg)
+  "7a792b7d-d5f7-40cf-86d4-12b8165b23e7": 0.5, // Lukket salg VOK (Inkl. Mobilevoice salg)
+  "8d7b6403-28a2-40ee-9877-be42e60e0f36": 1.0, // Fuldt salg VOK (Inkl. Mobilevoice salg)
+  "b0030dec-23b3-4cf8-9d88-0b4affe1312c": 0.5, // Lead Provi VOK (Inkl. Mobilevoice salg)
 };
 const FIBER_PRODUCT_IDS_EF = Object.keys(FIBER_BOARD_POINTS_EF);
 const FIBER_SALE_PRODUCT_IDS_EF = [
@@ -2632,6 +2638,10 @@ const FIBER_SALE_PRODUCT_IDS_EF = [
   "c63708fc-2f10-42a8-82dc-2728979908d9",
   "34518fa2-0d01-41f5-9cf4-be8aeda803ff",
   "25e393c0-95ea-4508-925e-0449c79cb023",
+  "59f00afb-ce48-4da1-a21c-8fefa93eb11a",
+  "adc508fa-d2ba-4fe9-abe4-b0121cb0481f",
+  "7a792b7d-d5f7-40cf-86d4-12b8165b23e7",
+  "8d7b6403-28a2-40ee-9877-be42e60e0f36",
 ];
 
 async function handleFiberSalesCount(
