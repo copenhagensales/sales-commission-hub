@@ -495,6 +495,10 @@ Deno.serve(async (req) => {
       }
 
       let talent: any = null;
+      const { data: exclusionRows } = await supabase
+        .from("league_talent_exclusions")
+        .select("employee_id");
+      const talentExcluded = new Set((exclusionRows ?? []).map((r: { employee_id: string }) => r.employee_id));
       const seasonStartDate = season.start_date;
       if (seasonStartDate) {
         const seasonStart = new Date(seasonStartDate);
@@ -509,6 +513,7 @@ Deno.serve(async (req) => {
 
         if (seasonStandingsAll) {
           for (const ss of seasonStandingsAll) {
+            if (talentExcluded.has(ss.employee_id)) continue;
             const emp = empMap.get(ss.employee_id);
             if (emp?.employment_start_date) {
               const startDate = new Date(emp.employment_start_date);
@@ -612,6 +617,10 @@ Deno.serve(async (req) => {
       }
 
       let talent: any = null;
+      const { data: exclusionRows } = await supabase
+        .from("league_talent_exclusions")
+        .select("employee_id");
+      const talentExcluded = new Set((exclusionRows ?? []).map((r: { employee_id: string }) => r.employee_id));
       const seasonStartDate = season.start_date;
       if (seasonStartDate && enriched.length > 0) {
         const seasonStart = new Date(seasonStartDate);
@@ -619,6 +628,7 @@ Deno.serve(async (req) => {
 
         const talentCandidates = enriched
           .filter((s) => {
+            if (talentExcluded.has(s.employee_id)) return false;
             const emp = empMap.get(s.employee_id);
             if (!emp?.employment_start_date) return false;
             return new Date(emp.employment_start_date) > talentCutoff && (s.current_provision || 0) > 0;

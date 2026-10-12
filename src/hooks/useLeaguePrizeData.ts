@@ -167,6 +167,11 @@ export function usePrizeLeaders(
       let allTalents: RankedPlayer[] = [];
       let talent: PrizeLeader | null = null;
 
+      const { data: exclusionRows } = await supabase
+        .from("league_talent_exclusions")
+        .select("employee_id");
+      const talentExcluded = new Set((exclusionRows ?? []).map((r) => r.employee_id));
+
       if (seasonStartDate) {
         const cutoffDate = new Date(seasonStartDate);
         cutoffDate.setDate(cutoffDate.getDate() - 90);
@@ -177,7 +182,7 @@ export function usePrizeLeaders(
           allTalents = (allStandings as any[])
             .filter((s: any) => {
               const emp = s.employee;
-              return emp?.employment_start_date && emp.employment_start_date > cutoffStr && s.total_points > 0;
+              return emp?.employment_start_date && !talentExcluded.has(emp.id) && emp.employment_start_date > cutoffStr && s.total_points > 0;
             })
             .map((s: any) => ({
               employee: { id: s.employee.id, first_name: s.employee.first_name, last_name: s.employee.last_name },
@@ -207,7 +212,7 @@ export function usePrizeLeaders(
           const talentCandidates = (qualData ?? [])
             .filter((s: any) => {
               const emp = s.employee;
-              return emp?.employment_start_date && emp.employment_start_date > cutoffStr && (s.current_provision || 0) > 0;
+              return emp?.employment_start_date && !talentExcluded.has(emp.id) && emp.employment_start_date > cutoffStr && (s.current_provision || 0) > 0;
             });
 
           allTalents = talentCandidates.map((s: any) => ({
