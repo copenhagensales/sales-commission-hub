@@ -388,7 +388,7 @@ export default function CommissionLeague() {
           todayProvision={myTodayProvision}
         />
       )}
-      <div className="cph-board min-h-screen bg-slate-900 p-2 sm:p-4 md:p-6">
+      <div className="cph-board min-h-screen bg-slate-900 -m-4 md:-m-8 p-2 sm:p-4 md:p-6">
         <div className="max-w-6xl mx-auto space-y-3 sm:space-y-6">
           {isCompletedPhase && (
             <div className="flex justify-end"><StartSeasonButton /></div>
