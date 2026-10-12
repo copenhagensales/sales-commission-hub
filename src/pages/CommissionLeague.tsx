@@ -477,7 +477,7 @@ export default function CommissionLeague() {
                   <div className="order-1 md:order-2 flex flex-col items-center gap-2">
                     <div className="flex items-center gap-3">
                       <Trophy className="h-9 w-9 md:h-10 md:w-10 text-yellow-500 trophy-glow drop-shadow-[0_0_12px_rgba(234,179,8,0.4)]" />
-                      <h1 className="text-3xl md:text-4xl font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
+                      <h1 className="league-title-gold text-3xl md:text-4xl font-extrabold uppercase tracking-wider">
                         Sæson {season.season_number}
                       </h1>
                     </div>

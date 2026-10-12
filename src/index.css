@@ -1099,3 +1099,12 @@
 .pd-ticker-move { display:flex; width:max-content; animation: pd-marquee 40s linear infinite; }
 @keyframes pd-marquee { to { transform: translateX(-50%); } }
 .pd-tvlink button { background:hsl(0 0% 100% / .03) !important; border:1px solid hsl(0 0% 100% / .12) !important; color:hsl(var(--pd-ink)) !important; height:2.9rem; font-weight:700; }
+
+/* Guldfarvet sæsontitel på Superliga-siden (overlever cph-board-temaet) */
+:root {
+  --league-gold: 45 93% 58%;
+}
+.league-title-gold,
+.cph-board .league-title-gold {
+  color: hsl(var(--league-gold)) !important;
+}
