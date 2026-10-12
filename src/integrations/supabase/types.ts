@@ -11464,6 +11464,46 @@ export type Database = {
         }
         Relationships: []
       }
+      league_talent_exclusions: {
+        Row: {
+          created_at: string
+          employee_id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_talent_exclusions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_talent_exclusions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_talent_exclusions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lederne_campaign_review: {
         Row: {
           adversus_campaign_id: string
