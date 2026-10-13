@@ -1211,6 +1211,24 @@ export type Database = {
         }
         Relationships: []
       }
+      apple_relay_eea_ranges: {
+        Row: {
+          country: string
+          loaded_at: string
+          net: unknown
+        }
+        Insert: {
+          country: string
+          loaded_at?: string
+          net: unknown
+        }
+        Update: {
+          country?: string
+          loaded_at?: string
+          net?: unknown
+        }
+        Relationships: []
+      }
       applications: {
         Row: {
           application_date: string
