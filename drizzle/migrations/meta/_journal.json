@@ -127,6 +127,13 @@
       "when": 1791793481984,
       "tag": "0017_league_talent_exclusions",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791911618654,
+      "tag": "0018_apple_relay_eea_ranges",
+      "breakpoints": true
     }
   ]
 }
