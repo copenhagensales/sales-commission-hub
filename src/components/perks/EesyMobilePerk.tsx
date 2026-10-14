@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Smartphone, CheckCircle2, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest, type EesyCustomerType,
+  useEesyMobileSubscriptions, useMyEesyMobileRequest, useIsOwner, useSubmitEesyMobileRequest, type EesyCustomerType,
 } from "@/hooks/useEesyMobileRequests";
 
 /** Kun visning: læser navn og normalpris ud af abonnementsteksten fra databasen. */
@@ -35,6 +35,7 @@ export function EesyMobilePerk() {
   const { toast } = useToast();
   const { data: subs = [] } = useEesyMobileSubscriptions();
   const { data: mine, isLoading } = useMyEesyMobileRequest();
+  const canSubmitMore = useIsOwner();
   const submit = useSubmitEesyMobileRequest();
   const [open, setOpen] = useState(false);
   const [customerType, setCustomerType] = useState<EesyCustomerType>("ny_kunde");
@@ -89,7 +90,7 @@ export function EesyMobilePerk() {
           50 % rabat på et Eesy-abonnement, når du flytter dit nuværende nummer til Eesy.
           Gælder ikke nye numre. Tilbuddet gælder kun medarbejdere, ikke familie eller venner. Du kan få ét tilbud.
         </p>
-        {isLoading ? null : mine ? (
+        {!isLoading && mine && (
           <p className="flex items-start gap-2 text-sm">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <span>
@@ -97,7 +98,8 @@ export function EesyMobilePerk() {
               {mine.status === "sendt" ? "Den er sendt videre til Eesy." : "Den afventer behandling."}
             </span>
           </p>
-        ) : (
+        )}
+        {!isLoading && (!mine || canSubmitMore) && (
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => openAs("ny_kunde")}>Skift til Eesy</Button>
             <Button variant="outline" onClick={() => openAs("eksisterende")}>Eksisterende Eesy-kunde</Button>
