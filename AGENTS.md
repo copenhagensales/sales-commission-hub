@@ -1,2 +1,4 @@
 - EU/EØS-adgang håndhæves ved login af edge-funktionen geo-login-guard mod eea_ip_ranges og non_eea_ip_ranges (DB-IP Lite); kun IP'er der beviseligt er uden for EU/EØS afvises (session tilbagekaldes server-side), ukendt land/fejl lukkes ind. Why: login-hooks får ikke request-headers, og backend leverer kun IP, ikke land.
 - Kolonner fra manuelle uploads defineres og får sletteregler i data_import_* tabellerne (MG → Data import). Gælder i dag kun Eesy TM kurv/kombineret upload. Upload fjerner udefinerede kolonner, men beholder altid dem, matchingen læser. Why: kun definerede data må opbevares, uden at matchingen ændres.
+
+- Opstart (/opstartshold) viser kun ugemodellen fra get_ramp_team_overview: week_status normalt, last_week_status (ramp_week_status maalt pr. sidste soendag) om mandagen; kun 1-1 (coaching) taeller som ugens 1-1 paa siden. Why: én kilde til status, ingen parallel beregning i frontend.
