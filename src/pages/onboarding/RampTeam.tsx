@@ -37,6 +37,7 @@ import {
   type SupportGroup,
 } from "./RampOverviewMatrix";
 import { RampSellerPanel } from "./RampSellerPanel";
+import { RampEstablishedSection } from "./RampEstablished";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { WEEKDAY_NAME, displayWeek, isMondayView, isoWeekOf } from "@/lib/rampWeek";
@@ -916,7 +917,6 @@ export default function RampTeam() {
     [allMembers, allFullTeam, excludedIds],
   );
 
-  const [view, setView] = useState<"new" | "team">("new");
   const [filter, setFilter] = useState<BoardFilter | null>(null);
   const [search, setSearch] = useState("");
   const searchTerm = search.trim().toLocaleLowerCase("da");
@@ -1149,7 +1149,7 @@ export default function RampTeam() {
                   Kun for teamledere
                 </span>
               </div>
-              {view === "new" && (
+              {(
                 <div className="mt-1.5 flex flex-wrap items-center gap-3">
                   <p className="text-[15px] font-semibold" style={{ color: "#3c4743" }}>
                     {weekLine}
@@ -1170,26 +1170,6 @@ export default function RampTeam() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-full bg-white p-1" role="tablist" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}>
-                {(
-                  [
-                    { v: "new" as const, label: `Nye i opstart · ${members.length}` },
-                    { v: "team" as const, label: "Hele holdet" },
-                  ]
-                ).map((t) => (
-                  <button
-                    key={t.v}
-                    type="button"
-                    role="tab"
-                    aria-selected={view === t.v}
-                    onClick={() => setView(t.v)}
-                    className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-bold"
-                    style={{ background: view === t.v ? "#1b1f1d" : "transparent", color: view === t.v ? "#ffffff" : "#1b1f1d" }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "#57635e" }} />
                 <input
@@ -1219,8 +1199,6 @@ export default function RampTeam() {
             </div>
           </header>
 
-          {view === "new" ? (
-            <>
               <RampKpiFilters
                 counts={counts}
                 missing={missing}
@@ -1280,42 +1258,14 @@ export default function RampTeam() {
                 aboutButton={discreet ? null : aboutButton}
                 footer={<RampMinTargetsEditor targets={minTargets} />}
               />
-            </>
-          ) : (
-            <section style={{ display: "grid", gap: 12 }}>
-              <div>
-                <p className="text-[19px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
-                  Hele holdet · {fullTeamList.length}
-                </p>
-                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Alle øvrige aktive sælgere på {campaignLabel}. Ingen norm og ingen status — kun tallene og ugens 1-1.
-                </p>
-              </div>
-              {fullTeamLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#57635e" }} />
-                </div>
-              ) : filteredFullTeam.length === 0 ? (
-                <div className="rounded-[20px] bg-white p-6 text-center" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
-                  <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                    Ingen øvrige sælgere på holdet lige nu
-                  </p>
-                </div>
-              ) : (
-                filteredFullTeam.map((member) => (
-                  <FullTeamMemberCard
-                    key={member.employee_id}
-                    member={member}
-                    discreet={discreet}
-                    absencePending={pendingAbsence.has(member.employee_id)}
-                    onOpen={(m, done) => setDialog({ employeeId: m.employee_id, done })}
-                    onAbsence={registerAbsence}
-                    onExclude={exclude}
-                  />
-                ))
-              )}
-            </section>
-          )}
+            <RampEstablishedSection
+              members={fullTeam}
+              matches={matchesSearch}
+              pendingAbsence={pendingAbsence}
+              onHold={(m, done) => setDialog({ employeeId: m.employee_id, done })}
+              onAbsence={registerAbsence}
+              onExclude={exclude}
+            />
 
           {pausedList.length > 0 && (
             <section style={{ display: "grid", gap: 8 }}>
