@@ -110,3 +110,7 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 ## Åbne opgaver (28/9)
 - [ ] Lederne-salg uden telefon på United-fanen — afventer GDPR-beslutning fra Kasper/Mathias
 - [x] Kasper: read-only afstemning FDM uge 39 — forklaret fuldt (Stork-hentning 25/9, mandagskørsel gik i stå)
+
+## Oktober 2026
+- [ ] TDC: kobl Adversus-kampagne 126377 (Kanvas NY Med TDC Net fibermulighed) til TDC Erhverv Products + 1 salg
+- [ ] Opstart: fjern skift "Nye/Hele holdet"; ny sektion "Etablerede sælgere" nederst (kun 1-1/feedback)
