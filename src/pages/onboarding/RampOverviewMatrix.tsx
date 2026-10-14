@@ -159,6 +159,7 @@ function HistoryCell({ w }: { w: RampWeekStatus }) {
 }
 
 const PREVIEW = 3;
+__CHART__
 
 export function RampOverviewMatrix({
   members,
@@ -167,6 +168,7 @@ export function RampOverviewMatrix({
   onSelectGroup,
   onSelectMember,
   footer,
+  targets,
 }: {
   members: RampTeamMember[];
   counts: Record<SupportGroup, number>;
@@ -174,8 +176,19 @@ export function RampOverviewMatrix({
   onSelectGroup: (g: SupportGroup) => void;
   onSelectMember: (employeeId: string) => void;
   footer?: ReactNode;
+  targets?: number[];
 }) {
   const [expanded, setExpanded] = useState<Record<SupportGroup, boolean>>({ start: true, hold: false, track: false });
+  const [flash, setFlash] = useState<string | null>(null);
+  const focusRow = (employeeId: string, g: SupportGroup) => {
+    if (activeGroup && activeGroup !== g) onSelectGroup(activeGroup);
+    setExpanded((e) => ({ ...e, [g]: true }));
+    setFlash(employeeId);
+    window.setTimeout(() => {
+      document.getElementById(`ramp-row-${employeeId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    window.setTimeout(() => setFlash((f) => (f === employeeId ? null : f)), 2200);
+  };
   const any = members.find((m) => m.week_status)?.week_status ?? null;
   const isoWeek = any?.iso_week ?? members[0]?.iso_week;
   const newWeek = members.length > 0 && members.every((m) => !m.week_status || m.week_status.status === "ny_uge");
@@ -260,6 +273,8 @@ export function RampOverviewMatrix({
         })}
       </div>
 
+      <WeekOverviewChart members={members} targets={targets ?? []} newWeek={newWeek} onSelect={focusRow} />
+
       <section
         className="rounded-[20px] bg-white p-5 sm:p-7"
         style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
@@ -315,9 +330,13 @@ export function RampOverviewMatrix({
                       return (
                         <tr
                           key={m.employee_id}
+                          id={`ramp-row-${m.employee_id}`}
                           onClick={() => onSelectMember(m.employee_id)}
-                          className="cursor-pointer"
-                          style={{ background: "#f6f8f7" }}
+                          className="cursor-pointer transition-[outline-color] duration-500"
+                          style={{
+                            background: flash === m.employee_id ? "#fff6d6" : "#f6f8f7",
+                            outline: flash === m.employee_id ? `2px solid ${DARK}` : "2px solid transparent",
+                          }}
                         >
                           <td className="rounded-l-[12px] border-l-4 px-3 py-2.5" style={{ borderColor: COLOR[g] }}>
                             <SellerCell m={m} w={w} />
