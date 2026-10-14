@@ -31,6 +31,9 @@ export interface RampWeekStatus {
   sales_live: number;
   prev_ratio: number | null;
   pace_ratio: number | null;
+  /** Salg pr. afsluttet arbejdsdag i ugen og i sidste uge (grundlag for "bedre end sidste uge"). */
+  per_day?: number | null;
+  prev_per_day?: number | null;
   status: RampWeekStatusKey;
   history: RampWeekHistory[];
 }

@@ -39,8 +39,8 @@ export function supportGroup(member: { week_status?: RampWeekStatus | null }): S
 /** Ugens tempo mod sidste uges resultat. Kun til tekster; status afgøres i databasen. */
 export function expectationTrend(member: { week_status?: RampWeekStatus | null }): Trend {
   const w = member.week_status;
-  if (!w || w.pace_ratio == null || w.prev_ratio == null) return "unknown";
-  const diff = w.pace_ratio - w.prev_ratio;
+  if (!w || w.per_day == null || w.prev_per_day == null) return "unknown";
+  const diff = w.per_day - w.prev_per_day;
   return diff > 1e-9 ? "up" : diff < -1e-9 ? "down" : "flat";
 }
 
@@ -132,8 +132,8 @@ export function RampKpiFilters({
   discreet: boolean;
 }) {
   const cards: { f: BoardFilter; title: string; rule: string; text: string; n: number | string }[] = [
-    { f: "start", title: "Start her", rule: "Bagud · ikke bedre end sidste uge", text: "Giv dem mest tid denne uge", n: discreet ? "–" : counts.start },
-    { f: "hold", title: "Hold fast", rule: "Bagud · men bedre end sidste uge", text: "Anerkend fremgangen", n: discreet ? "–" : counts.hold },
+    { f: "start", title: "Start her", rule: "Bagud · ikke flere salg pr. dag end sidste uge", text: "Giv dem mest tid denne uge", n: discreet ? "–" : counts.start },
+    { f: "hold", title: "Hold fast", rule: "Bagud · men flere salg pr. dag end sidste uge", text: "Anerkend fremgangen", n: discreet ? "–" : counts.hold },
     { f: "track", title: "På sporet", rule: "På eller foran ugens tempo", text: "Brug dem som makker", n: discreet ? "–" : counts.track },
     { f: "missing", title: "Mangler ugens 1-1", rule: "Frist fredag kl. 8", text: `${held} af ${required} holdt`, n: missing },
   ];
