@@ -799,6 +799,10 @@ export default function RampTeam() {
                           targets={minTargets}
                           emptyText={allItems.every((i) => !i.g) ? "Ny uge · første status i morgen" : null}
                           onSelect={(id) => {
+                            if (establishedItems.some((i) => i.m.employee_id === id)) {
+                              setPanelId(id);
+                              return;
+                            }
                             setFilter(null);
                             setFocusId({ id, nonce: Date.now() });
                           }}
@@ -829,7 +833,6 @@ export default function RampTeam() {
               items={establishedItems}
               discreet={discreet}
               target={minTargets[minTargets.length - 1] ?? 0}
-              onRowClick={(m) => setPanelId(m.employee_id)}
               matches={matchesSearch}
               pendingAbsence={pendingAbsence}
               onHold={(m, done) => setDialog({ employeeId: m.employee_id, done })}
