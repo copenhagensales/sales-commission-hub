@@ -87,6 +87,8 @@ export interface RampTeamMember {
   week_complete: boolean;
   weeks: RampWeekPoint[];
   actions: RampAction[];
+  /** Ugemodellen (ramp_week_status): eneste kilde til status, grupper og alarmer. */
+  week_status?: RampWeekStatus | null;
 }
 
 /** Ugepunkt for hele holdet: ingen norm, kun det raa antal produkter. */
