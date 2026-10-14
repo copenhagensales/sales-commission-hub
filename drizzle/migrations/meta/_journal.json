@@ -183,6 +183,13 @@
       "when": 1791973708733,
       "tag": "0025_ramp_overview_start_date",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791973724038,
+      "tag": "0026_ramp_overview_action_focus",
+      "breakpoints": true
     }
   ]
 }
