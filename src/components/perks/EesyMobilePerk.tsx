@@ -112,6 +112,7 @@ export function EesyMobilePerk() {
             <DialogDescription>
               Dine oplysninger kan kun ses af admin. De bruges kun til oprettelsen hos Eesy, og CPR-nummer,
               ICC-nummer, adresse og telefonnummer slettes 30 dage efter, at anmodningen er sendt videre.
+              Tilbuddet gælder kun, så længe du er ansat hos CS.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
