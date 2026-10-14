@@ -4,7 +4,6 @@ import { Loader2, Check, X, Plus, Search, Lock, EyeOff } from "lucide-react";
 import {
   RAMP_WEEKLY_ABSENCE,
   RAMP_WEEKLY_COACHING,
-  RAMP_WEEKLY_LISTEN,
   formatRiskStatShort,
   useCanViewRampTeam,
   useLogRampAction,
@@ -55,17 +54,7 @@ const UNDO_MS = 8000;
 type FilterMode = "all" | "danger" | "missing" | SupportGroup;
 /** Opstartere har en norm; hele holdet har ikke. Alt faelles arbejder paa begge. */
 type AnyMember = RampTeamMember | RampFullTeamMember;
-type SessionKind = "coaching" | "listen";
 
-const KIND_LABEL: Record<SessionKind, string> = {
-  coaching: "1-1 coaching",
-  listen: "1-1 lyt",
-};
-
-const KIND_ACTION: Record<SessionKind, string> = {
-  coaching: RAMP_WEEKLY_COACHING,
-  listen: RAMP_WEEKLY_LISTEN,
-};
 
 const RED = "#d4453c";
 const RED_TEXT = "#c13b32";
@@ -116,7 +105,7 @@ function derive(member: AnyMember): Derived {
     const { year, week } = isoWeekOf(new Date(action.performed_at));
     const key = weekKey(year, week);
     const entry = weekActions.get(key) ?? { sessions: 0, absence: false };
-    if (action.action_type === RAMP_WEEKLY_COACHING || action.action_type === RAMP_WEEKLY_LISTEN) {
+    if (action.action_type === RAMP_WEEKLY_COACHING) {
       entry.sessions += 1;
     }
     if (action.action_type === RAMP_WEEKLY_ABSENCE) entry.absence = true;
@@ -126,7 +115,7 @@ function derive(member: AnyMember): Derived {
   const gap = missingSales(member);
   const countedThisWeek = weekActions.get(weekKey(member.iso_year, member.iso_week))?.sessions ?? 0;
   const sessionsThisWeek =
-    member.has_coaching || member.has_listen ? Math.max(1, countedThisWeek) : countedThisWeek;
+    member.has_coaching ? Math.max(1, countedThisWeek) : countedThisWeek;
 
   // Sammenhaengende uger bagud uden en session (den aktuelle uge taelles med).
   // Uger foer ordningens startdato taeller ikke som manglende.
@@ -310,7 +299,7 @@ function ProgramRow({
   const done = sessions > 0;
   const status = done
     ? sessions > 1
-      ? `Holdt i uge ${member.iso_week} · ${sessions} sessioner`
+      ? `Holdt i uge ${member.iso_week} · ${sessions} gange`
       : `Holdt i uge ${member.iso_week}`
     : missedWeeks >= 2
       ? `Mangler ${missedWeeks} uger i træk`
@@ -337,7 +326,7 @@ function ProgramRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-          1-1 session
+          1-1
         </span>
         <span className="mt-px block text-[12px] font-semibold" style={{ color: "#57635e" }}>
           {status}
@@ -364,8 +353,8 @@ function HistoryBars({ member, d }: { member: AnyMember; d: Derived }) {
           const label = entry?.absence
             ? `Uge ${w.iso_week}: fravær hele ugen`
             : count === 1
-              ? `Uge ${w.iso_week}: 1 session holdt`
-              : `Uge ${w.iso_week}: ${count} sessioner holdt`;
+              ? `Uge ${w.iso_week}: 1-1 holdt`
+              : `Uge ${w.iso_week}: ${count} × 1-1 holdt`;
           return (
             <span
               key={`hist-${weekKey(w.iso_year, w.iso_week)}`}
@@ -430,14 +419,17 @@ function FullTeamMemberCard({
   member,
   onOpen,
   onExclude,
+  onAbsence,
+  absencePending,
   discreet,
 }: {
   member: RampFullTeamMember;
-  onOpen: (member: RampFullTeamMember, kind: SessionKind, done: boolean) => void;
+  onOpen: (member: RampFullTeamMember, done: boolean) => void;
+  onAbsence: (member: RampFullTeamMember) => void;
+  absencePending: boolean;
   onExclude: (member: RampFullTeamMember) => void;
   discreet: boolean;
 }) {
-  const logAction = useLogRampAction();
   const d = derive(member);
   const weekSum = member.weeks.reduce((sum, w) => sum + w.sales, 0);
 
@@ -502,14 +494,14 @@ function FullTeamMemberCard({
           style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionLabel>Ugens faste forløb</SectionLabel>
+            <SectionLabel>Ugens 1-1</SectionLabel>
             <span
               className="text-[12px] font-extrabold"
               style={{ color: d.sessionsThisWeek >= 1 ? "#0f5a38" : AMBER_TEXT }}
             >
               {d.sessionsThisWeek >= 1
                 ? d.sessionsThisWeek > 1
-                  ? `Ugen er klaret · ${d.sessionsThisWeek} sessioner`
+                  ? `Ugen er klaret · ${d.sessionsThisWeek} × 1-1`
                   : "Ugen er klaret"
                 : "0 af 1 holdt"}
             </span>
@@ -517,7 +509,7 @@ function FullTeamMemberCard({
 
           {member.has_absence ? (
             <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
-              Der er registreret fravær hele ugen — forløbet er ikke krævet.
+              Der er registreret fravær hele ugen — 1-1 er ikke krævet.
             </p>
           ) : (
             <div className="mt-3 space-y-2">
@@ -525,36 +517,30 @@ function FullTeamMemberCard({
                 sessions={d.sessionsThisWeek}
                 member={member}
                 missedWeeks={d.missedWeeks}
-                onOpen={() => onOpen(member, "coaching", d.sessionsThisWeek > 0)}
+                onOpen={() => onOpen(member, d.sessionsThisWeek > 0)}
               />
               {d.sessionsThisWeek > 0 && (
                 <button
                   type="button"
-                  onClick={() => onOpen(member, "coaching", true)}
+                  onClick={() => onOpen(member, true)}
                   className="flex w-full items-center gap-2 rounded-[13px] border border-dashed px-[15px] py-[11px] text-left text-[13px] font-bold"
                   style={{ borderColor: "#c3ccc8", color: "#0f5a38", background: "#ffffff" }}
                 >
                   <Plus className="h-4 w-4" />
-                  Tilføj ekstra session i uge {member.iso_week}
+                  Tilføj ekstra 1-1 i uge {member.iso_week}
                 </button>
               )}
               {!member.week_required && (
                 <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
                   {member.weekly_program_active
-                    ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
+                    ? "Under 2 arbejdsdage i ugen — 1-1 er ikke krævet."
                     : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
                 </p>
               )}
               <button
                 type="button"
-                disabled={logAction.isPending}
-                onClick={() =>
-                  logAction.mutate({
-                    employeeId: member.employee_id,
-                    actionType: RAMP_WEEKLY_ABSENCE,
-                    flagId: null,
-                  })
-                }
+                disabled={absencePending}
+                onClick={() => onAbsence(member)}
                 className="text-[12px] font-semibold underline disabled:opacity-50"
                 style={{ color: "#57635e" }}
               >
@@ -676,12 +662,10 @@ function FeedbackLogList({
 
 function FeedbackDialog({
   member,
-  kind,
   alreadyDone,
   onClose,
 }: {
   member: AnyMember;
-  kind: SessionKind;
   alreadyDone: boolean;
   onClose: () => void;
 }) {
@@ -693,7 +677,7 @@ function FeedbackDialog({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const ready = note.trim().length >= 10 && focusArea.trim().length > 0;
   const d = derive(member);
-  const previous = d.feedbackLog.filter((a) => a.action_type === KIND_ACTION[kind]);
+  const previous = d.feedbackLog.filter((a) => a.action_type === RAMP_WEEKLY_COACHING);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -704,7 +688,7 @@ function FeedbackDialog({
     send.mutate(
       {
         employeeId: member.employee_id,
-        kind,
+        kind: "coaching",
         note: note.trim(),
         focusArea: focusArea.trim(),
         focusNote: focusNote.trim() || null,
@@ -732,7 +716,7 @@ function FeedbackDialog({
               className="text-[11px] font-extrabold uppercase"
               style={{ color: "#57635e", letterSpacing: ".12em" }}
             >
-              {KIND_LABEL[kind]}
+              1-1
             </p>
             <p className="text-[22px] font-extrabold leading-tight" style={{ color: "#1b1f1d" }}>
               {member.employee_name}
@@ -754,7 +738,7 @@ function FeedbackDialog({
               className="rounded-2xl border p-3 text-[12px]"
               style={{ background: "#e7f4ed", borderColor: "#a9dcc3", color: "#0f5a38" }}
             >
-              Forløbet er allerede holdt i uge {member.iso_week}. Du kan sende en tilføjelse.
+              Ugens 1-1 er allerede holdt i uge {member.iso_week}. Du kan sende en ekstra 1-1.
             </p>
           )}
 
