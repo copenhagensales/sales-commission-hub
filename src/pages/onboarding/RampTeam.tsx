@@ -25,12 +25,24 @@ import { RampMinTargetsEditor } from "./RampMinTargetsEditor";
 import { getInitials } from "@/utils/formatting";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  RampOverviewMatrix,
+  RampKpiFilters,
+  RampWeekBoard,
+  WeekOverviewChart,
   expectationTrend,
+  groupOf,
   missingSales,
+  oneOnOneOf,
   supportGroup,
+  type BoardFilter,
+  type BoardItem,
   type SupportGroup,
 } from "./RampOverviewMatrix";
+import { RampSellerPanel } from "./RampSellerPanel";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
+import { WEEKDAY_NAME, displayWeek, isMondayView, isoWeekOf } from "@/lib/rampWeek";
+
+const UNDO_MS = 8000;
 
 /**
  * Opstart — lederrettet side ("Ekstra støtte"-design).
@@ -160,55 +172,6 @@ function derive(member: AnyMember): Derived {
   };
 }
 
-function priorityBand(member: AnyMember, d: Derived) {
-  if (member.has_absence) {
-    return {
-      tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
-      mark: "✓",
-      title: "Fravær hele ugen registreret",
-      sub: "Ugen er lukket — forløbet genoptages næste uge.",
-    };
-  }
-  if (d.missedWeeks >= 2) {
-    return {
-      tone: { bg: "#fdf2e3", icon: AMBER_STRIP, text: "#7a4e11" },
-      mark: "!",
-      title: "Din opgave: hold en 1-1 i dag",
-      sub: `Ingen session de sidste ${d.missedWeeks} uger. Han/hun har mest brug for tid med dig lige nu.`,
-    };
-  }
-  if (member.week_required && d.sessionsThisWeek === 0) {
-    return {
-      tone: { bg: "#fdf2e3", icon: AMBER_STRIP, text: "#7a4e11" },
-      mark: "!",
-      title: `Din opgave: ugens 1-1 i uge ${member.iso_week}`,
-      sub: "Der skal holdes mindst én session denne uge",
-    };
-  }
-  if (!member.week_required && !member.weekly_program_active) {
-    return {
-      tone: { bg: "#f1f4f3", icon: "#57635e", text: "#1b1f1d" },
-      mark: "✓",
-      title: "Ordningen er ikke trådt i kraft endnu",
-      sub: "Ugen tælles ikke som manglende",
-    };
-  }
-  if (d.trend === "down") {
-    return {
-      tone: { bg: "#fdf2e3", icon: AMBER_TEXT, text: "#7a4e11" },
-      mark: "✓",
-      title: "Forløb kørt — men salget falder",
-      sub: "Tag trenden op på næste coaching",
-    };
-  }
-  return {
-    tone: { bg: "#e7f4ed", icon: GREEN, text: "#0f5a38" },
-    mark: "✓",
-    title: "Forløb kørt — og salget stiger",
-    sub: "Hold kadencen indtil de er på forventning",
-  };
-}
-
 function Pill({
   children,
   bg,
@@ -333,79 +296,6 @@ function WeekLabels({
   );
 }
 
-function WeeklyBars({
-  weeks,
-  stripColor,
-  currentWeek,
-}: {
-  weeks: RampWeekPoint[];
-  stripColor: string;
-  currentWeek: number;
-}) {
-  const last = weeks[weeks.length - 1];
-  const bandLow = last ? last.p25 : 0;
-  const bandHigh = last ? last.p75 : 0;
-  const max = Math.max(1, bandHigh, ...weeks.map((w) => w.sales)) * 1.12;
-  const H = 84;
-  const px = (v: number) => Math.round((v / max) * H);
-
-  return (
-    <div>
-      <SectionLabel>Produkter pr. uge mod typisk spænd</SectionLabel>
-      <div className="relative mt-3.5 flex items-end gap-2" style={{ height: H }}>
-        {bandHigh > 0 && (
-          <div
-            className="pointer-events-none absolute inset-x-0 border-y-2 border-dashed"
-            style={{
-              top: H - px(bandHigh),
-              height: Math.max(2, px(bandHigh) - px(bandLow)),
-              borderColor: "#c3ccc8",
-              background: "rgba(27,31,29,.07)",
-            }}
-          />
-        )}
-        {last && last.p50 > 0 && (
-          <div
-            className="pointer-events-none absolute inset-x-0"
-            style={{ top: H - px(last.p50), height: 2, background: "#1b1f1d" }}
-          />
-        )}
-        {weeks.map((w) => {
-          const color = stripColor;
-          return (
-            <div
-              key={weekKey(w.iso_year, w.iso_week)}
-              className="relative z-[1] flex flex-1 flex-col items-center gap-[5px]"
-            >
-              <span
-                className="text-[12px] font-extrabold tabular-nums"
-                style={{ color: "#1b1f1d" }}
-              >
-                {w.sales}
-              </span>
-              <span
-                className="w-full"
-                style={{
-                  height: Math.max(2, px(w.sales)),
-                  background: color,
-                  borderRadius: "5px 5px 0 0",
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <WeekLabels weeks={weeks} currentWeek={currentWeek} />
-      {last && (
-        <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#57635e" }}>
-          Blåt felt = typisk spænd {Math.round(bandLow)}–{Math.round(bandHigh)} · sort streg =
-          median {Math.round(last.p50)}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function ProgramRow({
   sessions,
   member,
@@ -491,258 +381,6 @@ function HistoryBars({ member, d }: { member: AnyMember; d: Derived }) {
   );
 }
 
-function effectLine(member: AnyMember, d: Derived): { text: string; color: string } {
-  const coachingWeeks = member.weeks.filter(
-    (w) => (d.weekActions.get(weekKey(w.iso_year, w.iso_week))?.sessions ?? 0) > 0,
-  ).length;
-  if (coachingWeeks < 2 || member.weeks.length < 2) {
-    return { text: "For få forløb til at måle effekt endnu", color: "#57635e" };
-  }
-  const first = member.weeks[0].sales;
-  const last = member.weeks[member.weeks.length - 1].sales;
-  const diff = last - first;
-  return {
-    text: `Coaching ${coachingWeeks} uger i træk — salg ${first} → ${last} (${
-      diff >= 0 ? `op ${diff}` : `ned ${Math.abs(diff)}`
-    })`,
-    color: diff >= 0 ? "#0f5a38" : AMBER_TEXT,
-  };
-}
-
-function MemberCard({
-  member,
-  onOpen,
-  onExclude,
-  discreet,
-}: {
-  member: RampTeamMember;
-  onOpen: (member: RampTeamMember, kind: SessionKind, done: boolean) => void;
-  onExclude: (member: RampTeamMember) => void;
-  discreet: boolean;
-}) {
-  const logAction = useLogRampAction();
-  const d = derive(member);
-  const band = priorityBand(member, d);
-  const effect = effectLine(member, d);
-  const trendPill =
-    d.trend === "up"
-      ? { text: "↑ Stigende", bg: "#e7f4ed", color: "#0f5a38" }
-      : d.trend === "down"
-        ? { text: "↓ Faldende", bg: GREY_PILL, color: "#4a5651" }
-        : { text: "→ Flad", bg: "#f1f4f3", color: "#57635e" };
-
-  return (
-    <article
-      id={`ramp-member-${member.employee_id}`}
-      className="relative scroll-mt-24 overflow-hidden rounded-[20px] bg-white"
-      style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-    >
-      <span
-        className="absolute bottom-0 left-0 top-0 w-[5px]"
-        style={{ background: discreet ? NEUTRAL : d.stripColor }}
-      />
-
-      <div className="px-5 pt-5 sm:px-[26px]">
-        <div className="flex flex-wrap items-center justify-between gap-3.5">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[15px] font-extrabold"
-              style={{ background: "#f1f4f3", color: "#4a5651" }}
-            >
-              {getInitials(member.employee_name)}
-            </span>
-            <div className="min-w-0">
-              <p
-                className="text-[18px] font-extrabold leading-tight"
-                style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
-              >
-                {member.employee_name}
-              </p>
-              <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                {[member.campaign_name, `arbejdsdag ${member.day_no}`]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!discreet && (
-              <Pill bg={trendPill.bg} color={trendPill.color}>
-                {trendPill.text}
-              </Pill>
-            )}
-            {!discreet && (supportGroup(member) === "start" || supportGroup(member) === "hold") && (
-              <Pill bg={RED_FLAT} color={RED_TEXT}>
-                Ekstra støtte
-              </Pill>
-            )}
-            {!discreet && d.gap > 0 && (
-              <Pill bg={GREY_PILL} color="#57635e">
-                Mangler {d.gap} salg
-              </Pill>
-            )}
-            <ExcludeButton onClick={() => onExclude(member)} />
-          </div>
-        </div>
-
-        <div
-          className="mt-[18px] flex items-center gap-3.5 rounded-[14px] px-[18px] py-3.5"
-          style={{ background: band.tone.bg }}
-        >
-          <span
-            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] text-[16px] font-extrabold text-white"
-            style={{ background: band.tone.icon }}
-          >
-            {band.mark}
-          </span>
-          <div className="min-w-0">
-            <p
-              className="whitespace-normal text-[16px] font-extrabold"
-              style={{ color: band.tone.text, letterSpacing: "-.01em", textWrap: "balance" }}
-            >
-              {band.title}
-            </p>
-            <p className="mt-0.5 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-              {band.sub}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center gap-3">
-          <span
-            className="whitespace-nowrap text-[12px] font-extrabold tabular-nums"
-            style={{ color: "#57635e" }}
-          >
-            Dag {member.day_no} af 40
-          </span>
-          <span
-            className="h-2 flex-1 overflow-hidden rounded-[4px]"
-            style={{ background: "#f1f4f3" }}
-          >
-            <span
-              className="block h-full rounded-[4px]"
-              style={{
-                width: `${Math.min(100, (member.day_no / 40) * 100)}%`,
-                background: discreet ? NEUTRAL : d.stripColor,
-              }}
-            />
-          </span>
-          <span
-            className="whitespace-nowrap text-[12px] font-bold tabular-nums"
-            style={{ color: "#57635e" }}
-          >
-            {member.days_left} dage tilbage
-          </span>
-        </div>
-      </div>
-
-      <div
-        className="mt-[18px] grid gap-[22px] border-t px-5 py-[18px] sm:px-[26px] lg:grid-cols-2"
-        style={{ borderColor: "#eef2f0" }}
-      >
-        {discreet ? (
-          <p className="text-[13px] font-semibold" style={{ color: "#57635e" }}>
-            Produktgrafen er skjult i diskret visning.
-          </p>
-        ) : (
-          <WeeklyBars weeks={member.weeks} stripColor={d.stripColor} currentWeek={member.iso_week} />
-        )}
-
-        <div
-          className="rounded-[16px] border px-5 py-[18px]"
-          style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionLabel>Ugens faste forløb</SectionLabel>
-            <span
-              className="text-[12px] font-extrabold"
-              style={{ color: d.sessionsThisWeek >= 1 ? "#0f5a38" : AMBER_TEXT }}
-            >
-              {d.sessionsThisWeek >= 1
-                ? d.sessionsThisWeek > 1
-                  ? `Ugen er klaret · ${d.sessionsThisWeek} sessioner`
-                  : "Ugen er klaret"
-                : "0 af 1 holdt"}
-            </span>
-          </div>
-
-          {member.has_absence ? (
-            <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
-              Der er registreret fravær hele ugen — forløbet er ikke krævet.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2">
-              <ProgramRow
-                sessions={d.sessionsThisWeek}
-                member={member}
-                missedWeeks={d.missedWeeks}
-                onOpen={() => onOpen(member, "coaching", d.sessionsThisWeek > 0)}
-              />
-              {d.sessionsThisWeek > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onOpen(member, "coaching", true)}
-                  className="flex w-full items-center gap-2 rounded-[13px] border border-dashed px-[15px] py-[11px] text-left text-[13px] font-bold"
-                  style={{ borderColor: "#c3ccc8", color: "#0f5a38", background: "#ffffff" }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Tilføj ekstra session i uge {member.iso_week}
-                </button>
-              )}
-              {!member.week_required && (
-                <p className="text-[12px] font-semibold" style={{ color: "#57635e" }}>
-                  {member.weekly_program_active
-                    ? "Under 2 arbejdsdage i ugen — forløbet er ikke krævet."
-                    : "Ordningen er endnu ikke trådt i kraft — ugen tælles ikke som manglende."}
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={logAction.isPending}
-                onClick={() =>
-                  logAction.mutate({
-                    employeeId: member.employee_id,
-                    actionType: RAMP_WEEKLY_ABSENCE,
-                    flagId: member.flag_id,
-                  })
-                }
-                className="text-[12px] font-semibold underline disabled:opacity-50"
-                style={{ color: "#57635e" }}
-              >
-                Registrér fravær hele ugen
-              </button>
-            </div>
-          )}
-
-          <div
-            className="mt-3 rounded-[12px] border px-3.5 py-3 text-[12px] font-semibold"
-            style={{ background: "#ffffff", borderColor: "#e0e7e4", color: "#4a5651" }}
-          >
-            <span className="font-extrabold" style={{ color: "#1b1f1d" }}>
-              Fokus i samtalen:
-            </span>{" "}
-            Start med trivsel, ikke tal: Hvordan er det at være ny? Hvad driller mest lige nu? Find
-            én ting at øve sammen inden næste uge.
-          </div>
-
-          <HistoryBars member={member} d={d} />
-
-          <p
-            className="mt-3 border-t pt-3 text-[13px] font-bold"
-            style={{ borderColor: "#e7eeeb", color: effect.color, textWrap: "pretty" }}
-          >
-            {effect.text}
-          </p>
-
-          <FeedbackLogList member={member} d={d} limit={4} />
-
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/** Rene tal pr. uge uden norm — hele holdet maales ikke mod en kurve. */
 function PlainWeeklyBars({
   weeks,
   currentWeek,
@@ -1281,19 +919,11 @@ export default function RampTeam() {
   const { data: exclusions = [] } = useRampFeedbackExclusions();
   const { data: minTargets = DEFAULT_WEEKLY_MIN_TARGETS } = useRampMinTargets();
   const setExclusion = useSetRampFeedbackExclusion();
+  const logAction = useLogRampAction();
 
-  const excludedIds = useMemo(
-    () => new Set(exclusions.map((e) => e.employee_id)),
-    [exclusions],
-  );
-  const members = useMemo(
-    () => allMembers.filter((m) => !excludedIds.has(m.employee_id)),
-    [allMembers, excludedIds],
-  );
-  const fullTeam = useMemo(
-    () => allFullTeam.filter((m) => !excludedIds.has(m.employee_id)),
-    [allFullTeam, excludedIds],
-  );
+  const excludedIds = useMemo(() => new Set(exclusions.map((e) => e.employee_id)), [exclusions]);
+  const members = useMemo(() => allMembers.filter((m) => !excludedIds.has(m.employee_id)), [allMembers, excludedIds]);
+  const fullTeam = useMemo(() => allFullTeam.filter((m) => !excludedIds.has(m.employee_id)), [allFullTeam, excludedIds]);
   const pausedList = useMemo(
     () =>
       ([...allMembers, ...allFullTeam] as AnyMember[])
@@ -1301,99 +931,89 @@ export default function RampTeam() {
         .sort((a, b) => a.employee_name.localeCompare(b.employee_name, "da")),
     [allMembers, allFullTeam, excludedIds],
   );
-  const [filter, setFilter] = useState<FilterMode>("all");
+
+  const [view, setView] = useState<"new" | "team">("new");
+  const [filter, setFilter] = useState<BoardFilter | null>(null);
   const [search, setSearch] = useState("");
   const searchTerm = search.trim().toLocaleLowerCase("da");
   const matchesSearch = (m: { employee_name: string }) =>
     !searchTerm || m.employee_name.toLocaleLowerCase("da").includes(searchTerm);
-  const [showEvidence, setShowEvidence] = useState(false);
+
   const { user } = useAuth();
   const discreetKey = `ramp-discreet:${user?.id ?? "anon"}`;
+  const chartKey = `ramp-chart-open:${user?.id ?? "anon"}`;
   const [discreet, setDiscreet] = useState(false);
+  const [chartOpen, setChartOpen] = useState(true);
   useEffect(() => {
     setDiscreet(window.localStorage.getItem(discreetKey) === "1");
   }, [discreetKey]);
-  const toggleDiscreet = () => {
+  useEffect(() => {
+    const saved = window.localStorage.getItem(chartKey);
+    setChartOpen(saved === null ? window.innerWidth >= 768 : saved === "1");
+  }, [chartKey]);
+  const toggleDiscreet = () =>
     setDiscreet((v) => {
-      const next = !v;
-      window.localStorage.setItem(discreetKey, next ? "1" : "0");
-      return next;
+      window.localStorage.setItem(discreetKey, !v ? "1" : "0");
+      return !v;
     });
-  };
-  const scrollToMember = (employeeId: string) => {
-    setFilter("all");
-    setSearch("");
-    window.setTimeout(() => {
-      document
-        .getElementById(`ramp-member-${employeeId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  };
-  const [dialog, setDialog] = useState<{
-    employeeId: string;
-    kind: SessionKind;
-    done: boolean;
-  } | null>(null);
+  const toggleChart = () =>
+    setChartOpen((v) => {
+      window.localStorage.setItem(chartKey, !v ? "1" : "0");
+      return !v;
+    });
+
+  const [dialog, setDialog] = useState<{ employeeId: string; done: boolean } | null>(null);
+  const [panelId, setPanelId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<{ id: string; nonce: number } | null>(null);
+  const [pendingAbsence, setPendingAbsence] = useState<Set<string>>(new Set());
+  const absenceTimers = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const timers = absenceTimers.current;
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, []);
 
   const isoWeek = members[0]?.iso_week ?? null;
   const campaignLabel = useMemo(() => {
-    const names = Array.from(
-      new Set(members.map((m) => m.campaign_name).filter((n): n is string => Boolean(n))),
-    );
+    const names = Array.from(new Set(members.map((m) => m.campaign_name).filter((n): n is string => Boolean(n))));
     return names.length > 0 ? names.join(" · ") : "Eesy TM Products";
   }, [members]);
   const programStart = members[0]?.weekly_program_start_date ?? null;
   const programActive = members[0]?.weekly_program_active ?? false;
   const programStartLabel = programStart
-    ? new Date(`${programStart}T00:00:00`).toLocaleDateString("da-DK", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
+    ? new Date(`${programStart}T00:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" })
     : null;
 
-  const allList = useMemo(
+  // Visningsuge: mandag = sidste uges slutresultat. Statusberegningen er uændret (databasen).
+  const ref = members.map((m) => m.week_status).find((w) => w && !w.partial_start) ?? members[0]?.week_status ?? null;
+  const monday = isMondayView(ref);
+  const lastIso = members.map((m) => m.last_week_status?.iso_week).find((n) => n != null) ?? null;
+  const done = ref?.done_days ?? 0;
+  const total = ref?.workdays ?? 5;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const yesterday = WEEKDAY_NAME[((new Date().getDay() + 6) % 7) || 7];
+
+  const items: BoardItem[] = useMemo(
     () =>
-      members
-        .map((m) => ({ member: m, urgency: derive(m).urgency }))
-        .sort(
-          (a, b) =>
-            b.urgency - a.urgency ||
-            a.member.employee_name.localeCompare(b.member.employee_name, "da"),
-        )
-        .map((x) => x.member),
-    [members],
+      members.map((m) => {
+        const w = displayWeek(m, monday);
+        return { m, w, g: groupOf(w), one: oneOnOneOf(m, pendingAbsence.has(m.employee_id)) };
+      }),
+    [members, monday, pendingAbsence],
   );
-
-  const dangerList = useMemo(() => allList.filter((m) => { const g = supportGroup(m); return g === "start" || g === "hold"; }), [allList]);
-  const groupLists = useMemo(() => {
-    const map: Record<SupportGroup, RampTeamMember[]> = { start: [], hold: [], track: [] };
-    for (const m of allList) {
-      const g = supportGroup(m);
-      if (g) map[g].push(m);
-    }
-    return map;
-  }, [allList]);
-
-  const missingList = useMemo(
-    () =>
-      allList.filter(
-        (m) => m.week_required && !m.has_absence && !m.has_coaching && !m.has_listen,
-      ),
-    [allList],
-  );
-
   const counts = useMemo(() => {
-    const good = members.filter((m) => supportGroup(m) === "track").length;
-    const pending = members.filter((m) => supportGroup(m) === null).length;
-    return {
-      danger: dangerList.length,
-      good,
-      pending,
-      missing: missingList.length,
-      total: members.length,
-    };
-  }, [members, dangerList.length, missingList.length]);
+    const c: Record<SupportGroup, number> = { start: 0, hold: 0, track: 0 };
+    for (const i of items) if (i.g) c[i.g] += 1;
+    return c;
+  }, [items]);
+  const missing = items.filter((i) => i.one.kind === "missing").length;
+  const requiredCount = items.filter((i) => i.m.week_required).length;
+  const heldCount = items.filter((i) => i.m.week_required && i.one.kind === "held").length;
+
+  const shownItems = items.filter((i) => matchesSearch(i.m));
+  const chartItems = shownItems.filter((i) =>
+    !filter ? true : filter === "missing" ? i.one.kind === "missing" : i.g === filter,
+  );
+  const panelItem = items.find((i) => i.m.employee_id === panelId) ?? null;
 
   const fullTeamList = useMemo(
     () =>
@@ -1404,17 +1024,63 @@ export default function RampTeam() {
       ),
     [fullTeam],
   );
-  const fullTeamMissing = useMemo(
-    () =>
-      fullTeam.filter((m) => m.week_required && !m.has_absence && !m.has_coaching && !m.has_listen)
-        .length,
-    [fullTeam],
-  );
 
   const dialogMember: AnyMember | undefined = dialog
     ? (members.find((m) => m.employee_id === dialog.employeeId) as AnyMember | undefined) ??
       fullTeam.find((m) => m.employee_id === dialog.employeeId)
     : undefined;
+
+  const registerAbsence = (m: AnyMember) => {
+    const id = m.employee_id;
+    setPendingAbsence((s) => new Set(s).add(id));
+    const timer = window.setTimeout(() => {
+      absenceTimers.current.delete(id);
+      logAction.mutate(
+        { employeeId: id, actionType: RAMP_WEEKLY_ABSENCE, flagId: null },
+        {
+          onSettled: () =>
+            setPendingAbsence((s) => {
+              const n = new Set(s);
+              n.delete(id);
+              return n;
+            }),
+        },
+      );
+    }, UNDO_MS);
+    absenceTimers.current.set(id, timer);
+    toast("Fravær registreret", {
+      duration: UNDO_MS,
+      action: {
+        label: "Fortryd",
+        onClick: () => {
+          window.clearTimeout(absenceTimers.current.get(id));
+          absenceTimers.current.delete(id);
+          setPendingAbsence((s) => {
+            const n = new Set(s);
+            n.delete(id);
+            return n;
+          });
+        },
+      },
+    });
+  };
+
+  const exclude = (m: AnyMember) => {
+    setPanelId(null);
+    setExclusion.mutate(
+      { employeeId: m.employee_id, excluded: true },
+      {
+        onSuccess: () =>
+          toast("Taget ud af oversigten", {
+            duration: UNDO_MS,
+            action: {
+              label: "Fortryd",
+              onClick: () => setExclusion.mutate({ employeeId: m.employee_id, excluded: false }),
+            },
+          }),
+      },
+    );
+  };
 
   if (accessLoading || isLoading) {
     return (
@@ -1429,35 +1095,63 @@ export default function RampTeam() {
   if (!canView) {
     return (
       <MainLayout>
-        <div className="py-16 text-center text-muted-foreground">
-          Du har ikke adgang til Opstart.
-        </div>
+        <div className="py-16 text-center text-muted-foreground">Du har ikke adgang til Opstart.</div>
       </MainLayout>
     );
   }
 
-  const list = (
-    filter === "all"
-      ? allList
-      : filter === "danger"
-        ? dangerList
-        : filter === "missing"
-          ? missingList
-          : groupLists[filter]
-  ).filter(matchesSearch);
   const day10 = stats.find((s) => s.day_no === 10);
+  const weekLine = monday
+    ? `Sidste uge (uge ${lastIso ?? "-"}) · slutresultat · ny status i morgen`
+    : `Uge ${isoWeek ?? "-"} · målt til og med i går (${yesterday}) · ${done} af ${total} arbejdsdage gået · ${Math.max(0, total - done)} dage tilbage`;
+  const filteredFullTeam = fullTeamList.filter(matchesSearch);
+
+  const aboutButton = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="rounded-full px-3 py-1 text-[12px] font-bold" style={{ background: "#f1f4f3", color: "#1b1f1d" }}>
+          Om modellen
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[360px] space-y-3 text-[13px]" align="end">
+        <p className="font-semibold" style={{ color: "#1b1f1d" }}>
+          Status måles på den indeværende kalenderuge til og med i går: ugens salg mod hvor man burde være nu.
+          Under tempo og ikke bedre end sidste uge = Start her. Under tempo men bedre end sidste uge = Hold fast.
+          I første opstartsuge findes ingen forrige uge, så under tempo = Hold fast.
+        </p>
+        <div className="rounded-[12px] p-3" style={{ background: "#f6f8f7" }}>
+          <p className="text-[11px] font-extrabold uppercase" style={{ color: "#57635e", letterSpacing: ".1em" }}>
+            Historik · målt mod typisk niveau
+          </p>
+          <p className="mt-1 font-semibold" style={{ color: "#3c4743" }}>
+            {day10 && day10.n_below > 0 && day10.n_above > 0
+              ? `Lå en ny under typisk på dag 10, stoppede ${Math.round((day10.n_below_stopped / day10.n_below) * 100)} % inden dag 40 — mod ${Math.round((day10.n_above_stopped / day10.n_above) * 100)} % af dem på eller over.`
+              : "Grundlaget er endnu for tyndt til en sammenligning på dag 10."}
+          </p>
+          {stats.map((s) => {
+            const line = formatRiskStatShort(s);
+            return line ? (
+              <p key={s.day_no} className="text-[12px]" style={{ color: "#57635e" }}>
+                {line}
+              </p>
+            ) : null;
+          })}
+          <p className="mt-1 text-[12px]" style={{ color: "#57635e" }}>
+            Lille grundlag · gælder grupper, ikke enkeltpersoner.
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <MainLayout>
       <div className="ramp-page" style={{ background: "#e6efec" }}>
-        <div className="mx-auto max-w-[1080px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
-          <header className="flex flex-col gap-4">
-            <div>
+        <div className="mx-auto max-w-[1180px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
+          <header className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1
-                  className="text-[30px] font-extrabold leading-tight sm:text-[34px]"
-                  style={{ color: "#1b1f1d", letterSpacing: "-.03em" }}
-                >
+                <h1 className="text-[30px] font-extrabold leading-tight sm:text-[34px]" style={{ color: "#1b1f1d", letterSpacing: "-.03em" }}>
                   Opstart
                 </h1>
                 <span
@@ -1466,402 +1160,188 @@ export default function RampTeam() {
                 >
                   {campaignLabel}
                 </span>
-                <span
-                  className="flex items-center gap-1 rounded-full px-[10px] py-[5px] text-[12px] font-bold"
-                  style={{ background: "#ffffff", color: "#4a5651" }}
-                >
+                <span className="flex items-center gap-1 rounded-full px-[10px] py-[5px] text-[12px] font-bold" style={{ background: "#ffffff", color: "#4a5651" }}>
                   <Lock className="h-3 w-3" />
                   Kun for teamledere
                 </span>
-                <button
-                  type="button"
-                  aria-pressed={discreet}
-                  onClick={toggleDiscreet}
-                  className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-[5px] text-[12px] font-bold"
-                  style={{
-                    background: discreet ? "#1b1f1d" : "#ffffff",
-                    color: discreet ? "#ffffff" : "#1b1f1d",
-                    borderColor: discreet ? "#1b1f1d" : "#d7e0dc",
-                  }}
-                >
-                  <EyeOff className="h-3.5 w-3.5" />
-                  Diskret visning
-                </button>
               </div>
-              <p className="mt-1.5 text-[15px] font-semibold" style={{ color: "#57635e" }}>
-                Uge {isoWeek ?? "-"} · første 40 arbejdsdage
-              </p>
-              <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                Forsøgsordning: gælder kun {campaignLabel}. Virker det, ruller vi det ud på de
-                øvrige teams.
-              </p>
-              {programStartLabel && (
-                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  {programActive
-                    ? `Ugentlige forløb registreres fra ${programStartLabel}.`
-                    : `Ugentlige forløb registreres først fra ${programStartLabel} — indtil da tælles ingen uger som manglende.`}
-                </p>
-              )}
-            </div>
-            <div className="flex w-full flex-wrap items-center gap-2">
-              <div className="flex flex-wrap gap-1 rounded-full bg-white p-1" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}>
-              {(
-                [
-                  { mode: "all" as FilterMode, label: "Alle nye", n: counts.total },
-                  { mode: "danger" as FilterMode, label: "Ekstra støtte", n: counts.danger },
-                  {
-                    mode: "missing" as FilterMode,
-                    label: `Mangler forløb i uge ${isoWeek ?? "-"}`,
-                    n: counts.missing,
-                  },
-                ]
-              ).map((tab) => {
-                const active =
-                  filter === tab.mode ||
-                  (tab.mode === "danger" && (filter === "start" || filter === "hold"));
-                return (
-                  <button
-                    key={tab.mode}
-                    type="button"
-                    onClick={() => setFilter(tab.mode)}
-                    className="flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[14px] font-bold"
-                    style={{
-                      background: active ? "#1b1f1d" : "transparent",
-                      color: active ? "#ffffff" : "#1b1f1d",
-                    }}
-                  >
-                    {tab.mode === "danger" && (
-                      <span
-                        aria-hidden
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ background: RED }}
-                      />
-                    )}
-                    {tab.label}
-                    <span
-                      className="rounded-full px-1.5 py-0.5 text-[11px] font-extrabold tabular-nums"
-                      style={{
-                        background: active ? "rgba(255,255,255,.18)" : "#eef2f0",
-                        color: active ? "#ffffff" : "#4a5651",
-                      }}
-                    >
-                      {tab.n}
+              {view === "new" && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                  <p className="text-[15px] font-semibold" style={{ color: "#3c4743" }}>
+                    {weekLine}
+                  </p>
+                  {!monday && (
+                    <span className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "#57635e" }}>
+                      <span className="inline-block h-1.5 w-20 rounded-full" style={{ background: "#d7e0dc" }}>
+                        <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: "#1b1f1d" }} />
+                      </span>
+                      Ugen er {pct} % gået
                     </span>
+                  )}
+                </div>
+              )}
+              <p className="mt-1 text-[12px] font-semibold" style={{ color: "#7b857f" }}>
+                Forsøgsordning på {campaignLabel}
+                {programStartLabel && !programActive ? ` · ugens 1-1 registreres fra ${programStartLabel}` : ""}.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-full bg-white p-1" role="tablist" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}>
+                {(
+                  [
+                    { v: "new" as const, label: `Nye i opstart · ${members.length}` },
+                    { v: "team" as const, label: "Hele holdet" },
+                  ]
+                ).map((t) => (
+                  <button
+                    key={t.v}
+                    type="button"
+                    role="tab"
+                    aria-selected={view === t.v}
+                    onClick={() => setView(t.v)}
+                    className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-bold"
+                    style={{ background: view === t.v ? "#1b1f1d" : "transparent", color: view === t.v ? "#ffffff" : "#1b1f1d" }}
+                  >
+                    {t.label}
                   </button>
-                );
-              })}
+                ))}
               </div>
-              <div className="relative ml-auto">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                  style={{ color: "#57635e" }}
-                />
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "#57635e" }} />
                 <input
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Søg sælger"
                   aria-label="Søg sælger"
-                  className="w-56 rounded-full bg-white py-2.5 pl-9 pr-4 text-[14px] font-semibold outline-none"
+                  className="w-48 rounded-full bg-white py-2.5 pl-9 pr-4 text-[14px] font-semibold outline-none"
                   style={{ color: "#1b1f1d", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}
                 />
               </div>
+              <button
+                type="button"
+                aria-pressed={discreet}
+                onClick={toggleDiscreet}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-2 text-[12px] font-bold"
+                style={{
+                  background: discreet ? "#1b1f1d" : "#ffffff",
+                  color: discreet ? "#ffffff" : "#1b1f1d",
+                  borderColor: discreet ? "#1b1f1d" : "#d7e0dc",
+                }}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+                Diskret visning
+              </button>
             </div>
           </header>
 
-          {discreet ? (
-            <div
-              className="rounded-[16px] bg-white px-[22px] py-4 text-[14px] font-semibold"
-              style={{ color: "#4a5651", boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-            >
-              Diskret visning er slået til. Status, tal og spænd er skjult, så skærmen kan vises
-              frem.
-            </div>
-          ) : (
+          {view === "new" ? (
             <>
-              <RampOverviewMatrix
-                members={allList}
-                counts={{
-                  start: groupLists.start.length,
-                  hold: groupLists.hold.length,
-                  track: groupLists.track.length,
-                }}
-                activeGroup={filter === "start" || filter === "hold" || filter === "track" ? filter : null}
-                onSelectGroup={(g) => setFilter(filter === g ? "all" : g)}
-                onSelectMember={scrollToMember}
-                footer={<RampMinTargetsEditor targets={minTargets} />}
-                targets={minTargets}
+              <RampKpiFilters
+                counts={counts}
+                missing={missing}
+                held={heldCount}
+                required={requiredCount}
+                active={filter}
+                onSelect={(f) => setFilter(filter === f ? null : f)}
+                discreet={discreet}
               />
-          <div className="grid gap-3.5 sm:grid-cols-3">
-            {[
-              {
-                strip: RED,
-                label: "Ekstra støtte",
-                value: counts.danger,
-                sub: `af ${counts.total} sælgere`,
-                extra: "Bagud i denne uge — giv dem mest tid nu",
-                extraColor: RED_TEXT,
-              },
-              {
-                strip: GREEN,
-                label: "På sporet",
-                value: counts.good,
-                sub: "på eller foran ugens tempo",
-                extra: "Skal stadig have ugens forløb",
-                extraColor: "#0f5a38",
-              },
-              {
-                strip: !programActive ? "#c9d6d1" : AMBER_STRIP,
-                label: `Din opgave · uge ${isoWeek ?? "-"}`,
-                value: counts.missing,
-                sub: "mangler ugens 1-1",
-                extra: !programActive
-                  ? programStartLabel
-                    ? `Starter ${programStartLabel}`
-                    : "Ordningen er ikke trådt i kraft endnu"
-                  : counts.missing > 0
-                    ? "Skal holdes inden fredag kl. 8"
-                    : "Alle forløb er afviklet",
-                extraColor: !programActive ? "#57635e" : AMBER_TEXT,
-              },
-            ].map((kpi) => (
-              <div
-                key={kpi.label}
-                className="relative overflow-hidden rounded-[20px] bg-white px-[22px] py-5"
-                style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-              >
-                <span
-                  className="absolute bottom-0 left-0 top-0 w-[5px]"
-                  style={{ background: kpi.strip }}
-                />
-                <p
-                  className="text-[12px] font-extrabold uppercase"
-                  style={{ color: "#57635e", letterSpacing: ".12em" }}
-                >
-                  {kpi.label}
-                </p>
-                <div className="mt-2 flex items-baseline gap-2">
-                  <span
-                    className="tabular-nums"
-                    style={{
-                      fontSize: 40,
-                      fontWeight: 800,
-                      letterSpacing: "-.04em",
-                      lineHeight: 1,
-                      color: "#1b1f1d",
-                    }}
-                  >
-                    {kpi.value}
-                  </span>
-                  <span className="text-[14px] font-semibold" style={{ color: "#57635e" }}>
-                    {kpi.sub}
-                  </span>
-                </div>
-                <p className="mt-[7px] text-[13px] font-bold" style={{ color: kpi.extraColor }}>
-                  {kpi.extra}
-                </p>
-              </div>
-            ))}
-          </div>
 
-          {stats.length > 0 && (
-            <section
-              className="rounded-[16px] border-l-[5px] bg-white px-[22px] py-4"
-              style={{ borderColor: RED, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-            >
-              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
-                <div className="min-w-[200px] flex-1">
-                  <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                    Hvorfor ekstra støtte?{" "}
-                    <span className="text-[12px] font-bold" style={{ color: "#7b857f" }}>
-                      Historik · målt mod typisk niveau
-                    </span>
-                  </p>
-                  <p
-                    className="mt-1 text-[14px] font-semibold"
-                    style={{ color: "#3c4743", textWrap: "pretty" }}
-                  >
-                    {day10 && day10.n_below > 0 && day10.n_above > 0 ? (
-                      <>
-                        Ligger en ny under typisk på dag 10, stopper{" "}
-                        <strong style={{ color: RED_TEXT }}>
-                          {Math.round((day10.n_below_stopped / day10.n_below) * 100)} %
-                        </strong>{" "}
-                        inden dag 40 — mod{" "}
-                        <strong style={{ color: "#0f5a38" }}>
-                          {Math.round((day10.n_above_stopped / day10.n_above) * 100)} %
-                        </strong>{" "}
-                        af dem på eller over. Det er ikke dem, vi skal af med. Det er dem, vi
-                        risikerer at miste.
-                      </>
-                    ) : (
-                      "Grundlaget er endnu for tyndt til en sammenligning på dag 10. Det er ikke dem, vi skal af med. Det er dem, vi risikerer at miste."
-                    )}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowEvidence((v) => !v)}
-                  className="rounded-full px-3.5 py-[7px] text-[13px] font-bold"
-                  style={{ background: "#f1f4f3", color: "#1b1f1d" }}
-                >
-                  {showEvidence ? "Skjul grundlag" : "Se grundlag"}
-                </button>
-              </div>
-              {showEvidence && (
-                <div
-                  className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2 border-t pt-3.5 text-[13px] font-semibold"
-                  style={{ borderColor: "#eaefed", color: "#57635e" }}
-                >
-                  {stats.map((s) => {
-                    const line = formatRiskStatShort(s);
-                    return line ? <span key={s.day_no}>{line}</span> : null;
-                  })}
-                  <span>Lille grundlag — tallene kan flytte sig</span>
-                  <span>Gælder grupper, ikke enkeltpersoner</span>
-                </div>
+              {!discreet && (
+                <section className="rounded-[20px] bg-white p-5 sm:p-7" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[18px] font-extrabold" style={{ color: "#1b1f1d" }}>
+                      Overblik: hvem ligger hvor?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={toggleChart}
+                      aria-expanded={chartOpen}
+                      className="rounded-full px-3 py-1 text-[12px] font-bold"
+                      style={{ background: "#f1f4f3", color: "#1b1f1d" }}
+                    >
+                      {chartOpen ? "Skjul" : "Vis"}
+                    </button>
+                  </div>
+                  {chartOpen && (
+                    <>
+                      <div className="mt-3">
+                        <WeekOverviewChart
+                          items={chartItems}
+                          targets={minTargets}
+                          emptyText={items.every((i) => !i.g) ? "Ny uge · første status i morgen" : null}
+                          onSelect={(id) => {
+                            setFilter(null);
+                            setFocusId({ id, nonce: Date.now() });
+                          }}
+                        />
+                      </div>
+                      <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
+                        Vandret: opstartsuge. Lodret: {monday ? "sidste uges salg ift. ugens krav" : "ugens salg til og med i går ift. hvor man burde være nu"} (100 % = på tempo).
+                        Tidligere uger tæller ikke med. Over 200 % vises øverst.
+                      </p>
+                    </>
+                  )}
+                </section>
               )}
-            </section>
-          )}
+
+              <RampWeekBoard
+                items={shownItems}
+                activeFilter={filter}
+                discreet={discreet}
+                monday={monday}
+                focusId={focusId}
+                onRowClick={(m) => setPanelId(m.employee_id)}
+                onHold={(m) => setDialog({ employeeId: m.employee_id, done: false })}
+                aboutButton={discreet ? null : aboutButton}
+                footer={<RampMinTargetsEditor targets={minTargets} />}
+              />
             </>
-          )}
-
-          <section style={{ display: "grid", gap: 12 }}>
-            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+          ) : (
+            <section style={{ display: "grid", gap: 12 }}>
               <div>
-                <p
-                  className="text-[19px] font-extrabold"
-                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
-                >
-                  {filter === "missing"
-                    ? `Mangler forløb i uge ${isoWeek ?? "-"}`
-                    : filter === "danger"
-                      ? "Ekstra støtte nu"
-                      : filter === "start"
-                        ? "1 · Start her"
-                        : filter === "hold"
-                          ? "2 · Hold fast"
-                          : filter === "track"
-                            ? "3 · På sporet"
-                            : "Alle nye i opstart"}
-                </p>
-                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Alle nye får mindst én 1-1 session med feedback hver uge i de første 40
-                  arbejdsdage — også dem der ligger flot. Der kan tilføjes flere sessioner efter
-                  behov.
-                </p>
-              </div>
-              <p className="text-[13px] font-bold" style={{ color: "#57635e" }}>
-                Sorteret efter hvem der har mest brug for dig nu
-              </p>
-            </div>
-
-            {list.length === 0 ? (
-              <div
-                className="rounded-[20px] bg-white p-6 text-center"
-                style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-              >
-                <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                  {filter === "missing"
-                    ? `Alle forløb er afviklet i uge ${isoWeek ?? "-"}`
-                    : filter === "all"
-                      ? "Ingen sælgere er i opstart lige nu"
-                      : "Ingen sælgere i denne gruppe lige nu"}
-                </p>
-                {filter !== "all" && (
-                  <button
-                    type="button"
-                    onClick={() => setFilter("all")}
-                    className="mt-2 text-[12px] font-bold underline"
-                    style={{ color: "#0f5a38" }}
-                  >
-                    Vis alle nye
-                  </button>
-                )}
-              </div>
-            ) : (
-              list.map((member) => (
-                <MemberCard
-                  key={member.employee_id}
-                  member={member}
-                  discreet={discreet}
-                  onOpen={(m, kind, done) =>
-                    setDialog({ employeeId: m.employee_id, kind, done })
-                  }
-                  onExclude={(m) =>
-                    setExclusion.mutate({ employeeId: m.employee_id, excluded: true })
-                  }
-                />
-              ))
-            )}
-          </section>
-
-          <section style={{ display: "grid", gap: 12 }}>
-            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p
-                  className="text-[19px] font-extrabold"
-                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
-                >
+                <p className="text-[19px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
                   Hele holdet · {fullTeamList.length}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Alle øvrige aktive sælgere på {campaignLabel}. Ingen norm og ingen status — kun
-                  tallene og ugens 1-1 session med feedback.
+                  Alle øvrige aktive sælgere på {campaignLabel}. Ingen norm og ingen status — kun tallene og ugens 1-1.
                 </p>
               </div>
-              <p
-                className="text-[13px] font-bold"
-                style={{ color: fullTeamMissing > 0 ? AMBER_TEXT : "#0f5a38" }}
-              >
-                {fullTeamMissing > 0
-                  ? `${fullTeamMissing} mangler forløb i uge ${isoWeek ?? "-"}`
-                  : "Alle forløb er afviklet"}
-              </p>
-            </div>
-
-            {fullTeamLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#57635e" }} />
-              </div>
-            ) : fullTeamList.filter(matchesSearch).length === 0 ? (
-              <div
-                className="rounded-[20px] bg-white p-6 text-center"
-                style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-              >
-                <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
-                  Ingen øvrige sælgere på holdet lige nu
-                </p>
-              </div>
-            ) : (
-              fullTeamList.filter(matchesSearch).map((member) => (
-                <FullTeamMemberCard
-                  key={member.employee_id}
-                  member={member}
-                  discreet={discreet}
-                  onOpen={(m, kind, done) =>
-                    setDialog({ employeeId: m.employee_id, kind, done })
-                  }
-                  onExclude={(m) =>
-                    setExclusion.mutate({ employeeId: m.employee_id, excluded: true })
-                  }
-                />
-              ))
-            )}
-          </section>
+              {fullTeamLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#57635e" }} />
+                </div>
+              ) : filteredFullTeam.length === 0 ? (
+                <div className="rounded-[20px] bg-white p-6 text-center" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
+                  <p className="text-[15px] font-extrabold" style={{ color: "#1b1f1d" }}>
+                    Ingen øvrige sælgere på holdet lige nu
+                  </p>
+                </div>
+              ) : (
+                filteredFullTeam.map((member) => (
+                  <FullTeamMemberCard
+                    key={member.employee_id}
+                    member={member}
+                    discreet={discreet}
+                    absencePending={pendingAbsence.has(member.employee_id)}
+                    onOpen={(m, done) => setDialog({ employeeId: m.employee_id, done })}
+                    onAbsence={registerAbsence}
+                    onExclude={exclude}
+                  />
+                ))
+              )}
+            </section>
+          )}
 
           {pausedList.length > 0 && (
             <section style={{ display: "grid", gap: 8 }}>
               <div className="mt-1.5">
-                <p
-                  className="text-[19px] font-extrabold"
-                  style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}
-                >
+                <p className="text-[17px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
                   Skal ikke have feedback · {pausedList.length}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Disse sælgere er taget ud af oversigten og tælles ikke med i manglende forløb. De
-                  kan aktiveres igen når som helst.
+                  Disse sælgere er taget ud af oversigten og tælles ikke med i manglende 1-1. De kan aktiveres igen når
+                  som helst.
                 </p>
               </div>
               {pausedList.filter(matchesSearch).map((member) => (
@@ -1869,28 +1349,27 @@ export default function RampTeam() {
                   key={member.employee_id}
                   member={member}
                   isPending={setExclusion.isPending}
-                  onActivate={(m) =>
-                    setExclusion.mutate({ employeeId: m.employee_id, excluded: false })
-                  }
+                  onActivate={(m) => setExclusion.mutate({ employeeId: m.employee_id, excluded: false })}
                 />
               ))}
             </section>
           )}
-
-          <p className="pb-4 text-[12px]" style={{ color: "#57635e" }}>
-            Forløbet kører indtil sælgeren er på forventning. Det er en samtale der
-            mangler — ikke en vurdering af sælgeren.
-          </p>
         </div>
       </div>
 
+      <RampSellerPanel
+        item={panelItem}
+        monday={monday}
+        discreet={discreet}
+        targets={minTargets}
+        onClose={() => setPanelId(null)}
+        onHold={(m, done) => setDialog({ employeeId: m.employee_id, done })}
+        onAbsence={registerAbsence}
+        onExclude={exclude}
+      />
+
       {dialog && dialogMember && (
-        <FeedbackDialog
-          member={dialogMember}
-          kind={dialog.kind}
-          alreadyDone={dialog.done}
-          onClose={() => setDialog(null)}
-        />
+        <FeedbackDialog member={dialogMember} alreadyDone={dialog.done} onClose={() => setDialog(null)} />
       )}
     </MainLayout>
   );
