@@ -232,6 +232,13 @@
       "when": 1791982208907,
       "tag": "0032_eesy_mobile_owner_multiple_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792001725028,
+      "tag": "0033_ramp_full_team_week_status",
+      "breakpoints": true
     }
   ]
 }

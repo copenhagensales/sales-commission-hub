@@ -10,17 +10,47 @@ import {
   sortByLongestSince,
   weeksAgoLabel,
 } from "@/lib/rampEstablished";
-import { oneOnOneOf } from "./RampOverviewMatrix";
+import { oneOnOneOf, type BoardItem } from "./RampOverviewMatrix";
 
 /**
  * Etablerede saelgere (efter de foerste 40 arbejdsdage).
- * Ingen salgsstatus, intet krav og ingen alarm — kun 1-1 og feedback.
+ * Maales med samme ugemodel som de nye (krav = sidste opstartskrav, beregnet i databasen).
  */
 
 const DARK = "#1b1f1d";
 const MUTED = "#57635e";
 const GREEN = "#177a4d";
 const SHOWN = 5;
+const GROUP_STYLE: Record<string, { label: string; color: string }> = {
+  start: { label: "Start her", color: "#c13b32" },
+  hold: { label: "Hold fast", color: "#9a6216" },
+  track: { label: "På sporet", color: GREEN },
+};
+
+function SalesCell({ item, discreet }: { item: BoardItem | undefined; discreet: boolean }) {
+  const w = item?.w;
+  if (!w || !item?.g)
+    return (
+      <span className="text-[12px] font-semibold" style={{ color: "#8b958f" }}>
+        {w?.status === "ny_uge" ? "Ny uge" : "–"}
+      </span>
+    );
+  const st = GROUP_STYLE[item.g];
+  const pct = w.expected_now > 0 ? Math.round((w.sales / w.expected_now) * 100) : null;
+  return (
+    <div>
+      <p className="text-[13px] font-extrabold" style={{ color: st.color }}>
+        {st.label}
+      </p>
+      {!discreet && (
+        <p className="text-[12px] font-semibold tabular-nums" style={{ color: MUTED }}>
+          {w.sales} af {Math.round(w.required * 10) / 10}
+          {pct !== null ? ` · ${pct} % af tempo` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
 
 type Member = RampFullTeamMember & { start_date?: string | null };
 
@@ -87,6 +117,9 @@ function OneCell({ m, pending, onHold }: { m: Member; pending: boolean; onHold: 
 
 export function RampEstablishedSection({
   members,
+  items,
+  discreet,
+  target,
   matches,
   pendingAbsence,
   onHold,
@@ -94,6 +127,9 @@ export function RampEstablishedSection({
   onExclude,
 }: {
   members: Member[];
+  items: BoardItem[];
+  discreet: boolean;
+  target: number;
   matches: (m: { employee_name: string }) => boolean;
   pendingAbsence: Set<string>;
   onHold: (m: Member, done: boolean) => void;
@@ -109,6 +145,7 @@ export function RampEstablishedSection({
   const visible = sorted.filter(matches);
   const rows = showAll ? visible : visible.slice(0, SHOWN);
   const panel = members.find((m) => m.employee_id === panelId) ?? null;
+  const itemById = useMemo(() => new Map(items.map((i) => [i.m.employee_id, i])), [items]);
 
   return (
     <section className="rounded-[20px] bg-white p-5 sm:p-7" style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
@@ -118,7 +155,7 @@ export function RampEstablishedSection({
             Etablerede sælgere · {n}
           </p>
           <p className="mt-1 text-[13px] font-semibold" style={{ color: MUTED }}>
-            Efter de første 40 arbejdsdage. Ingen salgsstatus og intet krav, kun 1-1 og feedback.
+            Efter de første 40 arbejdsdage. Mål: {target} salg pr. uge.
           </p>
         </div>
         <div className="flex gap-6">
@@ -146,6 +183,7 @@ export function RampEstablishedSection({
           <thead>
             <tr className="text-[11px] font-extrabold uppercase" style={{ color: MUTED, letterSpacing: ".1em" }}>
               <th className="py-2 pr-3">Sælger</th>
+              <th className="py-2 pr-3">Ugens salg</th>
               <th className="py-2 pr-3">Ugens 1-1</th>
               <th className="py-2 pr-3">Sidste 4 uger</th>
               <th className="py-2">Seneste feedback</th>
@@ -171,6 +209,9 @@ export function RampEstablishedSection({
                     </p>
                   </td>
                   <td className="py-3 pr-3">
+                    <SalesCell item={itemById.get(m.employee_id)} discreet={discreet} />
+                  </td>
+                  <td className="py-3 pr-3">
                     <OneCell m={m} pending={pendingAbsence.has(m.employee_id)} onHold={(x) => onHold(x, false)} />
                   </td>
                   <td className="py-3 pr-3">
@@ -184,7 +225,7 @@ export function RampEstablishedSection({
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-4 text-[13px] font-semibold" style={{ color: MUTED }}>
+                <td colSpan={5} className="py-4 text-[13px] font-semibold" style={{ color: MUTED }}>
                   Ingen etablerede sælgere matcher.
                 </td>
               </tr>
@@ -214,6 +255,8 @@ export function RampEstablishedSection({
           {panel && (
             <EstablishedPanel
               m={panel}
+              item={itemById.get(panel.employee_id)}
+              discreet={discreet}
               pending={pendingAbsence.has(panel.employee_id)}
               onHold={(done) => {
                 setPanelId(null);
@@ -234,12 +277,16 @@ export function RampEstablishedSection({
 
 function EstablishedPanel({
   m,
+  item,
+  discreet,
   pending,
   onHold,
   onAbsence,
   onExclude,
 }: {
   m: Member;
+  item: BoardItem | undefined;
+  discreet: boolean;
   pending: boolean;
   onHold: (done: boolean) => void;
   onAbsence: () => void;
@@ -258,6 +305,13 @@ function EstablishedPanel({
           {[m.campaign_name, "Etableret sælger"].filter(Boolean).join(" · ")}
         </SheetDescription>
       </SheetHeader>
+
+      <section className="flex items-center justify-between gap-2 rounded-[16px] border p-4" style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}>
+        <p className="text-[11px] font-extrabold uppercase" style={{ color: MUTED, letterSpacing: ".12em" }}>
+          Ugens salg
+        </p>
+        <SalesCell item={item} discreet={discreet} />
+      </section>
 
       <section className="space-y-3 rounded-[16px] border p-4" style={{ background: "#f6f9f8", borderColor: "#e7eeeb" }}>
         <div className="flex items-center justify-between gap-2">

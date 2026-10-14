@@ -110,6 +110,8 @@ export interface BoardItem {
   w: RampWeekStatus | null;
   g: SupportGroup | null;
   one: OneOnOne;
+  /** Etableret saelger (efter de foerste 40 arbejdsdage). Vises i kolonnen "Etableret". */
+  established?: boolean;
 }
 
 // ---------- Tal-knapper ----------
@@ -322,6 +324,8 @@ export function OneOnOneCell({ one, onHold }: { one: OneOnOne; onHold: () => voi
 // ---------- Graf ----------
 
 const CHART_WEEKS = 8;
+/** Kolonner i grafen: opstartsuge 1-8 + "Etableret". */
+const CHART_COLS = CHART_WEEKS + 1;
 const PACE_MAX = 2;
 
 interface ChartDot {
@@ -353,7 +357,7 @@ export function WeekOverviewChart({
   const padB = 64;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
-  const colW = plotW / CHART_WEEKS;
+  const colW = plotW / CHART_COLS;
   const yOf = (p: number) => padT + plotH - (Math.min(p, PACE_MAX) / PACE_MAX) * plotH;
   const R = 8;
 
@@ -361,10 +365,10 @@ export function WeekOverviewChart({
   for (const item of items) {
     const { w, g } = item;
     if (!g || !w || w.expected_now <= 0) continue;
-    const col = Math.min(Math.max(1, w.start_week), CHART_WEEKS) - 1;
+    const col = item.established ? CHART_WEEKS : Math.min(Math.max(1, w.start_week), CHART_WEEKS) - 1;
     dots.push({ item, w, g, col, pace: w.sales / w.expected_now, x: 0, y: 0 });
   }
-  for (let c = 0; c < CHART_WEEKS; c++) {
+  for (let c = 0; c < CHART_COLS; c++) {
     const center = padL + colW * c + colW / 2;
     const placed: ChartDot[] = [];
     const inCol = dots.filter((d) => d.col === c).sort((a, b) => a.pace - b.pace);
@@ -384,7 +388,7 @@ export function WeekOverviewChart({
     }
   }
   const labels: { d: ChartDot; ly: number; lx: number }[] = [];
-  for (let c = 0; c < CHART_WEEKS; c++) {
+  for (let c = 0; c < CHART_COLS; c++) {
     const colDots = dots.filter((d) => d.col === c);
     const lx = colDots.length ? Math.max(...colDots.map((d) => d.x)) + R + 6 : 0;
     const ls = colDots
@@ -398,7 +402,7 @@ export function WeekOverviewChart({
   }
 
   const tip = (d: ChartDot) => {
-    const base = `${d.item.m.employee_name} · opstartsuge ${d.w.start_week} · ${d.w.sales} af ${fmtSales(d.w.required)} salg · burde have ${fmtSales(d.w.expected_now)} nu (${Math.round(d.pace * 100)} %)`;
+    const base = `${d.item.m.employee_name} · ${d.item.established ? "etableret" : `opstartsuge ${d.w.start_week}`} · ${d.w.sales} af ${fmtSales(d.w.required)} salg · burde have ${fmtSales(d.w.expected_now)} nu (${Math.round(d.pace * 100)} %)`;
     return d.w.partial_start
       ? `${base}\nStartet ${WEEKDAY_NAME[d.w.start_weekday]} · krav ${fmtSales(d.w.required)} af ${fmtSales(d.w.week_target)}`
       : base;
@@ -427,14 +431,14 @@ export function WeekOverviewChart({
             {p === 2 ? "200 %+" : `${p * 100} %`}
           </text>
         ))}
-        {Array.from({ length: CHART_WEEKS }, (_, c) => (
+        {Array.from({ length: CHART_COLS }, (_, c) => (
           <g key={c}>
             {c > 0 && <line x1={padL + colW * c} x2={padL + colW * c} y1={padT} y2={padT + plotH} stroke="#e3e9e6" />}
             <text x={padL + colW * c + colW / 2} y={padT + plotH + 20} fontSize={12} fontWeight={800} fill={DARK} textAnchor="middle">
-              Uge {c + 1}
+              {c === CHART_WEEKS ? "Etableret" : `Uge ${c + 1}`}
             </text>
             <text x={padL + colW * c + colW / 2} y={padT + plotH + 36} fontSize={12} fontWeight={600} fill={MUTED} textAnchor="middle">
-              {fmtSales(weeklyTarget(c + 1, targets))} salg
+              {fmtSales(c === CHART_WEEKS ? targets[targets.length - 1] ?? 0 : weeklyTarget(c + 1, targets))} salg
             </text>
           </g>
         ))}

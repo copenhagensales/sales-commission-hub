@@ -545,20 +545,36 @@ export default function RampTeam() {
       }),
     [members, monday, pendingAbsence],
   );
+  // Etablerede maales med samme ugemodel (krav = sidste opstartskrav) og taeller med i tal og graf.
+  const establishedItems: BoardItem[] = useMemo(
+    () =>
+      fullTeam.map((m) => {
+        const w = displayWeek(m, monday);
+        return {
+          m: m as unknown as RampTeamMember,
+          w,
+          g: groupOf(w),
+          one: oneOnOneOf(m, pendingAbsence.has(m.employee_id)),
+          established: true,
+        };
+      }),
+    [fullTeam, monday, pendingAbsence],
+  );
+  const allItems = useMemo(() => [...items, ...establishedItems], [items, establishedItems]);
   const counts = useMemo(() => {
     const c: Record<SupportGroup, number> = { start: 0, hold: 0, track: 0 };
-    for (const i of items) if (i.g) c[i.g] += 1;
+    for (const i of allItems) if (i.g) c[i.g] += 1;
     return c;
-  }, [items]);
-  const missing = items.filter((i) => i.one.kind === "missing").length;
-  const requiredCount = items.filter((i) => i.m.week_required).length;
-  const heldCount = items.filter((i) => i.m.week_required && i.one.kind === "held").length;
+  }, [allItems]);
+  const missing = allItems.filter((i) => i.one.kind === "missing").length;
+  const requiredCount = allItems.filter((i) => i.m.week_required).length;
+  const heldCount = allItems.filter((i) => i.m.week_required && i.one.kind === "held").length;
 
   const shownItems = items.filter((i) => matchesSearch(i.m));
-  const chartItems = shownItems.filter((i) =>
+  const chartItems = allItems.filter((i) => matchesSearch(i.m)).filter((i) =>
     !filter ? true : filter === "missing" ? i.one.kind === "missing" : i.g === filter,
   );
-  const panelItem = items.find((i) => i.m.employee_id === panelId) ?? null;
+  const panelItem = allItems.find((i) => i.m.employee_id === panelId) ?? null;
 
   const dialogMember: AnyMember | undefined = dialog
     ? (members.find((m) => m.employee_id === dialog.employeeId) as AnyMember | undefined) ??
@@ -781,8 +797,12 @@ export default function RampTeam() {
                         <WeekOverviewChart
                           items={chartItems}
                           targets={minTargets}
-                          emptyText={items.every((i) => !i.g) ? "Ny uge · første status i morgen" : null}
+                          emptyText={allItems.every((i) => !i.g) ? "Ny uge · første status i morgen" : null}
                           onSelect={(id) => {
+                            if (establishedItems.some((i) => i.m.employee_id === id)) {
+                              setPanelId(id);
+                              return;
+                            }
                             setFilter(null);
                             setFocusId({ id, nonce: Date.now() });
                           }}
@@ -810,6 +830,9 @@ export default function RampTeam() {
               />
             <RampEstablishedSection
               members={fullTeam}
+              items={establishedItems}
+              discreet={discreet}
+              target={minTargets[minTargets.length - 1] ?? 0}
               matches={matchesSearch}
               pendingAbsence={pendingAbsence}
               onHold={(m, done) => setDialog({ employeeId: m.employee_id, done })}
