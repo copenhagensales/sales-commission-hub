@@ -35,6 +35,8 @@ export interface RampAction {
   performed_by_name: string | null;
   /** Feedbacktekst der blev sendt ordret til modtagerne (null for gamle registreringer). */
   note: string | null;
+  /** Ugens fokus valgt i 1-1-dialogen (null for gamle registreringer). */
+  focus_area?: string | null;
   /** E-mailadresser feedbacken blev sendt til. */
   recipients: string[];
 }
@@ -90,6 +92,10 @@ export interface RampTeamMember {
   actions: RampAction[];
   /** Ugemodellen (ramp_week_status): eneste kilde til status, grupper og alarmer. */
   week_status?: RampWeekStatus | null;
+  /** Sidste uges slutresultat (ramp_week_status maalt pr. denne mandag). Bruges kun til mandagsvisning. */
+  last_week_status?: RampWeekStatus | null;
+  /** Opstartsdato (employee_ramp_enrollment.start_date). */
+  start_date?: string | null;
 }
 
 /** Ugepunkt for hele holdet: ingen norm, kun det raa antal produkter. */
