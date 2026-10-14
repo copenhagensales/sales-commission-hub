@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Smartphone, CheckCircle2 } from "lucide-react";
+import { Smartphone, CheckCircle2, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest, type EesyCustomerType,
@@ -40,6 +40,9 @@ export function EesyMobilePerk() {
   const [customerType, setCustomerType] = useState<EesyCustomerType>("ny_kunde");
   const [form, setForm] = useState(EMPTY);
   const isNew = customerType === "ny_kunde";
+  const prices = subs.map((x) => parseSub(x).price).filter((n): n is number => n !== null);
+  const minPrice = prices.length ? Math.min(...prices) : null;
+  const popular = subs.find((x) => x.includes("100GB"));
 
   const set = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -78,7 +81,10 @@ export function EesyMobilePerk() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xl font-bold text-primary">50%</p>
+        <div className="flex items-baseline gap-2">
+          <p className="text-3xl font-extrabold text-primary">50%</p>
+          {minPrice !== null && <p className="text-sm text-muted-foreground">Fra <b className="text-foreground">{fmtKr(minPrice / 2)}</b>/md.</p>}
+        </div>
         <p className="text-sm text-muted-foreground">
           50 % rabat på et Eesy-abonnement, når du flytter dit nuværende nummer til Eesy.
           Gælder ikke nye numre. Tilbuddet gælder kun medarbejdere, ikke familie eller venner. Du kan få ét tilbud.
@@ -110,7 +116,10 @@ export function EesyMobilePerk() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{isNew ? "Abonnement" : "Dit abonnement hos Eesy"}</Label>
+              <div className="flex items-baseline justify-between gap-2">
+                <Label>{isNew ? "Vælg abonnement" : "Dit abonnement hos Eesy"}</Label>
+                <span className="text-xs text-muted-foreground">Halv pris · 6 mdr. binding</span>
+              </div>
               <RadioGroup value={form.subscription} onValueChange={(v) => setForm((f) => ({ ...f, subscription: v }))} className="grid gap-2 sm:grid-cols-2">
                 {subs.map((s) => {
                   const p = parseSub(s);
@@ -118,9 +127,10 @@ export function EesyMobilePerk() {
                   return (
                     <label
                       key={s}
-                      className={`relative flex cursor-pointer flex-col gap-1 rounded-xl border-2 p-3 transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                      className={`relative flex cursor-pointer flex-col gap-1 rounded-xl border-2 p-3 pt-4 transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
                     >
-                      <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">-50%</span>
+                      {s === popular && <span className="absolute -top-2 left-3 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Mest populær</span>}
+                      <span className="absolute right-2 top-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">-50%</span>
                       <span className="flex items-center gap-2">
                         <RadioGroupItem value={s} />
                         <span className="text-base font-bold">{p.data}</span>
@@ -135,7 +145,7 @@ export function EesyMobilePerk() {
                       ) : (
                         <span className="text-sm">{s}</span>
                       )}
-                      <span className="text-[11px] text-muted-foreground">Du sparer {p.price !== null ? fmtKr(p.price / 2) : ""} hver måned · 6 mdr. binding</span>
+                      {p.price !== null && <span className="w-fit rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">Spar {fmtKr(p.price * 3)} på 6 mdr.</span>}
                     </label>
                   );
                 })}
@@ -150,7 +160,7 @@ export function EesyMobilePerk() {
                 <div className="col-span-3 space-y-1"><Label htmlFor="ee-city">By</Label><Input id="ee-city" value={form.city} onChange={set("city")} maxLength={60} autoComplete="address-level2" /></div>
               </div>
             )}
-            <div className="space-y-1"><Label htmlFor="ee-cpr">CPR-nummer</Label><Input id="ee-cpr" value={form.cpr} onChange={set("cpr")} inputMode="numeric" placeholder="DDMMÅÅ-XXXX" autoComplete="off" maxLength={11} /></div>
+            <div className="space-y-1"><Label htmlFor="ee-cpr" className="flex items-center justify-between gap-2">CPR-nummer <span className="flex items-center gap-1 text-[11px] font-normal text-muted-foreground"><Lock className="h-3 w-3" /> Kun ejerne ser det · slettes efter 30 dage</span></Label><Input id="ee-cpr" value={form.cpr} onChange={set("cpr")} inputMode="numeric" placeholder="DDMMÅÅ-XXXX" autoComplete="off" maxLength={11} /></div>
             <div className="space-y-1"><Label htmlFor="ee-phone">{isNew ? "Nuværende telefonnummer (som skal flyttes)" : "Dit Eesy-telefonnummer"}</Label><Input id="ee-phone" value={form.phone} onChange={set("phone")} inputMode="numeric" maxLength={11} /></div>
             {isNew && (
               <div className="space-y-1"><Label htmlFor="ee-icc">ICC-nummer (står på SIM-kortet)</Label><Input id="ee-icc" value={form.icc} onChange={set("icc")} inputMode="numeric" autoComplete="off" maxLength={26} /></div>
@@ -158,7 +168,7 @@ export function EesyMobilePerk() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Annullér</Button>
-            <Button onClick={onSubmit} disabled={!valid || submit.isPending}>Send anmodning</Button>
+            <Button onClick={onSubmit} disabled={!valid || submit.isPending}>Få 50 % rabat</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
