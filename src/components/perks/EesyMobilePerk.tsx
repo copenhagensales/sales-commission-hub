@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Smartphone, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest,
+  useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest, type EesyCustomerType,
 } from "@/hooks/useEesyMobileRequests";
 
 const EMPTY = {
@@ -45,7 +45,7 @@ export function EesyMobilePerk() {
 
   const onSubmit = async () => {
     try {
-      await submit.mutateAsync(form);
+      await submit.mutateAsync({ ...form, customerType });
       setForm(EMPTY);
       setOpen(false);
       toast({ title: "Anmodning sendt", description: "Vi sender dine oplysninger videre til Eesy." });
@@ -79,14 +79,17 @@ export function EesyMobilePerk() {
             </span>
           </p>
         ) : (
-          <Button onClick={() => setOpen(true)}>Skift til Eesy</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => openAs("ny_kunde")}>Skift til Eesy</Button>
+            <Button variant="outline" onClick={() => openAs("eksisterende")}>Eksisterende Eesy-kunde</Button>
+          </div>
         )}
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Skift til Eesy Mobil med 50 % rabat</DialogTitle>
+            <DialogTitle>{isNew ? "Skift til Eesy Mobil med 50 % rabat" : "Eksisterende Eesy-kunde: 50 % rabat"}</DialogTitle>
             <DialogDescription>
               Dine oplysninger kan kun ses af ejerne. De bruges kun til oprettelsen hos Eesy, og CPR-nummer,
               ICC-nummer, adresse og telefonnummer slettes 30 dage efter, at anmodningen er sendt videre.
@@ -94,7 +97,7 @@ export function EesyMobilePerk() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Abonnement</Label>
+              <Label>{isNew ? "Abonnement" : "Dit abonnement hos Eesy"}</Label>
               <RadioGroup value={form.subscription} onValueChange={(v) => setForm((f) => ({ ...f, subscription: v }))}>
                 {subs.map((s) => (
                   <label key={s} className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm">
