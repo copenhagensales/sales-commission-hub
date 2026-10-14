@@ -1,5 +1,6 @@
 import type { RampTeamMember } from "@/hooks/useRampTeam";
 import { useState, type ReactNode } from "react";
+import { weeklyTarget } from "@/lib/rampMinTarget";
 import { restOfWeek, WEEKDAY_NAME, type RampWeekStatus } from "@/lib/rampWeek";
 
 /**
@@ -159,7 +160,183 @@ function HistoryCell({ w }: { w: RampWeekStatus }) {
 }
 
 const PREVIEW = 3;
-__CHART__
+const CHART_WEEKS = 8;
+const PACE_MAX = 2;
+
+interface ChartDot {
+  m: RampTeamMember;
+  w: RampWeekStatus;
+  g: SupportGroup;
+  col: number;
+  pace: number;
+  x: number;
+  y: number;
+}
+
+/** Overblik over ugemodellen: kun tal fra week_status (ingen ny beregning). */
+function WeekOverviewChart({
+  members,
+  targets,
+  newWeek,
+  onSelect,
+}: {
+  members: RampTeamMember[];
+  targets: number[];
+  newWeek: boolean;
+  onSelect: (employeeId: string, g: SupportGroup) => void;
+}) {
+  const W = 960;
+  const H = 400;
+  const padL = 56;
+  const padR = 96;
+  const padT = 18;
+  const padB = 64;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const colW = plotW / CHART_WEEKS;
+  const yOf = (p: number) => padT + plotH - (Math.min(p, PACE_MAX) / PACE_MAX) * plotH;
+  const R = 8;
+
+  const dots: ChartDot[] = [];
+  for (const m of members) {
+    const g = supportGroup(m);
+    const w = m.week_status;
+    if (!g || !w || w.expected_now <= 0) continue;
+    const col = Math.min(Math.max(1, w.start_week), CHART_WEEKS) - 1;
+    dots.push({ m, w, g, col, pace: w.sales / w.expected_now, x: 0, y: 0 });
+  }
+  // Beeswarm pr. søjle: læg prikker så tæt på midten som muligt uden overlap.
+  for (let c = 0; c < CHART_WEEKS; c++) {
+    const center = padL + colW * c + colW / 2;
+    const placed: ChartDot[] = [];
+    const inCol = dots.filter((d) => d.col === c).sort((a, b) => a.pace - b.pace);
+    for (const d of inCol) {
+      d.y = yOf(d.pace);
+      const offsets = [0];
+      for (let k = 1; k < 20; k++) offsets.push(k * (R + 1), -k * (R + 1));
+      const limit = colW / 2 - R - 2;
+      let best = 0;
+      for (const o of offsets) {
+        if (Math.abs(o) > limit) continue;
+        const ok = placed.every((p) => Math.hypot(p.x - (center + o), p.y - d.y) >= 2 * R + 2);
+        if (ok) {
+          best = o;
+          break;
+        }
+        best = o;
+      }
+      d.x = center + best;
+      placed.push(d);
+    }
+  }
+  // Navne for Start her: skub lodret, så de ikke overlapper inden for søjlen.
+  const labels: { d: ChartDot; ly: number }[] = [];
+  for (let c = 0; c < CHART_WEEKS; c++) {
+    const ls = dots
+      .filter((d) => d.col === c && d.g === "start")
+      .sort((a, b) => a.y - b.y)
+      .map((d) => ({ d, ly: d.y }));
+    for (let i = 1; i < ls.length; i++) ls[i].ly = Math.max(ls[i].ly, ls[i - 1].ly + 14);
+    const overflow = ls.length ? ls[ls.length - 1].ly - (padT + plotH - 4) : 0;
+    if (overflow > 0) ls.forEach((l) => (l.ly -= overflow));
+    labels.push(...ls);
+  }
+
+  const tip = (d: ChartDot) => {
+    const base = `${d.m.employee_name} · opstartsuge ${d.w.start_week} · ${d.w.sales} af ${fmtSales(d.w.required)} salg · burde have ${fmtSales(d.w.expected_now)} nu (${Math.round(d.pace * 100)} %)`;
+    return d.w.partial_start
+      ? `${base}\nStartet ${WEEKDAY_NAME[d.w.start_weekday]} · krav ${fmtSales(d.w.required)} af ${fmtSales(d.w.week_target)}`
+      : base;
+  };
+
+  return (
+    <section
+      className="rounded-[20px] bg-white p-5 sm:p-7"
+      style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
+      aria-label="Overblik: hvem ligger hvor?"
+    >
+      <p className="text-[18px] font-extrabold" style={{ color: DARK }}>
+        Overblik: hvem ligger hvor?
+      </p>
+      {newWeek ? (
+        <p className="mt-6 text-[15px] font-bold" style={{ color: MUTED }}>
+          Ny uge · første status i morgen
+        </p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[720px]" role="img">
+            <rect x={padL} y={padT} width={plotW} height={yOf(1) - padT} fill="#177a4d" opacity={0.07} />
+            <rect x={padL} y={yOf(1)} width={plotW} height={padT + plotH - yOf(1)} fill="#c13b32" opacity={0.07} />
+            <text x={padL + 8} y={padT + 16} fontSize={11} fontWeight={800} fill={GREEN} letterSpacing=".08em">
+              FORAN TEMPO
+            </text>
+            <text x={padL + 8} y={padT + plotH - 8} fontSize={11} fontWeight={800} fill={RED} letterSpacing=".08em">
+              BAGUD I DENNE UGE
+            </text>
+            {[0, 0.5, 1, 1.5, 2].map((p) => (
+              <text key={p} x={padL - 8} y={yOf(p) + 4} fontSize={12} fontWeight={700} fill={MUTED} textAnchor="end">
+                {p === 2 ? "200 %+" : `${p * 100} %`}
+              </text>
+            ))}
+            {Array.from({ length: CHART_WEEKS }, (_, c) => (
+              <g key={c}>
+                {c > 0 && (
+                  <line x1={padL + colW * c} x2={padL + colW * c} y1={padT} y2={padT + plotH} stroke="#e3e9e6" />
+                )}
+                <text x={padL + colW * c + colW / 2} y={padT + plotH + 20} fontSize={12} fontWeight={800} fill={DARK} textAnchor="middle">
+                  Uge {c + 1}
+                </text>
+                <text x={padL + colW * c + colW / 2} y={padT + plotH + 36} fontSize={12} fontWeight={600} fill={MUTED} textAnchor="middle">
+                  {fmtSales(weeklyTarget(c + 1, targets))} salg
+                </text>
+              </g>
+            ))}
+            <text x={padL + plotW / 2} y={H - 6} fontSize={11} fontWeight={700} fill={MUTED} textAnchor="middle">
+              Opstartsuge · krav pr. uge
+            </text>
+            <line x1={padL} x2={padL + plotW} y1={yOf(1)} y2={yOf(1)} stroke={DARK} strokeWidth={2} />
+            <rect x={padL + plotW + 4} y={yOf(1) - 10} width={88} height={20} rx={6} fill={DARK} />
+            <text x={padL + plotW + 48} y={yOf(1) + 4} fontSize={11} fontWeight={800} fill="#ffffff" textAnchor="middle">
+              Ugens tempo
+            </text>
+            {dots.map((d) => (
+              <g
+                key={d.m.employee_id}
+                className="cursor-pointer"
+                onClick={() => onSelect(d.m.employee_id, d.g)}
+                data-group={d.g}
+              >
+                <title>{tip(d)}</title>
+                {d.g === "start" && <circle cx={d.x} cy={d.y} r={R} fill={RED} stroke="#ffffff" strokeWidth={2} />}
+                {d.g === "hold" && <circle cx={d.x} cy={d.y} r={R - 1} fill="#ffffff" stroke={YELLOW} strokeWidth={3} />}
+                {d.g === "track" && <circle cx={d.x} cy={d.y} r={R - 1} fill="#d6efe2" stroke={GREEN} strokeWidth={3} />}
+              </g>
+            ))}
+            {labels.map(({ d, ly }) => (
+              <text
+                key={`l-${d.m.employee_id}`}
+                x={d.x + R + 4}
+                y={ly + 4}
+                fontSize={11}
+                fontWeight={800}
+                fill={RED}
+                className="cursor-pointer"
+                onClick={() => onSelect(d.m.employee_id, d.g)}
+              >
+                {d.m.employee_name}
+              </text>
+            ))}
+          </svg>
+        </div>
+      )}
+      <p className="mt-3 text-[12px] font-semibold" style={{ color: MUTED }}>
+        Vandret: opstartsuge. Lodret: ugens salg til og med i går ift. hvor man burde være nu (100 % = på tempo).
+        Tidligere uger tæller ikke med. Over 200 % vises øverst.
+      </p>
+    </section>
+  );
+}
+
 
 export function RampOverviewMatrix({
   members,

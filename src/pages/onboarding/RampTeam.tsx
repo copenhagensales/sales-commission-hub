@@ -1601,6 +1601,7 @@ export default function RampTeam() {
                 onSelectGroup={(g) => setFilter(filter === g ? "all" : g)}
                 onSelectMember={scrollToMember}
                 footer={<RampMinTargetsEditor targets={minTargets} />}
+                targets={minTargets}
               />
           <div className="grid gap-3.5 sm:grid-cols-3">
             {[
