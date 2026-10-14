@@ -230,13 +230,15 @@ function WeekOverviewChart({
     }
   }
   // Navne for Start her: skub lodret, så de ikke overlapper inden for søjlen.
-  const labels: { d: ChartDot; ly: number }[] = [];
+  const labels: { d: ChartDot; ly: number; lx: number }[] = [];
   for (let c = 0; c < CHART_WEEKS; c++) {
-    const ls = dots
-      .filter((d) => d.col === c && d.g === "start")
+    const colDots = dots.filter((d) => d.col === c);
+    const lx = colDots.length ? Math.max(...colDots.map((d) => d.x)) + R + 6 : 0;
+    const ls = colDots
+      .filter((d) => d.g === "start")
       .sort((a, b) => a.y - b.y)
-      .map((d) => ({ d, ly: d.y }));
-    for (let i = 1; i < ls.length; i++) ls[i].ly = Math.max(ls[i].ly, ls[i - 1].ly + 14);
+      .map((d) => ({ d, ly: d.y, lx }));
+    for (let i = 1; i < ls.length; i++) ls[i].ly = Math.max(ls[i].ly, ls[i - 1].ly + 15);
     const overflow = ls.length ? ls[ls.length - 1].ly - (padT + plotH - 4) : 0;
     if (overflow > 0) ls.forEach((l) => (l.ly -= overflow));
     labels.push(...ls);
@@ -312,10 +314,14 @@ function WeekOverviewChart({
                 {d.g === "track" && <circle cx={d.x} cy={d.y} r={R - 1} fill="#d6efe2" stroke={GREEN} strokeWidth={3} />}
               </g>
             ))}
-            {labels.map(({ d, ly }) => (
+            {labels.map(({ d, ly, lx }) => (
+              <g key={`l-${d.m.employee_id}`}>
+              {(lx - d.x > R + 8 || Math.abs(ly - d.y) > 2) && (
+                <line x1={d.x} y1={d.y} x2={lx - 2} y2={ly} stroke={RED} strokeOpacity={0.35} strokeWidth={1} />
+              )}
               <text
                 key={`l-${d.m.employee_id}`}
-                x={d.x + R + 4}
+                x={lx}
                 y={ly + 4}
                 fontSize={11}
                 fontWeight={800}
@@ -325,6 +331,7 @@ function WeekOverviewChart({
               >
                 {d.m.employee_name}
               </text>
+              </g>
             ))}
           </svg>
         </div>
