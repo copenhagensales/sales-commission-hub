@@ -12,6 +12,9 @@ interface Seller {
   cum_sales: number;
   threshold_value: number;
   created_at: string;
+  /** Ugemodel: 'week'. Aeldre flag: 'cumulative'. */
+  model?: string | null;
+  week_required?: number | null;
 }
 
 interface RiskStat {
@@ -69,8 +72,15 @@ function buildStatSentence(stat: RiskStat): string {
  */
 const EXPECTATION_MEASURE_FROM = "2026-10-09T14:00:00Z";
 
-function measureCell(s: { cum_sales: number; threshold_value: number; created_at: string }): string {
+const fmt = (v: number) => String(Math.round(v * 10) / 10).replace(".", ",");
+
+function measureCell(s: Seller): string {
   const t = Number(s.threshold_value);
+  if (s.model === "week" && s.week_required != null) {
+    const req = Number(s.week_required);
+    const missing = Math.max(0, req - Number(s.cum_sales));
+    return `${s.cum_sales} af ${fmt(req)} · burde have ${fmt(t)} · mangler ${fmt(missing)}`;
+  }
   if (new Date(s.created_at).getTime() >= new Date(EXPECTATION_MEASURE_FROM).getTime()) {
     const pct = t > 0 ? Math.round((Number(s.cum_sales) / t) * 100) : 0;
     const exp = String(Math.round(t * 10) / 10).replace(".", ",");
@@ -109,7 +119,7 @@ function buildContent(payload: LeaderPayload): string {
           <th style="padding:8px 12px;">Sælger</th>
           <th style="padding:8px 12px;">Kampagne</th>
           <th style="padding:8px 12px;">Måledag</th>
-          <th style="padding:8px 12px;">Salg mod forventning</th>
+          <th style="padding:8px 12px;">Ugens salg mod krav</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
