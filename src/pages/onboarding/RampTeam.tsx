@@ -81,17 +81,6 @@ const FOCUS_AREAS = [
 ] as const;
 const NEUTRAL = "#b9c4bf";
 
-function isoWeekOf(date: Date): { year: number; week: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return {
-    year: d.getUTCFullYear(),
-    week: Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7),
-  };
-}
-
 interface Derived {
   gap: number;
   /** Antal 1-1 sessioner holdt i den indevaerende uge (kravet er 1). */

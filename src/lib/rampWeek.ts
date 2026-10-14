@@ -83,3 +83,20 @@ export function displayWeek<T extends { week_status?: RampWeekStatus | null; las
 ): RampWeekStatus | null {
   return (monday ? m.last_week_status : m.week_status) ?? null;
 }
+
+/** ISO-uge for en dato (lokal tid). */
+export function isoWeekOf(date: Date): { year: number; week: number } {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return {
+    year: d.getUTCFullYear(),
+    week: Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7),
+  };
+}
+
+/** Ugedagsnavn (mandag = 1) for et tidspunkt. */
+export function weekdayName(iso: string): string {
+  return WEEKDAY_NAME[new Date(iso).getDay() || 7];
+}
