@@ -488,6 +488,7 @@ export default function RampTeam() {
   const chartKey = `ramp-chart-open:${user?.id ?? "anon"}`;
   const [discreet, setDiscreet] = useState(false);
   const [chartOpen, setChartOpen] = useState(true);
+  const [pausedOpen, setPausedOpen] = useState(false);
   useEffect(() => {
     setDiscreet(window.localStorage.getItem(discreetKey) === "1");
   }, [discreetKey]);
@@ -818,23 +819,35 @@ export default function RampTeam() {
 
           {pausedList.length > 0 && (
             <section style={{ display: "grid", gap: 8 }}>
-              <div className="mt-1.5">
-                <p className="text-[17px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
-                  Skal ikke have feedback · {pausedList.length}
-                </p>
-                <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
-                  Disse sælgere er taget ud af oversigten og tælles ikke med i manglende 1-1. De kan aktiveres igen når
-                  som helst.
-                </p>
+              <div className="mt-1.5 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[17px] font-extrabold" style={{ color: "#1b1f1d", letterSpacing: "-.02em" }}>
+                    Skal ikke have feedback · {pausedList.length}
+                  </p>
+                  <p className="mt-1 text-[13px] font-semibold" style={{ color: "#57635e" }}>
+                    Disse sælgere er taget ud af oversigten og tælles ikke med i manglende 1-1. De kan aktiveres igen når
+                    som helst.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPausedOpen((v) => !v)}
+                  aria-expanded={pausedOpen || !!searchTerm}
+                  className="rounded-full px-3 py-1 text-[12px] font-bold"
+                  style={{ background: "#ffffff", color: "#1b1f1d" }}
+                >
+                  {pausedOpen || searchTerm ? "Skjul" : "Vis"}
+                </button>
               </div>
-              {pausedList.filter(matchesSearch).map((member) => (
-                <PausedRow
-                  key={member.employee_id}
-                  member={member}
-                  isPending={setExclusion.isPending}
-                  onActivate={(m) => setExclusion.mutate({ employeeId: m.employee_id, excluded: false })}
-                />
-              ))}
+              {(pausedOpen || !!searchTerm) &&
+                pausedList.filter(matchesSearch).map((member) => (
+                  <PausedRow
+                    key={member.employee_id}
+                    member={member}
+                    isPending={setExclusion.isPending}
+                    onActivate={(m) => setExclusion.mutate({ employeeId: m.employee_id, excluded: false })}
+                  />
+                ))}
             </section>
           )}
         </div>
