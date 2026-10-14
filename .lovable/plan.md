@@ -1,18 +1,31 @@
-# 5GI 279 kr. (3 måneder 129 kr.) viser 300 kr. provision
+# 5GI 279 kr. (3 måneder 129 kr.) får 300 kr. i stedet for 225 kr.
 
-## Hvad jeg har fundet (læst i systemet, intet er ændret)
-- Produktet "5GI - 279 kr. (3 måneder 129 kr) (6 mdr. binding)" har en grundsats på **300 kr. i provision og 650 kr. i omsætning**.
-- Produktet har ingen prisregler. Derfor bruger systemet grundsatsen.
-- Satsen blev sidst ændret 8. april 2026, hvor den blev sat til 300 kr. med virkning fra 29. marts. Der står ingen 225 kr. i prishistorikken.
-- I dag (14. okt.) ligger der 9 salg på produktet, og alle står til 300 kr./650 kr.
-- Dagsrapporten viser altså den sats, der står i systemet. Det er ikke en fejl i rapporten.
+## Konklusion
+Du har ret i, at det er reglerne på "5GI MBB", der giver 225 kr. Salget i dagsrapporten lander dog ikke på "5GI MBB". Det lander på produktet "5GI - 279 kr. (3 måneder 129 kr) (6 mdr. binding)".
 
-Der findes også en del andre 5GI-produkter med lignende navne, fx "2 måneder 99 kr", "279 kr./md (3 md. til 129 kr.)" og "12 måneder 199 kr". Flere af dem står også til 300 kr.
+Det produkt er lagt sammen med "5GI MBB", men har selv ingen regler. Derfor falder salget tilbage på produktets grundsats på 300 kr.
 
-## Forslag (kræver dit ja, da det rører provision)
-1. Du bekræfter den korrekte sats: 225 kr. i provision. Og omsætningen, er den stadig 650 kr.?
-2. Du bekræfter, fra hvilken dato den skal gælde: fra i dag, fra en bestemt dato eller tilbage i tiden.
-3. Du bekræfter, om satsen også gælder for de 5GI-varianter, der ligner produktet.
-4. Derefter retter du satsen i MG Test under prisdialogen med den valgte dato, eller også gør jeg det. Salgene i perioden bliver regnet om, og jeg tjekker provisionen før og efter.
+## Det har jeg fundet (kun læst, intet er ændret)
+- "5GI - 279 kr. (3 måneder 129 kr)" har produktkode 9461. Det er markeret som lagt sammen med "5GI MBB" og har 0 prisregler. Grundsatsen er 300 kr. og 650 kr.
+- "5GI MBB" har 5 regler. "Specialkampagne 2026" (prioritet 10, alle kampagner undtagen 23) ville passe på **alle 290** salg nævnt nedenfor og give 225 kr.
+- **Fra 24. sept. kl. 15:26 til i dag** er der kommet 290 salgslinjer ind på det sammenlagte produkt. Alle står til 300 kr. uden regel. Det giver 87.000 kr. i provision i dag. Med 225 kr. ville det være 65.250 kr., altså en forskel på **21.750 kr.** for Eesy TM-sælgerne.
+- Før 24. sept. landede salgene direkte på "5GI MBB".
+- I prisberegningen bliver produktet fundet ud fra produktkoden. Den følger ikke sammenlægningen videre til "5GI MBB" og bruger derfor ikke reglerne der. Kun TDC-salgssiden i koden kender sammenlægningen.
+- Det er endnu ikke bekræftet, hvorfor det skiftede netop 24. sept. Det kan skyldes, at opkaldssystemet begyndte at sende kode 9461, eller at sammenlægningen blev lavet på det tidspunkt. Det undersøger jeg som det første.
+- Sidebemærkning: I september fik 243 salg på "5GI MBB" selv 300 kr. uden regel. Det er en separat sag, som jeg kun undersøger, hvis du ønsker det.
 
-Der bliver ikke ændret noget, før du har svaret.
+## Forslag
+**A. Hurtig rettelse (data, ingen kode)**
+Flyt de 290 salgslinjer og produktkoden 9461 over på "5GI MBB". Kør derefter genberegningen af priser kun for de linjer, så de rammer reglerne og får 225 kr. Fremtidige salg lander så direkte på "5GI MBB".
+
+**B. Grundig rettelse (kode i prismotoren, rød zone)**
+Lad prisberegningen følge sammenlægningen, så sammenlagte produkter altid bruger hovedproduktets regler. Ændringen skal ske ens i frontend og i baggrundsjobbet. Det kan også ændre provisionen for andre sammenlagte produkter, så jeg laver først en tørkørsel, der viser, hvilke produkter og beløb der påvirkes.
+
+Begge løsninger ændrer provision tilbage til 24. sept. Der gælder følgende:
+- Før jeg gør noget, laver jeg en optælling af antal og provision.
+- Kun de berørte linjer bliver ændret.
+- Efter rettelsen kontrollerer jeg, at summen er 65.250 kr.
+
+**Jeg anbefaler A nu og B som særskilt opgave efter tørkørslen.**
+
+Der bliver ikke ændret noget, før du har godkendt. Provisionen fra 24. sept. skal også godkendes af Kasper eller Mathias, fordi den påvirker løngrundlaget.
