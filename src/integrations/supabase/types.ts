@@ -14301,8 +14301,11 @@ export type Database = {
           day_no: number
           employee_id: string
           id: string
+          model: string
           status: string
           threshold_value: number
+          week_iso: number | null
+          week_required: number | null
         }
         Insert: {
           client_campaign_id: string
@@ -14314,8 +14317,11 @@ export type Database = {
           day_no: number
           employee_id: string
           id?: string
+          model?: string
           status?: string
           threshold_value: number
+          week_iso?: number | null
+          week_required?: number | null
         }
         Update: {
           client_campaign_id?: string
@@ -14327,8 +14333,11 @@ export type Database = {
           day_no?: number
           employee_id?: string
           id?: string
+          model?: string
           status?: string
           threshold_value?: number
+          week_iso?: number | null
+          week_required?: number | null
         }
         Relationships: [
           {
@@ -19358,11 +19367,35 @@ export type Database = {
         }
         Returns: number
       }
+      ramp_risk_flag_candidates: {
+        Args: { p_as_of: string }
+        Returns: {
+          client_campaign_id: string
+          curve_version: number
+          day_no: number
+          employee_id: string
+          expected_now: number
+          iso_week: number
+          required: number
+          sales: number
+        }[]
+      }
       ramp_risk_mail_payload: { Args: never; Returns: Json }
       ramp_session_recipients: {
         Args: { p_employee_id: string }
         Returns: Json
       }
+      ramp_week_status: {
+        Args: {
+          p_as_of: string
+          p_campaigns: string[]
+          p_email: string
+          p_end: string
+          p_start: string
+        }
+        Returns: Json
+      }
+      ramp_week_target: { Args: { p_week: number }; Returns: number }
       ramp_week_workdays: {
         Args: { p_end?: string; p_monday: string; p_start: string }
         Returns: number
