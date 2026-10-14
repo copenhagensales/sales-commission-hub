@@ -30,6 +30,11 @@ export function EesyMobileRequestsList() {
       name: "Eesy",
       rows: list.map((r) => ({
         Navn: r.full_name,
+        Kundetype: r.customer_type === "eksisterende" ? "Eksisterende Eesy-kunde" : "Ny kunde (nummerflytning)",
+        Vejnavn: r.street ?? "",
+        Nr: r.house_number ?? "",
+        Postnr: r.postal_code ?? "",
+        By: r.city ?? "",
         Adresse: r.address ?? "",
         "CPR-nr.": r.cpr_number ? `${r.cpr_number.slice(0, 6)}-${r.cpr_number.slice(6)}` : "",
         Telefonnummer: r.phone_number ?? "",
@@ -90,7 +95,7 @@ export function EesyMobileRequestsList() {
                 {rows.map((r) => (
                   <tr key={r.id} className="border-t align-top">
                     <td className="py-2 pr-3 font-medium">{r.full_name}</td>
-                    <td className="pr-3">{r.address ?? "Slettet"}</td>
+                    <td className="pr-3">{r.customer_type === "eksisterende" ? <span className="text-muted-foreground">Eksisterende kunde</span> : (r.address ?? "Slettet")}</td>
                     <td className="pr-3 font-mono">{showCpr && r.cpr_number ? `${r.cpr_number.slice(0, 6)}-${r.cpr_number.slice(6)}` : maskCpr(r.cpr_number)}</td>
                     <td className="pr-3">{r.phone_number ?? "Slettet"}</td>
                     <td className="pr-3 font-mono">{r.icc_number ?? "Slettet"}</td>
