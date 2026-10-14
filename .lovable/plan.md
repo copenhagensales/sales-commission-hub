@@ -1,21 +1,19 @@
-# Kobl ny TDC-kampagne "Kanvas NY Med TDC Net fibermulighed" til TDC Erhverv
+# Excel-fil: TDC Erhverv fiber-satser (HAP/VOK)
 
-## Status nu
-- Stork har allerede opdaget kampagnen fra Adversus i dag kl. 11:15 (Adversus-ID 126377).
-- Den er **ikke koblet** til en Stork-kampagne endnu.
-- Der er allerede **1 salg** (i dag kl. 12:36) på kampagnen, som står uden kampagne.
-- Alle øvrige TDC Erhverv Kanvas-kampagner (fx "Kanvas NY", "Kanvas NY - Uden numre") er koblet til **TDC Erhverv Products**.
+## Hvad laves
+En Excel-fil til download, kun læst fra systemet. Ingen data ændres.
 
-## Hvad der gøres
-1. Kobl Adversus-kampagne 126377 til **TDC Erhverv Products** – samme som de andre TDC Kanvas-kampagner.
-2. Knyt det ene eksisterende salg til samme kampagne, så det tæller på TDC Erhverv.
-3. Kør prisberegningen for det ene salg, så provision og omsætning beregnes efter de almindelige TDC-regler (ingen regler ændres).
-4. Kontrollér: kampagnen er koblet, 0 TDC-salg uden kampagne tilbage, salget har provision.
+Kolonner: Produkt · Type (HAP/VOK) · Salgstype (Lukket / Lead Provi / Fuldt) · Provision (kr.) · Omsætning (kr.) · Gælder fra · Bemærkning.
 
-Fremover kommer nye salg automatisk ind med det samme.
+Rækker (12):
+- Lukket salg HAP 375 / 500 (fra 8. sep. 2026)
+- Lead Provi HAP 375 / 1.000 (fra 8. sep. 2026)
+- Fuldt salg HAP 750 / 1.500
+- Lukket salg VOK 625 / 850 (fra 8. sep. 2026)
+- Lead Provi VOK 625 / 1.650 (fra 8. sep. 2026)
+- Fuldt salg VOK 1.250 / 2.500
+- De 6 "Inkl. Mobilevoice"-varianter: 0 / 0, markeret "Satser ikke fastsat endnu"
 
-## Selv fremover
-I MG Test → Kampagner (Adversus-kampagner) vises nye kampagner som "ikke mappet". Vælg "TDC Erhverv Products" i rullemenuen – det er hele mappingen.
-
-## Afgrænsning
-Ingen kodeændringer. Prisregler, produkter, løn og andre kampagner røres ikke.
+## Teknisk
+- Satser hentes fra produktets aktive prisregel, ellers produktets grundsats.
+- Filen gemmes som `tdc-erhverv-fiber-satser.xlsx` under Filer.
