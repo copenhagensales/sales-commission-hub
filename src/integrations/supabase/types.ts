@@ -14442,6 +14442,7 @@ export type Database = {
           extra_viewer_employee_ids: string[]
           id: string
           lookback_months: number
+          risk_flags_paused: boolean
           updated_at: string
           weekly_min_targets: Json
           weekly_program_start_date: string | null
@@ -14452,6 +14453,7 @@ export type Database = {
           extra_viewer_employee_ids?: string[]
           id?: string
           lookback_months?: number
+          risk_flags_paused?: boolean
           updated_at?: string
           weekly_min_targets?: Json
           weekly_program_start_date?: string | null
@@ -14462,6 +14464,7 @@ export type Database = {
           extra_viewer_employee_ids?: string[]
           id?: string
           lookback_months?: number
+          risk_flags_paused?: boolean
           updated_at?: string
           weekly_min_targets?: Json
           weekly_program_start_date?: string | null
@@ -19343,6 +19346,7 @@ export type Database = {
       }
       ramp_campaign_ids: { Args: { p_campaign: string }; Returns: string[] }
       ramp_create_risk_flags: { Args: never; Returns: number }
+      ramp_create_risk_flags_cumulative: { Args: never; Returns: number }
       ramp_expected_at: { Args: { _day_no: number }; Returns: number }
       ramp_nightly_maintenance: { Args: never; Returns: Json }
       ramp_product_count: {
