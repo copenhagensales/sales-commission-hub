@@ -1131,7 +1131,7 @@ export default function RampTeam() {
   return (
     <MainLayout>
       <div className="ramp-page" style={{ background: "#e6efec" }}>
-        <div className="mx-auto max-w-[1180px] p-4 sm:p-6" style={{ display: "grid", gap: 18 }}>
+        <div className="mx-auto max-w-[1180px] p-4 sm:p-6" style={{ display: "grid", gap: 18, gridTemplateColumns: "minmax(0, 1fr)" }}>
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
