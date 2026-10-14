@@ -114,3 +114,9 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 ## Oktober 2026
 - [x] TDC: kobl Adversus-kampagne 126377 (Kanvas NY Med TDC Net fibermulighed) til TDC Erhverv Products + 1 salg
 - [x] Opstart: fjern skift "Nye/Hele holdet"; ny sektion "Etablerede sælgere" nederst (kun 1-1/feedback)
+
+## Oktober 2026 (forts.)
+- [x] 5GI MBB: kode 9461 flyttet, genberegnet fra 15/9 (-8.475 kr)
+- [ ] 5GI: 303 linjer i undtagne kampagner står til 300 kr — afventer beslutning
+- [x] Relatel-salg Jacob Nielson 14/10 rettet til 100% tilskud (låst)
+- [x] Fordele: Eesy Mobil 50%-formular + ejerliste med eksport, CPR-sletning 30 dage efter sendt

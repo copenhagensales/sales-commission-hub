@@ -7038,6 +7038,73 @@ export type Database = {
           },
         ]
       }
+      eesy_mobile_requests: {
+        Row: {
+          address: string | null
+          cpr_number: string | null
+          created_at: string
+          employee_id: string
+          full_name: string
+          icc_number: string | null
+          id: string
+          phone_number: string | null
+          sensitive_purged_at: string | null
+          sent_at: string | null
+          status: string
+          subscription: string
+        }
+        Insert: {
+          address?: string | null
+          cpr_number?: string | null
+          created_at?: string
+          employee_id: string
+          full_name: string
+          icc_number?: string | null
+          id?: string
+          phone_number?: string | null
+          sensitive_purged_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subscription: string
+        }
+        Update: {
+          address?: string | null
+          cpr_number?: string | null
+          created_at?: string
+          employee_id?: string
+          full_name?: string
+          icc_number?: string | null
+          id?: string
+          phone_number?: string | null
+          sensitive_purged_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subscription?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eesy_mobile_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eesy_mobile_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eesy_mobile_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           content: string
@@ -18508,6 +18575,7 @@ export type Database = {
         Returns: number
       }
       data_import_retention_run: { Args: { _dry_run?: boolean }; Returns: Json }
+      eesy_mobile_subscriptions: { Args: never; Returns: string[] }
       effective_auth_user_id: { Args: never; Returns: string }
       effective_employee_id: { Args: never; Returns: string }
       effective_has_app_role: { Args: { _role: string }; Returns: boolean }
@@ -19322,7 +19390,16 @@ export type Database = {
         Args: { _salary_type: string }
         Returns: string
       }
+      my_eesy_mobile_request: {
+        Args: never
+        Returns: {
+          created_at: string
+          status: string
+          subscription: string
+        }[]
+      }
       pay_period_start: { Args: { ts: string }; Returns: string }
+      purge_eesy_mobile_sensitive: { Args: never; Returns: number }
       quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }
       quality_has_module_access: {
         Args: { _user_id?: string }
@@ -19478,6 +19555,17 @@ export type Database = {
       shares_team_with_user: {
         Args: { _target_employee_id: string; _user_id: string }
         Returns: boolean
+      }
+      submit_eesy_mobile_request: {
+        Args: {
+          _address: string
+          _cpr: string
+          _full_name: string
+          _icc: string
+          _phone: string
+          _subscription: string
+        }
+        Returns: string
       }
       sync_cohort_team_memberships: { Args: never; Returns: Json }
       sync_personnel_salary: {

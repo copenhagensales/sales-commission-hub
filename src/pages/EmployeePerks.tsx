@@ -24,6 +24,9 @@ import {
   type PerkRedemptionType,
 } from "@/hooks/useEmployeePerks";
 import { PerkDialog } from "@/components/perks/PerkDialog";
+import { EesyMobilePerk } from "@/components/perks/EesyMobilePerk";
+import { EesyMobileRequestsList } from "@/components/perks/EesyMobileRequestsList";
+import { useIsOwner } from "@/hooks/useEesyMobileRequests";
 
 const TYPE_LABEL: Record<PerkRedemptionType, string> = {
   online: "Online",
@@ -41,6 +44,7 @@ const FILTERS: Array<{ value: "alle" | PerkRedemptionType; label: string }> = [
 export default function EmployeePerks() {
   const { toast } = useToast();
   const { data: perks = [], isLoading } = useEmployeePerks();
+  const isOwner = useIsOwner();
   const { canManage } = useCanManagePerks();
   const deletePerk = useDeletePerk();
 
@@ -137,6 +141,10 @@ export default function EmployeePerks() {
           ))}
         </div>
       </div>
+
+      <EesyMobilePerk />
+      {isOwner && <EesyMobileRequestsList />}
+
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Indlæser...</p>

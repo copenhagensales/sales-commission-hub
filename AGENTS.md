@@ -3,3 +3,4 @@
 
 - Opstart (/opstartshold) viser kun ugemodellen fra get_ramp_team_overview: week_status normalt, last_week_status (ramp_week_status maalt pr. sidste soendag) om mandagen; kun 1-1 (coaching) taeller som ugens 1-1 paa siden. Why: én kilde til status, ingen parallel beregning i frontend.
 - Opstart: etablerede saelgere (get_ramp_full_team) vises paa samme side under de nye, kun med 1-1/feedback; daekning og sortering ligger i src/lib/rampEstablished.ts. Why: ingen salgsstatus eller krav for etablerede, én kilde til 1-1-logik.
+- Eesy Mobil-fordel: anmodninger indsendes kun via RPC submit_eesy_mobile_request (én pr. medarbejder), abonnementer defineres kun i eesy_mobile_subscriptions(), kun ejere læser listen, og CPR/ICC/adresse/telefon nulstilles af cron 30 dage efter status sendt. Why: CPR skal minimeres og kun findes ét sted.
