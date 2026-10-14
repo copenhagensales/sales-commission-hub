@@ -169,6 +169,13 @@
       "when": 1791962897357,
       "tag": "0023_ramp_mail_payload_week",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791973642200,
+      "tag": "0024_ramp_overview_last_week_status",
+      "breakpoints": true
     }
   ]
 }
