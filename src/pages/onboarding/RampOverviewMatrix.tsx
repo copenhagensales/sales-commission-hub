@@ -39,8 +39,8 @@ export function supportGroup(member: { week_status?: RampWeekStatus | null }): S
 /** Ugens tempo mod sidste uges resultat. Kun til tekster; status afgøres i databasen. */
 export function expectationTrend(member: { week_status?: RampWeekStatus | null }): Trend {
   const w = member.week_status;
-  if (!w || w.pace_ratio == null || w.prev_ratio == null) return "unknown";
-  const diff = w.pace_ratio - w.prev_ratio;
+  if (!w || w.per_day == null || w.prev_per_day == null) return "unknown";
+  const diff = w.per_day - w.prev_per_day;
   return diff > 1e-9 ? "up" : diff < -1e-9 ? "down" : "flat";
 }
 
