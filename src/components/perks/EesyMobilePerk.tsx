@@ -110,7 +110,7 @@ export function EesyMobilePerk() {
           <DialogHeader>
             <DialogTitle>{isNew ? "Skift til Eesy Mobil med 50 % rabat" : "Eksisterende Eesy-kunde: 50 % rabat"}</DialogTitle>
             <DialogDescription>
-              Dine oplysninger kan kun ses af ejerne. De bruges kun til oprettelsen hos Eesy, og CPR-nummer,
+              Dine oplysninger kan kun ses af admin. De bruges kun til oprettelsen hos Eesy, og CPR-nummer,
               ICC-nummer, adresse og telefonnummer slettes 30 dage efter, at anmodningen er sendt videre.
             </DialogDescription>
           </DialogHeader>
@@ -160,7 +160,7 @@ export function EesyMobilePerk() {
                 <div className="col-span-3 space-y-1"><Label htmlFor="ee-city">By</Label><Input id="ee-city" value={form.city} onChange={set("city")} maxLength={60} autoComplete="address-level2" /></div>
               </div>
             )}
-            <div className="space-y-1"><Label htmlFor="ee-cpr" className="flex items-center justify-between gap-2">CPR-nummer <span className="flex items-center gap-1 text-[11px] font-normal text-muted-foreground"><Lock className="h-3 w-3" /> Kun ejerne ser det · slettes efter 30 dage</span></Label><Input id="ee-cpr" value={form.cpr} onChange={set("cpr")} inputMode="numeric" placeholder="DDMMÅÅ-XXXX" autoComplete="off" maxLength={11} /></div>
+            <div className="space-y-1"><Label htmlFor="ee-cpr" className="flex items-center justify-between gap-2">CPR-nummer <span className="flex items-center gap-1 text-[11px] font-normal text-muted-foreground"><Lock className="h-3 w-3" /> Kun admin ser det · slettes efter 30 dage</span></Label><Input id="ee-cpr" value={form.cpr} onChange={set("cpr")} inputMode="numeric" placeholder="DDMMÅÅ-XXXX" autoComplete="off" maxLength={11} /></div>
             <div className="space-y-1"><Label htmlFor="ee-phone">{isNew ? "Nuværende telefonnummer (som skal flyttes)" : "Dit Eesy-telefonnummer"}</Label><Input id="ee-phone" value={form.phone} onChange={set("phone")} inputMode="numeric" maxLength={11} /></div>
             {isNew && (
               <div className="space-y-1"><Label htmlFor="ee-icc">ICC-nummer (står på SIM-kortet)</Label><Input id="ee-icc" value={form.icc} onChange={set("icc")} inputMode="numeric" autoComplete="off" maxLength={26} /></div>
