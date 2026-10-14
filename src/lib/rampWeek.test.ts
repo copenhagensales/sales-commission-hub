@@ -35,3 +35,24 @@ describe("ugemodel", () => {
     });
   });
 });
+
+import { displayWeek, isMondayView } from "./rampWeek";
+import type { RampWeekStatus as RWS } from "./rampWeek";
+
+describe("mandagsvisning", () => {
+  const cur = { done_days: 0, partial_start: false, iso_week: 42 } as RWS;
+  const last = { done_days: 5, partial_start: false, iso_week: 41 } as RWS;
+  it("mandag (0 afsluttede dage, fuld uge) viser sidste uge", () => {
+    expect(isMondayView(cur)).toBe(true);
+    expect(displayWeek({ week_status: cur, last_week_status: last }, true)?.iso_week).toBe(41);
+  });
+  it("tirsdag viser denne uge", () => {
+    const tue = { ...cur, done_days: 1 } as RWS;
+    expect(isMondayView(tue)).toBe(false);
+    expect(displayWeek({ week_status: tue, last_week_status: last }, false)?.iso_week).toBe(42);
+  });
+  it("ny sælger midt i ugen udløser ikke mandagsvisning", () => {
+    expect(isMondayView({ done_days: 0, partial_start: true } as RWS)).toBe(false);
+    expect(isMondayView(null)).toBe(false);
+  });
+});
