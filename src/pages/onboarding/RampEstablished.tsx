@@ -153,7 +153,7 @@ export function RampEstablishedSection({
           </thead>
           <tbody>
             {rows.map((m) => {
-              const sen = m.day_no <= 0 ? "Ikke startet endnu" : m.day_no <= 45 ? "Ny etableret" : seniority(m.start_date);
+              const sen = m.day_no <= 0 ? "Ikke startet endnu" : m.day_no <= 40 ? `Ikke tilmeldt opstart · dag ${m.day_no}` : m.day_no <= 45 ? "Ny etableret" : seniority(m.start_date);
               const fb = latestFeedback(m);
               return (
                 <tr
