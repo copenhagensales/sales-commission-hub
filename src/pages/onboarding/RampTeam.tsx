@@ -1347,7 +1347,10 @@ export default function RampTeam() {
         discreet={discreet}
         targets={minTargets}
         onClose={() => setPanelId(null)}
-        onHold={(m, done) => setDialog({ employeeId: m.employee_id, done })}
+        onHold={(m, done) => {
+          setPanelId(null);
+          setDialog({ employeeId: m.employee_id, done });
+        }}
         onAbsence={registerAbsence}
         onExclude={exclude}
       />
