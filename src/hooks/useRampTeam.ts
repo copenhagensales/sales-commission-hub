@@ -1,3 +1,4 @@
+import type { RampWeekStatus } from "@/lib/rampWeek";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -87,6 +88,8 @@ export interface RampTeamMember {
   week_complete: boolean;
   weeks: RampWeekPoint[];
   actions: RampAction[];
+  /** Ugemodellen (ramp_week_status): eneste kilde til status, grupper og alarmer. */
+  week_status?: RampWeekStatus | null;
 }
 
 /** Ugepunkt for hele holdet: ingen norm, kun det raa antal produkter. */

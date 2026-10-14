@@ -134,6 +134,41 @@
       "when": 1791911618654,
       "tag": "0018_apple_relay_eea_ranges",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791962571907,
+      "tag": "0019_ramp_pause_risk_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791962651086,
+      "tag": "0020_ramp_week_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791962682635,
+      "tag": "0021_ramp_week_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791962714227,
+      "tag": "0022_ramp_overview_week_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791962897357,
+      "tag": "0023_ramp_mail_payload_week",
+      "breakpoints": true
     }
   ]
 }
