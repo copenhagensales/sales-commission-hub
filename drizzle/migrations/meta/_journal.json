@@ -197,6 +197,13 @@
       "when": 1791974198999,
       "tag": "0027_ramp_overview_last_week_as_of_sunday",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791976541480,
+      "tag": "0028_ramp_full_team_start_date_focus",
+      "breakpoints": true
     }
   ]
 }

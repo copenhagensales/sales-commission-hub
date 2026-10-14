@@ -2,3 +2,4 @@
 - Kolonner fra manuelle uploads defineres og får sletteregler i data_import_* tabellerne (MG → Data import). Gælder i dag kun Eesy TM kurv/kombineret upload. Upload fjerner udefinerede kolonner, men beholder altid dem, matchingen læser. Why: kun definerede data må opbevares, uden at matchingen ændres.
 
 - Opstart (/opstartshold) viser kun ugemodellen fra get_ramp_team_overview: week_status normalt, last_week_status (ramp_week_status maalt pr. sidste soendag) om mandagen; kun 1-1 (coaching) taeller som ugens 1-1 paa siden. Why: én kilde til status, ingen parallel beregning i frontend.
+- Opstart: etablerede saelgere (get_ramp_full_team) vises paa samme side under de nye, kun med 1-1/feedback; daekning og sortering ligger i src/lib/rampEstablished.ts. Why: ingen salgsstatus eller krav for etablerede, én kilde til 1-1-logik.

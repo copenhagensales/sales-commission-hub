@@ -87,7 +87,10 @@ export type OneOnOne =
   | { kind: "not_required" };
 
 /** Kun 1-1 (coaching) tæller som ugens 1-1. */
-export function oneOnOneOf(m: RampTeamMember, absencePending = false): OneOnOne {
+export function oneOnOneOf(
+  m: Pick<RampTeamMember, "has_coaching" | "actions" | "iso_year" | "iso_week" | "has_absence" | "week_required">,
+  absencePending = false,
+): OneOnOne {
   if (m.has_coaching) {
     const a = m.actions.find((x) => {
       if (x.action_type !== RAMP_WEEKLY_COACHING) return false;
