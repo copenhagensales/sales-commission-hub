@@ -159,13 +159,13 @@ function derive(member: AnyMember): Derived {
     trend,
     urgency,
     stripColor:
-      member.expectation_status === "under"
-        ? trend === "up"
+      supportGroup(member) === "start"
+        ? RED
+        : supportGroup(member) === "hold"
           ? YELLOW
-          : RED
-        : member.expectation_status === "on_track"
-          ? GREEN
-          : NEUTRAL,
+          : supportGroup(member) === "track"
+            ? GREEN
+            : NEUTRAL,
     weekActions,
     feedbackLog: member.actions.filter((a) => a.note && a.note.trim().length > 0),
   };
@@ -582,7 +582,7 @@ function MemberCard({
                 {trendPill.text}
               </Pill>
             )}
-            {!discreet && member.expectation_status === "under" && (
+            {!discreet && (supportGroup(member) === "start" || supportGroup(member) === "hold") && (
               <Pill bg={RED_FLAT} color={RED_TEXT}>
                 Ekstra støtte
               </Pill>
@@ -1376,11 +1376,11 @@ export default function RampTeam() {
     [members],
   );
 
-  const dangerList = useMemo(() => allList.filter((m) => m.expectation_status === "under"), [allList]);
+  const dangerList = useMemo(() => allList.filter((m) => { const g = supportGroup(m); return g === "start" || g === "hold"; }), [allList]);
   const groupLists = useMemo(() => {
     const map: Record<SupportGroup, RampTeamMember[]> = { start: [], hold: [], track: [] };
     for (const m of allList) {
-      const g = supportGroup(m, derive(m).trend);
+      const g = supportGroup(m);
       if (g) map[g].push(m);
     }
     return map;
@@ -1395,8 +1395,8 @@ export default function RampTeam() {
   );
 
   const counts = useMemo(() => {
-    const good = members.filter((m) => m.expectation_status === "on_track").length;
-    const pending = members.filter((m) => m.expectation_status === "ukendt").length;
+    const good = members.filter((m) => supportGroup(m) === "track").length;
+    const pending = members.filter((m) => supportGroup(m) === null).length;
     return {
       danger: dangerList.length,
       good,
@@ -1592,7 +1592,6 @@ export default function RampTeam() {
             <>
               <RampOverviewMatrix
                 members={allList}
-                trendOf={(m) => derive(m).trend}
                 counts={{
                   start: groupLists.start.length,
                   hold: groupLists.hold.length,
@@ -1601,7 +1600,6 @@ export default function RampTeam() {
                 activeGroup={filter === "start" || filter === "hold" || filter === "track" ? filter : null}
                 onSelectGroup={(g) => setFilter(filter === g ? "all" : g)}
                 onSelectMember={scrollToMember}
-                minTargets={minTargets}
                 footer={<RampMinTargetsEditor targets={minTargets} />}
               />
           <div className="grid gap-3.5 sm:grid-cols-3">
@@ -1611,14 +1609,14 @@ export default function RampTeam() {
                 label: "Ekstra støtte",
                 value: counts.danger,
                 sub: `af ${counts.total} sælgere`,
-                extra: "Under forventning — giv dem mest tid i denne uge",
+                extra: "Bagud i denne uge — giv dem mest tid nu",
                 extraColor: RED_TEXT,
               },
               {
                 strip: GREEN,
                 label: "På sporet",
                 value: counts.good,
-                sub: "på eller over forventning",
+                sub: "på eller foran ugens tempo",
                 extra: "Skal stadig have ugens forløb",
                 extraColor: "#0f5a38",
               },

@@ -22,7 +22,7 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
     <div className="rounded-[12px] px-4 py-2.5" style={{ background: "#f6f8f7" }}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
         <span className="font-extrabold" style={{ color: "#1b1f1d" }}>
-          Forventning · salg pr. uge
+          Krav · salg pr. kalenderuge
         </span>
         <span className="font-semibold tabular-nums" style={{ color: "#3c4743" }}>
           {shown.map((s, i) => (
@@ -70,8 +70,7 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
             {save.isPending ? "Gemmer…" : "Gem"}
           </button>
           <p className="basis-full text-[12px] font-semibold" style={{ color: "#57635e" }}>
-            Kravet fordeles på de 5 arbejdsdage i ugen (fx 5 salg = 1 pr. dag). Grafen, grupperne og alarmerne på dag 10 og
-            15 måles mod det.
+            Kravet gælder pr. kalenderuge (mandag–fredag) og nedsættes forholdsmæssigt ved delvis uge og helligdage. Ugetavlen, grupperne og alarmerne på dag 10 og 15 måles mod det.
           </p>
         </div>
       )}
