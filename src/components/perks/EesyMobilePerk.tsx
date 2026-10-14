@@ -14,6 +14,19 @@ import {
   useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest, type EesyCustomerType,
 } from "@/hooks/useEesyMobileRequests";
 
+/** Kun visning: læser navn og normalpris ud af abonnementsteksten fra databasen. */
+function parseSub(s: string) {
+  const m = s.match(/^Fri tale - (.+?) - (\d+(?:[.,]\d+)?) kr\./);
+  const label = m ? m[1] : s;
+  const parts = label.match(/^(.+?\(5G\))\s*\+?\s*(.*)$/);
+  return {
+    data: parts ? parts[1] : label,
+    extra: parts ? `Fri tale${parts[2] ? " · " + parts[2] : ""}` : "Fri tale",
+    price: m ? Number(m[2].replace(",", ".")) : null,
+  };
+}
+const fmtKr = (n: number) => `${n.toLocaleString("da-DK", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })} kr.`;
+
 const EMPTY = {
   subscription: "", fullName: "", street: "", houseNumber: "", postalCode: "", city: "", cpr: "", phone: "", icc: "",
 };
@@ -98,12 +111,34 @@ export function EesyMobilePerk() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>{isNew ? "Abonnement" : "Dit abonnement hos Eesy"}</Label>
-              <RadioGroup value={form.subscription} onValueChange={(v) => setForm((f) => ({ ...f, subscription: v }))}>
-                {subs.map((s) => (
-                  <label key={s} className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm">
-                    <RadioGroupItem value={s} /> {s}
-                  </label>
-                ))}
+              <RadioGroup value={form.subscription} onValueChange={(v) => setForm((f) => ({ ...f, subscription: v }))} className="grid gap-2 sm:grid-cols-2">
+                {subs.map((s) => {
+                  const p = parseSub(s);
+                  const selected = form.subscription === s;
+                  return (
+                    <label
+                      key={s}
+                      className={`relative flex cursor-pointer flex-col gap-1 rounded-xl border-2 p-3 transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                    >
+                      <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">-50%</span>
+                      <span className="flex items-center gap-2">
+                        <RadioGroupItem value={s} />
+                        <span className="text-base font-bold">{p.data}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{p.extra}</span>
+                      {p.price !== null ? (
+                        <span className="mt-1 flex items-baseline gap-2">
+                          <span className="text-2xl font-extrabold text-primary">{fmtKr(p.price / 2)}</span>
+                          <span className="text-xs text-muted-foreground">/md.</span>
+                          <span className="text-sm text-muted-foreground line-through">{fmtKr(p.price)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-sm">{s}</span>
+                      )}
+                      <span className="text-[11px] text-muted-foreground">Du sparer {p.price !== null ? fmtKr(p.price / 2) : ""} hver måned · 6 mdr. binding</span>
+                    </label>
+                  );
+                })}
               </RadioGroup>
             </div>
             <div className="space-y-1"><Label htmlFor="ee-name">Fulde navn</Label><Input id="ee-name" value={form.fullName} onChange={set("fullName")} maxLength={120} /></div>
