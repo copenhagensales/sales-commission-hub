@@ -444,7 +444,7 @@ export function CphBoardFrame({
 
   const now = new Date();
   const kpiCols = tvMode
-    ? `1.35fr ${primaryKpis.slice(1).map(() => "1fr").join(" ")}`
+    ? `repeat(${primaryKpis.length}, minmax(0, 1fr))`
     : undefined;
 
   return (

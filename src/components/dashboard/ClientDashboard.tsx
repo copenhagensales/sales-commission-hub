@@ -447,8 +447,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
               )}
               <div className={tvMode ? "contents" : "hidden 2xl:contents"}>
               <CphLeaderboard
-                title="Top lønperiode"
-                sellers={sortedPayrollSellers}
+                title="Top i dag"
+                sellers={sortedDailySellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
                 light
@@ -468,8 +468,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 maxRows={tvMode ? 7 : undefined}
               />
               <CphLeaderboard
-                title="Top i dag"
-                sellers={sortedDailySellers}
+                title="Top lønperiode"
+                sellers={sortedPayrollSellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
                 showCrossSales={showCrossSales || hasSecondary}
