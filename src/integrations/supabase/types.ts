@@ -7100,21 +7100,21 @@ export type Database = {
           {
             foreignKeyName: "eesy_mobile_requests_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "employee_basic_info"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "eesy_mobile_requests_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "eesy_mobile_requests_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
