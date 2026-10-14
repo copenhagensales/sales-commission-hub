@@ -507,7 +507,7 @@ function FullTeamMemberCard({
             </span>
           </div>
 
-          {member.has_absence ? (
+          {member.has_absence || absencePending ? (
             <p className="mt-3 text-[12px] font-semibold" style={{ color: "#57635e" }}>
               Der er registreret fravær hele ugen — 1-1 er ikke krævet.
             </p>
