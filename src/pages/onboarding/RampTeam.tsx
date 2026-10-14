@@ -650,7 +650,7 @@ export default function RampTeam() {
       <PopoverContent className="w-[360px] space-y-3 text-[13px]" align="end">
         <p className="font-semibold" style={{ color: "#1b1f1d" }}>
           Status måles på den indeværende kalenderuge til og med i går: ugens salg mod hvor man burde være nu.
-          Under tempo og ikke bedre end sidste uge = Start her. Under tempo men bedre end sidste uge = Hold fast.
+          Under tempo og ikke flere salg pr. arbejdsdag end sidste uge = Start her. Under tempo men flere salg pr. arbejdsdag end sidste uge = Hold fast.
           I første opstartsuge findes ingen forrige uge, så under tempo = Hold fast.
         </p>
         <div className="rounded-[12px] p-3" style={{ background: "#f6f8f7" }}>
