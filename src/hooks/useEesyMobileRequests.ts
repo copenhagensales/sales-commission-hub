@@ -35,10 +35,16 @@ export function useMyEesyMobileRequest() {
   });
 }
 
+export type EesyCustomerType = "ny_kunde" | "eksisterende";
+
 export interface EesyMobileSubmitInput {
+  customerType: EesyCustomerType;
   subscription: string;
   fullName: string;
-  address: string;
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
   cpr: string;
   phone: string;
   icc: string;
@@ -48,10 +54,14 @@ export function useSubmitEesyMobileRequest() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (i: EesyMobileSubmitInput) => {
-      const { error } = await supabase.rpc("submit_eesy_mobile_request", {
+      const { error } = await supabase.rpc("submit_eesy_mobile_request_v2", {
+        _customer_type: i.customerType,
         _subscription: i.subscription,
         _full_name: i.fullName,
-        _address: i.address,
+        _street: i.street,
+        _house_number: i.houseNumber,
+        _postal_code: i.postalCode,
+        _city: i.city,
         _cpr: i.cpr,
         _phone: i.phone,
         _icc: i.icc,

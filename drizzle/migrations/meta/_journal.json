@@ -218,6 +218,13 @@
       "when": 1791980154339,
       "tag": "0030_eesy_mobile_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791980499225,
+      "tag": "0031_eesy_mobile_existing_customer_split_address",
+      "breakpoints": true
     }
   ]
 }

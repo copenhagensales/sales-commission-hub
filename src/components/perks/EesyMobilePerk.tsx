@@ -11,10 +11,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Smartphone, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest,
+  useEesyMobileSubscriptions, useMyEesyMobileRequest, useSubmitEesyMobileRequest, type EesyCustomerType,
 } from "@/hooks/useEesyMobileRequests";
 
-const EMPTY = { subscription: "", fullName: "", address: "", cpr: "", phone: "", icc: "" };
+const EMPTY = {
+  subscription: "", fullName: "", street: "", houseNumber: "", postalCode: "", city: "", cpr: "", phone: "", icc: "",
+};
 
 export function EesyMobilePerk() {
   const { toast } = useToast();
@@ -22,20 +24,28 @@ export function EesyMobilePerk() {
   const { data: mine, isLoading } = useMyEesyMobileRequest();
   const submit = useSubmitEesyMobileRequest();
   const [open, setOpen] = useState(false);
+  const [customerType, setCustomerType] = useState<EesyCustomerType>("ny_kunde");
   const [form, setForm] = useState(EMPTY);
+  const isNew = customerType === "ny_kunde";
 
   const set = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const digits = (s: string) => s.replace(/\D/g, "");
-  const valid =
-    !!form.subscription && form.fullName.trim().length >= 2 && form.address.trim().length >= 5 &&
-    digits(form.cpr).length === 10 && digits(form.phone).length === 8 &&
-    digits(form.icc).length >= 18 && digits(form.icc).length <= 22;
+  const common =
+    !!form.subscription && form.fullName.trim().length >= 2 &&
+    digits(form.cpr).length === 10 && digits(form.phone).length === 8;
+  const valid = isNew
+    ? common && form.street.trim().length >= 2 && /^[0-9]{1,4}[A-Za-z]?([ ,.].{0,30})?$/.test(form.houseNumber.trim()) &&
+      form.postalCode.length === 4 && form.city.trim().length >= 2 &&
+      digits(form.icc).length >= 18 && digits(form.icc).length <= 22
+    : common;
+
+  const openAs = (t: EesyCustomerType) => { setCustomerType(t); setOpen(true); };
 
   const onSubmit = async () => {
     try {
-      await submit.mutateAsync(form);
+      await submit.mutateAsync({ ...form, customerType });
       setForm(EMPTY);
       setOpen(false);
       toast({ title: "Anmodning sendt", description: "Vi sender dine oplysninger videre til Eesy." });
@@ -69,14 +79,17 @@ export function EesyMobilePerk() {
             </span>
           </p>
         ) : (
-          <Button onClick={() => setOpen(true)}>Skift til Eesy</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => openAs("ny_kunde")}>Skift til Eesy</Button>
+            <Button variant="outline" onClick={() => openAs("eksisterende")}>Eksisterende Eesy-kunde</Button>
+          </div>
         )}
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Skift til Eesy Mobil med 50 % rabat</DialogTitle>
+            <DialogTitle>{isNew ? "Skift til Eesy Mobil med 50 % rabat" : "Eksisterende Eesy-kunde: 50 % rabat"}</DialogTitle>
             <DialogDescription>
               Dine oplysninger kan kun ses af ejerne. De bruges kun til oprettelsen hos Eesy, og CPR-nummer,
               ICC-nummer, adresse og telefonnummer slettes 30 dage efter, at anmodningen er sendt videre.
@@ -84,7 +97,7 @@ export function EesyMobilePerk() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Abonnement</Label>
+              <Label>{isNew ? "Abonnement" : "Dit abonnement hos Eesy"}</Label>
               <RadioGroup value={form.subscription} onValueChange={(v) => setForm((f) => ({ ...f, subscription: v }))}>
                 {subs.map((s) => (
                   <label key={s} className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm">
@@ -94,10 +107,19 @@ export function EesyMobilePerk() {
               </RadioGroup>
             </div>
             <div className="space-y-1"><Label htmlFor="ee-name">Fulde navn</Label><Input id="ee-name" value={form.fullName} onChange={set("fullName")} maxLength={120} /></div>
-            <div className="space-y-1"><Label htmlFor="ee-addr">Adresse</Label><Input id="ee-addr" value={form.address} onChange={set("address")} maxLength={200} /></div>
+            {isNew && (
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-3 space-y-1"><Label htmlFor="ee-street">Vejnavn</Label><Input id="ee-street" value={form.street} onChange={set("street")} maxLength={120} autoComplete="address-line1" /></div>
+                <div className="space-y-1"><Label htmlFor="ee-no">Nr.</Label><Input id="ee-no" value={form.houseNumber} onChange={set("houseNumber")} maxLength={20} placeholder="12B" /></div>
+                <div className="space-y-1"><Label htmlFor="ee-pc">Postnr.</Label><Input id="ee-pc" value={form.postalCode} onChange={(e) => setForm((f) => ({ ...f, postalCode: digits(e.target.value).slice(0, 4) }))} inputMode="numeric" maxLength={4} autoComplete="postal-code" /></div>
+                <div className="col-span-3 space-y-1"><Label htmlFor="ee-city">By</Label><Input id="ee-city" value={form.city} onChange={set("city")} maxLength={60} autoComplete="address-level2" /></div>
+              </div>
+            )}
             <div className="space-y-1"><Label htmlFor="ee-cpr">CPR-nummer</Label><Input id="ee-cpr" value={form.cpr} onChange={set("cpr")} inputMode="numeric" placeholder="DDMMÅÅ-XXXX" autoComplete="off" maxLength={11} /></div>
-            <div className="space-y-1"><Label htmlFor="ee-phone">Nuværende telefonnummer (som skal flyttes)</Label><Input id="ee-phone" value={form.phone} onChange={set("phone")} inputMode="numeric" maxLength={11} /></div>
-            <div className="space-y-1"><Label htmlFor="ee-icc">ICC-nummer (står på SIM-kortet)</Label><Input id="ee-icc" value={form.icc} onChange={set("icc")} inputMode="numeric" autoComplete="off" maxLength={26} /></div>
+            <div className="space-y-1"><Label htmlFor="ee-phone">{isNew ? "Nuværende telefonnummer (som skal flyttes)" : "Dit Eesy-telefonnummer"}</Label><Input id="ee-phone" value={form.phone} onChange={set("phone")} inputMode="numeric" maxLength={11} /></div>
+            {isNew && (
+              <div className="space-y-1"><Label htmlFor="ee-icc">ICC-nummer (står på SIM-kortet)</Label><Input id="ee-icc" value={form.icc} onChange={set("icc")} inputMode="numeric" autoComplete="off" maxLength={26} /></div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Annullér</Button>

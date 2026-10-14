@@ -7041,44 +7041,59 @@ export type Database = {
       eesy_mobile_requests: {
         Row: {
           address: string | null
+          city: string | null
           cpr_number: string | null
           created_at: string
+          customer_type: string
           employee_id: string
           full_name: string
+          house_number: string | null
           icc_number: string | null
           id: string
           phone_number: string | null
+          postal_code: string | null
           sensitive_purged_at: string | null
           sent_at: string | null
           status: string
+          street: string | null
           subscription: string
         }
         Insert: {
           address?: string | null
+          city?: string | null
           cpr_number?: string | null
           created_at?: string
+          customer_type?: string
           employee_id: string
           full_name: string
+          house_number?: string | null
           icc_number?: string | null
           id?: string
           phone_number?: string | null
+          postal_code?: string | null
           sensitive_purged_at?: string | null
           sent_at?: string | null
           status?: string
+          street?: string | null
           subscription: string
         }
         Update: {
           address?: string | null
+          city?: string | null
           cpr_number?: string | null
           created_at?: string
+          customer_type?: string
           employee_id?: string
           full_name?: string
+          house_number?: string | null
           icc_number?: string | null
           id?: string
           phone_number?: string | null
+          postal_code?: string | null
           sensitive_purged_at?: string | null
           sent_at?: string | null
           status?: string
+          street?: string | null
           subscription?: string
         }
         Relationships: [
@@ -19563,6 +19578,21 @@ export type Database = {
           _full_name: string
           _icc: string
           _phone: string
+          _subscription: string
+        }
+        Returns: string
+      }
+      submit_eesy_mobile_request_v2: {
+        Args: {
+          _city: string
+          _cpr: string
+          _customer_type: string
+          _full_name: string
+          _house_number: string
+          _icc: string
+          _phone: string
+          _postal_code: string
+          _street: string
           _subscription: string
         }
         Returns: string
