@@ -204,7 +204,11 @@ export function DBPeriodSelector({
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="bg-popover z-50">
+        <DropdownMenuContent
+          align="end"
+          className="bg-popover z-50"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
           {presets.map((preset) => (
             <DropdownMenuItem
               key={preset.label}
@@ -226,7 +230,12 @@ export function DBPeriodSelector({
         <PopoverTrigger asChild>
           <span className="sr-only">Åbn kalender</span>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 z-50" align="end" sideOffset={8}>
+        <PopoverContent
+          className="w-auto p-0 z-50"
+          align="end"
+          sideOffset={8}
+          onFocusOutside={(e) => e.preventDefault()}
+        >
           <Calendar
             mode="range"
             defaultMonth={periodStart}
