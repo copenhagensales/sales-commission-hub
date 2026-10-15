@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Clock, Package, TrendingUp, Palmtree, XCircle, Utensils, Star, Gift } from "lucide-react";
 import { getVacationPayRate, VacationType } from "@/lib/calculations/vacation-pay";
+import { useEmployeeSalesEmails } from "@/hooks/useEmployeeSalesEmails";
 
 interface PayrollDayByDayProps {
   employeeId: string;
@@ -25,20 +26,8 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
   const startStr = format(payrollPeriod.start, "yyyy-MM-dd");
   const endStr = format(payrollPeriod.end, "yyyy-MM-dd");
 
-  // 1. Get agent emails for this employee
-  const { data: agentEmails = [] } = useQuery({
-    queryKey: ["payroll-agent-emails", employeeId],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
-        .from("employee_agent_mapping")
-        .select("agent_id, agents(email)")
-        .eq("employee_id", employeeId);
-      if (!data) return [];
-      return data.map((m: { agents: { email: string } }) => m.agents.email.toLowerCase());
-    },
-    enabled: !!employeeId,
-  });
+  // 1. Get agent emails for this employee (mapping, else work email)
+  const { data: agentEmails = [] } = useEmployeeSalesEmails(employeeId);
 
   // 2. Get sales with items for the period
   const { data: salesData = [] } = useQuery({
