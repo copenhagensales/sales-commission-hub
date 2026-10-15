@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useEmployeeSalesEmails } from "./useEmployeeSalesEmails";
 import { startOfMonth, startOfWeek, endOfWeek, format, startOfDay } from "date-fns";
 import { useSalesAggregatesExtended, type AggregateData } from "./useSalesAggregatesExtended";
 
@@ -30,33 +29,8 @@ export function usePersonalSalesStats(
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
 
-  // Fetch agent emails for this employee
-  const { data: agentEmails } = useQuery({
-    queryKey: ["employee-agent-emails", employeeId],
-    queryFn: async () => {
-      const { data: mappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, agents(email)")
-        .eq("employee_id", employeeId);
-
-      const emails = mappings
-        ?.map(m => (m.agents as any)?.email)
-        .filter(Boolean) as string[] || [];
-
-      if (emails.length > 0) return emails;
-
-      // Fallback: use work_email from employee_master_data
-      const { data: emp } = await supabase
-        .from("employee_master_data" as any)
-        .select("work_email")
-        .eq("id", employeeId)
-        .maybeSingle();
-
-      const workEmail = (emp as any)?.work_email;
-      return workEmail ? [workEmail] : [];
-    },
-    enabled: !!employeeId,
-  });
+  // Fetch agent emails for this employee (mapping, else work email)
+  const { data: agentEmails } = useEmployeeSalesEmails(employeeId);
 
   // Use the central aggregation hook for the full period
   const effectiveStart = periodStart || monthStart;
