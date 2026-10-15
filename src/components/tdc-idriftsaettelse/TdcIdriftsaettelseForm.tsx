@@ -121,10 +121,9 @@ function buildMail(f: {
       p(`<p><b>Tilskud:</b></p><p>I har fået tildelt et terminaltilskud ${amtHtml}</p>`,
         `Tilskud:\nI har fået tildelt et terminaltilskud ${amtVal}\n`);
     }
+    const shop = "I kan på https://shop.tdc.dk/ se hvilket hardware vi udbyder, bestillinger foregår via kontaktformularen og er ikke noget jeg har mulighed for at gøre for dig. Hvis i ønsker at bestille for mere, end det medfølgende terminaltilskud, vil i selv skulle betale differencen.";
+    p(`<p>${shop}</p>`, `${shop}\n`);
   }
-
-  const shop = "I kan på https://shop.tdc.dk/ se hvilket hardware vi udbyder, bestillinger foregår via kontaktformularen og er ikke noget jeg har mulighed for at gøre for dig. Hvis i ønsker at bestille for mere, end det medfølgende terminaltilskud, vil i selv skulle betale differencen.";
-  p(`<p>${shop}</p>`, `${shop}\n`);
 
   if (f.solution === "omstilling" && f.features.length) {
     p(`<p style="margin-bottom:4pt"><b>Vi har talt om I gerne vil gøre brug af følgende funktioner:</b></p>${ul(f.features.map(esc))}`,
@@ -210,7 +209,7 @@ export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } 
   }, [prefill]);
 
   const mail = useMemo(
-    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features, benefits, startMode, startDate }),
+    () => buildMail({ solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy: hasSubsidy || needsRouter, subsidyAmount, subsidySpecific, subsidyProducts, router: needsRouter ? router : "", features, benefits, startMode, startDate }),
     [solution, contact, phone, mainNumber, rows, mbb, noRouter, fiveG, hasSubsidy, subsidyAmount, subsidySpecific, subsidyProducts, router, needsRouter, features, benefits, startMode, startDate],
   );
 
