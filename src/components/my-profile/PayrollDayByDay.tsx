@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, eachDayOfInterval } from "date-fns";
+import { format, eachDayOfInterval, startOfDay, endOfDay } from "date-fns";
+import { countsTowardPayrollProvision } from "@/lib/payrollSaleFilter";
 import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,6 +30,10 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
   // 1. Get agent emails for this employee (mapping, else work email)
   const { data: agentEmails = [] } = useEmployeeSalesEmails(employeeId);
 
+  // Period bounds in local (Danish) time, same as Mål tab
+  const periodStartIso = startOfDay(payrollPeriod.start).toISOString();
+  const periodEndIso = endOfDay(payrollPeriod.end).toISOString();
+
   // 2. Get sales with items for the period
   const { data: salesData = [] } = useQuery({
     queryKey: ["payroll-sales", employeeId, startStr, endStr, agentEmails],
@@ -37,12 +42,13 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("sales")
-        .select("id, sale_datetime, agent_email, sale_items(quantity, mapped_commission, product_id, products(name))")
+        .select("id, sale_datetime, agent_email, validation_status, sale_items(quantity, mapped_commission, product_id, products(name))")
         .in("agent_email", agentEmails)
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`)
-        .neq("status", "rejected");
-      return data || [];
+        .gte("sale_datetime", periodStartIso)
+        .lte("sale_datetime", periodEndIso);
+      return (data || []).filter((s: { validation_status: string | null }) =>
+        countsTowardPayrollProvision(s.validation_status),
+      );
     },
     enabled: agentEmails.length > 0,
   });
@@ -86,8 +92,8 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
         .from("sales")
         .select("sale_items(mapped_commission)")
         .in("agent_email", agentEmails)
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`)
+        .gte("sale_datetime", periodStartIso)
+        .lte("sale_datetime", periodEndIso)
         .eq("validation_status", "cancelled");
       if (!data) return 0;
       let sum = 0;
