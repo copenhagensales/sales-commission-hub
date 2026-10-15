@@ -239,6 +239,13 @@
       "when": 1792001725028,
       "tag": "0033_ramp_full_team_week_status",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792067985210,
+      "tag": "0034_can_view_employee_assistant_junction",
+      "breakpoints": true
     }
   ]
 }
