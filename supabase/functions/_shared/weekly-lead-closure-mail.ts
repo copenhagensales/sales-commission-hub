@@ -210,7 +210,8 @@ function viewOf(l: LineTotals): LineView & { active: boolean } {
   return {
     reportLine: l.reportLine,
     closedTotal: l.closed + mcr,
-    unreachable: (l.extras[INVALID] ?? 0) + mcr + dialerClosed(l),
+    // Enreach Efterladt/Udløbet/Fjernet tæller ikke med (Trygs optælling).
+    unreachable: (l.extras[INVALID] ?? 0) + mcr,
     unqualified: l.extras[UNQUALIFIED] ?? 0,
     decided: l.decided,
     booked: l.booked,
@@ -274,10 +275,8 @@ function unreachableBreakdown(l: LineView): string {
     const expired = l.source.extras["enreach_expired"] ?? 0;
     const removed = l.source.extras["enreach_removed"] ?? 0;
     rows += line("Max call (lukket af dialeren)", mcr, total, true);
-    if (abandoned) rows += line("Efterladt (lukket af dialeren)", abandoned, total, true);
-    if (expired) rows += line("Udløbet (lukket af dialeren)", expired, total, true);
-    if (removed) rows += line("Fjernet (lukket af dialeren)", removed, total, true);
-    rows += line("Ugyldig", total - mcr - abandoned - expired - removed, total, true);
+    rows += line("Ugyldig", total - mcr, total, true);
+    if (abandoned + expired + removed) rows += `<tr><td colspan="2" style="padding:8px 0 5px;border-top:1px dashed ${BRAND.cellBorder};font-size:12px;color:${BRAND.muted};">Lukket af Enreach (tæller ikke med): Efterladt ${nf(abandoned)} · Udløbet ${nf(expired)} · Fjernet ${nf(removed)}</td></tr>`;
   } else if (source === "adversus") {
     const reasons = l.source.invalidReasons ?? [];
     const marked = reasons.filter((r) => r.reason && r.reason !== NOT_SPLIT).sort((a, b) => b.count - a.count);
