@@ -125,6 +125,7 @@ export function WorkstationDetailSheet({
     persist(
       {
         computerStatus: "working",
+        markUpdatedNow: true,
         equipment: EQUIPMENT_KINDS.reduce(
           (acc, kind) => ({ ...acc, [kind]: "ok" as EquipmentStatus }),
           {} as Partial<Record<EquipmentKind, EquipmentStatus>>,
