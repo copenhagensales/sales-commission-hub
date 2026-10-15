@@ -189,9 +189,6 @@ function hitrateCell(booked: number, decided: number): string {
 
 const INVALID = "invalid";
 const UNQUALIFIED = "unqualified";
-/** Enreach-emner lukket af dialeren uden kontakt (indgår i Ikke kontaktbare). */
-const DIALER_CLOSED = ["enreach_abandoned", "enreach_expired", "enreach_removed"] as const;
-const dialerClosed = (l: LineTotals) => DIALER_CLOSED.reduce((s, k) => s + (l.extras[k] ?? 0), 0);
 /** Årsag gemt for uger hentet før opdelingen, som ikke kunne genskabes. */
 const NOT_SPLIT = "Ikke opgjort";
 
