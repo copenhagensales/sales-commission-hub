@@ -1002,6 +1002,8 @@ function lineTotals(rows: StatRow[], config: Config, callRows: CallStatRow[]): L
       mine.filter((r) => predicate(r.status)).reduce((s, r) => s + r.lead_count, 0);
     const extras: Record<string, number> = {};
     for (const e of config.excluded) extras[e.status] = sum((status) => status === e.status);
+    // Lukket af Enreach: kun info i mailen, indgår ikke i nogen sum.
+    for (const s of ["enreach_abandoned", "enreach_expired", "enreach_removed"]) extras[s] = sum((status) => status === s);
     const reasons = new Map<string, number>();
     for (const r of mine) {
       if (r.status !== INVALID_STATUS) continue;
