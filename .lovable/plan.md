@@ -6,6 +6,7 @@
   - **Løn-fanen** viser 0 kr provision for 15/10–14/11, selvom samme 4 salg findes.
   - Sidste periode (15/9–14/10) har hun 51.465 kr. i provision i databasen.
 - **Årsag:** Løn-fanen henter kun salg, hvor feltet `status` er forskelligt fra "rejected" (`PayrollDayByDay.tsx:44`). Feltet `status` er tomt på **alle** salg i databasen (0 af alle rækker har en værdi). I databasen tæller "tom" ikke som "forskellig fra", så alle salg falder fra. Løn-fanens provision er derfor 0 kr for alle, ikke kun Fanny.
+- Kontrol af en anden sælger: Mikkel Winther Fjeldsøe Kirk har agent-mapping og salg i dag. Hans **Løn-fane** viser også 0 kr. Når andre sælgere "kan se det", er det derfor sandsynligvis **Mål-fanen**. Den virker allerede for sælgere med mapping i den publicerede app. For Fanny virker Mål-fanen først efter Publish af gårsdagens rettelse.
 - Mål-fanen og alle tavler bruger i stedet `validation_status` og udelader kun "rejected" og "cancelled" (salgsoptællingen, `get_sales_aggregates_v2`). Det er den gældende regel.
 - Mindre fund: Løn-fanen afgrænser datoer i UTC (`T00:00:00`), mens Mål-fanen bruger dansk tid. Salg mellem kl. 00 og 02 dansk tid kan derfor havne i forkert dag eller periode.
 - Gårsdagens rettelse (arbejdsmail-fallback) virker i preview. Den kræver stadig Publish for at nå den rigtige app.
