@@ -92,8 +92,8 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
         .from("sales")
         .select("sale_items(mapped_commission)")
         .in("agent_email", agentEmails)
-        .gte("sale_datetime", `${startStr}T00:00:00`)
-        .lte("sale_datetime", `${endStr}T23:59:59`)
+        .gte("sale_datetime", periodStartIso)
+        .lte("sale_datetime", periodEndIso)
         .eq("validation_status", "cancelled");
       if (!data) return 0;
       let sum = 0;
