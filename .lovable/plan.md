@@ -1,4 +1,4 @@
-# Løn-fanen viser 0 kr provision — for alle sælgere, ikke kun Fanny
+# Løn & Mål: underfanen "Løn" viser 0 kr provision for alle sælgere
 
 ## Fund (read-only, bekræftet)
 - Jeg har åbnet Fannys Løn & Mål i preview:
@@ -25,3 +25,8 @@
 - Filer: `src/components/my-profile/PayrollDayByDay.tsx` (salgsforespørgsel: fjern `.neq("status","rejected")`, hent `validation_status`, filtrér med den nye funktion, datoer via periodens Date-objekter i ISO). Ny `src/lib/payrollSaleFilter.ts` og test til den.
 - Påvirkning: Løn-fanens provisionstal går fra 0 til de rigtige tal for alle provisionslønnede. Det er et rent visningsfund, men tallene bliver synlige for sælgerne.
 - Zone: Løn-visning (gul/rød). Ingen beregning af udbetalt løn ændres.
+
+## Ordforklaring
+"Løn & Mål" er én side med to underfaner øverst: **Mål** og **Løn**. Fejlen sidder i underfanen **Løn**.
+
+Den boks, du har markeret ("Mål er kun tilgængelige for provisionslønnede medarbejdere"), vises, når den person, siden åbnes for, ikke er provisionslønnet. Det sker fx, når du selv åbner /my-goals med din egen konto. Fanny er registreret som provisionslønnet, så hun ser ikke den boks. Hun ser derimod siden med 0 kr i underfanen Løn.
