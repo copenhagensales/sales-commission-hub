@@ -247,21 +247,19 @@ function UnreachableBreakdown({
   removed?: number;
   reasons: { reason: string | null; count: number }[];
 }) {
-  const total = invalid + mcr + abandoned + expired + removed;
+  const total = invalid + mcr;
   if (source === "enreach") {
+    const enreachClosed = abandoned + expired + removed;
     return (
       <div className="ml-auto max-w-xs space-y-0.5 text-xs">
         <BreakdownLine label="Max call (lukket af dialeren)" count={mcr} whole={total} />
-        {abandoned > 0 && (
-          <BreakdownLine label="Efterladt (lukket af dialeren)" count={abandoned} whole={total} />
-        )}
-        {expired > 0 && (
-          <BreakdownLine label="Udløbet (lukket af dialeren)" count={expired} whole={total} />
-        )}
-        {removed > 0 && (
-          <BreakdownLine label="Fjernet (lukket af dialeren)" count={removed} whole={total} />
-        )}
         <BreakdownLine label="Ugyldig" count={invalid} whole={total} />
+        {enreachClosed > 0 && (
+          <div className="mt-1.5 border-t border-dashed pt-1.5 text-left text-muted-foreground">
+            Lukket af Enreach (tæller ikke med): Efterladt {formatCount(abandoned)} · Udløbet{" "}
+            {formatCount(expired)} · Fjernet {formatCount(removed)}
+          </div>
+        )}
       </div>
     );
   }
@@ -450,6 +448,9 @@ export default function WeeklyLeadClosureReport() {
         rows.filter((r) => predicate(r.status)).reduce((total, r) => total + r.lead_count, 0);
       const extras: Record<string, number> = {};
       for (const s of excludedStatuses) extras[s.status] = sum((status) => status === s.status);
+      // Lukket af Enreach: kun info, indgår ikke i nogen sum eller nævner.
+      for (const s of [ABANDONED_STATUS, EXPIRED_STATUS, REMOVED_STATUS])
+        extras[s] = sum((status) => status === s);
       const closed = sum((status) => closingStatuses.includes(status));
       // Max Call Reach står uden for tragten og påvirker ingen af tallene ovenfor.
       const mcr = sum((status) => status === MCR_STATUS);
@@ -716,12 +717,8 @@ export default function WeeklyLeadClosureReport() {
                                * kontaktforsøg. På Adversus ligger lukningerne allerede i ugyldige
                                * (mcr = 0), så begrebet er ens på tværs af systemer.
                                */
-                              const unreachable =
-                                invalid +
-                                row.mcr +
-                                (row.extras[ABANDONED_STATUS] ?? 0) +
-                                (row.extras[EXPIRED_STATUS] ?? 0) +
-                                (row.extras[REMOVED_STATUS] ?? 0);
+                              // Enreach Efterladt/Udløbet/Fjernet tæller ikke med (Trygs optælling).
+                              const unreachable = invalid + row.mcr;
                               const unreachablePct = pctValue(unreachable, row.closedTotal);
                               const unqualified = row.extras[UNQUALIFIED_STATUS] ?? 0;
                               const unqualifiedPct = pctValue(unqualified, row.closedTotal);
