@@ -443,8 +443,15 @@ export function CphBoardFrame({
 }: CphBoardFrameProps) {
 
   const now = new Date();
+  // TV: KPI-rækken lægges på et 12-kolonne-grid, så kortenes kanter flugter
+  // med de tre kolonner nedenunder (hiper-række og toplister).
+  const kpiSpans: number[] | null =
+    primaryKpis.length === 5 ? [4, 2, 2, 2, 2]
+    : primaryKpis.length === 3 ? [4, 4, 4]
+    : primaryKpis.length === 6 ? [2, 2, 2, 2, 2, 2]
+    : null;
   const kpiCols = tvMode
-    ? `repeat(${primaryKpis.length}, minmax(0, 1fr))`
+    ? kpiSpans ? "repeat(12, minmax(0, 1fr))" : `repeat(${primaryKpis.length}, minmax(0, 1fr))`
     : undefined;
 
   return (
