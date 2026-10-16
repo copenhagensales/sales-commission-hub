@@ -543,7 +543,13 @@ export function CphBoardFrame({
         style={tvMode ? { gridTemplateColumns: kpiCols } : undefined}
       >
         {primaryKpis.map((kpi, i) => (
-          <CphKpiCard key={kpi.label} kpi={kpi} emphasis={i === 0} tvMode={tvMode} />
+          <div
+            key={kpi.label}
+            className="flex min-w-0 [&>*]:flex-1"
+            style={tvMode && kpiSpans ? { gridColumn: `span ${kpiSpans[i]} / span ${kpiSpans[i]}` } : undefined}
+          >
+            <CphKpiCard kpi={kpi} emphasis={i === 0} tvMode={tvMode} />
+          </div>
         ))}
       </section>
 
