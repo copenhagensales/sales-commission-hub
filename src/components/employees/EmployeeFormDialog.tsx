@@ -28,6 +28,7 @@ import {
   type ExistingEmployeeMatch,
 } from "@/lib/employees/findExistingEmployeeByEmail";
 import { activateEmployee, resolveActivationStartDate } from "@/lib/employees/activateEmployee";
+import { describeEmployeeSaveError } from "@/lib/employees/employeeSaveErrors";
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -145,6 +146,8 @@ export function EmployeeFormDialog({
   const [saving, setSaving] = useState(false);
   const [duplicateMatch, setDuplicateMatch] = useState<ExistingEmployeeMatch | null>(null);
   const [reactivating, setReactivating] = useState(false);
+  const warnedEmailRef = useRef<string | null>(null);
+  const lastAutoSaveErrorRef = useRef<string | null>(null);
   const [openSections, setOpenSections] = useState<string[]>(["identity"]);
 
   const handleReactivate = async () => {
@@ -346,6 +349,12 @@ export function EmployeeFormDialog({
     setSaving(true);
     try {
       if (editingEmployee) {
+        const conflict = await findWorkEmailConflict();
+        if (conflict) {
+          setSaving(false);
+          setDuplicateMatch(conflict);
+          return;
+        }
         const isDeactivating = editingEmployee.is_active && formData.is_active === false;
         const teamId = isDeactivating ? await snapshotEmployeeTeamId(editingEmployee.id) : null;
 
@@ -374,14 +383,12 @@ export function EmployeeFormDialog({
         if (error) throw error;
       }
 
-
-      
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: editingEmployee ? t("employees.toast.updated") : t("employees.toast.created") });
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      toast({ title: t("employees.toast.error"), description: (error as Error).message, variant: "destructive" });
+      toast({ title: t("employees.toast.error"), description: describeEmployeeSaveError(error).message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
