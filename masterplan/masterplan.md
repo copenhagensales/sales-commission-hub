@@ -13,7 +13,7 @@ Masterplanen beskriver, hvordan strukturen fra dokumentet *Storks struktur* før
 - **Hvert skridt har et bevis**, før det næste tages. Mens ét område bevises, bygges det næste, og det, der kan bygges samtidig, bygges samtidig.
 - **Alt er afgjort i planen.** Du bruger kun dine hænder ved de handlinger og godkendelser, der står i »Hvad du skal gøre«.
 
-**Status:** godkendt 19/10-2026. Planen har 55 konkrete trin i fase 0–5. Hvert trin siger, hvad der er færdigt bagefter, hvad der er afgjort, og hvordan det bevises. Planen har været gennem tre uafhængige angrebsrunder. Den første fandt, at overgangen manglede. Den anden fandt 23 huller mellem trinene, flest i lønnens overgang. Den tredje kontrollerede rettelserne: 16 var lukket, 7 delvist, og der var 10 nye rester. De er rettet i trinene. Planen er derefter gjort mere ambitiøs: genafspilning i stedet for at vente på lønperioder, fase 3 og 4 bygget samtidig med ét lønskift og moduler flyttet undervejs. Målet er ca. 5 måneder fra go (se Tidsplan). Den eksisterende masterplan for 2.0 (`docs/strategi/stork-2-0-master-plan.md`) røres ikke. Repoet er offentligt, så åbne sikkerhedshuller beskrives her kun generelt, indtil de er lukket.
+**Status:** godkendt 19/10-2026. Samme dag tilføjet efter din afgørelse: 2.0's sikkerhedsregler på hele databasen fra fase 0, log på alle tabeller i fase 1 og egen backup uden for Lovable (trin 0.3, 0.5, 1.1 og 1.2). Det giver ca. én uge mere i fase 0. Planen har 55 konkrete trin i fase 0–5. Hvert trin siger, hvad der er færdigt bagefter, hvad der er afgjort, og hvordan det bevises. Planen har været gennem tre uafhængige angrebsrunder. Den første fandt, at overgangen manglede. Den anden fandt 23 huller mellem trinene, flest i lønnens overgang. Den tredje kontrollerede rettelserne: 16 var lukket, 7 delvist, og der var 10 nye rester. De er rettet i trinene. Planen er derefter gjort mere ambitiøs: genafspilning i stedet for at vente på lønperioder, fase 3 og 4 bygget samtidig med ét lønskift og moduler flyttet undervejs. Målet er ca. 5 måneder fra go (se Tidsplan). Repoet er offentligt, så åbne sikkerhedshuller beskrives her kun generelt, indtil de er lukket. Den eksisterende masterplan for 2.0 (`docs/strategi/stork-2-0-master-plan.md`) røres ikke.
 
 ## Udgangspunkt: hvad der flyttes
 
@@ -112,7 +112,7 @@ Gamle skrivere lukkes, når deres enhed skifter. En læsekopi lever, til dens si
 
 ## Fase 0: forudsætninger
 
-Før første forretningsenhed skifter ejer, skal leveringsvejen, testmiljøet, skriveregistret, kontrolpunkterne og ændringsproceduren være på plads. Fase 0 slutter med én lille, fuldstændig prøveflytning.
+Før første forretningsenhed skifter ejer, skal leveringsvejen, testmiljøet, skriveregistret, kontrolpunkterne, sikkerhedsreglerne, den egne backup og ændringsproceduren være på plads. Fase 0 slutter med én lille, fuldstændig prøveflytning.
 
 ### Leveringsvejen til 1.0's database
 
@@ -133,7 +133,7 @@ Lovable gemmer migrationer i `drizzle/migrations/` siden 7/10. Databasen kan ikk
 
 ([Lovable MCP](https://docs.lovable.dev/integrations/lovable-mcp-server), [Database](https://docs.lovable.dev/features/database))
 
-**Min anbefaling: D, med A som reserve.** D prøves først på en læseopgave, derefter på én godkendt ændring. B bruges kun, hvis vi senere får brug for en mere begrænset adgang, og den er bevist. C anbefales ikke nu.
+**Min anbefaling: D, med A som reserve.** D prøves først på en læseopgave, derefter på én godkendt ændring. B bruges kun som læsende adgang til den egne backup og til kontrollen, når den er bevist. C bruges kun, hvis den læsende adgang ikke kan bevises.
 
 Tre ting gælder uanset vej:
 
@@ -147,9 +147,9 @@ Tre ting gælder uanset vej:
 
 **Færdigt bagefter:** vi kan lægge en databaseændring, en ændret edge function og en UI-ændring ind i 1.0 ad en afprøvet vej og altid se, hvad der blev kørt, af hvem og hvornår.
 
-- **Bygges:** D prøves i fire skridt: læs, skriv et prøveskema, aflæs ændringen og ryd op. Første rigtige levering er et udvidet skemaudtræk (`introspect_schema_v2`) med indeks og versionsnummer.
-- **Afgjort:** D er hovedvejen, når prøven er bestået, og A er reserve. B og C bygges ikke. D bruges kun til scripts, der står i ændringsloggen, aldrig til direkte dataændringer. UI-kontrakten ligger i `public` med præfikset `stork_`.
-- **Bevis:** alle fire skridt lykkes ad D og A. Det nye udtræk er identisk med det gamle for de fælles dele. Et kald uden token afvises.
+- **Bygges:** D prøves i fire skridt: læs, skriv et prøveskema, aflæs ændringen og ryd op. Derefter oprettes en læsende databasebruger, som prøves gennem Supabases forbindelsespulje. Første rigtige levering er et udvidet skemaudtræk (`introspect_schema_v2`) med indeks og versionsnummer.
+- **Afgjort:** D er hovedvejen, når prøven er bestået, og A er reserve. B bygges kun som læsende databasebruger til backup og kontrol (0.3 og 0.5). C bygges kun, hvis den læsende adgang ikke kan bevises. Så flyttes 1.0 til eget Supabase før fase 1. D bruges kun til scripts, der står i ændringsloggen, aldrig til direkte dataændringer. UI-kontrakten ligger i `public` med præfikset `stork_`.
+- **Bevis:** alle fire skridt lykkes ad D og A. Det nye udtræk er identisk med det gamle for de fælles dele. Et kald uden token afvises. Den læsende bruger kan læse alle tabeller og intet skrive.
 
 #### Trin 0.2 Testkopi af 1.0 · M
 
@@ -159,13 +159,13 @@ Tre ting gælder uanset vej:
 - **Afgjort:** testkopien indeholder kun syntetiske data, heller ikke anonymiserede produktionsrækker. Sammenligninger, der kræver rigtige data, køres som læsende, sammenlægtede forespørgsler i drift.
 - **Bevis:** testkopiens skema er identisk med driftens. Der er nul aktive job og nul udgående kald. 1.0's UI kan logge ind som hver af de 11 roller, og en gendannelse af testkopien er øvet.
 
-#### Trin 0.3 Ændringsprocedure, sikkerhedskopi og tilbagevej · S
+#### Trin 0.3 Ændringsprocedure, sikkerhedskopi og tilbagevej · M
 
-**Færdigt bagefter:** ingen databaseændring sker uden at blive registreret, heller ikke fra Lovable-chatten. Før hvert skift tages en kopi af det, der ændres, og der er en øvet vej tilbage.
+**Færdigt bagefter:** ingen databaseændring sker uden at blive registreret, heller ikke fra Lovable-chatten. Før hvert skift tages en kopi af det, der ændres, og der er en øvet vej tilbage. Stork har sin egen backup uden for Lovable, så en fejl kan rettes uden at miste resten af dagens data.
 
-- **Bygges:** strukturens schemas (`core_identity`, `core_compliance`, `app_portal`, `overgang`), genbrugt fra 2.0 med standardrettigheder. En ændringslog med scriptets kontrolsum og skemaets fingeraftryk før og efter. En UI-version, der får gamle åbne faner til at genindlæse.
-- **Afgjort:** Lovables Cloud-tilladelse sættes til »Ask each time« for både skema- og dataændringer. Hovedgrenen beskyttes ikke; ændringsloggen og fingeraftrykket er værnet.
-- **Bevis:** en ændring uden om proceduren opdages. Lovable-chatten beder om lov ved en dataændring. En gammel fane genindlæses inden for 5 minutter.
+- **Bygges:** strukturens schemas (`core_identity`, `core_compliance`, `app_portal`, `overgang`), genbrugt fra 2.0 med standardrettigheder. En ændringslog med scriptets kontrolsum og skemaets fingeraftryk før og efter. En UI-version, der får gamle åbne faner til at genindlæse. Egen backup: de vigtigste tabeller (salg, salgslinjer, medarbejdere, vagter, fravær og rettigheder) tages hver time og resten hver nat. Et planlagt job uden for Lovable tager den med den læsende databasebruger fra 0.1. Den gemmes krypteret i jeres egen Supabase-konto i EU i 30 dage og kan gendanne én tabel uden at røre resten.
+- **Afgjort:** Lovables Cloud-tilladelse sættes til »Ask each time« for både skema- og dataændringer. Hovedgrenen beskyttes ikke; ændringsloggen og fingeraftrykket er værnet. Lovables daglige backup er reserve. Kan den læsende adgang ikke bevises i 0.1, flyttes 1.0 til eget Supabase med gendannelse til et vilkårligt tidspunkt før fase 1, fordi datasikkerhed er noget af det vigtigste i systemet (din afgørelse 19/10).
+- **Bevis:** en ændring uden om proceduren opdages. Lovable-chatten beder om lov ved en dataændring. En gammel fane genindlæses inden for 5 minutter. En tabel gendannes fra den egne backup på testkopien, og de øvrige tabeller er urørte.
 
 #### Trin 0.4 Skriveregistret · L
 
@@ -175,17 +175,26 @@ Tre ting gælder uanset vej:
 - **Afgjort:** en skriver, der strider mod strukturen, får aldrig afgørelsen »fortsætter«, når dens enhed skifter.
 - **Bevis:** registret genfinder kortlægningens tal. En stikprøve på 20 rækker passer. Ingen skriver i fase 1's enheder står uden afgørelse.
 
-#### Trin 0.5 Kontrolpunkter og midlertidige værn · M
+#### Trin 0.5 Kontrolpunkter, sikkerhedsregler og midlertidige værn · L
 
-**Færdigt bagefter:** Stork tjekker hver dag sig selv: om nogen har ændret regler eller adgange uden om proceduren, om nogen skriver i data, der er flyttet, og om automatik fejler. Brud vises i den fælles oversigt og sendes som alarm.
+**Færdigt bagefter:** Stork tjekker hver dag sig selv: om nogen har ændret regler eller adgange uden om proceduren, om nogen skriver i data, der er flyttet, og om automatik fejler. Brud vises i den fælles oversigt og sendes som alarm. 2.0's sikkerhedsregler gælder hele databasen: det, der svækker adgangen, afvises, og resten kontrolleres samme dag.
 
 - **Bygges:** et dagligt skemaudtræk, der sammenlignes med en godkendt baseline, og ti tjek inde i databasen på 1.0's eksisterende alarmkæde (`compliance_run_checks`, `compliance_alerts`).
+- **Sikkerhedsregler fra 2.0 på hele databasen** (2.0-masterplanen §1.1 og §3):
+  1. Nye tabeller uden RLS afvises, og RLS kan ikke slås fra.
+  2. Ny adgang for ikke-indloggede afvises, medmindre den står på en godkendt liste. Eksisterende adgang, som ingen offentlig side bruger, lukkes i fase 0. Resten lukkes ned til nøgler i 5.3.
+  3. Regler, der åbner persondata for alle indloggede, afvises.
+  4. Funktioner, der går uden om RLS, står i et register med deres brugertjek. Nye funktioner uden registrering afvises. De ca. 50 eksisterende uden brugertjek rettes i 1.8.
+  5. En rettighedstest kører hver dag for hver rolle mod hver tabel og giver alarm ved en ny adgang.
+  6. Ændringer i RLS-regler og registrerede funktioner kontrolleres samme dag med Supabases sikkerhedstjek.
+
+  Afvisningerne sker i databasen, mens ændringen laves, også når den kommer fra Lovable-chatten. Den får så en fejl, der henviser til ændringsproceduren. Kan databasen ikke stoppe ændringerne, giver kontrollen alarm inden for en time.
 - **Midlertidige værn:** din regel er, at huller lukkes af strukturen. Fire huller kan ikke vente på det trin, der ejer dem, fordi de kan skade data, persondata eller den kontrol, omlægningen bygger på. De får et midlertidigt værn nu, og værnet fjernes, når trinnet overtager:
   1. Et hul i rettighederne. Erstattes af rettighederne i 1.8.
   2. Medarbejdere kan i dag slettes fysisk af automatiske job. Databasen afviser al sletning af medarbejdere, uanset vej. Erstattes af anonymiseringen i 1.4.
   3. Et hul i kontrolpunkterne. Det er dem, resten af omlægningen kontrolleres med.
   4. Et hul i adgangen til persondata. Lukkes nu, og funktionerne fjernes i 1.8.
-- **Bevis:** hvert tjek giver alarm ved en fremprovokeret fejl. Efter værnene afvises de kald, værnene skal stoppe, og de berørte skærme virker som før.
+- **Bevis:** hvert tjek giver alarm ved en fremprovokeret fejl. Hver sikkerhedsregel afviser et fremprovokeret forsøg, også fra Lovable-chatten, og den daglige rettighedstest finder en adgang, der er åbnet med vilje på testkopien. Efter værnene afvises de kald, værnene skal stoppe, og de berørte skærme virker som før.
 
 #### Trin 0.6 Strukturens grundmur i 1.0's database · M
 
@@ -224,7 +233,7 @@ Faserne følger afhængighederne: en enhed skifter, når det, den bygger på, er
 
 | Fase | Indhold | Færdig når |
 | --- | --- | --- |
-| **1. Fundament · trin 1.1–1.8** | Personer og ansættelser. Organisationstræet med historik fra skæringsdatoen. Eksterne identiteter. Rettigheder som data og synlighed i databasen, også på 1.0's gamle adgangsveje. Brugerens kontekst, som erstatter e-mail-opslag 61 steder. Log på alt, der flyttes. Register over alle kolonner. Anonymiseringsjournal. Medarbejderoprydningen omlægges fra sletning til anonymisering | Alle sider får brugerens kontekst fra strukturen. Direkte kald mod databasen viser både tilladte og afviste svar pr. rolle. Alle veje til organisationsændringer registreres fra skæringsdatoen |
+| **1. Fundament · trin 1.1–1.8** | Personer og ansættelser. Organisationstræet med historik fra skæringsdatoen. Eksterne identiteter. Rettigheder som data og synlighed i databasen, også på 1.0's gamle adgangsveje. Brugerens kontekst, som erstatter e-mail-opslag 61 steder. Log på alle tabeller. Register over alle kolonner. Anonymiseringsjournal. Medarbejderoprydningen omlægges fra sletning til anonymisering | Alle sider får brugerens kontekst fra strukturen. Direkte kald mod databasen viser både tilladte og afviste svar pr. rolle. Alle veje til organisationsændringer registreres fra skæringsdatoen |
 | **2. Stammens grundlag · trin 2.1–2.7** | Klienter, kampagner og klientprofil. Indgange med rålag, dataminimering og dubletbeskyttelse. Synkroniseringen holder op med at slette og genskabe salgslinjer. Produkter og prisregler med én motor, og omprisningsjobbet omlægges | Alle salgets skrivere er flyttet eller lukket. Motorens pris er ens med 1.0's for alle linjer i en åben periode, eller hver afvigelse er godkendt af dig |
 | **3. Pengesporet · trin 3.1–3.9** | Perioder som data. Posteringer med åbningsgrundlag for gamle salg. Lønlinjer, lås, genåbning og eksport. Klient-feedback og annulleringer gennem én indgang. **Lønnens time- og FM-grundlag:** timer, fravær, klientfordeling, diæt og oplæringsbonus kommer fra fase 4, som bygges samtidig og skifter med lønnen | To genafspillede lønperioder og en uge live giver samme løn pr. medarbejder og samme DB pr. team som referencen, eller afvigelserne er forklaret. De kritiske forløb er bestået. Skiftet sker ved en periodegrænse |
 | **4. Tid og FM · trin 4.1–4.12** | Vagter som rækker fra skæringsdatoen, fravær, stempelur og klientfordeling. Lokationer efter dit krav, booking, bemanding og FM-lønarter. Bygges samtidig med fase 3, og alt med lønvirkning skifter med lønnen | Løntimer kommer fra vagterne. FM-salg kontrolleres mod tilladelsen. Timer pr. medarbejder er ens med 1.0 i genafspilningen, bortset fra de godkendte afvigelser T1–T11 |
@@ -239,12 +248,12 @@ Målet er, at Stork er i mål ca. 5 måneder efter go. Arbejdet kører uden paus
 | Uge efter go | Færdigt |
 | --- | --- |
 | 1 | De fire midlertidige værn er på, leveringsvejen virker, og kontrolpunkterne kører |
-| 3 | Fase 0 er færdig, og prøveflytningen har målt, hvad en flytning koster |
-| 7 | Fase 1: personer, organisation, rettigheder, log og GDPR er i strukturen |
-| 11 | Fase 2: salg og pris skifter ved en periodegrænse |
-| 11–19 | Fase 3 og 4 bygges side om side og genafspilles. Kommunikation, rekruttering, kontrakter, AMO og IT flyttes undervejs |
-| 19 | Lønskiftet: løn, tid og FM skifter samlet ved en periodegrænse |
-| 22 | Fase 5: tal, tavler, rapporter og de sidste moduler er flyttet, og slutkontrollen er bestået |
+| 4 | Fase 0 er færdig, og prøveflytningen har målt, hvad en flytning koster |
+| 8 | Fase 1: personer, organisation, rettigheder, log og GDPR er i strukturen |
+| 12 | Fase 2: salg og pris skifter ved en periodegrænse |
+| 12–20 | Fase 3 og 4 bygges side om side og genafspilles. Kommunikation, rekruttering, kontrakter, AMO og IT flyttes undervejs |
+| 20 | Lønskiftet: løn, tid og FM skifter samlet ved en periodegrænse |
+| 23 | Fase 5: tal, tavler, rapporter og de sidste moduler er flyttet, og slutkontrollen er bestået |
 
 ## Fase 1: fundamentet
 
@@ -254,7 +263,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 
 **Færdigt bagefter:** alle 3.419 felter i Stork har en registreret betydning: persondata (direkte, indirekte eller nej), slags data og opbevaringstid. Felter inde i fritekst og JSON er også dækket, og klient- og kampagnefrister står samme sted.
 
-- **Bygges:** registret genbrugt fra 2.0 (`data_field_definitions` og dets regler), med status forslag, bekræftet eller uafklaret. Match-rollen udgår (din afgørelse 20/5).
+- **Bygges:** registret genbrugt fra 2.0 (`data_field_definitions` og dets regler), med status forslag, bekræftet eller uafklaret. Match-rollen udgår (din afgørelse 20/5). En ny kolonne uden klassifikation giver alarm samme dag (2.0-masterplanen §1.2).
 - **Afgjort:**
   - Felter uden kilde får foreløbig »indirekte persondata« og »manuel« opbevaring, så intet slettes automatisk.
   - Den GDPR-ansvarlige bekræfter ca. 330 persondatakandidater.
@@ -262,12 +271,12 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
   - Aktivering af en opbevaringsregel kræver superadmin.
 - **Bevis:** 3.419 af 3.419 kolonner har en række. Ingen af fase 1's kolonner er uafklarede. Loggen hasher præcis de direkte persondatafelter.
 
-#### Trin 1.2 Log på alt, der flyttes · S
+#### Trin 1.2 Log på alle tabeller · M
 
-**Færdigt bagefter:** hver ændring i fase 1's data er logget pr. række med hvem, hvornår, hvad og hvorfor. Det gælder, uanset om ændringen kom fra en skærm, et job, en integration eller AI.
+**Færdigt bagefter:** hver ændring i Storks data er logget pr. række med hvem, hvornår, hvad og hvorfor. Det gælder, uanset om ændringen kom fra en skærm, et job, en integration eller AI.
 
-- **Bygges:** logtrigger på alle nye tabeller og på de 19 tabeller i 1.0, som fase 1 rører. Læsning af CPR, bank, privatadresse og telefon logges pr. opslag.
-- **Bevis:** over 7 dage passer logrækkerne med de ændrede rækker. Hver skrivertype er set med rigtig kilde. Loggen kan ikke ændres.
+- **Bygges:** logtrigger på alle nye tabeller og på alle 1.0's tabeller. Rå dialerdata og caches logges samlet pr. kørsel i stedet for pr. række. Loggen på 1.0's tabeller er varianten fra 0.6, der aldrig kaster fejl, og direkte persondata hashes (2.0-masterplanen §1.3). Læsning af CPR, bank, privatadresse og telefon logges pr. opslag.
+- **Bevis:** over 7 dage passer logrækkerne med de ændrede rækker. Hver skrivertype er set med rigtig kilde. Loggen kan ikke ændres. Databasens svartid er uændret efter, at loggen er slået til.
 
 #### Trin 1.3 Person og ansættelse · XL
 
@@ -1032,6 +1041,8 @@ Den største risiko er en fejl i lønnen ved et skift. Den næststørste er, at 
 | UI-omlægningens omfang | 452 filer skal have ny dataforbindelse | Prøveflytning, der måler arbejdet. Fælles domænefunktioner. Visninger holder gamle sider i live |
 | Offentlige sider, TV og integrationer | Kandidatbooking, kontraktunderskrift, TV-tavler eller dialer-synk holder op med at virke | Kontraktens afgrænsede adgang. Med i skyggekørslen |
 | Persondata i test | Rigtige persondata i en testkopi | Kun syntetiske data |
+| Datatab ved en fejl | Lovable kan kun gendanne hele databasen til en daglig backup, og alt siden går tabt | Egen backup hver time af de vigtigste tabeller og gendannelse af én tabel ad gangen (0.3) |
+| Svækket adgang | Lovable ændrer RLS-regler og funktioner, der går uden om RLS, løbende og uden gennemgang | 2.0's sikkerhedsregler afviser svækkelser, og en daglig rettighedstest pr. rolle finder resten (0.5) |
 
 ## Hvad du skal gøre
 
@@ -1070,6 +1081,8 @@ Her står de valg, der før var dine beslutninger, og de valg, der er kommet til
 | Lokationsstatusser og grupper | Ny og Aktiv bliver aktiv, Pause bliver dvale, og Sortlistet bliver nedlagt. En type bliver én gruppe, kun hvis 1.0 fakturerer eller giver rabat til én modpart for alle dens lokationer; andre lokationer får hver sin gruppe | Dit lokationskrav og 1.0's data | 4.6 |
 | E-conomic | E-conomic-delen bygges ikke om. Dens data arkiveres læsbare | Din afgørelse 14/5: »E-conomic udelades fuldstændig« | 5.11 |
 | Modulernes funktioner | Funktioner i brug bevares som moduler. Funktioner uden brug stoppes | Målet om, at 1.0's UI bevares | Fase 5 |
+| Sikkerhedsregler fra 2.0 på hele databasen | Fra fase 0 afvises svækkelser af adgangen, og en rettighedstest kører hver dag. Fra fase 1 logges alle tabeller | Din afgørelse 19/10: »Datasikkerhed er noget af det vigtigste i systemet«. 2.0-masterplanen §1.1–§1.3 | 0.5, 1.1 og 1.2 |
+| Egen backup | De vigtigste tabeller hver time og resten hver nat, uden for Lovable. Kan det ikke bevises, flyttes 1.0 til eget Supabase før fase 1 | Din afgørelse 19/10 | 0.3 |
 
 ## Tekniske valg
 
@@ -1077,10 +1090,11 @@ De tekniske valg er mine. Hvert valg er afgjort og bevises i det trin, der bruge
 
 | Valg | Afgjort | Bevis |
 | --- | --- | --- |
-| Leveringsvej for databasen | D med A som reserve. B (egen databasebruger) og C (eget projekt) bygges ikke | Fire skridt i 0.1: læs, skriv, aflæs og ryd op |
+| Leveringsvej for databasen | D med A som reserve. B (egen databasebruger) bygges kun som læsende bruger til backup og kontrol. C (eget projekt) bygges kun, hvis B ikke kan bevises | Fire skridt i 0.1: læs, skriv, aflæs og ryd op |
 | Edge functions | Leveres gennem Lovable-chatten | Én ændret funktion i 0.1, hvor versionen svarer til Git |
 | Testmiljø | En lokal kopi bygget direkte fra driftens skemaudtræk, med kun syntetiske data og uden job. Sammenligninger med rigtige data køres som læsende, samlede forespørgsler i drift | Skemaet er identisk med driftens i 0.2 |
 | Skriveregister | Alle skrivere i kode, skema og job findes og får en afgørelse, før deres enhed skifter | 0.4 og hvert trins skriverliste |
 | Genbrug fra 2.0 | Trin 1–10 lægges ind som samlet sluttilstand, aldrig ved at afspille 2.0's historik | 0.6 og fase 1 |
 | Beregningsmotoren | Kører i databasen, så pris og bogføring sker i samme transaktion | 2.4's genafspilning af to lønperioder |
 | UI-kontraktens første domænefunktioner | Bygges i prøveflytningen og til brugerens kontekst. Mønsteret bruges først bredt, når det er bevist | 0.7 og 1.5 |
+| Sikkerhedsreglerne | Afvisningerne sker med databasens egne udløsere ved skemaændringer, mens ændringen laves. Kan de ikke bruges i Lovable Cloud, et tjek hver time med alarm | 0.5: hvert forsøg afvises eller giver alarm inden for en time |
