@@ -260,6 +260,13 @@
       "when": 1792396556641,
       "tag": "0036_employee_work_email_check_on_update",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792397390944,
+      "tag": "0037_employee_archive_and_email_history",
+      "breakpoints": true
     }
   ]
 }
