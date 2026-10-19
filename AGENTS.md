@@ -1,3 +1,18 @@
+## Struktur og datasikkerhed (masterplanen, godkendt 19/10-2026)
+
+Dette afsnit er fast og må ikke fjernes eller omskrives af agenten.
+
+Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Indtil andet er aftalt, gælder disse regler for alle databaseændringer:
+
+1. Hver ny tabel får RLS slået til med regler, der kun giver den adgang, rollen skal have. RLS må aldrig slås fra.
+2. Ny adgang for ikke-indloggede (anon) laves ikke uden aftale. Lav aldrig regler med USING (true) eller WITH CHECK (true) på tabeller med persondata eller løn (CPR, bank, adresse, telefon, e-mail, løn).
+3. SECURITY DEFINER bruges kun, når funktionen selv tjekker den indloggede bruger og dennes rettighed og har fast search_path.
+4. Rør aldrig de schemas og funktioner, strukturen ejer: core_*, app_*, overgang og funktioner med præfikset stork_.
+5. Medarbejdere og salg slettes aldrig. Brug status og anonymisering.
+6. Databasen afviser efterhånden ændringer, der bryder punkt 1–4. Får du sådan en afvisning, så stop, forsøg ikke at omgå den, og beskriv ændringen, så den kan tages gennem ændringsproceduren.
+
+## Øvrige regler
+
 - EU/EØS-adgang håndhæves ved login af edge-funktionen geo-login-guard mod eea_ip_ranges og non_eea_ip_ranges (DB-IP Lite); kun IP'er der beviseligt er uden for EU/EØS afvises (session tilbagekaldes server-side), ukendt land/fejl lukkes ind. Why: login-hooks får ikke request-headers, og backend leverer kun IP, ikke land.
 - Kolonner fra manuelle uploads defineres og får sletteregler i data_import_* tabellerne (MG → Data import). Gælder i dag kun Eesy TM kurv/kombineret upload. Upload fjerner udefinerede kolonner, men beholder altid dem, matchingen læser. Why: kun definerede data må opbevares, uden at matchingen ændres.
 
