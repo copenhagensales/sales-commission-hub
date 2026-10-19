@@ -29,12 +29,17 @@ export function useMicrosoftLoginGuard() {
         if (cancelled || error) return;
         if (data && data.allowed === false) {
           await supabase.auth.signOut();
-          toast.error("Microsoft-login afvist", {
-            description:
-              data.message ||
-              "Din konto skal opdateres før Microsoft-login — kontakt administrationen",
-            duration: 12000,
+          const description =
+            data.message ||
+            "Din konto skal opdateres før Microsoft-login — kontakt administrationen";
+          toast.error("Microsoft-login afvist", { description, duration: 12000 });
+          // Vis samme årsag i loginsidens røde fejlboks
+          const params = new URLSearchParams({
+            error: "access_denied",
+            error_code: String(data.reason || "microsoft_login_afvist"),
+            error_description: description,
           });
+          window.location.assign(`/auth?${params.toString()}`);
         }
       } catch {
         // Netværksfejl må ikke låse brugeren ude - ignoreres bevidst.
