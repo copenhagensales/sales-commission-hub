@@ -21,6 +21,7 @@ import {
 } from "./ClientDBTeamGroupRow";
 import { ClientDBSummaryCard } from "./ClientDBSummaryCard";
 import { ClientDBDailyChart } from "./ClientDBDailyChart";
+import { ClientDBDailyRevenueChart } from "./ClientDBDailyRevenueChart";
 import { DbDataQualityPanel } from "./DbDataQualityPanel";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
@@ -159,6 +160,13 @@ export function ClientDBTab() {
     }),
     [chartDb.totals, chartOverhead.total]
   );
+
+  // Vægtet forventet annullering i 31-dages vinduet (pr. klient-sats vægtet med klientens salgsomsætning)
+  const chartCancellationFactor = useMemo(() => {
+    const gross = chartDb.clientRows.reduce((s, r) => s + r.revenue, 0);
+    const deduction = chartDb.clientRows.reduce((s, r) => s + r.cancellationRevenueDeduction, 0);
+    return gross > 0 ? 1 - deduction / gross : 1;
+  }, [chartDb.clientRows]);
 
   const { data: previousPeriodData, previousPeriodLabel } = useClientPeriodComparison(
     periodStart,
@@ -718,6 +726,12 @@ export function ClientDBTab() {
         totalRevenue={chartTotals.totalRevenue}
         totalOverhead={chartTotals.totalOverhead}
         isLoading={chartDb.isLoading || chartOverhead.isLoading || dailyAggregatesLoading}
+      />
+
+      <ClientDBDailyRevenueChart
+        byDate={dailyAggregates?.byDate || {}}
+        cancellationFactor={chartCancellationFactor}
+        isLoading={chartDb.isLoading || dailyAggregatesLoading}
       />
 
       {selectedClientForDaily && (
