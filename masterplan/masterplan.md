@@ -13,7 +13,7 @@ Masterplanen beskriver, hvordan strukturen fra dokumentet *Storks struktur* før
 - **Hvert skridt har et bevis**, før det næste tages. Mens ét område bevises, bygges det næste, og det, der kan bygges samtidig, bygges samtidig.
 - **Alt er afgjort i planen.** Du bruger kun dine hænder ved de handlinger og godkendelser, der står i »Hvad du skal gøre«.
 
-**Status:** godkendt 19/10-2026. Samme dag tilføjet efter din afgørelse: 2.0's sikkerhedsregler på hele databasen fra fase 0, log på alle tabeller i fase 1 og egen backup uden for Lovable (trin 0.3, 0.5, 1.1 og 1.2). Det giver ca. én uge mere i fase 0. Planen har 55 konkrete trin i fase 0–5. Hvert trin siger, hvad der er færdigt bagefter, hvad der er afgjort, og hvordan det bevises. Planen har været gennem tre uafhængige angrebsrunder. Den første fandt, at overgangen manglede. Den anden fandt 23 huller mellem trinene, flest i lønnens overgang. Den tredje kontrollerede rettelserne: 16 var lukket, 7 delvist, og der var 10 nye rester. De er rettet i trinene. Planen er derefter gjort mere ambitiøs: genafspilning i stedet for at vente på lønperioder, fase 3 og 4 bygget samtidig med ét lønskift og moduler flyttet undervejs. Målet er ca. 5 måneder fra go (se Tidsplan). Repoet er offentligt, så åbne sikkerhedshuller beskrives her kun generelt, indtil de er lukket. Den eksisterende masterplan for 2.0 (`docs/strategi/stork-2-0-master-plan.md`) røres ikke.
+**Status:** godkendt 19/10-2026. Samme dag tilføjet efter din afgørelse: 2.0's sikkerhedsregler på hele databasen fra fase 0, log på alle tabeller i fase 1 og egen backup uden for Lovable (trin 0.3, 0.5, 1.1 og 1.2). Efter din godkendelse samme dag er også mangelanalysens punkter fra 2.0's fundament, forretningsforståelsen og dine afgørelser skrevet ind i trinene, og der er udpeget en GDPR- og AI-ansvarlig. Tilføjelserne giver tilsammen ca. fire uger mere. Planen har 55 konkrete trin i fase 0–5. Hvert trin siger, hvad der er færdigt bagefter, hvad der er afgjort, og hvordan det bevises. Planen har været gennem tre uafhængige angrebsrunder. Den første fandt, at overgangen manglede. Den anden fandt 23 huller mellem trinene, flest i lønnens overgang. Den tredje kontrollerede rettelserne: 16 var lukket, 7 delvist, og der var 10 nye rester. De er rettet i trinene. Planen er derefter gjort mere ambitiøs: genafspilning i stedet for at vente på lønperioder, fase 3 og 4 bygget samtidig med ét lønskift og moduler flyttet undervejs. Målet er ca. 6 måneder fra go (se Tidsplan). Repoet er offentligt, så åbne sikkerhedshuller beskrives her kun generelt, indtil de er lukket. Den eksisterende masterplan for 2.0 (`docs/strategi/stork-2-0-master-plan.md`) røres ikke.
 
 ## Udgangspunkt: hvad der flyttes
 
@@ -35,7 +35,7 @@ Tallene er fra skemaet 7/10 og koden 15/10. Siden er der kommet flere til: 131 e
 
 **Det, der ikke findes og derfor starter på en skæringsdato:**
 
-- historik for teams' ejerskab af klienter
+- historik for teams' ejerskab af klienter. 1.0 gemmer kun dagens kobling, så historikken genskabes fra sælgernes teamhistorik og fremlægges for dig som rapport (din afgørelse 16/5, trin 2.6)
 - teammedlemskab med datoer
 - vagter som rækker
 - hvad der faktisk blev udbetalt i løn
@@ -60,7 +60,7 @@ Porten er skyggekørslen. Er tallene ikke ens, og er forskellen ikke en godkendt
 1. **Krav:** områdets valg står allerede afgjort i trinnet med kilde. Før byggeriet kontrolleres, om 1.0 har ændret logik i området siden kortlægningen. Har den det, afgøres ændringen efter samme rækkefølge af kilder og skrives ind i trinnet.
 2. **Byg ved siden af:** områdets data, regler, handlinger og læseindgange bygges i strukturen. Det gamle røres ikke. Alt prøves først på en testkopi.
 3. **Flyt data:** historik flyttes fra 1.0's tabeller. Hvor historik ikke findes, starter den på skæringsdatoen. Uoverensstemmelser (dubletter, manglende koblinger) vises i den fælles oversigt og rettes før skiftet.
-4. **Skyggekørsel:** data fra mindst to afsluttede lønperioder genafspilles i begge systemer, og tallene sammenlignes. Data fra API'erne hentes igen fra kilderne, og 1.0's øvrige data tages fra et fastfrosset udtræk. Derefter kører det nye en uge live side om side med det gamle, så skrivere, job og arbejdsgange, som genafspilningen ikke viser, også er prøvet. Hver afvigelse forklares eller rettes.
+4. **Skyggekørsel:** data fra mindst to afsluttede lønperioder genafspilles i begge systemer, og tallene sammenlignes. Genafspilningen bruger de rådata, 1.0 allerede har gemt (fx salgenes rå payload), og 1.0's øvrige data tages fra et fastfrosset udtræk. Det, der mangler, hentes igen fra kilderne om natten i små portioner, så driftens synkronisering ikke rammer API-grænserne. Derefter kører det nye en uge live side om side med det gamle, så skrivere, job og arbejdsgange, som genafspilningen ikke viser, også er prøvet. Hver afvigelse forklares eller rettes.
 5. **Skift:** områdets sider får ny dataforbindelse gennem UI-kontrakten. Det, der påvirker løn, skiftes ved en periodegrænse. Du godkender skiftet ud fra listen over afvigelser i kroner.
 6. **Luk det gamle:** direkte skriveadgang til de gamle tabeller fjernes, og gamle beregninger slettes. Kontrolpunkterne tjekker løbende, at intet skriver uden om.
 
@@ -147,9 +147,9 @@ Tre ting gælder uanset vej:
 
 **Færdigt bagefter:** vi kan lægge en databaseændring, en ændret edge function og en UI-ændring ind i 1.0 ad en afprøvet vej og altid se, hvad der blev kørt, af hvem og hvornår.
 
-- **Bygges:** D prøves i fire skridt: læs, skriv et prøveskema, aflæs ændringen og ryd op. Derefter oprettes en læsende databasebruger, som prøves gennem Supabases forbindelsespulje. Første rigtige levering er et udvidet skemaudtræk (`introspect_schema_v2`) med indeks og versionsnummer.
-- **Afgjort:** D er hovedvejen, når prøven er bestået, og A er reserve. B bygges kun som læsende databasebruger til backup og kontrol (0.3 og 0.5). C bygges kun, hvis den læsende adgang ikke kan bevises. Så flyttes 1.0 til eget Supabase før fase 1. D bruges kun til scripts, der står i ændringsloggen, aldrig til direkte dataændringer. UI-kontrakten ligger i `public` med præfikset `stork_`.
-- **Bevis:** alle fire skridt lykkes ad D og A. Det nye udtræk er identisk med det gamle for de fælles dele. Et kald uden token afvises. Den læsende bruger kan læse alle tabeller og intet skrive.
+- **Bygges:** D prøves i fire skridt: læs, skriv et prøveskema, aflæs ændringen og ryd op. Derefter oprettes en læsende databasebruger, som prøves gennem Supabases forbindelsespulje. Første rigtige levering er et udvidet skemaudtræk (`introspect_schema_v2`) med indeks, versionsnummer og rettigheder for alle roller, også servicerollen.
+- **Afgjort:** D er hovedvejen, når prøven er bestået, og A er reserve. B bygges kun som læsende databasebruger til backup og kontrol (0.3 og 0.5). C bygges kun, hvis den læsende adgang ikke kan bevises. Så flyttes 1.0 til eget Supabase før fase 1. I 1.0-repoet slås hemmelighedsscanning med push-blokering, scanning af historikken, Dependabot og CodeQL til, og der må være 0 høje eller kritiske fund før hvert skift (2.0-masterplanen, cutover-krav 8–10). D bruges kun til scripts, der står i ændringsloggen, aldrig til direkte dataændringer. UI-kontrakten ligger i `public` med præfikset `stork_`.
+- **Bevis:** alle fire skridt lykkes ad D og A. Det nye udtræk er identisk med det gamle for de fælles dele. Et kald uden token afvises. Den læsende bruger når databasen gennem puljen, læser alle rækker i alle tabeller trods RLS og kan intet skrive, heller ikke gennem funktioner.
 
 #### Trin 0.2 Testkopi af 1.0 · M
 
@@ -163,9 +163,9 @@ Tre ting gælder uanset vej:
 
 **Færdigt bagefter:** ingen databaseændring sker uden at blive registreret, heller ikke fra Lovable-chatten. Før hvert skift tages en kopi af det, der ændres, og der er en øvet vej tilbage. Stork har sin egen backup uden for Lovable, så en fejl kan rettes uden at miste resten af dagens data.
 
-- **Bygges:** strukturens schemas (`core_identity`, `core_compliance`, `app_portal`, `overgang`), genbrugt fra 2.0 med standardrettigheder. En ændringslog med scriptets kontrolsum og skemaets fingeraftryk før og efter. En UI-version, der får gamle åbne faner til at genindlæse. Egen backup: de vigtigste tabeller (salg, salgslinjer, medarbejdere, vagter, fravær og rettigheder) tages hver time og resten hver nat. Et planlagt job uden for Lovable tager den med den læsende databasebruger fra 0.1. Den gemmes krypteret i jeres egen Supabase-konto i EU i 30 dage og kan gendanne én tabel uden at røre resten.
+- **Bygges:** strukturens schemas (`core_identity`, `core_compliance`, `app_portal`, `overgang`), genbrugt fra 2.0 med standardrettigheder. En ændringslog med scriptets kontrolsum og skemaets fingeraftryk før og efter. En UI-version, der får gamle åbne faner til at genindlæse. Egen backup: de vigtigste tabeller (salg, salgslinjer, medarbejdere, vagter, fravær og rettigheder) tages hver time og resten hver nat. Et planlagt job uden for Lovable tager den med den læsende databasebruger fra 0.1. Den gemmes krypteret i jeres egen Supabase-konto i EU i 30 dage og kan gendanne én tabel uden at røre resten. Kun navngivne superadmins har adgang til den, og den står i fortegnelsen over behandlinger. I strukturens schemas har anon og authenticated ingen direkte skriverettighed, og servicerollen har ingen direkte adgang til data, så edge functions går gennem strukturens handlinger ligesom UI'et. Hver AI-ændring af databasen logges med aktør, tidspunkt og ændring. For mine scripts logges også instruktion og godkender. En ændring fra Lovable kobles til den chatbesked, der udløste den, og til den, der sendte beskeden, og de berørte rækker tages fra loggen. Den AI-ansvarlige ejer loggen (din afgørelse 19/10).
 - **Afgjort:** Lovables Cloud-tilladelse sættes til »Ask each time« for både skema- og dataændringer. Hovedgrenen beskyttes ikke; ændringsloggen og fingeraftrykket er værnet. Lovables daglige backup er reserve. Kan den læsende adgang ikke bevises i 0.1, flyttes 1.0 til eget Supabase med gendannelse til et vilkårligt tidspunkt før fase 1, fordi datasikkerhed er noget af det vigtigste i systemet (din afgørelse 19/10).
-- **Bevis:** en ændring uden om proceduren opdages. Lovable-chatten beder om lov ved en dataændring. En gammel fane genindlæses inden for 5 minutter. En tabel gendannes fra den egne backup på testkopien, og de øvrige tabeller er urørte.
+- **Bevis:** en ændring uden om proceduren opdages. Lovable-chatten beder om lov ved en dataændring. En gammel fane genindlæses inden for 5 minutter. Gendannelse øves på testkopien med en backup af testkopien selv: én tabel gendannes, afstemmes mod de tabeller, der peger på den, og de øvrige tabeller er urørte. I drift prøves backuppen kun ved læsning: antal rækker og kontrolsummer pr. tabel afstemmes mod driften hver nat.
 
 #### Trin 0.4 Skriveregistret · L
 
@@ -181,35 +181,41 @@ Tre ting gælder uanset vej:
 
 - **Bygges:** et dagligt skemaudtræk, der sammenlignes med en godkendt baseline, og ti tjek inde i databasen på 1.0's eksisterende alarmkæde (`compliance_run_checks`, `compliance_alerts`).
 - **Sikkerhedsregler fra 2.0 på hele databasen** (2.0-masterplanen §1.1 og §3):
-  1. Nye tabeller uden RLS afvises, og RLS kan ikke slås fra.
+  1. Nye tabeller får RLS slået til automatisk i det øjeblik, de oprettes, så alt er lukket, til der er lavet regler. Det blokerer ikke Lovable, som selv tilføjer reglerne bagefter. At slå RLS fra afvises.
   2. Ny adgang for ikke-indloggede afvises, medmindre den står på en godkendt liste. Eksisterende adgang, som ingen offentlig side bruger, lukkes i fase 0. Resten lukkes ned til nøgler i 5.3.
   3. Regler, der åbner persondata for alle indloggede, afvises.
   4. Funktioner, der går uden om RLS, står i et register med deres brugertjek. Nye funktioner uden registrering afvises. De ca. 50 eksisterende uden brugertjek rettes i 1.8.
   5. En rettighedstest kører hver dag for hver rolle mod hver tabel og giver alarm ved en ny adgang.
   6. Ændringer i RLS-regler og registrerede funktioner kontrolleres samme dag med Supabases sikkerhedstjek.
 
-  Afvisningerne sker i databasen, mens ændringen laves, også når den kommer fra Lovable-chatten. Den får så en fejl, der henviser til ændringsproceduren. Kan databasen ikke stoppe ændringerne, giver kontrollen alarm inden for en time.
+  Målet er, at databasen afviser, mens ændringen laves, gennem alle tre veje: Lovable-chatten, SQL-editoren og MCP. Lovable får så en fejl, der henviser til ændringsproceduren. Fase 0 beviser hver regel gennem hver vej, og at en godkendt ændring stadig kan gennemføres med reglerne slået til. En regel, der ikke kan håndhæves på en vej, får i stedet alarm inden for en time, og det står i oversigten, hvilke regler der kun har alarm.
+- **Mere fra 2.0's fundament** (§1.1, §1.14 og §3):
+  1. Beskyttelse mod lækkede adgangskoder slås til, og svage adgangskoder nulstilles.
+  2. Automatiske job og edge functions tjekkes dagligt mod en godkendt liste, også om tjekket af login er slået fra. Et nyt eller ændret job uden registrering giver alarm, og job, der rører persondata eller løn, får hjertelyd.
+  3. En vagt uden for Lovable henter hjertelyden hvert 15. minut og giver alarm, hvis kontrolpunkter, backup, partitioner eller lås er forsinket. Så kommer der også alarm, når databasen selv står stille.
+  4. Rettighedstesten dækker også filer i 1.0's lagerpladser.
+  5. Kolonner, der peger på en anden tabel (\*\_id), får en relation, der afviser sletning i stedet for at slette med, medmindre de står på en undtagelsesliste med begrundelse. Nye tabeller får en dubletnøgle eller et begrundet fravalg. Brud giver alarm, og forældreløse rækker ryddes, når et område flyttes.
 - **Midlertidige værn:** din regel er, at huller lukkes af strukturen. Fire huller kan ikke vente på det trin, der ejer dem, fordi de kan skade data, persondata eller den kontrol, omlægningen bygger på. De får et midlertidigt værn nu, og værnet fjernes, når trinnet overtager:
   1. Et hul i rettighederne. Erstattes af rettighederne i 1.8.
   2. Medarbejdere kan i dag slettes fysisk af automatiske job. Databasen afviser al sletning af medarbejdere, uanset vej. Erstattes af anonymiseringen i 1.4.
   3. Et hul i kontrolpunkterne. Det er dem, resten af omlægningen kontrolleres med.
   4. Et hul i adgangen til persondata. Lukkes nu, og funktionerne fjernes i 1.8.
-- **Bevis:** hvert tjek giver alarm ved en fremprovokeret fejl. Hver sikkerhedsregel afviser et fremprovokeret forsøg, også fra Lovable-chatten, og den daglige rettighedstest finder en adgang, der er åbnet med vilje på testkopien. Efter værnene afvises de kald, værnene skal stoppe, og de berørte skærme virker som før.
+- **Bevis:** hvert tjek giver alarm ved en fremprovokeret fejl. Hver sikkerhedsregel afviser et fremprovokeret forsøg, også fra Lovable-chatten, og den daglige rettighedstest finder en adgang, der er åbnet med vilje på testkopien. Vagten uden for Lovable giver alarm, når kontrolpunkterne stoppes på testkopien. Efter værnene afvises de kald, værnene skal stoppe, og de berørte skærme virker som før.
 
 #### Trin 0.6 Strukturens grundmur i 1.0's database · M
 
 **Færdigt bagefter:** en uforanderlig log over hver ændring, overvågning af egne job og en bro, der lader nye funktioner bruge dagens rettigheder, indtil rettighederne er flyttet. Fra denne dag registreres alle ændringer i teams, medlemskaber og klienters teams med dato.
 
-- **Bygges:** loggen genbrugt fra 2.0, partitioneret pr. måned og med persondata hashet. En log-variant til 1.0-tabeller, der aldrig kaster fejl og mærker skrivninger efter kilde (UI, servicerolle, trigger, cron). Heartbeats til egne job.
-- **Afgjort:** skæringsdatoen for organisationshistorik er den dag, loggen slås til på de seks organisationstabeller. Det sker så tidligt som muligt, fordi hver dags forsinkelse er tabt historik.
-- **Bevis:** alle UI-skrivninger mod de seks tabeller kører fejlfrit med loggen slået til. Over 7 dage passer antallet af logrækker med antallet af ændringer.
+- **Bygges:** loggen genbrugt fra 2.0, partitioneret pr. måned og med persondata hashet. En log-variant til 1.0-tabeller, der aldrig kaster fejl og mærker skrivninger efter kilde (UI, servicerolle, trigger, cron). En logfejl stopper aldrig forretningsskrivningen; den lægges i en fejlkø og giver alarm. 2.0's logfilter ændres, så et uklassificeret felt hashes i stedet for at stå i klartekst. Heartbeats til egne job. En fast liste over uforanderlige tabeller og frosne felter, hvor hver tabel har værn mod ændring, sletning og tømning (TRUNCATE). Et fjernet værn giver alarm samme dag.
+- **Afgjort:** skæringsdatoen for organisationshistorik er den dag, loggen slås til på de seks organisationstabeller. Det sker så tidligt som muligt, fordi hver dags forsinkelse er tabt historik. Organisationstabellernes felter klassificeres, før loggen slås til, så teamhistorikken kan læses i loggen.
+- **Bevis:** alle UI-skrivninger mod de seks tabeller kører fejlfrit med loggen slået til. Over 7 dage passer antallet af logrækker med antallet af ændringer. Loggens kilde og årsag og skrive-gaten for strukturens handlinger kan ikke sættes med den offentlige nøgle eller et brugertoken. Et uklassificeret felt lander hashet i loggen.
 
 #### Trin 0.7 Prøveflytning: karriereønsker · M
 
 **Færdigt bagefter:** karriereønsker indsendes, ses og behandles gennem strukturen. Mails sendes én gang fra en kø. Databasen håndhæver, hvem der ser hvad. Vi har målt, hvad en flytning koster, og øvet vejen tilbage.
 
 - **Hvorfor karriereønsker:** den eneste lille enhed, hvor 1.0 allerede har alle tre synlighedsniveauer. Den har to handlinger og en mail, der bliver til en kø. Den har adgangsregler at bevise, rører ingen penge og har kun 3 rækker.
-- **Bygges:** enheden i `app_portal`, modtagere som data og den fælles afsendelseskø, som alle senere områder genbruger. Tre UI-filer omlægges, og to edge functions stoppes.
+- **Bygges:** enheden i `app_portal`, modtagere som data og den fælles afsendelseskø, som alle senere områder genbruger. Tre UI-filer omlægges, og to edge functions stoppes. Kontraktlisten angiver rettighedselementet for hver funktion, og en funktion uden element afvises.
 - **Afgjort:** modtagere, synlighed og mailtekster er 1.0's nuværende.
 - **Bevis:** en rettighedsmatrix for alle roller er identisk med 1.0's. Afviste kald afvises. Mailen sendes én gang ved genforsøg, og tilbagevejen er øvet.
 
@@ -243,17 +249,17 @@ Inden for hver fase flyttes enhederne efter de seks trin. Sider, job og integrat
 
 ## Tidsplan
 
-Målet er, at Stork er i mål ca. 5 måneder efter go. Arbejdet kører uden pause: mens ét område genafspilles og kører live, bygges det næste. Et skift med lønvirkning sker den 15., så et færdigt område venter højst til næste periodegrænse.
+Målet er, at Stork er i mål ca. 6 måneder efter go. Arbejdet kører uden pause: mens ét område genafspilles og kører live, bygges det næste. Et skift med lønvirkning sker den 15., så et færdigt område venter højst til næste periodegrænse. Skal 1.0 flyttes til eget Supabase (0.3), rykker alt ca. 3 uger.
 
 | Uge efter go | Færdigt |
 | --- | --- |
 | 1 | De fire midlertidige værn er på, leveringsvejen virker, og kontrolpunkterne kører |
-| 4 | Fase 0 er færdig, og prøveflytningen har målt, hvad en flytning koster |
-| 8 | Fase 1: personer, organisation, rettigheder, log og GDPR er i strukturen |
-| 12 | Fase 2: salg og pris skifter ved en periodegrænse |
-| 12–20 | Fase 3 og 4 bygges side om side og genafspilles. Kommunikation, rekruttering, kontrakter, AMO og IT flyttes undervejs |
-| 20 | Lønskiftet: løn, tid og FM skifter samlet ved en periodegrænse |
-| 23 | Fase 5: tal, tavler, rapporter og de sidste moduler er flyttet, og slutkontrollen er bestået |
+| 5 | Fase 0 er færdig, og prøveflytningen har målt, hvad en flytning koster |
+| 10 | Fase 1: personer, organisation, rettigheder, log og GDPR er i strukturen |
+| 14 | Fase 2: salg og pris skifter ved en periodegrænse |
+| 14–23 | Fase 3 og 4 bygges side om side og genafspilles. Kommunikation, rekruttering, kontrakter, AMO og IT flyttes undervejs |
+| 23 | Lønskiftet: løn, tid og FM skifter samlet ved en periodegrænse |
+| 26 | Fase 5: tal, tavler, rapporter og de sidste moduler er flyttet, og slutkontrollen er bestået |
 
 ## Fase 1: fundamentet
 
@@ -268,15 +274,15 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
   - Felter uden kilde får foreløbig »indirekte persondata« og »manuel« opbevaring, så intet slettes automatisk.
   - Den GDPR-ansvarlige bekræfter ca. 330 persondatakandidater.
   - 1.0's nuværende frister bliver startværdier.
-  - Aktivering af en opbevaringsregel kræver superadmin.
+  - Aktivering af en opbevaringsregel kræver superadmin. Opbevaringsregler går kladde → prøvet → godkendt → aktiv, og tørkørslen viser, hvor mange personer og rækker der rammes. Kun systemkolonner kan være permanente. Indtil en kolonne er bekræftet, hashes den i loggen som direkte persondata. En samtykkelog registrerer formål, kilde og tidspunkt pr. person og kandidat og håndhæves i 5.3 og 5.5.
 - **Bevis:** 3.419 af 3.419 kolonner har en række. Ingen af fase 1's kolonner er uafklarede. Loggen hasher præcis de direkte persondatafelter.
 
 #### Trin 1.2 Log på alle tabeller · M
 
 **Færdigt bagefter:** hver ændring i Storks data er logget pr. række med hvem, hvornår, hvad og hvorfor. Det gælder, uanset om ændringen kom fra en skærm, et job, en integration eller AI.
 
-- **Bygges:** logtrigger på alle nye tabeller og på alle 1.0's tabeller. Rå dialerdata og caches logges samlet pr. kørsel i stedet for pr. række. Loggen på 1.0's tabeller er varianten fra 0.6, der aldrig kaster fejl, og direkte persondata hashes (2.0-masterplanen §1.3). Læsning af CPR, bank, privatadresse og telefon logges pr. opslag.
-- **Bevis:** over 7 dage passer logrækkerne med de ændrede rækker. Hver skrivertype er set med rigtig kilde. Loggen kan ikke ændres. Databasens svartid er uændret efter, at loggen er slået til.
+- **Bygges:** logtrigger på alle nye tabeller og på alle 1.0's tabeller. Rå dialerdata og caches logges samlet pr. kørsel i stedet for pr. række. Loggen på 1.0's tabeller er varianten fra 0.6, der aldrig kaster fejl, og direkte persondata hashes (2.0-masterplanen §1.3). Loggen opbevares efter kolonnernes opbevaringsregler, og dens størrelse følges i den fælles oversigt mod et budget. Læsning af CPR, bank, privatadresse og telefon logges pr. opslag, og det samme gælder åbning af løn, stamkort og compliance-sider. Flytninger logges med kilden »flytning« og en årsag. Loggen læses kun gennem en handling med rettighed, og persondata kan kun fjernes fra loggen med break-glass og egen journal.
+- **Bevis:** over 7 dage passer logrækkerne med de ændrede rækker i alle tabeller, der logges pr. række, og rådata og caches har én logrække pr. kørsel. Hver skrivertype er set med rigtig kilde. Loggen kan ikke ændres. Svartiden for de 20 mest brugte skriveveje stiger højst 10 %, når loggen er slået til.
 
 #### Trin 1.3 Person og ansættelse · XL
 
@@ -290,8 +296,8 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
   - Der er 28 skrivekald og 10 triggere.
   - 329 personer og 421 historikrækker skal kobles. Den gamle historik har kun navne at koble på.
 - **Afgjort:**
-  - Medarbejdere slettes aldrig: »Slet« bliver »Afslut ansættelse«.
-  - »Aktiv« betyder en ansættelse, der er i gang eller starter i fremtiden.
+  - Medarbejdere slettes aldrig: »Slet« bliver »Afslut ansættelse«. Når en ansættelse slutter, lukkes login og sessioner samme dag.
+  - Hvad »aktiv« betyder, kan ændres i UI (din afgørelse 14/5). Startværdien er en ansættelse, der er i gang eller starter i fremtiden.
   - Dubletreglen er 1.0's.
   - Tvivlstilfælde i historikken kommer i en afklaringskø.
 - **Bevis:**
@@ -311,7 +317,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
   - Karantænen ved anonymisering gælder login, eksisterende sessioner og baggrundsjob.
   - Feltlisten er 1.0's, rettet til de rigtige kolonnenavne (i dag fejler 7 af dem).
   - Fristen er 5 år efter seneste ansættelses slutdato.
-  - Den GDPR-ansvarlige godkender sletteanmodninger.
+  - Den GDPR-ansvarlige godkender sletteanmodninger. Anonymiseringen afvises, hvis et felt klassificeret som direkte persondata på en personkoblet tabel mangler i feltlisten, og en ny persondatakolonne uden strategi giver alarm. Journal og data sammenlignes dagligt. Opsætningen går kladde → prøvet → godkendt → aktiv. Fortrydelse af en fejlanonymisering og sammenlægning af personer med historisk virkning sker kun med break-glass: superadmin alene med årsag (din afgørelse 15/10), med udløb og synlig i fælles oversigt. Indsigtsudtræk pr. person (art. 15), begrænsning (art. 18) og fortegnelsen (art. 30) dannes fra kolonneregistret og databehandleraftalerne. Gennemgangen signeres af den GDPR-ansvarlige og gentages i 5.12.
 - **Bevis:**
   - Anonymisering af en testperson rører alle kortlagte felter, og ingen af de 71 tilknyttede tabeller mister rækker.
   - En gendannelsesøvelse genafspiller journalen uden fejl, også efter et nedbrud før den eksterne aflevering.
@@ -321,7 +327,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 **Færdigt bagefter:** ved login spørger Stork databasen én gang: hvem er jeg, hvilken rolle har jeg, hvad må jeg, og hvad må jeg se. Ingen skærm finder længere medarbejderen ud fra e-mailen. Det opslag, der i dag bruger to tredjedele af databasens tid, forsvinder.
 
 - **Bygges:** `stork_min_kontekst()`, der beregner rettighedskortet efter præcis 1.0's regel, indtil rettighederne er flyttet i 1.8. 40 filer med 61 opslag omlægges.
-- **Afgjort:** login ændres ikke i fase 1. »Kræv Microsoft-login« bliver en indstilling pr. rolle med startværdien nej, så ingen udelukkes. »Se som« bevares for superadmin med skriveblokering.
+- **Afgjort:** login ændres ikke i fase 1. »Kræv Microsoft-login« bliver en indstilling pr. rolle med startværdien nej, så ingen udelukkes. Den slås til i 1.6 for superadmin og roller, der ser CPR, bank eller løn. »Se som« bevares for superadmin med skriveblokering.
 - **Bevis:** gammel og ny kontekst beregnes for alle 329 personer med nul uforklarede afvigelser, og en uge live bekræfter det. Det tunge opslag forsvinder fra databasens topliste.
 
 #### Trin 1.6 Eksterne identiteter · L
@@ -330,7 +336,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 
 - **Bygges:** `core_identity.identiteter` med spærring mod, at samme nøgle peger på to personer, og en resolver `find_person`, der aldrig gætter.
 - **1.0 i dag:** Microsoft-login (Entra ID) findes allerede. Værnet `microsoft-login-guard` kobler et Microsoft-login til medarbejderen via e-mail og afviser dubletter. Adgangskode-login er stadig åbent. Værnet omlægges her til at slå op i identiteterne.
-- **Afgjort:** eksisterende koblinger gælder fra første salg og er markeret som udledt. Ved dobbeltkoblinger gælder 1.0's valg, og sagen står som match-konflikt. Et Microsoft-login kobles automatisk, når præcis én aktiv medarbejder har kontoens e-mail og endnu ingen konto, som i 1.0's værn. Har medarbejderen allerede en anden konto, typisk med adgangskode på privat e-mail, kobler en administrator Microsoft-identiteten til personen, og sagen står i fælles oversigt. Værnets egne skrivninger, kontokoblingen og sletningen af tomme dubletkonti, bliver handlinger i strukturen.
+- **Afgjort:** eksisterende koblinger gælder fra første salg og er markeret som udledt. Ved dobbeltkoblinger gælder 1.0's valg, og sagen står som match-konflikt. Et Microsoft-login kobles automatisk, når præcis én aktiv medarbejder har kontoens e-mail og endnu ingen konto, som i 1.0's værn. Har medarbejderen allerede en anden konto, typisk med adgangskode på privat e-mail, kobler en administrator Microsoft-identiteten til personen, og sagen står i fælles oversigt. Værnets egne skrivninger, kontokoblingen og sletningen af tomme dubletkonti, bliver handlinger i strukturen. Så snart deres Microsoft-identitet er koblet, kræves Microsoft-login for superadmin og for roller, der ser CPR, bank eller løn (forretningsforståelsen §10 og 2.0-masterplanen: »Ingen backdoor«). Sammenlægning af identiteter, der flytter historiske salg, sker kun med break-glass.
 - **Bevis:** for hver agent i salg fra de seneste 90 dage giver resolveren samme person som 1.0, eller forskellen er en registreret konflikt. Et Microsoft-login giver samme medarbejder som 1.0's værn.
 
 #### Trin 1.7 Organisationstræ med dateret historik · L
@@ -340,7 +346,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 - **Bygges:** træ, placeringer, klientplaceringer, fortrydelse og søgning i undertræer, genbrugt fra 2.0. Gamle læsere (ca. 140 filer) læser videre fra kopier.
 - **Afgjort:**
   - Roden er Copenhagen Sales, og afdelingen Ejere rummer de 3 superadmins. Dagens teams hænger direkte under roden.
-  - En medarbejder placeres i ét team. Stab med flere medlemskaber placeres efter deres primære team.
+  - En medarbejder placeres i ét team. Stab med flere medlemskaber placeres efter deres primære team. Øvrige tilknytninger gemmes kun som historik og giver ingen synlighed, klienter eller DB (din afgørelse 16/5).
   - En leder af flere teams placeres på en afdeling over teamene.
 - **Bevis:** på skiftedagen gengiver træet dagens tilstand præcist. Hver organisationsændring siden trin 0.6 findes som dateret række.
 
@@ -357,10 +363,10 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
   - Elementerne er 1.0's 255 nøgler. Rollerne er 1.0's 11 med deres tildelinger.
   - Oversættelsen er self → Sig selv, team → Hiraki og all → Alt.
   - Personlige undtagelser bliver egne roller (én rolle pr. medarbejder).
-  - Rollen tildeles eksplicit, og stillingen styrer ikke længere rettigheder.
+  - Rollen tildeles eksplicit, og stillingen styrer ikke længere rettigheder. Databasen afviser en ændring, der giver færre end 2 superadmins. Synlighed af salg og opkald følger klientens nuværende team, mens løn- og DB-tal følger det team, der er frosset på salget (din afgørelse 16/5). Den daglige rettighedstest kører også pr. funktion i kontraktlisten.
 - **Bevis:**
   - En rettighedsmatrix for 329 personer × 255 elementer er ens mellem 1.0 og strukturen, bortset fra de afgjorte forskelle, som er listet pr. person.
-  - Afviste kald afvises for hver rolle.
+  - Afviste kald afvises for hver rolle. Hver kolonne i en RLS-regel har et indeks, undertræer slås op uden rekursion, og de tungeste sider måles ved 1.0's datamængde. Hver rolle har en grænse for, hvor længe en forespørgsel må køre.
 
 ## Fase 2: stammens grundlag
 
@@ -390,9 +396,9 @@ Fase 2 flytter klienter, kataloget, prisberegningen, indgangene og salget som en
 - **Bygges:** produkter, produktgrupper, kildeprodukter og prisregler med uforanderlige versioner.
 - **1.0 i dag:** 492 produkter og 476 regler. 52 skrivekald i 7 filer.
 - **Afgjort:**
-  - Basisprisen bliver en synlig basisregel pr. produkt, så ingens beløb ændres.
+  - Basisprisen bliver en synlig basisregel kun for de produkter og kampagner, hvor 1.0 faktisk bruger den, så ingens beløb ændres. Nye produkter og kampagner får ingen basisregel, og et salg uden regel markeres (forretningsforståelsen §4). En linje i en kampagne med egne regler, der lander på basisreglen, markeres også.
   - Ved overlap får den regel forrang, som 1.0 faktisk har brugt.
-  - Sammenlægning af produkter er økonomisk neutral.
+  - Sammenlægning af produkter er økonomisk neutral. Linjenavnet kan sættes pr. produkt, klient og kampagne og fryses på linjen.
   - Prisvinduet er de perioder, der ikke er låst. En periode, der er låst før fristen, kan ikke længere omprises. Lønperioderne fra 3.1 bygges derfor før dette trin.
 - **Bevis:** 1.0's genberegning som tørkørsel før og efter skiftet giver nul ændrede linjer.
 
@@ -404,7 +410,7 @@ Fase 2 flytter klienter, kataloget, prisberegningen, indgangene og salget som en
 - **Afgjort:**
   - Motoren kører i databasen, så pris og bogføring tjekkes i samme transaktion. Forhåndsvisning i UI kalder samme funktion.
   - Algoritmen er 1.0's mest komplette (`rematch-pricing-rules`) med dansk dato.
-  - ASE-reglerne bliver data i klientprofilen.
+  - ASE-reglerne bliver prisregler eller lønarter efter deres virkning, og klientprofilen henviser til dem (din afgørelse 20/5).
   - En linje uden regel venter synligt i oversigten.
 - **Bevis:** to genafspillede lønperioder og en uge live, hvor alle linjer er ens med 1.0 eller har en godkendt forklaring (fx dansk mod UTC-dato).
 
@@ -416,14 +422,14 @@ Fase 2 flytter klienter, kataloget, prisberegningen, indgangene og salget som en
 - **Afgjort:**
   - Feltbeslutningernes startværdier er 1.0's (behold → gem, bloker → gem ikke).
   - Uafklarede felter afgøres efter 1.0's egne regler, fx fritekst → gem ikke og telefon → persondata.
-  - Samme lead rettet samme dag bliver en ny version.
-- **Bevis:** dialerdata for to afsluttede perioder hentes igen og lander præcis én gang, og i en uge live findes hvert salg, opkald og hver session præcis én gang i begge systemer.
+  - Samme lead rettet samme dag bliver en ny version. Et salg for en ukendt kampagne venter i rålaget, til kampagnen er koblet. Hver indgang kræver en signatur eller hemmelighed pr. kilde.
+- **Bevis:** dialerdata for to afsluttede perioder genafspilles fra det, 1.0 har gemt, suppleret om natten fra kilderne, og lander præcis én gang, og i en uge live findes hvert salg, opkald og hver session præcis én gang i begge systemer.
 
 #### Trin 2.6 Salget som enhed: alle skrivere skifter samtidig · XL
 
 **Færdigt bagefter:** hvert salg oprettes ét sted, uanset om det kommer fra dialer, webhook, FM, Tast selv, Lederne eller bulk. Sælger, klient, kampagne og team fryses på salgsdatoen, og prisen kommer fra den ene motor. Ingen kan slette et salg. Forkerte salg afvises, og rettelser gemmes som hændelser på salget. Synkroniseringen holder op med at slette og genskabe linjerne; i dag mister et genindlæst salg sin godkendelse.
 
-- **Bygges:** salg og salgslinjer med stabile id'er, korrektionshændelser (annullering af salg, linje eller del af en linje, kurvrettelse, afvisning, tilbageførsel) og kopierne til 1.0's læsere.
+- **Bygges:** salg og salgslinjer med stabile id'er, korrektionshændelser (annullering af salg, linje eller del af en linje, kurvrettelse, afvisning, tilbageførsel, berigelse og ny version fra kilden) og kopierne til 1.0's læsere.
 - **1.0 i dag:**
   - 71.471 salg og 84.914 linjer.
   - Skrivere: 15 UI-filer med 53 skrivekald, 7 edge functions, 10 databasefunktioner og triggere samt 13 cron-job.
@@ -431,8 +437,8 @@ Fase 2 flytter klienter, kataloget, prisberegningen, indgangene og salget som en
 - **Afgjort:**
   - Ingen salg slettes.
   - Indgangen ændrer aldrig status eller rettelser.
-  - Tilladte overgange er afventer → godkendt, annulleret eller afvist og godkendt → annulleret. Begge kan tilbageføres.
-  - Ældre salg får teamet fra organisationstræets daterede historik, hvor den findes (fra trin 0.6). Ellers udledes det med kilde, og mangler grundlaget, står teamet som »ukendt«.
+  - Tilladte overgange er afventer → godkendt, annulleret eller afvist og godkendt → annulleret. Begge kan tilbageføres. En berigelse eller en ny version fra kilden genprissættes af motoren, forskellen bogføres i en åben periode, og den oprindelige linje bevares. Straksbetaling er et felt på salget, som indgår i prisen (forretningsforståelsen §4).
+  - Ældre salg får teamet fra organisationstræets daterede historik, hvor den findes (fra trin 0.6). Før det genskabes klientens team fra sælgernes teamhistorik. De steder, hvor data er uenige eller mangler, fremlægges for dig som rapport pr. klient og periode, og du bekræfter, retter eller markerer »ukendt« (din afgørelse 16/5). »Ukendt« bruges kun, hvor du har markeret det.
   - De 2.641 gamle FM-rækker afstemmes én gang her med én matchregel: sælger, tidspunkt og telefon. Rækker med et tilsvarende salg kobles. Rækker uden bevares som markeret historik, og et salg oprettes kun gennem en kontrolleret handling med afklaret beløb.
 - **Bevis:**
   - To genafspillede lønperioder og en uge live, hvor hvert salg og hver linje sammenlignes.
@@ -486,7 +492,7 @@ I fase 3 skifter lønnen. Det sker ved en periodegrænse, efter at to genafspill
   - Afventer og godkendt tæller med; annulleret og afvist tæller ikke.
   - Et sent salg i en låst periode bogføres i den ældste åbne periode.
   - Omsætning bogføres ved salget. Provision venter synligt, til sælgeren er matchet.
-  - Prisen genberegnes kun, mens linjens periode er åben.
+  - Prisen genberegnes kun, mens linjens periode er åben. Er perioden låst, ændres originalen ikke: en berigelse eller en ny version fra kilden giver en korrektion, og forskellen bogføres i en åben periode. Et underskud står i perioden for alle løngrupper og føres ikke automatisk videre. Det afskrives ikke ved fratræden, og inddrivelse er en manuel handling med årsag. Modposter på en fratrådt sælgers salg bogføres på sælgeren, og DB for et team uden leder vises i fælles oversigt.
 - **Bevis:** alle ti forløb fra angrebet giver de forventede posteringer, også en ændring på 0 kr. og et modtagerskift. Samtidige ændringer og gentagne kald giver aldrig en dobbelt postering.
 
 #### Trin 3.4 Åbningsgrundlag for gamle salg · L
@@ -524,7 +530,7 @@ I fase 3 skifter lønnen. Det sker ved en periodegrænse, efter at to genafspill
   - Vagten er eneste kilde til løntimer (trin 4.3).
   - Månedslønnens proratering bruger 1.0's eget månedsgrundlag.
   - Dagsbonus beregnes af serveren efter 1.0's regel, ikke når en side åbnes.
-  - Godkendt overtid bliver løninput.
+  - Godkendt overtid bliver løninput. Tærskler og regler, som 1.0 har i kode (dagsbonus, løntimer pr. vagtstatus og lønvirkning pr. fraværstype), bliver satser eller formelinput i UI med 1.0's værdier som startværdi (forretningsforståelsen §7).
 - **Bevis:** i genafspilningen er timer, fravær, diæt og bonus pr. medarbejder lig med det, referencen bruger, bortset fra de godkendte afvigelser T1–T11.
 
 #### Trin 3.7 Formelsystem, lønlinjer og team-DB · XL
@@ -532,14 +538,14 @@ I fase 3 skifter lønnen. Det sker ved en periodegrænse, efter at to genafspill
 **Færdigt bagefter:** ved lås beregner strukturen lønlinjer pr. medarbejder pr. lønart for sælgere, teamledere, assistenter og stab, med feriepenge, tillæg og fordeling på klient og historisk team. Lønarterne er formler, som kan oprettes og rettes i UI. Admin og sælgerens egen visning læser de samme linjer.
 
 - **Bygges:**
-  - Formelsystemet: byggeklodser, versioner og forhåndsvisning i UI, så en ny lønart kan oprettes uden kode (forretningsforståelsen §7). Det kører i databasen ligesom prismotoren og udvides i 5.1 med KPI'er.
+  - Formelsystemet: byggeklodser, versioner og forhåndsvisning i UI, så en ny lønart kan oprettes uden kode (forretningsforståelsen §7). Byggeklodserne omfatter mindst salg og posteringer, timer, vagter pr. status, fravær pr. type, FM-bookinger og FM-salg, klienttid, anciennitet og standard arbejdstid. En lønart går kladde → testet (forhåndsvisning i kroner pr. medarbejder) → godkendt → aktiv fra en dato, og aktiveringen logges. Det kører i databasen ligesom prismotoren og udvides i 5.1 med KPI'er.
   - Lønaftaler med gyldighed (erstatter lønfelterne på stamkortet), satser med gyldighed og lønlinjer. 35 filer i lønområdet henter færdige tal.
 - **Afgjort:**
   - Lønsedlens kolonner er defineret ud fra posteringernes oprindelse. Provision er posteringer fra salg og prisændringer, annulleringer er modposter og tilbageførsler, og netto er summen. Ingen postering tælles i to kolonner. CPO er en oprindelse inden for omsætning og lægges ikke til igen.
   - Feriepenge: én sats pr. ferieordning og løngruppe, med startværdier fra det, eksporten bruger i dag.
   - En sen modpost på et historisk team rammer teamets DB i posteringsperioden og den leder og sats, der gælder da.
   - Annulleringer fra stoppede sælgere tæller med i DB (forretningsforståelsen §7).
-  - Lederens DB bruger faktiske annulleringer i stedet for 1.0's procentsats. For salg fra 1.0-perioder har 1.0 allerede reduceret DB med procentsatsen, både på omsætning og på sælgeromkostning. Den DB-reduktion i kroner bliver en overgangspulje pr. team, klient og periode. Puljen beregnes med 1.0's egen formel på udtrækket fra låsen af N−1 og er et beregnet grundlag, ikke bevis for lønfradrag. I perioder, hvor lederens minimumsløn var bestemmende, gav procentsatsen intet lønfradrag, og der er puljen 0. Senere faktiske annulleringer af de salg måles på samme DB-grundlag og trækkes først fra puljen. Kun det, der overstiger puljen, rammer lederens DB. En tilbageført annullering giver puljen tilbage. En ubrugt pulje bortfalder. Det er planens overgangsvalg: lederen er lønnet efter 1.0's regel for de perioder, og en udbetaling ville ændre afsluttede perioders løn. Puljen og dens forbrug vises i kroner pr. leder, før du godkender skiftet.
+  - Team-DB er 1.0's formel i 1.0's rækkefølge (dbModel.ts): omsætning efter annulleringer − sælgerløn (provision og feriepenge) − sygefravær − øvrige omkostninger (teamudgifter og lokationsudgifter) − assistentløn med feriepenge − ATP og barsel = DB før lederløn. Lederlønnen er en procent af DB før lederløn, dog mindst den proraterede minimumsløn, og DB er DB før lederløn minus lederløn og lederens feriepenge. Mangler et grundlag, vises »mangler grundlag«, aldrig 0. Annulleringerne er de faktiske (R5). Formlen trækker mere fra end forretningsforståelsens korte formel. Det er en bevidst afvigelse, afgjort 19/10. Lederens DB bruger faktiske annulleringer i stedet for 1.0's procentsats. For salg fra 1.0-perioder har 1.0 allerede reduceret DB med procentsatsen, både på omsætning og på sælgeromkostning. Den DB-reduktion i kroner bliver en overgangspulje pr. team, klient og periode. Puljen beregnes med 1.0's egen formel på udtrækket fra låsen af N−1 og er et beregnet grundlag, ikke bevis for lønfradrag. I perioder, hvor lederens minimumsløn var bestemmende, gav procentsatsen intet lønfradrag, og der er puljen 0. Senere faktiske annulleringer af de salg måles på samme DB-grundlag og trækkes først fra puljen. Kun det, der overstiger puljen, rammer lederens DB. En tilbageført annullering giver puljen tilbage. En ubrugt pulje bortfalder. Det er planens overgangsvalg: lederen er lønnet efter 1.0's regel for de perioder, og en udbetaling ville ændre afsluttede perioders løn. Puljen og dens forbrug vises i kroner pr. leder, før du godkender skiftet.
   - En leder uden minimumsløn får det beregnede resultat, også når det er negativt, og underskuddet står (din afgørelse 15/10). En leder med minimumsløn får mindst den. 1.0 gemmer et tomt minimum som 0 og viser det som »-«. Derfor bliver 0 og tomt til »uden minimumsløn«, og positive beløb bliver et minimum.
 - **Bevis:** en 1.0-kompatibel variant giver præcis referencens tal. Forskellen til strukturens variant er de bevidste afvigelser, opgjort i kroner pr. medarbejder. Kolonnernes sum er lig med posteringernes sum, både i eksport og i DB. Puljen prøves over flere perioder med minimumsløn, ændrede satser og tilbageførsler.
 
@@ -551,7 +557,7 @@ I fase 3 skifter lønnen. Det sker ved en periodegrænse, efter at to genafspill
 - **Afgjort:**
   - Låsen sker i tre skridt. Først kan ingen ny genberegning starte i perioden. Derefter gør igangværende genberegninger sig færdige. Til sidst flyttes ventende genberegninger til den ældste åbne periode, og perioden låses.
   - Stork låser ved fristen, også med uafklarede poster. De står synligt og bogføres i en åben periode, når de er afklaret.
-  - En genåbnet periode får frist sidste dag i den måned, den genåbnes.
+  - En genåbnet periode får frist sidste dag i den måned, den genåbnes. Genåbning af en udbetalt periode kræver kun superadmin med årsag (din afgørelse 15/10). Det afviger fra forretningsforståelsen, som siger, at en udbetalt periode ikke kan ændres, og at break-glass kræver to godkendere. Vagter, fravær, stempler, overtid og bemanding med dato i en låst periode kan ikke ændres. En rettelse registreres som korrektion med lønvirkning i en åben periode, som brugeren vælger (forretningsforståelsen §8).
 - **Bevis:** lås prøves med både ventende og igangværende genberegninger. En rettelse samtidig med lås kommer med eller afvises med besked. En fejlet lås efterlader perioden åben. Genåbning bevarer den gamle version.
 
 #### Trin 3.9 Lønskiftet: løn, tid og FM samlet · L
@@ -628,8 +634,8 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
     - Fast månedsløn prorateres med vagtdage.
     - Sælgere har ingen timer i lønnen.
   - Vagter dannes til og med næste lønperiodes sidste dag. En mønsterændring rører kun fremtidige vagter, som ingen har rettet.
-  - Ved fratrædelse aflyses senere vagter automatisk. Salg uden vagt flages, og lederen opretter vagten bagud.
-  - Dagsbonusgrundlaget er 1.0's regel: mindst 5 timer, intet godkendt fravær, ansat fra 2026 og under antal bonusdage.
+  - Ved fratrædelse aflyses senere vagter automatisk. Vagter kan ikke ligge før ansættelsens start eller overlappe hinanden, vagtbytte mellem medarbejdere afvises, og en vagt over midnat hører til startdagen (forretningsforståelsen §5). Alle vagter, også fraværsdage, har et klienttilhør (2.0-masterplanen §2.2). Salg uden vagt flages, og lederen opretter vagten bagud.
+  - Dagsbonusgrundlaget er 1.0's regel: mindst 5 timer, intet godkendt fravær, ansat fra 2026 og under antal bonusdage. Tærsklerne er satser i UI med disse værdier som start.
   - KPI-, dashboard- og rapportsteder læser en kopi med 1.0's betydning indtil fase 5, så deres tal er uændrede.
 - **Bevis:** to genafspillede lønperioder og en uge live, hvor timer og vagtdage pr. medarbejder pr. dag er lig med 1.0's lønhooks, bortset fra de godkendte afvigelser T1–T5 og T11.
 
@@ -661,7 +667,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
   - Lønvirkningen pr. type er 1.0's: stab får syge vagter betalt, assistenter får intet fravær betalt, og fast månedsløn påvirkes ikke.
   - Sygedage tælles pr. vagt. Sælgernes sygedagstal ændres fra antal anmodninger til antal dage, men intet beløb ændres.
   - Godkendt overtid bliver timer til lønnen. Har lønarten ingen aktiv formel, står overtiden synligt som »uden lønart«.
-  - Godkendt fravær på en bemandet FM-dag aflyser bemandingen og vagten. Fravær og booking skifter samtidig med lønnen, så strukturen ejer begge.
+  - Godkendt fravær hele dagen på en bemandet FM-dag aflyser bemandingen og vagten. Fravær og booking skifter samtidig med lønnen, så strukturen ejer begge. Fravær kan registreres som hel dag eller i timer. Ved fravær i timer beholder vagten sin status, og arbejdstid og klienttid reduceres med fraværstimerne. Lønvirkningen følger fraværstypen, så fx stabens sygetimer stadig betales (forretningsforståelsen §5).
 - **Bevis:** fraværsdage pr. type og status pr. medarbejder er ens i to genafspillede perioder. Sammen med 4.2 er stabens og assistenternes løntimer ens.
 
 #### Trin 4.5 Klientfordeling og klient-tid (CPO) · L
@@ -675,7 +681,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
   - Stempler uden klient lægges på medarbejderens primære klient.
   - 1.0's CPO-satser flyttes som regler med betingelse på medarbejderen, så DB er uændret. CPO gives som i dag kun på sælgervagter og uden annulleringsfradrag.
   - Timeprovisionssatserne flyttes som kladde, fordi 1.0 aldrig har udbetalt dem.
-  - Medarbejderens klienter afledes af teamet og klientens team. Stab får ikke længere automatisk alle klienter, jf. din afgørelse 16/5.
+  - Medarbejderens klienter afledes af teamet og klientens team. Stab får ikke længere automatisk alle klienter, jf. din afgørelse 16/5. Tiden mellem to opkald for forskellige klienter deles på midtpunktet, første klient udvides til vagtens start og sidste til vagtens slut, og fordelingen genberegnes, når vagtens tid ændres. Kampagner kan have egne regler for klienttid (forretningsforståelsen §5).
 - **Bevis:** CPO pr. klient pr. dag i to genafspillede perioder er lig med 1.0's, bortset fra T6, og alle sælgervagter er 100 % fordelt.
 
 #### Trin 4.6 Lokationer, grupper, stande og tilladelser · L
@@ -689,7 +695,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
   - Lokationer af de øvrige typer, fx Markeder, Messer og Anden lokation, samler mange ejere. De får hver sin gruppe, så en ny lokation aldrig arver klienter fra en uvedkommende ejer. Grupper kan lægges sammen i UI, når ejeren er kendt.
   - Gruppens klienter er dem, der må stå på gruppens lokationer, og hver lokation fravælger resten. Retten pr. lokation på flytningsdagen er præcis 1.0's.
   - Hviledage er 1.0's karensuger gange 7. Hvilen gælder lokationen på tværs af klienter.
-  - En lokation uden stand får én stand, »Standard«.
+  - En lokation uden stand får én stand, »Standard«. Hver lokation får en type fra lokationskravets typeliste (K-1). Kan typen ikke afledes, bliver den »andet«.
   - Historiske rabatberegninger bevares, som de blev regnet. Indtil bookingen skifter med lønnen, aflyser en lokationsændring ikke bookinger; berørte bookinger vises i fælles oversigt.
 - **Bevis:** for hver lokation og klient er »kan bookes« lig med 1.0's på flytningsdagen, og kravets forløb K-1 til K-9 består. Hver lokation i en fælles gruppe indgår i 1.0's faktura- eller rabatgrundlag for typen.
 
@@ -703,7 +709,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
   - Status er kladde, bekræftet eller aflyst. »Book alligevel« fjernes, jf. dit lokationskrav.
   - Der er én klient pr. stand pr. dag. Hvilen gælder lokationen, og ingen eksisterende booking kan blive ulovlig af en ny.
   - Dvale kan ikke sættes hen over bekræftede bookingdage. Nedlæggelse og frakobling aflyser fremtidige dage.
-  - Bemanding på en bekræftet booking danner sælgerens vagt, og en mønstervagt samme dag aflyses. Bemanding på en dag med godkendt fravær afvises.
+  - Bemanding på en bekræftet booking danner sælgerens vagt, og en mønstervagt samme dag aflyses. Bemanding på en dag med godkendt fravær hele dagen afvises.
   - Lokationsomkostningen til DB er bookingens brutto efter én definition. Kladder tæller med som i dag.
 - **Bevis:** en skygge, hvor hver ny booking vurderes af både 1.0 og strukturen. Forskellene opgøres og godkendes før skiftet, og antallet af bemandede medarbejdere pr. dag er ens.
 
@@ -713,7 +719,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
 
 - **Bygges:** 14 tabeller (ca. 1.350 rækker) flyttes med status i stedet for sletning. Mails sendes som afsendelsesopgaver med status.
 - **Afgjort:**
-  - Hotelbookingen bevarer 1.0's model: antal værelser og samlet pris for opholdet.
+  - Hotelbookingen bevarer 1.0's model: antal værelser og samlet pris for opholdet. Det afviger fra 2.0's afgørelse om pris pr. værelse, så 1.0's hotelsider virker uændret.
   - Samme bil kan stå på flere bookinger samme dag, som i dag.
   - Kørsel registreres. Lønarten kørsel findes, men uden sats, så ingen løn ændres.
   - Beskeden om nøgleaflevering går til lederne i det team, der ejer klienten, i stedet for at modtagerne findes ved navnesøgning.
@@ -725,7 +731,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
 
 - **Afgjort:**
   - Satsen ved skift er 1.0's beløb for lønarten.
-  - Der kommer ingen automatisk rejsedagsregel. Dagens registrering afgør, som i dag.
+  - Der kommer ingen automatisk rejsedagsregel. Dagens registrering afgør, som i dag. Det afviger fra 2.0's afgørelse om, at en rejsedag giver 0 kr. Diætsatsen gælder pr. klient med gyldighed som i 2.0, med 1.0's beløb som startværdi.
   - 1.0's »startbonus« i lønnen er oplæringsbonus og hedder fremover det.
 - **Bevis:** diæt og oplæringsbonus pr. medarbejder i to genafspillede perioder er lig med 1.0's lønhook.
 
@@ -735,7 +741,7 @@ I hele fasen bliver hver sletning i 1.0 en status med årsag, og alle datoer er 
 
 - **1.0 i dag:** rabatlogikken findes tre steder, og undtagelser matches på lokationsnavn.
 - **Afgjort:**
-  - Rabatten beregnes ét sted med 1.0's regler: årsomsætning med sats låst pr. booking, månedsomsætning og antal pladser. Merprisen lægges til før rabat.
+  - Rabatten beregnes ét sted med 1.0's regler: årsomsætning med sats låst pr. booking, månedsomsætning og antal pladser. Trappernes grænser og satser er data i UI med 1.0's værdier som start. Merprisen lægges til før rabat.
   - Udgiftsrapporten bruger samme beregning, og dens afvigende regel bortfalder.
   - Undtagelser knyttes til lokationens id.
   - En rettelse af en godkendt faktura er en ny version.
@@ -816,8 +822,8 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Et tal dateres på salgsdatoen i dansk tid. Antal salg er antal enheder på linjer, hvis produkt tæller som salg.
   - Tallenes team er det team, der ejede klienten på salgsdatoen.
   - Provision og omsætning på tavler er summen af salgets pengeposteringer på salgsdatoen.
-  - Ikke-matchede salg tæller på klient og team, men ikke på en sælger, og vises som »ikke matchet«.
-  - KPI'er bygges af formelsystemets byggeklodser fra 3.7 i UI. Fri tekstformel, der køres som kode, udgår.
+  - Ikke-matchede salg tæller på klient og team, men ikke på en sælger, og vises som »ikke matchet«. Løn, provision og DB for en periode, strukturen har låst, læses fra lønversionen (3.8), så tavler og rapporter viser det, der blev udbetalt. 1.0's sidste periode viser referenceeksporten (3.9), og ældre perioder vises som »beregnet efter 1.0«. Salgstal må gerne ændre sig efter låsen, men ændringerne markeres.
+  - KPI'er bygges af formelsystemets byggeklodser fra 3.7 i UI. Fri tekstformel, der køres som kode, udgår. En KPI går kladde → testet → godkendt → aktiv ligesom lønarterne.
   - Timebaserede tal før vagternes skæringsdato bygger på et historisk timegrundlag, som flytningen danner én gang efter 1.0's egen regel og markerer »udledt af 1.0«. Det bruges kun i tal og rapporter, aldrig i løn. Mangler grundlaget, vises »mangler grundlag«, aldrig 0.
 - **Bevis:** To genafspillede perioder og en uge live. Med 1.0's regler er tallene ens række for række, og hver forskel med strukturens regler har en årsag. Historiske timetal er ens med det, 1.0 viser i dag.
 
@@ -826,7 +832,7 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
 **Færdigt bagefter:** alle dashboards, TV-skærme og månedsmål-tavler viser tal fra 5.1. Hvem der ser hvilken tavle, styres i rettighederne. TV kører på nøgler, der kun åbner deres egne tavler og kan udløbe. Alle mål sættes i UI.
 
 - **Afgjort:**
-  - Hver tavle er et rettighedselement. Adgangen oversættes pr. person og tavle fra det, 1.0 faktisk giver i dag. I 1.0 betyder »all« på en tavle hele teamet, ikke alle. Ingen får adgang, de ikke har i dag.
+  - Hver tavle er et rettighedselement. Adgangen oversættes pr. person og tavle fra det, 1.0 faktisk giver i dag. Adgangen til en tavle er foreningen af teamets og personens adgang (2.0-masterplanen). I 1.0 betyder »all« på en tavle hele teamet, ikke alle. Ingen får adgang, de ikke har i dag.
   - Eksisterende TV-koder bevares, så skærmene ikke skal sættes op igen.
   - De fem kopierede månedsmål-tavler bliver én tavletype. TDC- og Relatel-målene flyttes fra koden til data.
   - Klienttavlerne bevarer deres udseende og opdateres højst 60 sekunder bagud som i dag.
@@ -850,7 +856,7 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Dagsrapport og ugeplan til klienter bevares uden beløb og navne.
   - Tryg-ugerapporten bevares med dataminimeringen fra 25/9: kun samlede tal og ét årsagsfelt.
   - Prognosen bruger 1.0's metode, men resterende arbejdsdage tages fra de planlagte vagter.
-  - Churn og anciennitet regnes af ansættelsesperioderne.
+  - Churn og anciennitet regnes af ansættelsesperioderne. Teamlederens rapporter følger klientens nuværende team for salg og opkald og det frosne team for løn og DB.
 - **Bevis:** hver rapport er ens med 1.0 for to genafspillede perioder og en uge live. En teamleder, der kalder rapporten for et andet team, får kun egne rækker.
 
 #### Trin 5.5 Rekruttering · L
@@ -909,7 +915,7 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
 **Færdigt bagefter:** AMO, compliance-dokumentationen og IT-arbejdspladser kører som moduler på fundamentets log, klassifikation, filer og anonymisering.
 
 - **Afgjort:**
-  - AMO bevares fuldt (11 sider) med den fælles log i stedet for sin egen. Ugegennemgangen køres én gang; i dag kører den to gange.
+  - AMO bevares fuldt (11 sider) med den fælles log i stedet for sin egen. Ugegennemgangen køres én gang; i dag kører den to gange. Rettelse af AMO-loggen sker kun med break-glass.
   - Opbevaringsregler samles ét sted og aktiveres kun af superadmin.
   - En anmodning om GDPR-sletning udføres som anonymisering. Rækker og log består.
   - Læsning af følsomme data logges af databasen.
@@ -972,6 +978,9 @@ Omlægningen er i mål, når alle fem punkter er sande, og kontrolpunkterne hold
 | 18 | Ændringsbeskeder | Kun kontraktens beskeder |
 | 19 | Fælles oversigt | Ingen uafklarede punkter ældre end deres frist |
 | 20 | Tilbagevej | UI én version tilbage virker mod kontrakten, og data er uændret |
+| 21 | GDPR | Indsigtsudtræk, begrænsning og fortegnelse virker, og gennemgangen er signeret af den GDPR-ansvarlige |
+| 22 | Kodesikkerhed | 0 høje eller kritiske fund i hemmelighedsscanning, Dependabot og CodeQL |
+| 23 | Login | Kun Microsoft-login. Ingen aktive adgangskoder |
 
 ## Skæringsdatoer og data der flyttes
 
@@ -980,9 +989,9 @@ Data, der findes i 1.0, flyttes med deres historik. Historik, som 1.0 aldrig har
 | Data | Flyttes med historik | Starter på skæringsdato |
 | --- | --- | --- |
 | Medarbejdere og ansættelser | Alle 329, også stoppede. Gamle medarbejder- og historikrækker kobles til person og ansættelsesforløb med en eksplicit oversigt, fordi den gamle historik kun kobler via navne. Tvivlstilfælde lægges i en afklaringskø | — |
-| Organisation | Teams og medlemskaber, som de står i dag | Datoer for medlemskab og for teams' ejerskab af klienter (fase 1) |
+| Organisation | Teams og medlemskaber, som de står i dag | Datoer for medlemskab (fase 1). Teams' ejerskab af klienter genskabes bagud og godkendes af dig som rapport (2.6) |
 | Klienter, kampagner, produkter, prisregler | Alle, inklusive prisregelhistorik og sammenlægninger | — |
-| Salg og salgslinjer | Alle ca. 71.000 med pris, regel, status og tidligere rettelser | Team frosset på salgsdatoen for salg efter skæringsdatoen. Ældre salg får teamet efter en fast metode, gemt med kilde og tidspunkt. Mangler grundlaget, står teamet som »ukendt« og afklares, hvis en rettelse får økonomisk betydning |
+| Salg og salgslinjer | Alle ca. 71.000 med pris, regel, status og tidligere rettelser | Team frosset på salgsdatoen for salg efter skæringsdatoen. Ældre salg får teamet efter en fast metode, gemt med kilde og tidspunkt. Hvor data er uenige eller mangler, afgør du det i rapporten (2.6), og »ukendt« bruges kun, hvor du har markeret det |
 | **Åbningsgrundlag for gamle salg** | Hver gammel salgslinje får et importeret økonomisk udgangspunkt pr. pengevirkning: det, 1.0's lønregel har talt med for linjen. Det tæller ikke som ny løn, men er grundlaget for senere modposter | Fra skæringsdatoen. Uden det ville en annullering af et gammelt salg give 0 kr. i fradrag |
 | Løn før skæringsdatoen | — | Gemmes som genskabt historik, en senere leverance efter skiftet, med tidspunkt, grundlag og kendte mangler. Den holdes adskilt fra det, der faktisk blev udbetalt, og bliver aldrig grundlag for udbetaling. Eksisterende lønfiler uden for Stork vurderes som selvstændig dokumentation |
 | Vagter | Planlagte mønstre og fravær | Vagter som rækker (fase 4) |
@@ -1004,7 +1013,7 @@ Intet skiftes på en påstand. Hver enhed skal bestå tre prøver før skiftet: 
 | Tid | Timer pr. medarbejder pr. dag og klientfordeling | To genafspillede perioder og en uge live |
 | Tavler og rapporter | Tal pr. tavle, dag og klient | To genafspillede perioder og en uge live |
 
-**Genafspilning.** Data fra dialerne og de andre API'er kan hentes igen. Derfor venter skyggekørslen ikke på en ny lønperiode i drift. En genafspilning af en hel periode tager timer, ikke en måned. Der sammenlignes hele perioder, fordi flere regler først findes på periodeniveau: lederløn med minimum, proratering af månedsløn, loft over dagsbonus og feriepenge. Den anden periode prøver overgangen: annulleringer af salg fra perioden før, underskud, der står, og lederpuljen. Mindst to afsluttede perioder køres igennem begge systemer på de samme data: API-data hentes igen, og 1.0's øvrige data (klientfeedback, vagter, fravær, rettelser) tages fra et fastfrosset udtræk. Ugen live fanger det, genafspilningen ikke kan vise: skrivere, vi ikke kendte, job, der kører på bestemte ugedage, og de rigtige brugeres arbejdsgange. Skiftet sker stadig ved en periodegrænse.
+**Genafspilning.** Salgenes rådata ligger allerede i 1.0, og resten fra dialerne og de andre API'er kan hentes igen. Derfor venter skyggekørslen ikke på en ny lønperiode i drift. En genafspilning af en hel periode tager timer, ikke en måned. Der sammenlignes hele perioder, fordi flere regler først findes på periodeniveau: lederløn med minimum, proratering af månedsløn, loft over dagsbonus og feriepenge. Den anden periode prøver overgangen: annulleringer af salg fra perioden før, underskud, der står, og lederpuljen. Mindst to afsluttede perioder køres igennem begge systemer på de samme data: rådata fra 1.0, suppleret om natten fra kilderne i små portioner, så driftens synkronisering ikke rammer API-grænserne, og 1.0's øvrige data (klientfeedback, vagter, fravær, rettelser) tages fra et fastfrosset udtræk. Ugen live fanger det, genafspilningen ikke kan vise: skrivere, vi ikke kendte, job, der kører på bestemte ugedage, og de rigtige brugeres arbejdsgange. Skiftet sker stadig ved en periodegrænse.
 
 **En fast reference.** 1.0 gemmer ikke sin løn. Den beregnes i browseren og afviger mellem visningerne. Derfor udpeges referencen pr. løngruppe og DB-opgørelse (fx løneksporten), og den køres med fastlåst kodeversion, input, satser, periode og filtre. Resultaterne gemmes, så sammenligningen kan gentages. Bevidste regelændringer godkendes for sig og ændrer ikke referencen.
 
@@ -1051,9 +1060,11 @@ Planen har ingen åbne spørgsmål. Hvert valg er afgjort i sit trin med kilde. 
 | Hvornår | Handling |
 | --- | --- |
 | Nu | Godkendt 19/10-2026 og lagt i denne mappe |
+| Før fase 0 | Ejeren af arbejdsområdet gør dig til admin i Lovable-arbejdsområdet, hvor 1.0 ligger (Workspace settings → People) |
 | Trin 0.1 | Forbinde Lovables MCP-server til Claude. Det er én godkendelse på din konto |
 | Trin 0.3 | Sætte Lovable Cloud-tilladelsen »Execute backward incompatible database migrations« til »Ask each time« |
-| Trin 1.1 | Den udpegede GDPR-ansvarlige bekræfter klassifikationen af ca. 330 persondatafelter |
+| Trin 1.1 | Den GDPR-ansvarlige bekræfter klassifikationen af ca. 330 persondatafelter |
+| Trin 2.6 | Gennemgå rapporten over klienternes team-historik: bekræft, ret eller markér »ukendt« pr. linje |
 | Hvert skift med lønvirkning (2.6 og 3.9) | Godkende listen over afvigelser med kronebeløb pr. medarbejder, før der skiftes |
 | Før trin 5.12 | Sørge for, at alle medarbejdere har en Microsoft-konto. I dag har ikke alle FM-sælgere en Microsoft-konto |
 
@@ -1069,7 +1080,7 @@ Her står de valg, der før var dine beslutninger, og de valg, der er kommet til
 | Skæringsdato for organisationshistorik | Den dag loggen tændes | Hver dags forsinkelse er tabt historik | 0.6 |
 | Én rolle eller personligt tillæg | Én rolle pr. medarbejder. Personlige undtagelser bliver egne roller | Den gamle masterplan §1.7 | 1.8 |
 | Uafklarede persondatafelter | Telefonfelter, også Finansforbundets, gemmes med kampagnens opbevaringsfrist. Lederne-salg gemmes uden telefon, og medlemsnummeret gemmes i 90 dage | Forretningsforståelsen §6 og §11 og 1.0's Lederne-synk | 2.5 |
-| Salg uden prisregel | Basisprisen bliver en synlig basisregel pr. produkt. En linje uden regel venter synligt | Forretningsforståelsen §4 (flag frem for at skjule) | 2.3 og 2.4 |
+| Salg uden prisregel | Basisregel kun, hvor 1.0 bruger basisprisen. Nye produkter og kampagner får ingen, og en linje uden regel venter synligt | Forretningsforståelsen §4 (flag frem for at skjule) | 2.3 og 2.4 |
 | Stempelur som løntimekilde | Fra lønskiftet er vagten eneste kilde, også for dem, 1.0 i dag lønner efter stempel. Forskellen vises i kroner før skiftet | Forretningsforståelsen §5 | 3.6 og 4.3 |
 | Sent salg i låst periode | Bogføres i den ældste åbne periode | Strukturens pengeposteringer | 3.3 |
 | Annulleringer, som 1.0 aldrig trak i lønnen | Trækkes ikke automatisk, fordi 1.0 ikke gemmer, hvad der blev udbetalt. De vises i kroner pr. medarbejder og kan rettes med en korrektion i en åben periode | Forretningsforståelsen §8: brugeren vælger den åbne periode | 3.4 |
@@ -1083,6 +1094,12 @@ Her står de valg, der før var dine beslutninger, og de valg, der er kommet til
 | Modulernes funktioner | Funktioner i brug bevares som moduler. Funktioner uden brug stoppes | Målet om, at 1.0's UI bevares | Fase 5 |
 | Sikkerhedsregler fra 2.0 på hele databasen | Fra fase 0 afvises svækkelser af adgangen, og en rettighedstest kører hver dag. Fra fase 1 logges alle tabeller | Din afgørelse 19/10: »Datasikkerhed er noget af det vigtigste i systemet«. 2.0-masterplanen §1.1–§1.3 | 0.5, 1.1 og 1.2 |
 | Egen backup | De vigtigste tabeller hver time og resten hver nat, uden for Lovable. Kan det ikke bevises, flyttes 1.0 til eget Supabase før fase 1 | Din afgørelse 19/10 | 0.3 |
+| GDPR- og AI-ansvarlig | Udpeget | Din afgørelse 19/10 | 0.3, 1.1 og 1.4 |
+| Genåbning af en udbetalt periode | Superadmin alene med årsag | Din afgørelse 15/10. Afviger fra forretningsforståelsen §8 og §12 | 3.8 |
+| Team-DB | 1.0's formel led for led, også lokationsomkostning og holdudgifter | Afgjort 19/10. Afviger fra den korte formel i forretningsforståelsen §7 | 3.7 |
+| Gendannelse til et tidspunkt | Egen backup hver time af de vigtigste tabeller, og salg kan hentes igen fra dialerne | Afgjort 19/10. Afviger fra 2.0's krav om gendannelse til et tidspunkt før drift | 0.3 |
+| Genafspilning uden separat API-bruger | Rådata fra 1.0, suppleret om natten fra kilderne i små portioner | Din afgørelse 19/10 | 2.5 og 3.9 |
+| Klienternes team før skæringsdatoen | Genskabes fra sælgernes teamhistorik og godkendes af dig som rapport | Din afgørelse 16/5 | 2.6 |
 
 ## Tekniske valg
 
