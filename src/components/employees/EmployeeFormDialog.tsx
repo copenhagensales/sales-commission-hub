@@ -846,14 +846,17 @@ export function EmployeeFormDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Medarbejderen findes allerede</AlertDialogTitle>
             <AlertDialogDescription>
-              {duplicateMatch?.is_active
-                ? `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} er allerede oprettet og aktiv. Ret det eksisterende stamkort i stedet for at oprette en ny medarbejder.`
-                : `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} findes allerede som inaktiv. Genaktivér det eksisterende stamkort, så løn, kontrakter, teamhistorik og login bevares.`}
+              {`Arbejdsmailen${duplicateMatch?.matchedOn === "private_email" ? " (privat e-mail)" : ""} sidder allerede på kortet: ${duplicateMatch?.first_name} ${duplicateMatch?.last_name} — ${duplicateMatch?.is_active ? "aktiv" : "deaktiveret"}, ansat ${duplicateMatch?.employment_start_date ? new Date(duplicateMatch.employment_start_date).toLocaleDateString("da-DK") : "ukendt dato"}. `}
+              {editingEmployee
+                ? "Én arbejdsmail må kun sidde på ét medarbejderkort. Ændringen er ikke gemt."
+                : duplicateMatch?.is_active
+                  ? "Ret det eksisterende kort i stedet for at oprette et nyt."
+                  : "Genaktivér det eksisterende kort, så løn, provision, kontrakter, teamhistorik og login bevares."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Luk</AlertDialogCancel>
-            {duplicateMatch && !duplicateMatch.is_active && (
+            {duplicateMatch && !duplicateMatch.is_active && !editingEmployee && (
               <AlertDialogAction
                 onClick={(e) => {
                   e.preventDefault();
