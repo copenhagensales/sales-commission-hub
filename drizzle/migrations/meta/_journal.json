@@ -246,6 +246,13 @@
       "when": 1792067985210,
       "tag": "0034_can_view_employee_assistant_junction",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792396218771,
+      "tag": "0035_employee_unique_active_auth_and_work_email",
+      "breakpoints": true
     }
   ]
 }
