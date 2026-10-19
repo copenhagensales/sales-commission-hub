@@ -22,7 +22,8 @@ export interface ExistingEmployeeMatch {
  */
 export async function findExistingEmployeeByEmail(
   workEmail?: string | null,
-  privateEmail?: string | null
+  privateEmail?: string | null,
+  excludeEmployeeId?: string
 ): Promise<ExistingEmployeeMatch | null> {
   const columns =
     "id, first_name, last_name, work_email, private_email, is_active, employment_start_date";
@@ -34,10 +35,12 @@ export async function findExistingEmployeeByEmail(
   if (priv) lookups.push({ column: "private_email", value: priv });
 
   for (const { column, value } of lookups) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("employee_master_data")
       .select(columns)
-      .ilike(column, value)
+      .ilike(column, value.replace(/[%_\\]/g, "\\$&"));
+    if (excludeEmployeeId) query = query.neq("id", excludeEmployeeId);
+    const { data, error } = await query
       .order("is_active", { ascending: false })
       .limit(1);
 

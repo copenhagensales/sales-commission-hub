@@ -28,6 +28,7 @@ import {
   type ExistingEmployeeMatch,
 } from "@/lib/employees/findExistingEmployeeByEmail";
 import { activateEmployee, resolveActivationStartDate } from "@/lib/employees/activateEmployee";
+import { describeEmployeeSaveError } from "@/lib/employees/employeeSaveErrors";
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -145,6 +146,8 @@ export function EmployeeFormDialog({
   const [saving, setSaving] = useState(false);
   const [duplicateMatch, setDuplicateMatch] = useState<ExistingEmployeeMatch | null>(null);
   const [reactivating, setReactivating] = useState(false);
+  const warnedEmailRef = useRef<string | null>(null);
+  const lastAutoSaveErrorRef = useRef<string | null>(null);
   const [openSections, setOpenSections] = useState<string[]>(["identity"]);
 
   const handleReactivate = async () => {
@@ -264,12 +267,31 @@ export function EmployeeFormDialog({
     }
   };
 
+  // Returnerer et andet kort, hvis arbejdsmailen er ændret til en mail der allerede bruges.
+  const findWorkEmailConflict = useCallback(async (): Promise<ExistingEmployeeMatch | null> => {
+    if (!editingEmployee) return null;
+    const next = formData.work_email?.trim().toLowerCase() ?? "";
+    const prev = editingEmployee.work_email?.trim().toLowerCase() ?? "";
+    if (!next || next === prev) return null;
+    return findExistingEmployeeByEmail(next, null, editingEmployee.id);
+  }, [editingEmployee, formData.work_email]);
+
   // Auto-save function for editing existing employee
   const autoSaveEmployee = useCallback(async () => {
     if (!editingEmployee) return;
 
     setAutoSaving(true);
     try {
+      const conflict = await findWorkEmailConflict();
+      if (conflict) {
+        const key = conflict.work_email?.toLowerCase() ?? "";
+        if (warnedEmailRef.current !== key) {
+          warnedEmailRef.current = key;
+          setDuplicateMatch(conflict);
+        }
+        return;
+      }
+
       const isDeactivating = editingEmployee.is_active && formData.is_active === false;
       const teamId = isDeactivating ? await snapshotEmployeeTeamId(editingEmployee.id) : null;
 
@@ -278,26 +300,33 @@ export function EmployeeFormDialog({
         .update(formData)
         .eq("id", editingEmployee.id);
 
-      if (!error) {
-        setLastSaved(new Date());
-        queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-
-        // Same notification path as the employee lists (server resolves recipients)
-        if (isDeactivating && !deactivationNotifiedRef.current) {
-          deactivationNotifiedRef.current = true;
-          await notifyEmployeeDeactivated({
-            employeeId: editingEmployee.id,
-            source: "employee-form",
-            teamId,
-          });
+      if (error) {
+        const { message } = describeEmployeeSaveError(error);
+        if (lastAutoSaveErrorRef.current !== message) {
+          lastAutoSaveErrorRef.current = message;
+          toast({ title: "Ændringen blev ikke gemt", description: message, variant: "destructive" });
         }
+        return;
+      }
+      lastAutoSaveErrorRef.current = null;
+      setLastSaved(new Date());
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+
+      // Same notification path as the employee lists (server resolves recipients)
+      if (isDeactivating && !deactivationNotifiedRef.current) {
+        deactivationNotifiedRef.current = true;
+        await notifyEmployeeDeactivated({
+          employeeId: editingEmployee.id,
+          source: "employee-form",
+          teamId,
+        });
       }
     } catch (err) {
       console.error("Auto-save error:", err);
     } finally {
       setAutoSaving(false);
     }
-  }, [editingEmployee, formData, queryClient]);
+  }, [editingEmployee, formData, queryClient, findWorkEmailConflict, toast]);
 
 
   // Debounced auto-save when form changes
@@ -320,6 +349,12 @@ export function EmployeeFormDialog({
     setSaving(true);
     try {
       if (editingEmployee) {
+        const conflict = await findWorkEmailConflict();
+        if (conflict) {
+          setSaving(false);
+          setDuplicateMatch(conflict);
+          return;
+        }
         const isDeactivating = editingEmployee.is_active && formData.is_active === false;
         const teamId = isDeactivating ? await snapshotEmployeeTeamId(editingEmployee.id) : null;
 
@@ -348,14 +383,12 @@ export function EmployeeFormDialog({
         if (error) throw error;
       }
 
-
-      
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: editingEmployee ? t("employees.toast.updated") : t("employees.toast.created") });
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      toast({ title: t("employees.toast.error"), description: (error as Error).message, variant: "destructive" });
+      toast({ title: t("employees.toast.error"), description: describeEmployeeSaveError(error).message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -813,14 +846,17 @@ export function EmployeeFormDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Medarbejderen findes allerede</AlertDialogTitle>
             <AlertDialogDescription>
-              {duplicateMatch?.is_active
-                ? `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} er allerede oprettet og aktiv. Ret det eksisterende stamkort i stedet for at oprette en ny medarbejder.`
-                : `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} findes allerede som inaktiv. Genaktivér det eksisterende stamkort, så løn, kontrakter, teamhistorik og login bevares.`}
+              {`Arbejdsmailen${duplicateMatch?.matchedOn === "private_email" ? " (privat e-mail)" : ""} sidder allerede på kortet: ${duplicateMatch?.first_name} ${duplicateMatch?.last_name} — ${duplicateMatch?.is_active ? "aktiv" : "deaktiveret"}, ansat ${duplicateMatch?.employment_start_date ? new Date(duplicateMatch.employment_start_date).toLocaleDateString("da-DK") : "ukendt dato"}. `}
+              {editingEmployee
+                ? "Én arbejdsmail må kun sidde på ét medarbejderkort. Ændringen er ikke gemt."
+                : duplicateMatch?.is_active
+                  ? "Ret det eksisterende kort i stedet for at oprette et nyt."
+                  : "Genaktivér det eksisterende kort, så løn, provision, kontrakter, teamhistorik og login bevares."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Luk</AlertDialogCancel>
-            {duplicateMatch && !duplicateMatch.is_active && (
+            {duplicateMatch && !duplicateMatch.is_active && !editingEmployee && (
               <AlertDialogAction
                 onClick={(e) => {
                   e.preventDefault();
