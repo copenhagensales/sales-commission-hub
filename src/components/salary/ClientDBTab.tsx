@@ -161,12 +161,13 @@ export function ClientDBTab() {
     [chartDb.totals, chartOverhead.total]
   );
 
-  // Vægtet forventet annullering i 31-dages vinduet (pr. klient-sats vægtet med klientens salgsomsætning)
+  // Forventet annullering: de indtastede satser pr. klient i tabellen ovenfor,
+  // vægtet med klientens salgsomsætning i den valgte periode
   const chartCancellationFactor = useMemo(() => {
-    const gross = chartDb.clientRows.reduce((s, r) => s + r.revenue, 0);
-    const deduction = chartDb.clientRows.reduce((s, r) => s + r.cancellationRevenueDeduction, 0);
+    const gross = clientRows.reduce((s, r) => s + r.revenue, 0);
+    const deduction = clientRows.reduce((s, r) => s + r.revenue * (r.cancellationPercent / 100), 0);
     return gross > 0 ? 1 - deduction / gross : 1;
-  }, [chartDb.clientRows]);
+  }, [clientRows]);
 
   const { data: previousPeriodData, previousPeriodLabel } = useClientPeriodComparison(
     periodStart,
