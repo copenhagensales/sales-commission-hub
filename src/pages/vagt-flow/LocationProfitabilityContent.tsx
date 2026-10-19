@@ -235,7 +235,7 @@ export default function LocationProfitabilityContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("id, sale_datetime, raw_payload, sale_items(mapped_commission, mapped_revenue, quantity, product_id, products(counts_as_sale))")
+        .select("id, sale_datetime, raw_payload, client_campaigns(client_id), sale_items(mapped_commission, mapped_revenue, quantity, product_id, products(counts_as_sale))")
         .gte("sale_datetime", startStr + "T00:00:00")
         .lte("sale_datetime", endStr + "T23:59:59")
         .eq("source", "fieldmarketing")
@@ -433,10 +433,15 @@ export default function LocationProfitabilityContent() {
         if (countsAsSale) salesCount += item.quantity || 1;
       }
 
-      // Determine which client this sale belongs to
+      // Determine which client this sale belongs to: the sale's own client first,
+      // booked day only as fallback (two clients can share location + day)
       const clientList = clientsByLocation.get(locId) || [];
+      const saleClientId: string | undefined = (sale as { client_campaigns?: { client_id?: string } | null }).client_campaigns?.client_id;
       let targetClientId: string | null = null;
-      if (clientList.length === 1) {
+      const ownClient = saleClientId ? clientList.find(c => c.clientId === saleClientId) : undefined;
+      if (ownClient) {
+        targetClientId = ownClient.clientId;
+      } else if (clientList.length === 1) {
         targetClientId = clientList[0].clientId;
       } else if (clientList.length > 1) {
         const matching = clientList.find(c => c.bookedDays.includes(dayNum));
