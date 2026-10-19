@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { format, parseISO } from "date-fns";
+import { da } from "date-fns/locale";
 
 interface DateAggregate {
   revenue: number;
@@ -32,7 +33,7 @@ export function ClientDBDailyRevenueChart({ byDate, cancellationFactor, isLoadin
     return Object.entries(groups)
       .map(([key, g]) => ({
         date: key,
-        label: groupBy === "month" ? format(parseISO(`${key}-01`), "MMM yy") : format(parseISO(key), "d/M"),
+        label: groupBy === "month" ? format(parseISO(`${key}-01`), "MMM yy", { locale: da }) : format(parseISO(key), "d/M"),
         omsaetning: Math.round(g.revenue * cancellationFactor),
         sales: g.sales,
       }))
