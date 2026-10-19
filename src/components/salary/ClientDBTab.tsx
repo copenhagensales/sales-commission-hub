@@ -754,6 +754,14 @@ export function ClientDBTab() {
         isLoading={chartDb.isLoading || monthlyAggregatesLoading}
       />
 
+      <ClientDBDailyRevenueChart
+        groupBy="month"
+        metric="db"
+        byDate={monthlyAggregates?.byDate || {}}
+        cancellationFactor={chartCancellationFactor}
+        isLoading={chartDb.isLoading || monthlyAggregatesLoading}
+      />
+
       {selectedClientForDaily && (
         <ClientDBDailyBreakdown
           clientId={selectedClientForDaily.id}
