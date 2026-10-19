@@ -7605,6 +7605,7 @@ export type Database = {
           address_country: string | null
           address_postal_code: string | null
           address_street: string | null
+          archived_at: string | null
           auth_user_id: string | null
           avatar_url: string | null
           bank_account_number: string | null
@@ -7637,9 +7638,12 @@ export type Database = {
           last_team_id: string | null
           locked_at: string | null
           manager_id: string | null
+          merged_into_employee_id: string | null
           mfa_enabled: boolean | null
           must_change_password: boolean | null
           onboarding_data_complete: boolean | null
+          original_start_date: string | null
+          original_start_date_derived: boolean
           parking_monthly_cost: number | null
           parking_spot_id: string | null
           personnel_category: string | null
@@ -7671,6 +7675,7 @@ export type Database = {
           address_country?: string | null
           address_postal_code?: string | null
           address_street?: string | null
+          archived_at?: string | null
           auth_user_id?: string | null
           avatar_url?: string | null
           bank_account_number?: string | null
@@ -7703,9 +7708,12 @@ export type Database = {
           last_team_id?: string | null
           locked_at?: string | null
           manager_id?: string | null
+          merged_into_employee_id?: string | null
           mfa_enabled?: boolean | null
           must_change_password?: boolean | null
           onboarding_data_complete?: boolean | null
+          original_start_date?: string | null
+          original_start_date_derived?: boolean
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
           personnel_category?: string | null
@@ -7737,6 +7745,7 @@ export type Database = {
           address_country?: string | null
           address_postal_code?: string | null
           address_street?: string | null
+          archived_at?: string | null
           auth_user_id?: string | null
           avatar_url?: string | null
           bank_account_number?: string | null
@@ -7769,9 +7778,12 @@ export type Database = {
           last_team_id?: string | null
           locked_at?: string | null
           manager_id?: string | null
+          merged_into_employee_id?: string | null
           mfa_enabled?: boolean | null
           must_change_password?: boolean | null
           onboarding_data_complete?: boolean | null
+          original_start_date?: string | null
+          original_start_date_derived?: boolean
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
           personnel_category?: string | null
@@ -7829,6 +7841,27 @@ export type Database = {
           {
             foreignKeyName: "employee_master_data_manager_id_fkey"
             columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_merged_into_employee_id_fkey"
+            columns: ["merged_into_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_merged_into_employee_id_fkey"
+            columns: ["merged_into_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_merged_into_employee_id_fkey"
+            columns: ["merged_into_employee_id"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
@@ -8726,6 +8759,58 @@ export type Database = {
           },
           {
             foreignKeyName: "employee_time_clocks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_work_email_history: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          note: string | null
+          valid_from: string | null
+          valid_to: string | null
+          work_email: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          note?: string | null
+          valid_from?: string | null
+          valid_to?: string | null
+          work_email: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          note?: string | null
+          valid_from?: string | null
+          valid_to?: string | null
+          work_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_work_email_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_work_email_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_work_email_history_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
