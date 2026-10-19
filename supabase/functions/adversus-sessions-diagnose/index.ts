@@ -34,7 +34,8 @@ function addDays(day: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-async function main(req: Request) {
+// deno-lint-ignore no-explicit-any -- service-klient fra requireCronOrOwner (3rd party)
+async function main(req: Request, svc: any) {
   const user = Deno.env.get("ADVERSUS_API_USERNAME");
   const pass = Deno.env.get("ADVERSUS_API_PASSWORD");
   if (!user || !pass) return json(500, { error: "Main-kontoens Adversus-legitimation mangler" });
@@ -54,6 +55,80 @@ async function main(req: Request) {
   };
 
   const url = new URL(req.url);
+  if (url.searchParams.get("mode") === "backfill") {
+    // Engangskørsel uge 1–29 2026 (main). Pr. (kampagne, uge): slet main-rækker, indsæt nye.
+    // Eneste mode der skriver: weekly_lead_closure_stats, kun aggregerede tal.
+    const ALLOWED = ["80333","109837","104520","109839","104835","109840","104837","109841","87918","109838","87912"];
+    const MIN_WEEK = "2025-12-29", MAX_WEEK = "2026-07-13";
+    const cid = url.searchParams.get("campaign") ?? "";
+    const wf = url.searchParams.get("from") ?? "", wt = url.searchParams.get("to") ?? "";
+    if (!ALLOWED.includes(cid)) return json(400, { error: "Kampagne uden for omfang" });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(wf) || !/^\d{4}-\d{2}-\d{2}$/.test(wt) || wf < MIN_WEEK || wt > MAX_WEEK) return json(400, { error: "Uger uden for omfang" });
+    if (new Date(`${wf}T00:00:00Z`).getUTCDay() !== 1) return json(400, { error: "from skal være mandag" });
+    const { data: mapRow } = await svc.from("weekly_lead_report_campaign_map").select("report_line").eq("account", "main").eq("adversus_campaign_id", cid).maybeSingle();
+    const reportLine = s(mapRow?.report_line);
+    const us = await get("/users?pageSize=1000");
+    const ua = (Array.isArray(us.data) ? us.data : (us.data as Row)?.users ?? []) as Row[];
+    const ours = new Set(ua.filter((u) => s(u.email ?? u.username).toLowerCase().endsWith(OUR_DOMAIN)).map((u) => s(u.id)));
+    // Brugere slettet i Adversus findes kun i Storks agentliste og salgsregistret.
+    const { data: ag } = await svc.from("agents").select("external_adversus_id, external_dialer_id, email").eq("source", "adversus");
+    for (const a of (ag ?? []) as Row[]) {
+      if (!s(a.email).toLowerCase().endsWith(OUR_DOMAIN)) continue;
+      for (const k of [s(a.external_adversus_id), s(a.external_dialer_id)]) if (k) ours.add(k);
+    }
+    for (let from = 0; ; from += 1000) {
+      const { data: sx, error: se } = await svc.from("sales").select("agent_external_id")
+        .eq("integration_type", "adversus").ilike("agent_email", `%${OUR_DOMAIN}`).not("agent_external_id", "is", null)
+        .gte("sale_datetime", "2025-06-01").order("id").range(from, from + 999);
+      if (se) return json(500, { error: "Kunne ikke læse salgsregistrets agent-id'er" });
+      for (const r of (sx ?? []) as Row[]) { const k = s(r.agent_external_id); if (k) ours.add(k); }
+      if (!sx || sx.length < 1000) break;
+    }
+    if (ours.size === 0) return json(500, { error: "Ingen brugere hentet — afbryder" });
+    const out: Row[] = [];
+    for (let week = wf; week <= wt; week = addDays(week, 7)) {
+      const fromIso = cphOffsetIso(week), toIso = cphOffsetIso(addDays(week, 7));
+      const all: Row[] = []; const seen = new Set<string>(); let failed: number | null = null;
+      for (let page = 1; page <= 200; page++) {
+        const filter = { campaignId: { $eq: Number(cid) }, startTime: { $gt: fromIso, $lt: toIso } };
+        const r = await get(`/sessions?filters=${encodeURIComponent(JSON.stringify(filter))}&page=${page}&pageSize=${PAGE_SIZE}&sortProperty=startTime&sortDirection=ASC`);
+        if (r.status !== 200) { failed = r.status; break; }
+        const arr = (Array.isArray(r.data) ? r.data : (r.data as Row)?.sessions ?? []) as Row[];
+        for (const x of arr) { const id = s(x.id); if (id && !seen.has(id) && s(x.campaignId) === cid) { seen.add(id); all.push(x); } }
+        if (arr.length < PAGE_SIZE) break;
+        if (page === 200) failed = -1;
+      }
+      if (failed !== null) return json(502, { error: `Hentning fejlede uge ${week} (status ${failed}) — intet gemt for denne uge`, færdige: out });
+      const latest = new Map<string, Row>();
+      for (const x of all) {
+        if (!CLOSED.has(s(x.status))) continue;
+        const lead = s(x.leadId); if (!lead) continue;
+        const t = s(x.endTime) || s(x.startTime); const prev = latest.get(lead);
+        if (!prev || t > (s(prev.endTime) || s(prev.startTime))) latest.set(lead, x);
+      }
+      const counts: Record<string, number> = {}; let andre = 0;
+      for (const x of latest.values()) {
+        const uid = s(x.userId);
+        const ref = !uid || uid === "0" ? "main:system" : ours.has(uid) ? `main:${uid}` : null;
+        if (!ref) { andre++; continue; }
+        inc(counts, `${ref}|${s(x.status)}`);
+      }
+      const rows = Object.entries(counts).map(([k, n]) => {
+        const [agent_reference, status] = k.split("|");
+        return { week_start: week, account: "main", adversus_campaign_id: cid, report_line: reportLine, agent_reference, status, invalid_reason: "", lead_count: n };
+      });
+      const del = await svc.from("weekly_lead_closure_stats").delete().eq("account", "main").eq("adversus_campaign_id", cid).eq("week_start", week).select("lead_count");
+      if (del.error) return json(500, { error: `Sletning fejlede uge ${week}`, færdige: out });
+      if (rows.length) {
+        const { error } = await svc.rpc("weekly_lead_closure_add", { _rows: rows });
+        if (error) return json(500, { error: `Indsættelse fejlede uge ${week}: ${error.message}`, færdige: out });
+      }
+      const byStatus: Record<string, number> = {};
+      for (const [k, n] of Object.entries(counts)) inc(byStatus, k.split("|")[1], n);
+      out.push({ uge: week, sessions: all.length, slettedeRækker: (del.data ?? []).length, indsatteRækker: rows.length, prStatus: byStatus, andreBrugere: andre });
+    }
+    return json(200, { kampagne: cid, egne: ours.size, uger: out, apiKald: apiCalls });
+  }
   if (url.searchParams.get("mode") === "probe") {
     const cid = url.searchParams.get("campaign") ?? "80333";
     const out: Row[] = [];
@@ -161,7 +236,7 @@ Deno.serve(async (req) => {
   const auth = await requireCronOrOwner(req);
   if (auth instanceof Response) return auth;
   try {
-    return await main(req);
+    return await main(req, auth.svc);
   } catch (e) {
     return json(500, { error: e instanceof Error ? e.message : "Ukendt fejl" });
   }
