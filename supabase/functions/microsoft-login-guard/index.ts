@@ -19,6 +19,8 @@ const NOT_EMPLOYEE_MSG =
   "Din konto er ikke oprettet i Stork — kontakt din teamleder";
 const NEEDS_LINK_MSG =
   "Din konto skal opdateres før Microsoft-login — kontakt administrationen";
+const MULTIPLE_MSG =
+  "Flere medarbejderkort matcher din mail — kontakt administrationen, så kortene kan rettes";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -87,6 +89,23 @@ Deno.serve(async (req) => {
       allowed: false,
       reason: "not_employee",
       message: NOT_EMPLOYEE_MSG,
+      cleaned_up: deleted,
+    });
+  }
+
+  // 3b. Flere AKTIVE kort matcher mailen -> login er tvetydigt: afvis og log årsagen
+  if (employees.length > 1) {
+    await svc.from("failed_login_attempts").insert({
+      email,
+      failure_reason: "flere medarbejderkort matcher",
+      origin: "microsoft-login-guard",
+      user_agent: req.headers.get("user-agent"),
+    });
+    const deleted = await cleanupOrphanUser();
+    return json(200, {
+      allowed: false,
+      reason: "multiple_employees",
+      message: MULTIPLE_MSG,
       cleaned_up: deleted,
     });
   }
