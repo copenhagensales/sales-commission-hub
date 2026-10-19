@@ -264,12 +264,31 @@ export function EmployeeFormDialog({
     }
   };
 
+  // Returnerer et andet kort, hvis arbejdsmailen er ændret til en mail der allerede bruges.
+  const findWorkEmailConflict = useCallback(async (): Promise<ExistingEmployeeMatch | null> => {
+    if (!editingEmployee) return null;
+    const next = formData.work_email?.trim().toLowerCase() ?? "";
+    const prev = editingEmployee.work_email?.trim().toLowerCase() ?? "";
+    if (!next || next === prev) return null;
+    return findExistingEmployeeByEmail(next, null, editingEmployee.id);
+  }, [editingEmployee, formData.work_email]);
+
   // Auto-save function for editing existing employee
   const autoSaveEmployee = useCallback(async () => {
     if (!editingEmployee) return;
 
     setAutoSaving(true);
     try {
+      const conflict = await findWorkEmailConflict();
+      if (conflict) {
+        const key = conflict.work_email?.toLowerCase() ?? "";
+        if (warnedEmailRef.current !== key) {
+          warnedEmailRef.current = key;
+          setDuplicateMatch(conflict);
+        }
+        return;
+      }
+
       const isDeactivating = editingEmployee.is_active && formData.is_active === false;
       const teamId = isDeactivating ? await snapshotEmployeeTeamId(editingEmployee.id) : null;
 
@@ -278,26 +297,33 @@ export function EmployeeFormDialog({
         .update(formData)
         .eq("id", editingEmployee.id);
 
-      if (!error) {
-        setLastSaved(new Date());
-        queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-
-        // Same notification path as the employee lists (server resolves recipients)
-        if (isDeactivating && !deactivationNotifiedRef.current) {
-          deactivationNotifiedRef.current = true;
-          await notifyEmployeeDeactivated({
-            employeeId: editingEmployee.id,
-            source: "employee-form",
-            teamId,
-          });
+      if (error) {
+        const { message } = describeEmployeeSaveError(error);
+        if (lastAutoSaveErrorRef.current !== message) {
+          lastAutoSaveErrorRef.current = message;
+          toast({ title: "Ændringen blev ikke gemt", description: message, variant: "destructive" });
         }
+        return;
+      }
+      lastAutoSaveErrorRef.current = null;
+      setLastSaved(new Date());
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+
+      // Same notification path as the employee lists (server resolves recipients)
+      if (isDeactivating && !deactivationNotifiedRef.current) {
+        deactivationNotifiedRef.current = true;
+        await notifyEmployeeDeactivated({
+          employeeId: editingEmployee.id,
+          source: "employee-form",
+          teamId,
+        });
       }
     } catch (err) {
       console.error("Auto-save error:", err);
     } finally {
       setAutoSaving(false);
     }
-  }, [editingEmployee, formData, queryClient]);
+  }, [editingEmployee, formData, queryClient, findWorkEmailConflict, toast]);
 
 
   // Debounced auto-save when form changes
