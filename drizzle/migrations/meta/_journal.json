@@ -267,6 +267,13 @@
       "when": 1792397390944,
       "tag": "0037_employee_archive_and_email_history",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792400183423,
+      "tag": "0038_employee_unique_work_email_all_cards",
+      "breakpoints": true
     }
   ]
 }

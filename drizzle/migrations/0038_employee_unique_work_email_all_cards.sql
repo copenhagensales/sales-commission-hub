@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS employee_master_data_work_email_unique_all ON public.employee_master_data (lower(work_email)) WHERE work_email IS NOT NULL;
