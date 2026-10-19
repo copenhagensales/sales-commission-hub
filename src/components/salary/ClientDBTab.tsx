@@ -139,6 +139,18 @@ export function ClientDBTab() {
     enabled: true,
   });
 
+  // --- 12 måneder tilbage (inkl. indeværende) til månedsgrafen ---
+  const monthlyPeriodStart = useMemo(() => {
+    const d = new Date();
+    return startOfMonth(new Date(d.getFullYear(), d.getMonth() - 11, 1));
+  }, []);
+  const { data: monthlyAggregates, isLoading: monthlyAggregatesLoading } = useSalesAggregatesExtended({
+    periodStart: monthlyPeriodStart,
+    periodEnd: chartPeriodEnd,
+    groupBy: ["date"],
+    enabled: true,
+  });
+
   const chartDb = useClientDbData({
     periodStart: chartPeriodStart,
     periodEnd: chartPeriodEnd,
@@ -737,9 +749,9 @@ export function ClientDBTab() {
 
       <ClientDBDailyRevenueChart
         groupBy="month"
-        byDate={dailyAggregates?.byDate || {}}
+        byDate={monthlyAggregates?.byDate || {}}
         cancellationFactor={chartCancellationFactor}
-        isLoading={chartDb.isLoading || dailyAggregatesLoading}
+        isLoading={chartDb.isLoading || monthlyAggregatesLoading}
       />
 
       {selectedClientForDaily && (
