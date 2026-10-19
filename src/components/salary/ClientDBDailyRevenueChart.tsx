@@ -15,22 +15,29 @@ interface Props {
   /** 1 - vægtet forventet annulleringsprocent for perioden */
   cancellationFactor: number;
   isLoading: boolean;
+  /** Gruppér pr. dag (standard) eller pr. måned */
+  groupBy?: "day" | "month";
 }
 
 /** Brutto-omsætning pr. dag fra salg, kun fratrukket forventede annulleringer. */
-export function ClientDBDailyRevenueChart({ byDate, cancellationFactor, isLoading }: Props) {
-  const data = useMemo(
-    () =>
-      Object.entries(byDate || {})
-        .map(([date, d]) => ({
-          date,
-          label: format(parseISO(date), "d/M"),
-          omsaetning: Math.round(d.revenue * cancellationFactor),
-          sales: d.sales,
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [byDate, cancellationFactor]
-  );
+export function ClientDBDailyRevenueChart({ byDate, cancellationFactor, isLoading, groupBy = "day" }: Props) {
+  const data = useMemo(() => {
+    const groups: Record<string, { revenue: number; sales: number }> = {};
+    for (const [date, d] of Object.entries(byDate || {})) {
+      const key = groupBy === "month" ? date.slice(0, 7) : date;
+      const g = (groups[key] ||= { revenue: 0, sales: 0 });
+      g.revenue += d.revenue;
+      g.sales += d.sales;
+    }
+    return Object.entries(groups)
+      .map(([key, g]) => ({
+        date: key,
+        label: groupBy === "month" ? format(parseISO(`${key}-01`), "MMM yy") : format(parseISO(key), "d/M"),
+        omsaetning: Math.round(g.revenue * cancellationFactor),
+        sales: g.sales,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [byDate, cancellationFactor, groupBy]);
 
   const total = data.reduce((s, d) => s + d.omsaetning, 0);
   const pct = Math.round((1 - cancellationFactor) * 1000) / 10;
@@ -44,7 +51,7 @@ export function ClientDBDailyRevenueChart({ byDate, cancellationFactor, isLoadin
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Omsætning pr. dag (brutto)
+            {groupBy === "month" ? "Omsætning pr. måned (brutto)" : "Omsætning pr. dag (brutto)"}
           </CardTitle>
           {!isLoading && (
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
