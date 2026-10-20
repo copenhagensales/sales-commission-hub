@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { TrygReportExports } from "@/components/reports/TrygReportExports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -550,6 +551,7 @@ export default function WeeklyLeadClosureReport() {
   return (
     <MainLayout>
       <div className="space-y-6 p-4 md:p-6">
+        <TrygReportExports />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Tryg – ugerapport</h1>
