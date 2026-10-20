@@ -12,13 +12,27 @@ export function CompleteProfileBanner() {
       if (!userData.user) return false;
 
       const lowerEmail = userData.user.email?.toLowerCase() || '';
-      const { data: employee, error } = await supabase
+      const { data: row, error } = await supabase
         .from("employee_master_data")
-        .select("onboarding_data_complete, cpr_number, address_street, bank_account_number")
+        .select("id, onboarding_data_complete")
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
-      if (error || !employee) return false;
+      if (error || !row) return false;
+
+      // CPR/adresse/bank hentes via stork_hent_foelsomme_felter for eget id.
+      const { data: sensitive, error: sensitiveError } = await supabase.rpc(
+        "stork_hent_foelsomme_felter",
+        { p_ids: [row.id] },
+      );
+      if (sensitiveError) return false;
+      const s = sensitive?.[0];
+      const employee = {
+        onboarding_data_complete: row.onboarding_data_complete,
+        cpr_number: s?.cpr_number ?? null,
+        address_street: s?.address_street ?? null,
+        bank_account_number: s?.bank_account_number ?? null,
+      };
 
       // Check if onboarding_data_complete is explicitly false, 
       // or if critical fields are missing

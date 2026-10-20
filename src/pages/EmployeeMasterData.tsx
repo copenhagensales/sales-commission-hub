@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { attachSalaryAmount, saveSalaryDetails } from "@/lib/salary/salaryDetails";
+import { EMPLOYEE_SAFE_COLUMNS, attachSensitiveFields } from "@/lib/employees/safeColumns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -218,12 +219,14 @@ export default function EmployeeMasterData() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("*")
+        .select(EMPLOYEE_SAFE_COLUMNS)
         .eq("is_staff_employee", false)
         .order("last_name", { ascending: true });
       if (error) throw error;
+      // CPR/bank/adresse hentes via stork_hent_foelsomme_felter (logget, rettighedstjek i DB).
+      const withSensitive = await attachSensitiveFields(data ?? []);
       // Lønbeløb ligger i den beskyttede løntabel; RLS bestemmer hvad der kommer med.
-      const withSalary = await attachSalaryAmount(data ?? []);
+      const withSalary = await attachSalaryAmount(withSensitive);
       return withSalary as unknown as EmployeeMasterDataRecord[];
     },
     staleTime: 0,
@@ -483,7 +486,7 @@ export default function EmployeeMasterData() {
         .from("employee_master_data")
         .update(updateData)
         .eq("id", id)
-        .select();
+        .select("id");
       if (error) throw error;
       if (!data || data.length === 0) {
         throw new Error("Du har ikke rettighed til at ændre denne medarbejder");

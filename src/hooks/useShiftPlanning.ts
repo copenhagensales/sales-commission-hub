@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { attachSalaryAmount, fetchSalaryDetails } from "@/lib/salary/salaryDetails";
+import { EMPLOYEE_SAFE_COLUMNS } from "@/lib/employees/safeColumns";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { parseISO, startOfDay } from "date-fns";
@@ -614,7 +615,7 @@ export function useCurrentEmployee() {
       const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("*")
+        .select(EMPLOYEE_SAFE_COLUMNS)
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 

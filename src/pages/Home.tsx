@@ -199,27 +199,20 @@ const Home = () => {
     queryKey: ["home-celebrations"],
     queryFn: async () => {
       const today = new Date();
-      const { data: employees } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, employment_start_date, cpr_number")
-        .eq("is_active", true);
+      // Aktive kolleger med fødselsdato fra databasen (ingen CPR i browseren).
+      const { data: employees } = await supabase.rpc("stork_foedselsdage");
       
       const results: { employeeId: string; type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
       
-      const parseCprBirthday = (cpr: string): Date | null => {
-        if (!cpr || cpr.length < 6) return null;
-        const day = parseInt(cpr.substring(0, 2), 10);
-        const month = parseInt(cpr.substring(2, 4), 10) - 1;
-        let year = parseInt(cpr.substring(4, 6), 10);
-        const currentYearShort = today.getFullYear() % 100;
-        year = year > currentYearShort ? 1900 + year : 2000 + year;
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-        return new Date(year, month, day);
+      const parseBirthday = (iso: string): Date | null => {
+        const [y, m, d] = iso.split("-").map((p) => parseInt(p, 10));
+        if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+        return new Date(y, m - 1, d);
       };
       
       employees?.forEach(emp => {
-        if (emp.cpr_number) {
-          const birthDate = parseCprBirthday(emp.cpr_number);
+        if (emp.foedselsdato) {
+          const birthDate = parseBirthday(emp.foedselsdato);
           if (birthDate) {
             const birthdayThisYear = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
             const age = differenceInYears(today, birthDate);

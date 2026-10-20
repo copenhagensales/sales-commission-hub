@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchSalaryDetails, saveSalaryDetails, logSalaryAccess } from "@/lib/salary/salaryDetails";
+import { EMPLOYEE_SAFE_COLUMNS, attachSensitiveFields } from "@/lib/employees/safeColumns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -109,13 +110,14 @@ export default function EmployeeDetail() {
     queryKey: ["employee-detail", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
+      const { data: raw, error } = await supabase
         .from("employee_master_data")
-        .select("*")
+        .select(EMPLOYEE_SAFE_COLUMNS)
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
-      if (!data) return null;
+      if (!raw) return null;
+      const [data] = await attachSensitiveFields([raw]);
       // Lønbeløbet ligger i den beskyttede løntabel; RLS afgør om det følger med.
       const salary = await fetchSalaryDetails(id);
       if (salary?.amount != null) {
