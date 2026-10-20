@@ -62,7 +62,7 @@ import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBa
 import { QualityFeedbackInbox } from "@/components/quality/QualityFeedbackInbox";
 import { EventGallery } from "@/components/home/EventGallery";
 import { RampCurveCard } from "@/components/ramp/RampCurveCard";
-import { NextEventHero } from "@/components/home/NextEventHero";
+import { EventRsvpCard } from "@/components/home/EventRsvpCard";
 
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
@@ -576,7 +576,7 @@ const Home = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
                 <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
-                Næste begivenhed
+                Begivenheder
               </CardTitle>
 
               <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
@@ -708,219 +708,27 @@ const Home = () => {
                 <p className="text-xs opacity-70">Tilføj en begivenhed med + knappen ovenfor</p>
               </div>
             ) : (
-              (() => {
-                const [featured, ...rest] = companyEvents.slice(0, 3);
-                const attendees = getEventAttendees(featured.id);
-                const myStatus = getMyAttendance(featured.id);
-                const daysUntil = differenceInDays(parseISO(featured.event_date), new Date());
-                const whenLabel =
-                  daysUntil < 0
-                    ? null
-                    : daysUntil === 0
-                      ? "I dag"
-                      : daysUntil === 1
-                        ? "I morgen"
-                        : `Om ${daysUntil} dage`;
-                const initials = (a: any) =>
-                  `${a.employee?.first_name?.[0] ?? ""}${a.employee?.last_name?.[0] ?? ""}`.toUpperCase();
-
-                return (
-                  <div className="flex flex-col gap-5">
-                    {/* Fremhævet begivenhed – countdown-hero */}
-                    <NextEventHero
-                      eventDate={parseISO(featured.event_date)}
-                      eventTime={featured.event_time}
-                      title={featured.title}
-                      location={featured.location}
-                      onOpenDetail={() => setSelectedEventForDetail(featured.id)}
-                      canManage={canManageEvents}
-                      onEdit={() => setEditingEvent(featured.id)}
-                      onDelete={() => deleteEventMutation.mutate(featured.id)}
-                    />
-
-
-                    {/* Deltagere */}
-                    {attendees.length > 0 && (
-                      <HoverCard>
-                        <HoverCardTrigger asChild>
-                          <div className="flex cursor-pointer items-center gap-2.5">
-                            <div className="flex">
-                              {attendees.slice(0, 3).map((a, i) => {
-                                const attendeeAvatar = lookupAvatar({
-                                  employeeId: (a.employee as any)?.id ?? a.employee_id,
-                                  name: `${(a.employee as any)?.first_name ?? ""} ${(a.employee as any)?.last_name ?? ""}`,
-                                });
-                                return (
-                                  <span
-                                    key={a.id}
-                                    className={`flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-card text-[10px] font-extrabold ${
-                                      i % 2 === 0
-                                        ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                                        : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
-                                    } ${i > 0 ? "-ml-2" : ""}`}
-                                  >
-                                    {attendeeAvatar ? (
-                                      <img
-                                        src={attendeeAvatar}
-                                        alt={initials(a)}
-                                        className="h-full w-full rounded-full object-cover"
-                                      />
-                                    ) : (
-                                      initials(a)
-                                    )}
-                                  </span>
-                                );
-                              })}
-                              {attendees.length > 3 && (
-                                <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-[hsl(var(--cph-light-blue))] text-[10px] font-extrabold text-[hsl(var(--cph-onyx))]">
-                                  +{attendees.length - 3}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[13px] text-foreground/70">
-                              {attendees.length} deltager
-                            </span>
-                          </div>
-                        </HoverCardTrigger>
-                        <HoverCardContent className="w-56 p-3">
-                          <p className="mb-2 text-sm font-medium">Deltagere</p>
-                          <div className="max-h-40 space-y-2 overflow-y-auto">
-                            {attendees.map((a) => (
-                              <div key={a.id} className="flex items-center gap-2 text-sm">
-                                <Avatar className="h-5 w-5">
-                                  <AvatarImage
-                                    src={
-                                      lookupAvatar({
-                                        employeeId: (a.employee as any)?.id ?? a.employee_id,
-                                        name: `${(a.employee as any)?.first_name ?? ""} ${(a.employee as any)?.last_name ?? ""}`,
-                                      }) || undefined
-                                    }
-                                    alt={initials(a)}
-                                  />
-                                  <AvatarFallback className="text-[10px]">
-                                    {initials(a)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="truncate">
-                                  {(a.employee as any)?.first_name} {(a.employee as any)?.last_name}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </HoverCardContent>
-                      </HoverCard>
-                    )}
-
-                    {/* Deltag / afbud */}
-                    <div className="border-t border-[hsl(var(--cph-onyx)/0.1)] pt-4">
-                      <p className="mb-2.5 text-[13px] text-foreground/60">Kommer du?</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleAttendanceMutation.mutate({
-                              eventId: featured.id,
-                              status: "attending",
-                            })
-                          }
-                          disabled={toggleAttendanceMutation.isPending}
-                          className={`flex w-full items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-[13px] font-extrabold sm:gap-2 sm:px-4 sm:text-[14px] transition-colors ${
-                            myStatus === "attending"
-                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                              : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                          }`}
-                        >
-                          <Check
-                            className={`h-3.5 w-3.5 ${
-                              myStatus === "attending" ? "text-[hsl(var(--cph-emerald))]" : ""
-                            }`}
-                          />
-                          {(featured as any).requires_registration
-                            ? myStatus === "attending"
-                              ? "Tilmeldt"
-                              : "Tilmeld"
-                            : "Jeg deltager"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleAttendanceMutation.mutate({
-                              eventId: featured.id,
-                              status: "maybe",
-                            })
-                          }
-                          disabled={toggleAttendanceMutation.isPending}
-                          className={`w-full rounded-full px-2 py-2.5 text-[13px] font-extrabold sm:px-4 sm:text-[14px] transition-colors ${
-                            myStatus === "maybe"
-                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                              : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                          }`}
-                        >
-                          Måske
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleAttendanceMutation.mutate({
-                              eventId: featured.id,
-                              status: "not_attending",
-                            })
-                          }
-                          disabled={toggleAttendanceMutation.isPending}
-                          className={`w-full rounded-full px-2 py-2.5 text-[13px] font-extrabold sm:px-4 sm:text-[14px] transition-colors ${
-                            myStatus === "not_attending"
-                              ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                              : "border border-[hsl(var(--cph-onyx)/0.16)] text-foreground/55 hover:bg-[hsl(var(--cph-onyx)/0.06)]"
-                          }`}
-                        >
-                          Afbud
-                        </button>
-                      </div>
-                    </div>
-
-
-                    {/* Øvrige begivenheder */}
-                    {rest.length > 0 && (
-                      <div className="divide-y divide-[hsl(var(--cph-onyx)/0.1)] border-t border-[hsl(var(--cph-onyx)/0.1)] pt-1">
-                        {rest.map((event) => (
-                          <div key={event.id} className="flex items-center gap-3 py-2.5">
-                            <span className="w-11 flex-none text-[12px] font-extrabold uppercase tracking-[0.06em] text-foreground/70 tabular-nums">
-                              {format(parseISO(event.event_date), "d. MMM", { locale: da })}
-                            </span>
-                            <span
-                              className="min-w-0 flex-1 cursor-pointer truncate text-[14px] font-extrabold hover:underline"
-                              onClick={() => setSelectedEventForDetail(event.id)}
-                            >
-                              {event.title}
-                            </span>
-                            <span className="flex-none text-[12px] text-foreground/70">
-                              {event.event_time ? `Kl. ${event.event_time.slice(0, 5)}` : ""}
-                            </span>
-                            <div className="flex flex-none items-center gap-0.5">
-                              <button type="button" title="Læs mere" onClick={() => setSelectedEventForDetail(event.id)}
-                                className="rounded-md p-1 text-foreground/60 transition-colors hover:bg-[hsl(var(--cph-onyx)/0.06)] hover:text-foreground">
-                                <Info className="h-3.5 w-3.5" />
-                              </button>
-                              {canManageEvents && (
-                                <>
-                                  <button type="button" title="Rediger" onClick={() => setEditingEvent(event.id)}
-                                    className="rounded-md p-1 text-foreground/60 transition-colors hover:bg-[hsl(var(--cph-onyx)/0.06)] hover:text-foreground">
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button type="button" title="Slet" onClick={() => deleteEventMutation.mutate(event.id)}
-                                    className="rounded-md p-1 text-destructive transition-colors hover:bg-destructive/15">
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()
+              <div className="flex flex-col gap-3">
+                {companyEvents.slice(0, 3).map((event, idx) => (
+                  <EventRsvpCard
+                    key={event.id}
+                    featured={idx === 0}
+                    title={event.title}
+                    eventDate={event.event_date}
+                    eventTime={event.event_time}
+                    location={event.location}
+                    requiresRegistration={(event as { requires_registration?: boolean }).requires_registration}
+                    attendeeCount={getEventAttendees(event.id).length}
+                    myStatus={getMyAttendance(event.id)}
+                    disabled={toggleAttendanceMutation.isPending}
+                    canManage={canManageEvents}
+                    onRespond={(status) => toggleAttendanceMutation.mutate({ eventId: event.id, status })}
+                    onOpenDetail={() => setSelectedEventForDetail(event.id)}
+                    onEdit={() => setEditingEvent(event.id)}
+                    onDelete={() => deleteEventMutation.mutate(event.id)}
+                  />
+                ))}
+              </div>
             )}
           </CardContent>
 
