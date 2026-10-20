@@ -288,6 +288,13 @@
       "when": 1792493106044,
       "tag": "0040_stork_proeve_a_drop",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792505012001,
+      "tag": "0041_migration",
+      "breakpoints": true
     }
   ]
 }
