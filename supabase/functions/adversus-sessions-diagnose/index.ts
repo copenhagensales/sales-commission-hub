@@ -55,6 +55,49 @@ async function main(req: Request, svc: any) {
   };
 
   const url = new URL(req.url);
+
+  // MIDLERTIDIG read-only: tæl dagens salg på en anden Adversus-konto (fx Eesy TM). Kun antal.
+  if (url.searchParams.get("mode") === "salescount") {
+    const integ = url.searchParams.get("integration") ?? "Eesy TM";
+    const day = url.searchParams.get("day") ?? new Date().toISOString().slice(0, 10);
+    const { data: di } = await svc.from("dialer_integrations").select("id").eq("name", integ).maybeSingle();
+    if (!di) return json(404, { error: "Integration ikke fundet" });
+    const { data: cred } = await svc.rpc("get_dialer_credentials", { p_integration_id: di.id, p_encryption_key: Deno.env.get("DB_ENCRYPTION_KEY") });
+    const c = (typeof cred === "string" ? JSON.parse(cred) : cred) as Row | null;
+    const u2 = s(c?.username ?? c?.user), p2 = s(c?.password ?? c?.pass);
+    if (!u2 || !p2) return json(500, { error: "Legitimation mangler" });
+    const h2 = { Authorization: `Basic ${btoa(`${u2}:${p2}`)}` };
+    const from = cphOffsetIso(day), to = cphOffsetIso(addDays(day, 1));
+    const all: Row[] = [];
+    for (let page = 1; page <= 20; page++) {
+      const f = encodeURIComponent(JSON.stringify({ lastModifiedTime: { $gt: from, $lt: to } }));
+      const r = await fetch(`${BASE}/sales?pageSize=1000&page=${page}&filters=${f}`, { headers: h2 });
+      apiCalls++;
+      if (!r.ok) return json(200, { fejlStatus: r.status, side: page });
+      const d = await r.json();
+      const arr = (Array.isArray(d) ? d : d?.sales ?? []) as Row[];
+      all.push(...arr);
+      if (arr.length < 1000) break;
+    }
+    const { data: stork } = await svc.from("sales").select("adversus_external_id, external_id").eq("source", integ).gte("sale_datetime", from).lt("sale_datetime", to);
+    const storkIds = new Set<string>();
+    for (const r of (stork ?? []) as Row[]) { if (r.adversus_external_id) storkIds.add(s(r.adversus_external_id)); if (r.external_id) storkIds.add(s(r.external_id)); }
+    const prState: Record<string, number> = {}, prTime: Record<string, Record<string, number>> = {}, mangler: Record<string, number> = {};
+    let produkter = 0, iDag = 0;
+    for (const x of all) {
+      const created = s(x.createdTime ?? x.closedTime);
+      if (created && (created < from || created >= to)) continue;
+      iDag++;
+      const st = s(x.state) || "(tom)";
+      inc(prState, st);
+      const hr = created ? new Date(created).toLocaleString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit" }) : "?";
+      prTime[hr] = prTime[hr] ?? {}; inc(prTime[hr], st);
+      const lines = Array.isArray(x.lines) ? (x.lines as Row[]) : [];
+      for (const l of lines) produkter += Number(l.quantity ?? 1) || 0;
+      if (!storkIds.has(s(x.id))) inc(mangler, `${st}|kampagne ${s(x.campaignId)}`);
+    }
+    return json(200, { dag: day, adversusSalgIDag: iDag, produkter, prState, prTime, storkSalg: (stork ?? []).length, manglerIStork: mangler, apiKald: apiCalls });
+  }
   if (url.searchParams.get("mode") === "backfill") {
     // Engangskørsel uge 1–29 2026 (main). Pr. (kampagne, uge): slet main-rækker, indsæt nye.
     // Eneste mode der skriver: weekly_lead_closure_stats, kun aggregerede tal.
