@@ -83,7 +83,7 @@ async function main(req: Request, svc: any) {
     const storkIds = new Set<string>();
     for (const r of (stork ?? []) as Row[]) { if (r.adversus_external_id) storkIds.add(s(r.adversus_external_id)); if (r.external_sales_id) storkIds.add(s(r.external_sales_id)); }
     const prState: Record<string, number> = {}, prTime: Record<string, Record<string, number>> = {}, mangler: Record<string, number> = {};
-    let produkter = 0, iDag = 0;
+    let produkter = 0, iDag = 0; const manglerIds: Row[] = [];
     for (const x of all) {
       const created = s(x.createdTime ?? x.closedTime);
       if (created && (created < from || created >= to)) continue;
@@ -94,9 +94,9 @@ async function main(req: Request, svc: any) {
       prTime[hr] = prTime[hr] ?? {}; inc(prTime[hr], st);
       const lines = Array.isArray(x.lines) ? (x.lines as Row[]) : [];
       for (const l of lines) produkter += Number(l.quantity ?? 1) || 0;
-      if (!storkIds.has(s(x.id))) inc(mangler, `${st}|kampagne ${s(x.campaignId)}`);
+      if (!storkIds.has(s(x.id))) { inc(mangler, `${st}|kampagne ${s(x.campaignId)}`); manglerIds.push({ id: s(x.id), state: st, closed: s(x.closedTime), modified: s(x.lastModifiedTime), ownedBy: s(x.ownedBy ?? x.createdBy) }); }
     }
-    return json(200, { dag: day, adversusSalgIDag: iDag, produkter, prState, prTime, storkSalg: (stork ?? []).length, manglerIStork: mangler, apiKald: apiCalls });
+    return json(200, { dag: day, adversusSalgIDag: iDag, produkter, prState, prTime, storkSalg: (stork ?? []).length, manglerIStork: mangler, manglerIds, apiKald: apiCalls });
   }
   if (url.searchParams.get("mode") === "backfill") {
     // Engangskørsel uge 1–29 2026 (main). Pr. (kampagne, uge): slet main-rækker, indsæt nye.
