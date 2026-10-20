@@ -153,7 +153,7 @@ export async function processCohortMember(
           invitation_status: "pending",
           daily_bonus_client_id: member.daily_bonus_client_id,
         })
-        .select()
+        .select("id")
         .single();
 
       if (empError) throw empError;
