@@ -19656,6 +19656,30 @@ export type Database = {
         Args: { _target_employee_id: string; _user_id: string }
         Returns: boolean
       }
+      stork_cpr_foedselsdato: { Args: { p_cpr: string }; Returns: string }
+      stork_foedselsdage: {
+        Args: never
+        Returns: {
+          employment_start_date: string
+          first_name: string
+          foedselsdato: string
+          id: string
+          last_name: string
+        }[]
+      }
+      stork_hent_foelsomme_felter: {
+        Args: { p_ids: string[] }
+        Returns: {
+          address_city: string
+          address_country: string
+          address_postal_code: string
+          address_street: string
+          bank_account_number: string
+          bank_reg_number: string
+          cpr_number: string
+          id: string
+        }[]
+      }
       submit_eesy_mobile_request: {
         Args: {
           _address: string
