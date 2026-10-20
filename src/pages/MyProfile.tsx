@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchSalaryDetails } from "@/lib/salary/salaryDetails";
+import { EMPLOYEE_SAFE_COLUMNS, attachSensitiveFields } from "@/lib/employees/safeColumns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -209,13 +210,14 @@ export default function MyProfile() {
     queryFn: async () => {
       // If in preview mode, fetch the preview employee's data
       if (isPreviewMode && previewEmployee?.id) {
-        const { data, error } = await supabase
+        const { data: raw, error } = await supabase
           .from("employee_master_data")
-          .select("*")
+          .select(EMPLOYEE_SAFE_COLUMNS)
           .eq("id", previewEmployee.id)
           .maybeSingle();
         if (error) throw error;
-        if (!data) return null;
+        if (!raw) return null;
+        const [data] = await attachSensitiveFields([raw]);
         
         // Fetch team names for this employee
         const { data: teamMemberships } = await supabase
@@ -241,24 +243,25 @@ export default function MyProfile() {
       if (!userData.user) return null;
 
       // Try auth_user_id first (most reliable), fallback to email matching
-      let data, error;
-      ({ data, error } = await supabase
+      let raw, error;
+      ({ data: raw, error } = await supabase
         .from("employee_master_data")
-        .select("*")
+        .select(EMPLOYEE_SAFE_COLUMNS)
         .eq("auth_user_id", userData.user.id)
         .maybeSingle());
       
-      if (!data && !error) {
+      if (!raw && !error) {
         const lowerEmail = userData.user.email?.toLowerCase() || '';
-        ({ data, error } = await supabase
+        ({ data: raw, error } = await supabase
           .from("employee_master_data")
-          .select("*")
+          .select(EMPLOYEE_SAFE_COLUMNS)
           .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
           .maybeSingle());
       }
       
       if (error) throw error;
-      if (!data) return null;
+      if (!raw) return null;
+      const [data] = await attachSensitiveFields([raw]);
       
       console.log("[MyProfile] Employee found:", data.id, "via", data.auth_user_id === userData.user.id ? "auth_user_id" : "email");
       

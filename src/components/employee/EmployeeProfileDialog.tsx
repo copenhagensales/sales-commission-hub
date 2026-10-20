@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchSalaryDetails, logSalaryAccess } from "@/lib/salary/salaryDetails";
+import { EMPLOYEE_SAFE_COLUMNS, attachSensitiveFields } from "@/lib/employees/safeColumns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,13 +18,15 @@ export function EmployeeProfileDialog({ open, onOpenChange, employeeId }: Employ
     queryKey: ["employee-profile-dialog", employeeId],
     queryFn: async () => {
       if (!employeeId) return null;
-      const { data, error } = await supabase
+      const { data: raw, error } = await supabase
         .from("employee_master_data")
-        .select("*")
+        .select(EMPLOYEE_SAFE_COLUMNS)
         .eq("id", employeeId)
         .maybeSingle();
       if (error) throw error;
-      if (!data) return null;
+      if (!raw) return null;
+      // CPR/adresse hentes via stork_hent_foelsomme_felter (logget, rettighedstjek i DB).
+      const [data] = await attachSensitiveFields([raw]);
       // Lønbeløbet ligger i den beskyttede løntabel — RLS afgør om det vises.
       const salary = await fetchSalaryDetails(employeeId);
       if (salary?.amount != null) {
