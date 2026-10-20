@@ -274,6 +274,13 @@
       "when": 1792400183423,
       "tag": "0038_employee_unique_work_email_all_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792492090814,
+      "tag": "0039_stork_proeve_a_create",
+      "breakpoints": true
     }
   ]
 }
