@@ -129,6 +129,54 @@ async function main(req: Request, svc: any) {
     }
     return json(200, { kampagne: cid, egne: ours.size, uger: out, apiKald: apiCalls });
   }
+  if (url.searchParams.get("mode") === "calllookup") {
+    // Midlertidig read-only: brugernavne, sessions pr. lead og historik-endpoint-probe. Intet gemmes.
+    const ids = (url.searchParams.get("users") ?? "").split(",").filter((x) => /^\d+$/.test(x));
+    const leadIds = (url.searchParams.get("leads") ?? "").split(",").filter((x) => /^\d+$/.test(x)).slice(0, 20);
+    const day = url.searchParams.get("day") ?? "2026-10-19";
+    const fromIso = cphOffsetIso(day), toIso = cphOffsetIso(addDays(day, 1));
+    const users = await get("/users");
+    const uArr = (Array.isArray(users.data) ? users.data : (users.data as Row)?.users ?? []) as Row[];
+    const brugere = ids.map((id) => {
+      const u = uArr.find((x) => s(x.id) === id);
+      return { id, fundet: !!u, navn: u ? s(u.displayName) || s(u.name) : null, cphDomæne: u ? s(u.email).toLowerCase().endsWith(OUR_DOMAIN) : null };
+    });
+    const pick = (o: Row, keys: string[]) => Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]));
+    const SESS_KEYS = ["id", "leadId", "campaignId", "userId", "status", "startTime", "endTime", "sessionSeconds", "cdr"];
+    const leads: Row[] = [];
+    let historyProbe: Row | null = null;
+    for (const lid of leadIds) {
+      const r = await get(`/sessions?filters=${encodeURIComponent(JSON.stringify({ leadId: { $eq: Number(lid) } }))}&page=1&pageSize=100&sortProperty=startTime&sortDirection=ASC`);
+      const arr = (Array.isArray(r.data) ? r.data : (r.data as Row)?.sessions ?? []) as Row[];
+      const sessions = arr.map((x) => {
+        const p = pick(x, SESS_KEYS);
+        if (p.cdr && typeof p.cdr === "object") {
+          const c = p.cdr as Row;
+          p.cdr = pick(c, ["id", "startTime", "answerTime", "endTime", "durationSeconds", "disposition"]);
+        }
+        return p;
+      });
+      const lr = await get(`/leads/${lid}`);
+      const l = (Array.isArray(lr.data) ? lr.data[0] : (lr.data as Row)?.leads ? ((lr.data as Row).leads as Row[])[0] : lr.data) as Row | undefined;
+      leads.push({
+        leadId: lid, sessionsStatus: r.status, sessionsFeltnavne: arr[0] ? Object.keys(arr[0]) : [],
+        sessionsAlle: sessions.length,
+        sessionsDag: sessions.filter((x) => s(x.startTime) >= fromIso && s(x.startTime) < toIso),
+        sessionsFørDag: sessions.filter((x) => s(x.startTime) < fromIso).map((x) => ({ status: x.status, startTime: x.startTime })),
+        leadStatus: lr.status, leadFeltnavne: l ? Object.keys(l) : [],
+        leadNu: l ? pick(l, ["status", "campaignId", "lastUpdatedTime", "lastModifiedTime", "created", "nextContactTime", "contactAttempts", "lastContactedBy"]) : null,
+      });
+      if (!historyProbe) {
+        historyProbe = {};
+        for (const p of ["history", "activities", "changelog", "events", "statusHistory", "log"]) {
+          const h = await get(`/leads/${lid}/${p}`);
+          historyProbe[p] = { status: h.status, felter: h.data && typeof h.data === "object" ? Object.keys(Array.isArray(h.data) ? (h.data[0] ?? {}) : h.data) : [] };
+        }
+      }
+      await new Promise((res) => setTimeout(res, 200));
+    }
+    return json(200, { dag: day, brugere, leads, historyProbe, apiKald: apiCalls });
+  }
   if (url.searchParams.get("mode") === "probe") {
     const cid = url.searchParams.get("campaign") ?? "80333";
     const out: Row[] = [];
