@@ -1,20 +1,21 @@
-# OPP 39955083 – Matias Heller Frederiksen
+# Eesy TM boards – opdaterer de ikke?
 
-## Hvad jeg har fundet (bekræftet, intet ændret)
+## Fund indtil nu (read-only, intet ændret)
 
-- I Stork findes **kun ét salg** med OPP 39955083: fredag 16/10 kl. 15:57, "Lukket salg VOK (Inkl. Mobilevoice salg)" x1, 850 kr. provision, 1.750 kr. omsætning, koblet til Matias og TDC Erhverv.
-- Det salg opfylder alle filtre i Dagsrapporter og i "TDC Erhverv - Ret salg" og bør vises, når **16/10** vælges.
-- Matias' salg registreret i dag (20/10) har andre OPP-numre: 29686300 (VOK), 45310531 (HAP) og 37788511 (HAP). Ingen af dem er fiber inkl. Mobilevoice med OPP 39955083.
-- Der er altså **intet salg i dag med OPP 39955083** i Stork. Dagens salg på samme CVR er enten registreret med et andet OPP-nummer, eller er ikke kommet ind i Stork endnu.
+- Hentningen fra Eesy TM-dialeren kører hvert ca. 15. min og melder "success" (seneste 15:28 dansk tid). Ingen fejl.
+- Seneste Eesy TM-salg i Stork: salgstid 14:25, registreret 14:43 dansk tid. Derefter er der ikke kommet nye salg ind (de sidste tre hentninger fandt 0 nye).
+- Boardet opdaterer selv: det beregner Eesy TM-tal for i dag på ny hvert minut (seneste 15:34).
+- I dag 31 salg i alt mod 57–69 på en normal hverdag; mellem 13 og 16 er der 10 mod normalt 17–25.
 
-## Næste skridt (read-only, ingen ændringer)
+Konklusion indtil videre: boardet og hentningen virker. Der kommer bare ingen nye salg ind fra dialeren. Enten er der reelt ikke lukket salg siden 14:25, eller også ligger der salg i dialeren, som Stork ikke får fat i.
 
-1. Afklar hvor "under salg" viser dagens salg: Salg-siden i Stork, eller i dialeren (Adversus).
-2. Hvis det er i Adversus: tjek om dagens salg er hentet ind (synk-log for TDC Erhverv-kampagnen i dag), og hvorfor ikke.
-3. Hvis det er i Stork: find salget ud fra tidspunkt og produkt og se hvilket OPP og hvilken dato det har.
-4. Rapportér årsagen. Rettelser (fx genhentning eller rettelse af OPP) laves kun efter godkendelse.
+## Næste skridt (read-only)
+
+1. Spørg dialeren direkte (kun læsning) om lukkede Eesy TM-salg i dag efter kl. 14:00 og tæl dem.
+2. Sammenlign antallet med Storks 31. Vis kun antal pr. time og pr. kampagne – ingen kundedata.
+3. Hvis dialeren har flere: find årsagen (fx ny kampagne uden kobling, ændret status eller felt), og rapportér. Der rettes intet uden godkendelse.
 
 ## Teknisk
 
-- Salgsrække `0acb6cd5…` (16/10), `client_campaign_id` = TDC Erhverv Products, `source` Lovablecph, OPP i `raw_payload.leadResultFields["OPP nr"]`.
-- `useTdcErhvervSales` filtrerer på klient-id og valgt dag; Dagsrapporter på `agent_email` og `sale_datetime` (ekskl. fieldmarketing). Begge matcher salget på 16/10.
+- `dialer_integrations` "Eesy TM" (adversus) last_status success; `integration_sync_runs` 13:28 UTC records 0, 13:16 UTC 136 (fuld genhentning, ingen nye).
+- Opslaget sker i den eksisterende read-only diagnose-funktion mod Adversus; ingen skrivning i databasen.
