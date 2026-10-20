@@ -281,6 +281,13 @@
       "when": 1792492090814,
       "tag": "0039_stork_proeve_a_create",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792493106044,
+      "tag": "0040_stork_proeve_a_drop",
+      "breakpoints": true
     }
   ]
 }
