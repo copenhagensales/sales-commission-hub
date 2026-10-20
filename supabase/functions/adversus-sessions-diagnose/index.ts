@@ -79,9 +79,9 @@ async function main(req: Request, svc: any) {
       all.push(...arr);
       if (arr.length < 1000) break;
     }
-    const { data: stork } = await svc.from("sales").select("adversus_external_id, external_id").eq("source", integ).gte("sale_datetime", from).lt("sale_datetime", to);
+    const { data: stork } = await svc.from("sales").select("adversus_external_id, external_sales_id").eq("source", integ).gte("sale_datetime", from).lt("sale_datetime", to);
     const storkIds = new Set<string>();
-    for (const r of (stork ?? []) as Row[]) { if (r.adversus_external_id) storkIds.add(s(r.adversus_external_id)); if (r.external_id) storkIds.add(s(r.external_id)); }
+    for (const r of (stork ?? []) as Row[]) { if (r.adversus_external_id) storkIds.add(s(r.adversus_external_id)); if (r.external_sales_id) storkIds.add(s(r.external_sales_id)); }
     const prState: Record<string, number> = {}, prTime: Record<string, Record<string, number>> = {}, mangler: Record<string, number> = {};
     let produkter = 0, iDag = 0;
     for (const x of all) {
