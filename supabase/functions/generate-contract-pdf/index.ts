@@ -77,27 +77,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Authorization: caller must be the contract's employee OR a manager.
-    const { data: isManager } = await supabase.rpc("is_manager_or_above", {
-      _user_id: userData.user.id,
+    // Authorization: contracts' own RLS decides (own contract, owner, recruitment,
+    // team leader for own team, confidential contracts). Read with caller's token.
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
     });
-    if (!isManager) {
-      const { data: callerEmp } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", userData.user.id)
-        .maybeSingle();
-      const { data: contractRow } = await supabase
-        .from("contracts")
-        .select("employee_id")
-        .eq("id", contractId)
-        .maybeSingle();
-      if (!callerEmp || !contractRow || callerEmp.id !== contractRow.employee_id) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    const { data: visibleContract } = await userClient
+      .from("contracts")
+      .select("id")
+      .eq("id", contractId)
+      .maybeSingle();
+    if (!visibleContract) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
 

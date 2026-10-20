@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { BrowserRouter } from "react-router-dom";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AppRouter } from "@/routes/AppRouter";
@@ -28,6 +29,23 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// Ryd al cache ved logud eller brugerskift, så data ikke lækker mellem brugere.
+let lastKnownUserId: string | null = null;
+supabase.auth.onAuthStateChange((event, session) => {
+  const currentUserId = session?.user?.id ?? null;
+  if (
+    event === "SIGNED_OUT" ||
+    (currentUserId !== null && lastKnownUserId !== null && currentUserId !== lastKnownUserId)
+  ) {
+    queryClient.clear();
+  }
+  if (event === "SIGNED_OUT") {
+    lastKnownUserId = null;
+  } else if (currentUserId) {
+    lastKnownUserId = currentUserId;
+  }
 });
 
 // Error Boundary to catch rendering errors

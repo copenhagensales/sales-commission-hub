@@ -214,7 +214,7 @@ export default function EmployeeMasterData() {
     { title: t("employees.steps.other"), key: "other" },
   ];
 
-  const { data: employees = [], isLoading } = useQuery({
+  const { data: employees = [], isLoading, error: employeesError } = useQuery({
     queryKey: ["employee-master-data"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -223,10 +223,9 @@ export default function EmployeeMasterData() {
         .eq("is_staff_employee", false)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      // CPR/bank/adresse hentes via stork_hent_foelsomme_felter (logget, rettighedstjek i DB).
-      const withSensitive = await attachSensitiveFields(data ?? []);
+      // CPR/bank/adresse hentes ikke til listen; kun for én medarbejder i handleEdit.
       // Lønbeløb ligger i den beskyttede løntabel; RLS bestemmer hvad der kommer med.
-      const withSalary = await attachSalaryAmount(withSensitive);
+      const withSalary = await attachSalaryAmount(data ?? []);
       return withSalary as unknown as EmployeeMasterDataRecord[];
     },
     staleTime: 0,
@@ -368,7 +367,15 @@ export default function EmployeeMasterData() {
     },
   });
 
-  const handleEdit = (employee: EmployeeMasterDataRecord) => {
+  const handleEdit = async (listEmployee: EmployeeMasterDataRecord) => {
+    let employee: EmployeeMasterDataRecord;
+    try {
+      const [full] = await attachSensitiveFields([listEmployee]);
+      employee = full;
+    } catch {
+      toast({ title: "Kunne ikke hente CPR/bank/adresse — prøv igen", variant: "destructive" });
+      return;
+    }
     setEditingEmployee(employee);
     setFormData({
       first_name: employee.first_name,
@@ -935,6 +942,13 @@ export default function EmployeeMasterData() {
                   {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : employeesError ? (
+                    <div className="py-12 px-4 text-center text-destructive">
+                      <p className="font-medium">Kunne ikke hente medarbejderlisten</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {employeesError instanceof Error ? employeesError.message : "Ukendt fejl"} — prøv at genindlæse siden.
+                      </p>
                     </div>
                   ) : (
                     <Table>
