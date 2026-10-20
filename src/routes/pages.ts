@@ -181,6 +181,7 @@ export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
 export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));
 export const TdcIdriftsaettelse = lazyPage(() => import("@/pages/TdcIdriftsaettelse"));
 export const TdcSalg = lazyPage(() => import("@/pages/TdcSalg"));
+export const FiberRegistrering = lazyPage(() => import("@/pages/FiberRegistrering"));
 
 // Economic
 export const EconomicUpload = lazyPage(() => import("@/pages/admin/EconomicUpload"));
