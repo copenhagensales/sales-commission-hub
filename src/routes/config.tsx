@@ -122,6 +122,7 @@ import {
   TdcOpsummeringPublic,
   TdcIdriftsaettelse,
   TdcSalg,
+  FiberRegistrering,
   TdcSalgPublic,
   ImmediatePaymentASE,
   EconomicUpload,
@@ -481,6 +482,7 @@ export const routes: RouteConfig[] = [
   { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },
   { path: "/tdc-idriftsaettelse", component: TdcIdriftsaettelse, access: "role", positionPermission: "menu_tdc_opsummering" },
   { path: "/tdc-salgsvaerktoej", component: TdcSalg, access: "role", positionPermission: "menu_tdc_opsummering" },
+  { path: "/fiber-registrering", component: FiberRegistrering, access: "role", positionPermission: "menu_tdc_opsummering" },
 
   // Economic Upload (Owner only)
   { path: "/admin/economic-upload", component: EconomicUpload, access: "role", positionPermission: "menu_economic_upload" },
