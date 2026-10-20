@@ -273,10 +273,11 @@ export async function syncIntegration(
         sales = await (adapter as any).fetchSalesRange({ from, to }, campaignMappings, maxRecords);
       } else if ((adapter as any).fetchSalesRange) {
         const salesSyncState = await getSyncState(supabase, integration.id, "sales");
-        // 60 min overlap: Adversus exposes sales in lastModifiedTime filters with delay (>5 min observed 20/10-2026).
-        // Upserts are idempotent, so overlap only costs a few extra API calls.
+        // Adversus: 60 min overlap — sales appear in lastModifiedTime filters with delay (>5 min observed 20/10-2026).
+        // Upserts are idempotent, so overlap only costs a few extra API calls. Other providers keep 5 min.
+        const overlapMinutes = providerForRateCheck === "adversus" ? 60 : 5;
         const windowStart = salesSyncState?.last_success_at
-          ? new Date(new Date(salesSyncState.last_success_at).getTime() - 60 * 60 * 1000)
+          ? new Date(new Date(salesSyncState.last_success_at).getTime() - overlapMinutes * 60 * 1000)
           : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         salesWindowEnd = new Date(Date.now() - 2 * 60 * 1000);
 
