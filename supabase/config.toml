@@ -267,3 +267,6 @@ verify_jwt = false
 
 [functions.enreach-closure-diagnose]
 verify_jwt = false
+
+[functions.hjerteforeningen-leads-export]
+verify_jwt = false
