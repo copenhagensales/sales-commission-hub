@@ -98,11 +98,13 @@ import { AppModeProvider } from "@/contexts/AppModeContext";
 import { useMgTestRealtimeSync } from "@/hooks/useMgTestRealtimeSync";
 import { useMicrosoftLoginGuard } from "@/hooks/useMicrosoftLoginGuard";
 import { useGeoLoginGuard } from "@/hooks/useGeoLoginGuard";
+import { useNyVersion } from "@/hooks/useNyVersion";
 
 const RealtimeListeners = () => {
   useMgTestRealtimeSync();
   useMicrosoftLoginGuard();
   useGeoLoginGuard();
+  useNyVersion();
   return null;
 };
 
