@@ -10,29 +10,10 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
-  const checkMustChangePassword = useCallback(async (userEmail: string | undefined) => {
-    if (!userEmail) {
-      setMustChangePassword(false);
-      return;
-    }
-    
-    const lowerEmail = userEmail.toLowerCase();
-    
-    // Add 3s timeout to prevent blocking - fall back to false (no forced change)
-    const timeoutPromise = new Promise<null>((resolve) => 
-      setTimeout(() => resolve(null), 3000)
-    );
-    
-    const queryPromise = supabase
-      .from("employee_master_data")
-      .select("must_change_password")
-      .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-      .eq("is_active", true)
-      .maybeSingle()
-      .then(res => res.data);
-    
-    const data = await Promise.race([queryPromise, timeoutPromise]);
-    setMustChangePassword(data?.must_change_password === true);
+  // Driftsfejl 21/10-2026: tjekket overbelastede databasen. Stork bruger kun
+  // Microsoft-login, så funktionen spørger ikke længere databasen.
+  const checkMustChangePassword = useCallback(async (_userEmail: string | undefined) => {
+    setMustChangePassword(false);
   }, []);
 
   const clearMustChangePassword = useCallback(async () => {
