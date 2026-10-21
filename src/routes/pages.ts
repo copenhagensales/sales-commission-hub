@@ -258,6 +258,11 @@ export const ComplianceProcessingRegistry = lazyPage(() => import("@/pages/compl
 export const ComplianceDpaOverview = lazyPage(() => import("@/pages/compliance/DpaOverview"));
 export const ComplianceClientAgreements = lazyPage(() => import("@/pages/compliance/ClientAgreements"));
 export const ComplianceDpaAddenda = lazyPage(() => import("@/pages/compliance/DpaAddenda"));
+export const CompliancePersondatapolitik = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.PersondatapolitikPage })));
+export const ComplianceDatabrudsprocedure = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.DatabrudsprocedurePage })));
+export const ComplianceKonsekvensvurderingProcedure = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.KonsekvensvurderingProcedurePage })));
+export const ComplianceBreachLog = lazyPage(() => import("@/pages/compliance/BreachLog"));
+export const ComplianceImpactAssessments = lazyPage(() => import("@/pages/compliance/ImpactAssessments"));
 
 export const ShortLinkRedirect = lazyPage(() => import("@/pages/ShortLinkRedirect"));
 export const MenuEditor = lazyPage(() => import("@/pages/MenuEditor"));
