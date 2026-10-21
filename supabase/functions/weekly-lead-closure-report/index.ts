@@ -1427,9 +1427,6 @@ async function finishAndMail(
       failed,
       latestCalls,
     );
-    // Leveringsstatus Tryg: kun med når feature-flaget er slået til (godkendt af Kasper).
-    const flowHtml = await flowMailSectionIfEnabled(svc, config, latest);
-    if (flowHtml) mail.html = mail.html.replace("<!--TRYG_FLOW_SECTION-->", flowHtml);
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
       config.recipients.map((recipient) => ({
@@ -1443,6 +1440,31 @@ async function finishAndMail(
     );
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
+    // Leveringsstatus Tryg: SEPARAT intern mail, kun til interne modtagere
+    // (flow_status, håndhævet @copenhagensales.dk i databasen). Aldrig til kunden.
+    // Sendes kun, når feature-flaget er slået til (godkendt af Kasper).
+    const flowHtml = await flowMailSectionIfEnabled(svc, config, latest);
+    const { data: flowRecipients } = await svc
+      .from("weekly_lead_closure_settings")
+      .select("recipient_email")
+      .eq("is_active", true)
+      .eq("flow_status", true);
+    const internal = ((flowRecipients ?? []) as { recipient_email: string }[])
+      .map((r) => r.recipient_email)
+      .filter((e) => e.toLowerCase().endsWith("@copenhagensales.dk"));
+    if (flowHtml && internal.length > 0) {
+      const { error: flowError } = await svc.from("scheduled_emails").insert(
+        internal.map((recipient) => ({
+          recipient_email: recipient,
+          subject: `Leveringsstatus Tryg (intern) – uge ${isoWeekNumber(latest)}`,
+          content: flowHtml,
+          template_key: "tryg_flow_status",
+          scheduled_at: scheduledAt,
+          status: "pending",
+        })),
+      );
+      if (flowError) throw new Error(`Kunne ikke lægge leveringsstatus-mailen i køen: ${flowError.message}`);
+    }
     // Mailkøen tømmes normalt af cron hvert 5. minut. Ved manuel afsendelse
     // skal mailen ud med det samme, så køen skubbes her.
     await flushMailQueue();
