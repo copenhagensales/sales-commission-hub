@@ -37,7 +37,7 @@ function copenhagenToday(): string {
 
 /** Leveringsstatus – denne uge (intern). Skjult bag feature-flag; superadmin ser den til afstemning. */
 export function TrygFlowStatus() {
-  const { data: flagOn = false } = useFeatureFlag(TRYG_FLOW_FLAG);
+  const flagOn = useFeatureFlag(TRYG_FLOW_FLAG);
   const { isSuperadmin } = useIsSuperadmin();
   const visible = flagOn || isSuperadmin;
 

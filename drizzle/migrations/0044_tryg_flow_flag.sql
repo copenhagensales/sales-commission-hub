@@ -1,0 +1,1 @@
+INSERT INTO public.feature_flags (key, enabled) VALUES ('tryg_leveringsstatus', false) ON CONFLICT (key) DO NOTHING;
