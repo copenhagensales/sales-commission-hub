@@ -2,8 +2,19 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { Check, Info, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 
 export type RsvpStatus = "attending" | "maybe" | "not_attending";
+
+export interface EventAttendeePreview {
+  id: string;
+  name: string;
+}
+
+function initials(name: string) {
+  return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+}
 
 interface EventRsvpCardProps {
   title: string;
@@ -12,6 +23,7 @@ interface EventRsvpCardProps {
   location?: string | null;
   requiresRegistration?: boolean;
   attendeeCount: number;
+  attendees?: EventAttendeePreview[];
   myStatus: RsvpStatus | null;
   featured?: boolean;
   disabled?: boolean;
@@ -43,7 +55,13 @@ export function EventRsvpCard({
   onOpenDetail,
   onEdit,
   onDelete,
+  attendees = [],
 }: EventRsvpCardProps) {
+  const lookupAvatar = useAvatarLookup();
+  // Udvalgte: dem med profilbillede først, maks. 5
+  const preview = [...attendees]
+    .sort((a, b) => Number(!!lookupAvatar({ employeeId: b.id, name: b.name })) - Number(!!lookupAvatar({ employeeId: a.id, name: a.name })))
+    .slice(0, 5);
   const date = parseISO(eventDate);
   const days = differenceInCalendarDays(date, new Date());
   const whenLabel = days <= 0 ? "I dag" : days === 1 ? "I morgen" : `Om ${days} dage`;
