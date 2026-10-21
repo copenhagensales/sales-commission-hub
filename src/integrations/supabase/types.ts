@@ -18244,6 +18244,42 @@ export type Database = {
           },
         ]
       }
+      weekly_lead_flow_daily: {
+        Row: {
+          account: string
+          adversus_campaign_id: string
+          agent_reference: string
+          day: string
+          id: string
+          kind: string
+          lead_count: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account: string
+          adversus_campaign_id: string
+          agent_reference?: string
+          day: string
+          id?: string
+          kind: string
+          lead_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account?: string
+          adversus_campaign_id?: string
+          agent_reference?: string
+          day?: string
+          id?: string
+          kind?: string
+          lead_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       weekly_lead_report_campaign_map: {
         Row: {
           account: string

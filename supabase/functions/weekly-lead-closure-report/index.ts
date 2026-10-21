@@ -20,6 +20,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
+import { buildTrygFlowMailSection } from "../_shared/tryg-flow-mail.ts";
 import {
   buildWeeklyLeadClosureMail,
   isoWeekNumber,
@@ -38,6 +39,8 @@ const MAX_PAGES = 400;
 const PAGES_PER_CHUNK = 3;
 const BOOKED_STATUS = "success";
 const UNKNOWN_BUCKET = "ukendt";
+/** Feature-flag for leveringsstatus (side + mailsektion). Slås til, når Kasper har godkendt afstemningen. */
+const TRYG_FLOW_FLAG = "tryg_leveringsstatus";
 
 type AccountKey = "main" | "lederne" | "enreach";
 
@@ -221,6 +224,8 @@ type LeadFacts = {
   day: string;
   /** Årsag fra rullelisten (kun invalid på konti med årsagsfelt), ellers "". */
   reason: string;
+  /** Dansk dag for lead.created — bruges kun til leveringsstatus (Modtaget). */
+  createdDay: string;
 };
 
 /** Egen nøgle i weekly_lead_closure_stats, så MCR kan aggregeres som statusser. */
@@ -310,6 +315,7 @@ async function streamCampaignPages(
         user: safeString(lead.lastContactedBy),
         day: copenhagenDay(safeString(lead.updated)),
         reason: status === INVALID_STATUS ? invalidReason(account, lead) : "",
+        createdDay: copenhagenDay(safeString(lead.created)),
       });
     }
     if (batch.length < PAGE_SIZE) return { scanned, nextPage: null };
@@ -765,6 +771,72 @@ async function saveCounts(
 }
 
 /**
+ * Leveringsstatus (Tryg): samme optælling som ugetallene, men pr. dag, plus
+ * antal emner oprettet pr. dag (Modtaget). Kun antal — ingen lead-data.
+ * Nøgle: day|kind|agent_reference|status.
+ */
+async function saveFlowDaily(
+  svc: SupabaseClient,
+  account: string,
+  campaignId: string,
+  counts: Map<string, number>,
+): Promise<void> {
+  if (counts.size === 0) return;
+  const merged = new Map<string, number>();
+  for (const [key, n] of counts) merged.set(key, (merged.get(key) ?? 0) + n);
+  const keys = [...merged.keys()];
+  // Tasks kører side for side, så eksisterende tal lægges oveni.
+  const days = [...new Set(keys.map((k) => k.split("|")[0]))];
+  const { data: existing } = await svc
+    .from("weekly_lead_flow_daily")
+    .select("day, kind, agent_reference, status, lead_count")
+    .eq("account", account)
+    .eq("adversus_campaign_id", campaignId)
+    .in("day", days);
+  for (const r of (existing ?? []) as { day: string; kind: string; agent_reference: string; status: string; lead_count: number }[]) {
+    const key = `${r.day}|${r.kind}|${r.agent_reference}|${r.status}`;
+    if (merged.has(key)) merged.set(key, (merged.get(key) ?? 0) + r.lead_count);
+  }
+  const rows = [...merged.entries()].map(([key, lead_count]) => {
+    const [day, kind, agent_reference, status] = key.split("|");
+    return {
+      day,
+      account,
+      adversus_campaign_id: campaignId,
+      kind,
+      agent_reference,
+      status,
+      lead_count,
+      updated_at: new Date().toISOString(),
+    };
+  });
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await svc
+      .from("weekly_lead_flow_daily")
+      .upsert(rows.slice(i, i + 500), { onConflict: "day,account,adversus_campaign_id,kind,agent_reference,status" });
+    if (error) throw new Error(`Kunne ikke gemme leveringsstatus: ${error.message}`);
+  }
+}
+
+/** Nulstiller leveringsstatus for én kampagne og de berørte uger. */
+async function resetFlowDaily(
+  svc: SupabaseClient,
+  account: string,
+  campaignId: string,
+  weeks: string[],
+): Promise<void> {
+  for (const week of weeks) {
+    await svc
+      .from("weekly_lead_flow_daily")
+      .delete()
+      .eq("account", account)
+      .eq("adversus_campaign_id", campaignId)
+      .gte("day", week)
+      .lte("day", addDays(week, 6));
+  }
+}
+
+/**
  * Opkaldsdelen for én task: ÉN konto + ÉN kampagne + ÉN uge. Fejler kilden,
  * fortsætter emnedelen uændret og linjen viser "–" i stedet for et forkert tal.
  */
@@ -816,16 +888,26 @@ async function processEnreachTask(
   config: Config,
   campaignId: string,
   weekStart: string,
+  flowOnly = false,
 ): Promise<{ scanned: number; nextPage: number | null }> {
   if (!weekStart || !campaignId) return { scanned: 0, nextPage: null };
 
   // Nulstil kun taskens kampagne og uge, så parallelle tasks ikke påvirkes.
-  await svc
-    .from("weekly_lead_closure_stats")
-    .delete()
-    .eq("account", "enreach")
-    .eq("adversus_campaign_id", campaignId)
-    .eq("week_start", weekStart);
+  // Ved flowOnly (backfill/opdatering af leveringsstatus) røres ugetallene ikke.
+  if (!flowOnly) {
+    await svc
+      .from("weekly_lead_closure_stats")
+      .delete()
+      .eq("account", "enreach")
+      .eq("adversus_campaign_id", campaignId)
+      .eq("week_start", weekStart);
+  }
+  await resetFlowDaily(svc, "enreach", campaignId, [weekStart]);
+  const daily = new Map<string, number>();
+  const addDaily = (day: string, user: string, status: string) => {
+    const k = `${day}|closed|${user}|${status}`;
+    daily.set(k, (daily.get(k) ?? 0) + 1);
+  };
 
   const access = await enreachAccess(svc);
   const counts = new Map<string, number>();
@@ -839,6 +921,7 @@ async function processEnreachTask(
     if (lead.status === ENREACH_MCR_STATUS) {
       const mcrKey = `${weekStart}|enreach|${lead.campaignId}||${MCR_STATUS}`;
       counts.set(mcrKey, (counts.get(mcrKey) ?? 0) + 1);
+      addDaily(lead.day, "", MCR_STATUS);
       return;
     }
     // Svaret indeholder kun afsluttede emner (AllClosedStatuses), så intet må
@@ -850,15 +933,18 @@ async function processEnreachTask(
       const dialerKey = ENREACH_DIALER_STATUS[raw] ?? `enreach_${raw}`;
       const key = `${weekStart}|enreach|${lead.campaignId}||${dialerKey}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      addDaily(lead.day, "", dialerKey);
       return;
     }
     if (!lead.user.endsWith(OUR_DOMAIN)) return; // kun vores egne sælgere
     const status = config.alias.get(lead.closure) ?? lead.closure ?? UNKNOWN_BUCKET;
     const key = `${weekStart}|enreach|${lead.campaignId}|${lead.user}|${status}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
+    addDaily(lead.day, `enreach:${lead.user}`, status);
   });
 
-  await saveCounts(svc, config, counts);
+  if (!flowOnly) await saveCounts(svc, config, counts);
+  await saveFlowDaily(svc, "enreach", campaignId, daily);
   // Kun tal logges — aldrig lead-data.
   return { scanned, nextPage: null };
 }
@@ -874,27 +960,33 @@ async function processEnreachTask(
 async function processTask(
   svc: SupabaseClient,
   config: Config,
-  job: { account: AccountKey; campaignId: string; weeks: string[]; nextPage: number },
+  job: { account: AccountKey; campaignId: string; weeks: string[]; nextPage: number; flowOnly?: boolean },
 ): Promise<{ scanned: number; nextPage: number | null }> {
   const account = ACCOUNTS.find((candidate) => candidate.key === job.account);
   if (!account) throw new Error(`Ukendt konto: ${job.account}`);
+  const flowOnly = job.flowOnly === true;
   if (account.kind === "enreach") {
-    return await processEnreachTask(svc, config, job.campaignId, job.weeks[0] ?? "");
+    return await processEnreachTask(svc, config, job.campaignId, job.weeks[0] ?? "", flowOnly);
   }
 
   const auth = authHeader(account);
   const users = await ourUsers(auth);
   const weekSet = new Set(job.weeks);
   const counts = new Map<string, number>();
+  const daily = new Map<string, number>();
 
   if (job.nextPage === 1) {
     // Nulstil kampagnens tal for de berørte uger, så genkørsler ikke lægger oveni.
-    await svc
-      .from("weekly_lead_closure_stats")
-      .delete()
-      .eq("account", job.account)
-      .eq("adversus_campaign_id", job.campaignId)
-      .in("week_start", job.weeks);
+    // Ved flowOnly (backfill/opdatering af leveringsstatus) røres ugetallene ikke.
+    if (!flowOnly) {
+      await svc
+        .from("weekly_lead_closure_stats")
+        .delete()
+        .eq("account", job.account)
+        .eq("adversus_campaign_id", job.campaignId)
+        .in("week_start", job.weeks);
+    }
+    await resetFlowDaily(svc, job.account, job.campaignId, job.weeks);
   }
 
   const { scanned, nextPage } = await streamCampaignPages(
@@ -903,6 +995,11 @@ async function processTask(
     job.campaignId,
     job.nextPage,
     (lead) => {
+      // Modtaget: emnet er oprettet i en af taskens uger (uafhængigt af lukning).
+      if (lead.createdDay && weekSet.has(mondayOf(lead.createdDay))) {
+        const rk = `${lead.createdDay}|received||`;
+        daily.set(rk, (daily.get(rk) ?? 0) + 1);
+      }
       if (!lead.day) return;
       const week = mondayOf(lead.day);
       if (!weekSet.has(week)) return;
@@ -911,11 +1008,15 @@ async function processTask(
       // Årsagen er kun med for invalid; tom = lukket af dialeren (gemmes som NULL).
       const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}|${lead.reason}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      // Samme filter som ugetallene, men pr. dag (leveringsstatus).
+      const dk = `${lead.day}|closed|${job.account}:${lead.user}|${status}`;
+      daily.set(dk, (daily.get(dk) ?? 0) + 1);
     },
 
   );
 
-  await saveCounts(svc, config, counts);
+  if (!flowOnly) await saveCounts(svc, config, counts);
+  await saveFlowDaily(svc, job.account, job.campaignId, daily);
 
   return { scanned, nextPage };
 }
@@ -1166,6 +1267,8 @@ interface RunState {
   /** Manuel afsendelse: mailen sendes selvom der allerede er sendt i dag. */
   forceMail: boolean;
   triggeredBy: string;
+  /** Kun leveringsstatus: ugetal, opkald og mail røres ikke (backfill/opdatering). */
+  flowOnly: boolean;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -1203,6 +1306,7 @@ async function chainNext(state: RunState): Promise<void> {
     send_mail: state.sendMail,
     force_mail: state.forceMail,
     triggered_by: state.triggeredBy,
+    flow_only: state.flowOnly,
   });
   try {
     await fetch(url, {
@@ -1310,6 +1414,7 @@ async function finishAndMail(
   let mailQueued = false;
   if (
     state.sendMail &&
+    !state.flowOnly &&
     config.recipients.length > 0 &&
     (state.forceMail || !(await alreadyMailedToday(svc)))
   ) {
@@ -1335,6 +1440,31 @@ async function finishAndMail(
     );
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
+    // Leveringsstatus Tryg: SEPARAT intern mail, kun til interne modtagere
+    // (flow_status, håndhævet @copenhagensales.dk i databasen). Aldrig til kunden.
+    // Sendes kun, når feature-flaget er slået til (godkendt af Kasper).
+    const flowHtml = await flowMailSectionIfEnabled(svc, config, latest);
+    const { data: flowRecipients } = await svc
+      .from("weekly_lead_closure_settings")
+      .select("recipient_email")
+      .eq("is_active", true)
+      .eq("flow_status", true);
+    const internal = ((flowRecipients ?? []) as { recipient_email: string }[])
+      .map((r) => r.recipient_email)
+      .filter((e) => e.toLowerCase().endsWith("@copenhagensales.dk"));
+    if (flowHtml && internal.length > 0) {
+      const { error: flowError } = await svc.from("scheduled_emails").insert(
+        internal.map((recipient) => ({
+          recipient_email: recipient,
+          subject: `Leveringsstatus Tryg (intern) – uge ${isoWeekNumber(latest)}`,
+          content: flowHtml,
+          template_key: "tryg_flow_status",
+          scheduled_at: scheduledAt,
+          status: "pending",
+        })),
+      );
+      if (flowError) throw new Error(`Kunne ikke lægge leveringsstatus-mailen i køen: ${flowError.message}`);
+    }
     // Mailkøen tømmes normalt af cron hvert 5. minut. Ved manuel afsendelse
     // skal mailen ud med det samme, så køen skubbes her.
     await flushMailQueue();
@@ -1358,6 +1488,88 @@ async function finishAndMail(
     statusBreakdown[line][r.status] = (statusBreakdown[line][r.status] ?? 0) + r.lead_count;
   }
   return { mailQueued, statusBreakdown };
+}
+
+/**
+ * Leveringsstatus Tryg til mandagsmailen. Modtaget = emner oprettet i ugen
+ * (weekly_lead_flow_daily, kind=received). Lukket = Tryg-rapportens eksisterende
+ * ugetal (weekly_lead_closure_stats, lukkende statusser). Ingen totaler på tværs.
+ */
+async function flowMailSectionIfEnabled(
+  svc: SupabaseClient,
+  config: Config,
+  latest: string,
+): Promise<string | null> {
+  const { data: flag } = await svc
+    .from("feature_flags")
+    .select("enabled")
+    .eq("key", TRYG_FLOW_FLAG)
+    .maybeSingle();
+  if ((flag as { enabled?: boolean } | null)?.enabled !== true) return null;
+
+  const lineOf = (acc: string, id: string) => config.mapping.get(mapKey(acc, id))?.reportLine ?? null;
+  const received = new Map<string, Map<string, number>>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await svc
+      .from("weekly_lead_flow_daily")
+      .select("day, account, adversus_campaign_id, lead_count")
+      .eq("kind", "received")
+      .lte("day", addDays(latest, 6))
+      .range(from, from + 999);
+    const batch = (data ?? []) as { day: string; account: string; adversus_campaign_id: string; lead_count: number }[];
+    for (const r of batch) {
+      const line = lineOf(r.account, r.adversus_campaign_id);
+      if (!line) continue;
+      const byWeek = received.get(line) ?? new Map<string, number>();
+      const w = mondayOf(r.day);
+      byWeek.set(w, (byWeek.get(w) ?? 0) + r.lead_count);
+      received.set(line, byWeek);
+    }
+    if (batch.length < 1000) break;
+  }
+  const firstWeek = [...received.values()].flatMap((m) => [...m.keys()]).sort()[0];
+  const closed = new Map<string, Map<string, number>>();
+  if (firstWeek) {
+    for (let from = 0; ; from += 1000) {
+      const { data } = await svc
+        .from("weekly_lead_closure_stats")
+        .select("week_start, account, adversus_campaign_id, status, lead_count")
+        .gte("week_start", firstWeek)
+        .lte("week_start", latest)
+        .range(from, from + 999);
+      const batch = (data ?? []) as { week_start: string; account: string; adversus_campaign_id: string; status: string; lead_count: number }[];
+      for (const r of batch) {
+        if (!config.closing.has(r.status)) continue;
+        const line = lineOf(r.account, r.adversus_campaign_id);
+        if (!line) continue;
+        const byWeek = closed.get(line) ?? new Map<string, number>();
+        byWeek.set(r.week_start, (byWeek.get(r.week_start) ?? 0) + r.lead_count);
+        closed.set(line, byWeek);
+      }
+      if (batch.length < 1000) break;
+    }
+  }
+  const trendWeeks = [3, 2, 1, 0].map((n) => addDays(latest, -7 * n));
+  const lines = config.lines.map((line) => {
+    const rec = received.get(line);
+    const clo = closed.get(line) ?? new Map<string, number>();
+    if (!rec || rec.size === 0) {
+      return { line, received: null, closed: clo.get(latest) ?? 0, diff: null, pool: null, trend: trendWeeks.map(() => null) };
+    }
+    const start = [...rec.keys()].sort()[0];
+    let pool = 0;
+    for (let w = start; w <= latest; w = addDays(w, 7)) pool += (rec.get(w) ?? 0) - (clo.get(w) ?? 0);
+    const diffOf = (w: string) => (w < start ? null : (rec.get(w) ?? 0) - (clo.get(w) ?? 0));
+    return {
+      line,
+      received: rec.get(latest) ?? 0,
+      closed: clo.get(latest) ?? 0,
+      diff: diffOf(latest),
+      pool,
+      trend: trendWeeks.map(diffOf),
+    };
+  });
+  return buildTrygFlowMailSection({ weekNumber: isoWeekNumber(latest), trendWeeks: trendWeeks.map(isoWeekNumber), lines });
 }
 
 /** Tæller tasks i en kørsel, så køen kan afgøre om den er tom. */
@@ -1414,6 +1626,8 @@ Deno.serve(async (req) => {
       run_ids?: string[];
       /** Valgfrit: kun disse konti lægges i køen (fx ["enreach"]). */
       accounts?: string[];
+      /** Kun leveringsstatus (Tryg): ugetal, opkald og mail røres ikke. */
+      flow_only?: boolean;
     };
 
     if (body.action === "status") {
@@ -1527,6 +1741,7 @@ Deno.serve(async (req) => {
         sendMail: body.send_mail !== false,
         forceMail: body.force_mail === true,
         triggeredBy,
+        flowOnly: body.flow_only === true,
       };
       const onlyAccounts = Array.isArray(body.accounts) && body.accounts.length > 0
         ? body.accounts.map((a) => safeString(a))
@@ -1546,6 +1761,7 @@ Deno.serve(async (req) => {
       sendMail: body.send_mail !== false,
       forceMail: body.force_mail === true,
       triggeredBy,
+      flowOnly: body.flow_only === true,
     };
     activeRunId = state.runId;
 
@@ -1585,7 +1801,7 @@ Deno.serve(async (req) => {
     try {
       // next_page = 0 betyder at emnerne er hentet, og opkaldsdelen mangler.
       if (task.next_page === 0 && !task.calls_done) {
-        const calls = await processCalls(svc, {
+        const calls = state.flowOnly ? null : await processCalls(svc, {
           account: task.account,
           campaignId: task.campaign_id,
           weekStart: task.week_start,
@@ -1614,6 +1830,7 @@ Deno.serve(async (req) => {
         campaignId: task.campaign_id,
         weeks: taskWeeks,
         nextPage: task.next_page,
+        flowOnly: state.flowOnly,
       });
       await svc
         .from("weekly_lead_closure_tasks")

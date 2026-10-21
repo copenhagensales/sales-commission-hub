@@ -295,6 +295,27 @@
       "when": 1792505012001,
       "tag": "0041_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792583657322,
+      "tag": "0042_tryg_flow_daily",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792584071063,
+      "tag": "0043_tryg_flow_recipients",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792584372688,
+      "tag": "0044_tryg_flow_flag",
+      "breakpoints": true
     }
   ]
 }
