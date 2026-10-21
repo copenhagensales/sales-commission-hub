@@ -4673,6 +4673,21 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_approvers: {
+        Row: {
+          created_at: string
+          email: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
       compliance_area_reviews: {
         Row: {
           area_key: string
@@ -4700,6 +4715,72 @@ export type Database = {
           reviewed_at?: string
           reviewed_by?: string | null
           reviewed_by_name?: string | null
+        }
+        Relationships: []
+      }
+      compliance_breach_log: {
+        Row: {
+          client_ids: string[]
+          client_notified_at: string | null
+          closed_on: string | null
+          created_at: string
+          created_by: string | null
+          data_types: string | null
+          description: string | null
+          discovered_at: string | null
+          estimated_subjects: number | null
+          id: string
+          measures: string | null
+          occurred_at: string | null
+          permanent_measures: string | null
+          retain_until: string
+          risk_assessment: string | null
+          root_cause: string | null
+          updated_at: string
+          was_breach: boolean | null
+          was_breach_reason: string | null
+        }
+        Insert: {
+          client_ids?: string[]
+          client_notified_at?: string | null
+          closed_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_types?: string | null
+          description?: string | null
+          discovered_at?: string | null
+          estimated_subjects?: number | null
+          id?: string
+          measures?: string | null
+          occurred_at?: string | null
+          permanent_measures?: string | null
+          retain_until?: string
+          risk_assessment?: string | null
+          root_cause?: string | null
+          updated_at?: string
+          was_breach?: boolean | null
+          was_breach_reason?: string | null
+        }
+        Update: {
+          client_ids?: string[]
+          client_notified_at?: string | null
+          closed_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_types?: string | null
+          description?: string | null
+          discovered_at?: string | null
+          estimated_subjects?: number | null
+          id?: string
+          measures?: string | null
+          occurred_at?: string | null
+          permanent_measures?: string | null
+          retain_until?: string
+          risk_assessment?: string | null
+          root_cause?: string | null
+          updated_at?: string
+          was_breach?: boolean | null
+          was_breach_reason?: string | null
         }
         Relationships: []
       }
@@ -4745,6 +4826,161 @@ export type Database = {
           effective_from?: string
           note?: string | null
           set_at?: string
+        }
+        Relationships: []
+      }
+      compliance_document_versions: {
+        Row: {
+          approved_at: string | null
+          approved_by_email: string | null
+          change_note: string | null
+          content_md: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string
+          id: string
+          status: string
+          version_major: number
+          version_minor: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_email?: string | null
+          change_note?: string | null
+          content_md?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          id?: string
+          status?: string
+          version_major?: number
+          version_minor?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_email?: string | null
+          change_note?: string | null
+          content_md?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          id?: string
+          status?: string
+          version_major?: number
+          version_minor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_documents: {
+        Row: {
+          created_at: string
+          href: string
+          id: string
+          key: string
+          render_mode: string
+          review_interval_months: number
+          sort_order: number
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          href: string
+          id?: string
+          key: string
+          render_mode?: string
+          review_interval_months?: number
+          sort_order?: number
+          title: string
+        }
+        Update: {
+          created_at?: string
+          href?: string
+          id?: string
+          key?: string
+          render_mode?: string
+          review_interval_months?: number
+          sort_order?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      compliance_impact_assessments: {
+        Row: {
+          approved_at: string | null
+          approved_by_email: string | null
+          assessment_date: string
+          conclusion: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          q1_purpose: string | null
+          q2_data: string | null
+          q3_instruction: string | null
+          q4_minimization: string | null
+          q5_access: string | null
+          q6_hosting: string | null
+          q7_risk: string | null
+          q8_retention: string | null
+          requires_client_notice: boolean
+          status: string
+          subject_description: string | null
+          subject_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_email?: string | null
+          assessment_date?: string
+          conclusion?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          q1_purpose?: string | null
+          q2_data?: string | null
+          q3_instruction?: string | null
+          q4_minimization?: string | null
+          q5_access?: string | null
+          q6_hosting?: string | null
+          q7_risk?: string | null
+          q8_retention?: string | null
+          requires_client_notice?: boolean
+          status?: string
+          subject_description?: string | null
+          subject_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_email?: string | null
+          assessment_date?: string
+          conclusion?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          q1_purpose?: string | null
+          q2_data?: string | null
+          q3_instruction?: string | null
+          q4_minimization?: string | null
+          q5_access?: string | null
+          q6_hosting?: string | null
+          q7_risk?: string | null
+          q8_retention?: string | null
+          requires_client_notice?: boolean
+          status?: string
+          subject_description?: string | null
+          subject_type?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -18660,6 +18896,7 @@ export type Database = {
       compliance_check_dialer_identity: { Args: never; Returns: undefined }
       compliance_check_ingestion_filter: { Args: never; Returns: undefined }
       compliance_check_unmapped_sales: { Args: never; Returns: undefined }
+      compliance_is_approver: { Args: never; Returns: boolean }
       compliance_mail_payload: { Args: never; Returns: Json }
       compliance_raise: {
         Args: {
