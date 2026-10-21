@@ -20,6 +20,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 import { createIngestionFilter } from "../_shared/ingestion-filter-runtime.ts";
+import { buildTrygFlowMailSection } from "../_shared/tryg-flow-mail.ts";
 import {
   buildWeeklyLeadClosureMail,
   isoWeekNumber,
@@ -38,6 +39,8 @@ const MAX_PAGES = 400;
 const PAGES_PER_CHUNK = 3;
 const BOOKED_STATUS = "success";
 const UNKNOWN_BUCKET = "ukendt";
+/** Feature-flag for leveringsstatus (side + mailsektion). Slås til, når Kasper har godkendt afstemningen. */
+const TRYG_FLOW_FLAG = "tryg_leveringsstatus";
 
 type AccountKey = "main" | "lederne" | "enreach";
 
@@ -1411,6 +1414,7 @@ async function finishAndMail(
   let mailQueued = false;
   if (
     state.sendMail &&
+    !state.flowOnly &&
     config.recipients.length > 0 &&
     (state.forceMail || !(await alreadyMailedToday(svc)))
   ) {
@@ -1423,6 +1427,9 @@ async function finishAndMail(
       failed,
       latestCalls,
     );
+    // Leveringsstatus Tryg: kun med når feature-flaget er slået til (godkendt af Kasper).
+    const flowHtml = await flowMailSectionIfEnabled(svc, config, latest);
+    if (flowHtml) mail.html = mail.html.replace("<!--TRYG_FLOW_SECTION-->", flowHtml);
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
       config.recipients.map((recipient) => ({
@@ -1459,6 +1466,88 @@ async function finishAndMail(
     statusBreakdown[line][r.status] = (statusBreakdown[line][r.status] ?? 0) + r.lead_count;
   }
   return { mailQueued, statusBreakdown };
+}
+
+/**
+ * Leveringsstatus Tryg til mandagsmailen. Modtaget = emner oprettet i ugen
+ * (weekly_lead_flow_daily, kind=received). Lukket = Tryg-rapportens eksisterende
+ * ugetal (weekly_lead_closure_stats, lukkende statusser). Ingen totaler på tværs.
+ */
+async function flowMailSectionIfEnabled(
+  svc: SupabaseClient,
+  config: Config,
+  latest: string,
+): Promise<string | null> {
+  const { data: flag } = await svc
+    .from("feature_flags")
+    .select("enabled")
+    .eq("key", TRYG_FLOW_FLAG)
+    .maybeSingle();
+  if ((flag as { enabled?: boolean } | null)?.enabled !== true) return null;
+
+  const lineOf = (acc: string, id: string) => config.mapping.get(mapKey(acc, id))?.reportLine ?? null;
+  const received = new Map<string, Map<string, number>>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await svc
+      .from("weekly_lead_flow_daily")
+      .select("day, account, adversus_campaign_id, lead_count")
+      .eq("kind", "received")
+      .lte("day", addDays(latest, 6))
+      .range(from, from + 999);
+    const batch = (data ?? []) as { day: string; account: string; adversus_campaign_id: string; lead_count: number }[];
+    for (const r of batch) {
+      const line = lineOf(r.account, r.adversus_campaign_id);
+      if (!line) continue;
+      const byWeek = received.get(line) ?? new Map<string, number>();
+      const w = mondayOf(r.day);
+      byWeek.set(w, (byWeek.get(w) ?? 0) + r.lead_count);
+      received.set(line, byWeek);
+    }
+    if (batch.length < 1000) break;
+  }
+  const firstWeek = [...received.values()].flatMap((m) => [...m.keys()]).sort()[0];
+  const closed = new Map<string, Map<string, number>>();
+  if (firstWeek) {
+    for (let from = 0; ; from += 1000) {
+      const { data } = await svc
+        .from("weekly_lead_closure_stats")
+        .select("week_start, account, adversus_campaign_id, status, lead_count")
+        .gte("week_start", firstWeek)
+        .lte("week_start", latest)
+        .range(from, from + 999);
+      const batch = (data ?? []) as { week_start: string; account: string; adversus_campaign_id: string; status: string; lead_count: number }[];
+      for (const r of batch) {
+        if (!config.closing.has(r.status)) continue;
+        const line = lineOf(r.account, r.adversus_campaign_id);
+        if (!line) continue;
+        const byWeek = closed.get(line) ?? new Map<string, number>();
+        byWeek.set(r.week_start, (byWeek.get(r.week_start) ?? 0) + r.lead_count);
+        closed.set(line, byWeek);
+      }
+      if (batch.length < 1000) break;
+    }
+  }
+  const trendWeeks = [3, 2, 1, 0].map((n) => addDays(latest, -7 * n));
+  const lines = config.lines.map((line) => {
+    const rec = received.get(line);
+    const clo = closed.get(line) ?? new Map<string, number>();
+    if (!rec || rec.size === 0) {
+      return { line, received: null, closed: clo.get(latest) ?? 0, diff: null, pool: null, trend: trendWeeks.map(() => null) };
+    }
+    const start = [...rec.keys()].sort()[0];
+    let pool = 0;
+    for (let w = start; w <= latest; w = addDays(w, 7)) pool += (rec.get(w) ?? 0) - (clo.get(w) ?? 0);
+    const diffOf = (w: string) => (w < start ? null : (rec.get(w) ?? 0) - (clo.get(w) ?? 0));
+    return {
+      line,
+      received: rec.get(latest) ?? 0,
+      closed: clo.get(latest) ?? 0,
+      diff: diffOf(latest),
+      pool,
+      trend: trendWeeks.map(diffOf),
+    };
+  });
+  return buildTrygFlowMailSection({ weekNumber: isoWeekNumber(latest), trendWeeks: trendWeeks.map(isoWeekNumber), lines });
 }
 
 /** Tæller tasks i en kørsel, så køen kan afgøre om den er tom. */
