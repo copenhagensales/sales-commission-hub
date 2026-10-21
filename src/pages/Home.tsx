@@ -719,6 +719,13 @@ const Home = () => {
                     location={event.location}
                     requiresRegistration={(event as { requires_registration?: boolean }).requires_registration}
                     attendeeCount={getEventAttendees(event.id).length}
+                    attendees={getEventAttendees(event.id).map((a) => {
+                      const emp = (a as { employee?: { id: string; first_name: string | null; last_name: string | null } | null }).employee;
+                      return {
+                        id: emp?.id ?? a.employee_id,
+                        name: `${emp?.first_name ?? ""} ${emp?.last_name ?? ""}`.trim() || "Ukendt",
+                      };
+                    })}
                     myStatus={getMyAttendance(event.id)}
                     disabled={toggleAttendanceMutation.isPending}
                     canManage={canManageEvents}

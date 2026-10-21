@@ -160,10 +160,59 @@ export function EventRsvpCard({
         })}
       </div>
 
-      <p className={cn("mt-3 text-[12px]", featured ? "opacity-75" : "text-foreground/60")}>
-        {attendeeCount} deltager{myStatus === "attending" ? " · inkl. dig" : ""}
-        {myStatus && myStatus !== "attending" ? ` · ${STATUS_LABEL[myStatus]}` : ""}
-      </p>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={attendees.length === 0}
+            className={cn(
+              "mt-3 flex items-center gap-2 rounded-full text-left text-[12px] hover:underline disabled:no-underline",
+              featured ? "opacity-90" : "text-foreground/60",
+            )}
+          >
+            {preview.length > 0 && (
+              <span className="flex -space-x-2">
+                {preview.map((a) => {
+                  const url = lookupAvatar({ employeeId: a.id, name: a.name });
+                  return (
+                    <span
+                      key={a.id}
+                      title={a.name}
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-muted text-[9px] font-bold text-muted-foreground ring-2",
+                        featured ? "ring-[hsl(var(--cph-onyx))]" : "ring-card",
+                      )}
+                    >
+                      {url ? <img src={url} alt={a.name} className="h-full w-full object-cover" /> : initials(a.name)}
+                    </span>
+                  );
+                })}
+              </span>
+            )}
+            <span>
+              {attendeeCount} deltager{myStatus === "attending" ? " · inkl. dig" : ""}
+              {myStatus && myStatus !== "attending" ? ` · ${STATUS_LABEL[myStatus]}` : ""}
+              {attendees.length > 0 ? " · Se hvem" : ""}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-2">
+          <p className="px-2 pb-2 text-xs font-bold text-muted-foreground">{attendees.length} deltager</p>
+          <ul className="max-h-72 space-y-1 overflow-y-auto">
+            {[...attendees].sort((a, b) => a.name.localeCompare(b.name, "da")).map((a) => {
+              const url = lookupAvatar({ employeeId: a.id, name: a.name });
+              return (
+                <li key={a.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm">
+                  <span className="flex h-6 w-6 flex-none items-center justify-center overflow-hidden rounded-full bg-muted text-[9px] font-bold text-muted-foreground">
+                    {url ? <img src={url} alt={a.name} className="h-full w-full object-cover" /> : initials(a.name)}
+                  </span>
+                  <span className="truncate">{a.name}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
