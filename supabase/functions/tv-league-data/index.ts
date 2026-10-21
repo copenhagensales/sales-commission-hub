@@ -151,6 +151,36 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // SECURITY: Samme adgangstjek som tv-dashboard-data — gyldig TV-kode
+    // (?code= mod tv_board_access) eller gyldig bruger-JWT. Ellers 401.
+    {
+      const authClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const accessCode = new URL(req.url).searchParams.get("code");
+      let authorized = false;
+      if (accessCode) {
+        const { data: accessData, error: accessError } = await authClient
+          .from("tv_board_access")
+          .select("id")
+          .eq("access_code", accessCode.toUpperCase())
+          .eq("is_active", true)
+          .maybeSingle();
+        authorized = !accessError && !!accessData;
+      } else {
+        const authHeader = req.headers.get("Authorization") || "";
+        const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+        if (token) {
+          const { data: userData } = await authClient.auth.getUser(token);
+          authorized = !!userData?.user;
+        }
+      }
+      if (!authorized) {
+        return new Response(
+          JSON.stringify({ error: accessCode ? "Invalid access code" : "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Return cache if fresh
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
       return new Response(JSON.stringify(cached.data), {

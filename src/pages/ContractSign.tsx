@@ -183,7 +183,7 @@ export default function ContractSign() {
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!id && !!user,
   });
 
   /* ─── Log contract access (view) ─── */
@@ -326,7 +326,24 @@ export default function ContractSign() {
     },
   });
 
-  if (isLoading || authLoading) {
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-card rounded-2xl shadow-xl p-8 text-center border border-border">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+            <FileText className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Log ind for at se kontrakten</h2>
+          <p className="text-muted-foreground mb-6">Du skal være logget ind for at se og underskrive kontrakten.</p>
+          <Button onClick={() => navigate("/auth")} className="w-full">
+            Log ind
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if ((isLoading && !!user) || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">

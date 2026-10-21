@@ -812,6 +812,7 @@ export default function CphSalesDashboard() {
         },
       }));
     },
+    enabled: !tvMode,
     refetchInterval: 60000,
     staleTime: 30000,
   });
