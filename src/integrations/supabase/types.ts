@@ -18119,6 +18119,7 @@ export type Database = {
       weekly_lead_closure_settings: {
         Row: {
           created_at: string
+          flow_status: boolean
           id: string
           is_active: boolean
           recipient_email: string
@@ -18126,6 +18127,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          flow_status?: boolean
           id?: string
           is_active?: boolean
           recipient_email: string
@@ -18133,6 +18135,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          flow_status?: boolean
           id?: string
           is_active?: boolean
           recipient_email?: string
