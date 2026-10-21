@@ -7,10 +7,25 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { ComplianceReviewAlert } from "@/components/compliance/ComplianceReviewAlert";
 import { ComplianceReviewPanel } from "@/components/compliance/ComplianceReviewPanel";
 import { ComplianceMonitoringPanel } from "@/components/compliance/ComplianceMonitoringPanel";
+import { useComplianceDocuments, versionLabel } from "@/hooks/useComplianceDocuments";
 
 export default function ComplianceOverview() {
   const navigate = useNavigate();
   const p = usePermissions();
+  const { data: complianceDocs = [] } = useComplianceDocuments();
+  const docStatus = (key: string) => {
+    const d = complianceDocs.find((x) => x.key === key);
+    if (d?.current) {
+      return {
+        badge: `Gældende ${versionLabel(d.current)}`,
+        badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+      };
+    }
+    return {
+      badge: "Afventer Kaspers godkendelse",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+    };
+  };
 
   const cards = [
     {
@@ -138,8 +153,7 @@ export default function ComplianceOverview() {
       description:
         "Backup-retention, hvornår anonymisering er fuldt irreversibel, og hvem der må gendanne data.",
       icon: Database,
-      badge: "Godkendt 1.0",
-      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+      ...docStatus("backup-policy"),
       href: "/compliance/documents/backup-policy",
       permKey: "menu_compliance_admin",
     },
@@ -148,8 +162,7 @@ export default function ComplianceOverview() {
       description:
         "Roller, behandlingsaktiviteter, databehandlere, sikkerhedsforanstaltninger og åbne punkter.",
       icon: ClipboardList,
-      badge: "Godkendt 1.0",
-      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+      ...docStatus("processing-registry"),
       href: "/compliance/documents/processing-registry",
       permKey: "menu_compliance_admin",
     },
@@ -158,9 +171,50 @@ export default function ComplianceOverview() {
       description:
         "Oversigt pr. leverandør med DPA-link, hvad der skal arkiveres, og status på arkivering.",
       icon: FileText,
-      badge: "Godkendt 1.0",
-      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+      ...docStatus("dpa-overview"),
       href: "/compliance/documents/dpa-overview",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Persondatapolitik",
+      description: "Intern politik for behandling af kunders persondata: dataminimering, sletning, adfærd, adgang og underdatabehandlere.",
+      icon: Shield,
+      ...docStatus("persondatapolitik"),
+      href: "/compliance/documents/persondatapolitik",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Procedure ved brud på persondatasikkerheden",
+      description: "Hvad et brud er, roller, og trinene fra anmeldelse til underretning af kunden inden for 24 timer.",
+      icon: AlertTriangle,
+      ...docStatus("databrudsprocedure"),
+      href: "/compliance/documents/databrudsprocedure",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Procedure for konsekvensvurdering",
+      description: "Vurdering af nye systemer, integrationer, felter og anvendelser, før de tages i brug.",
+      icon: Search,
+      ...docStatus("konsekvensvurdering-procedure"),
+      href: "/compliance/documents/konsekvensvurdering-procedure",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Databrudslog",
+      description: "Register over alle hændelser efter databrudsproceduren. Opbevares 5 år. PDF pr. hændelse.",
+      icon: AlertTriangle,
+      badge: "Register",
+      badgeColor: "bg-rose-500/10 text-rose-700 border-rose-500/30",
+      href: "/compliance/breach-log",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Konsekvensvurderinger",
+      description: "Register over gennemførte vurderinger med de otte spørgsmål, konklusion og Kaspers godkendelse.",
+      icon: ClipboardList,
+      badge: "Register",
+      badgeColor: "bg-rose-500/10 text-rose-700 border-rose-500/30",
+      href: "/compliance/impact-assessments",
       permKey: "menu_compliance_admin",
     },
     {
@@ -251,7 +305,7 @@ export default function ComplianceOverview() {
             <div className="space-y-1">
               <h2 className="text-2xl font-semibold text-foreground">Compliance-dokumenter</h2>
               <p className="text-sm text-muted-foreground">
-                Formelle dokumenter til godkendelse. Kan læses her og printes eller gemmes som PDF.
+                Formelle dokumenter og registre. Godkendes af Kasper Mikkelsen og kan eksporteres som PDF.
               </p>
             </div>
             <div className="grid gap-6 md:grid-cols-2">

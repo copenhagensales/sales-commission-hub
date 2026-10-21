@@ -10,11 +10,8 @@ export default function ProcessingRegistry() {
   return (
     <MainLayout>
       <ComplianceDocument
+        docKey="processing-registry"
         title="Fortegnelse over behandlingsaktiviteter (GDPR art. 30) og risikovurdering — Stork"
-        version="1.0"
-        documentDate="9. september 2026"
-        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
-        statusTone="approved"
       >
         <DocSection heading="A. Dataansvarlig">
           <p>
