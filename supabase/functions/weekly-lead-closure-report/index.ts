@@ -221,6 +221,8 @@ type LeadFacts = {
   day: string;
   /** Årsag fra rullelisten (kun invalid på konti med årsagsfelt), ellers "". */
   reason: string;
+  /** Dansk dag for lead.created — bruges kun til leveringsstatus (Modtaget). */
+  createdDay: string;
 };
 
 /** Egen nøgle i weekly_lead_closure_stats, så MCR kan aggregeres som statusser. */
@@ -310,6 +312,7 @@ async function streamCampaignPages(
         user: safeString(lead.lastContactedBy),
         day: copenhagenDay(safeString(lead.updated)),
         reason: status === INVALID_STATUS ? invalidReason(account, lead) : "",
+        createdDay: copenhagenDay(safeString(lead.created)),
       });
     }
     if (batch.length < PAGE_SIZE) return { scanned, nextPage: null };
@@ -765,6 +768,72 @@ async function saveCounts(
 }
 
 /**
+ * Leveringsstatus (Tryg): samme optælling som ugetallene, men pr. dag, plus
+ * antal emner oprettet pr. dag (Modtaget). Kun antal — ingen lead-data.
+ * Nøgle: day|kind|agent_reference|status.
+ */
+async function saveFlowDaily(
+  svc: SupabaseClient,
+  account: string,
+  campaignId: string,
+  counts: Map<string, number>,
+): Promise<void> {
+  if (counts.size === 0) return;
+  const merged = new Map<string, number>();
+  for (const [key, n] of counts) merged.set(key, (merged.get(key) ?? 0) + n);
+  const keys = [...merged.keys()];
+  // Tasks kører side for side, så eksisterende tal lægges oveni.
+  const days = [...new Set(keys.map((k) => k.split("|")[0]))];
+  const { data: existing } = await svc
+    .from("weekly_lead_flow_daily")
+    .select("day, kind, agent_reference, status, lead_count")
+    .eq("account", account)
+    .eq("adversus_campaign_id", campaignId)
+    .in("day", days);
+  for (const r of (existing ?? []) as { day: string; kind: string; agent_reference: string; status: string; lead_count: number }[]) {
+    const key = `${r.day}|${r.kind}|${r.agent_reference}|${r.status}`;
+    if (merged.has(key)) merged.set(key, (merged.get(key) ?? 0) + r.lead_count);
+  }
+  const rows = [...merged.entries()].map(([key, lead_count]) => {
+    const [day, kind, agent_reference, status] = key.split("|");
+    return {
+      day,
+      account,
+      adversus_campaign_id: campaignId,
+      kind,
+      agent_reference,
+      status,
+      lead_count,
+      updated_at: new Date().toISOString(),
+    };
+  });
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await svc
+      .from("weekly_lead_flow_daily")
+      .upsert(rows.slice(i, i + 500), { onConflict: "day,account,adversus_campaign_id,kind,agent_reference,status" });
+    if (error) throw new Error(`Kunne ikke gemme leveringsstatus: ${error.message}`);
+  }
+}
+
+/** Nulstiller leveringsstatus for én kampagne og de berørte uger. */
+async function resetFlowDaily(
+  svc: SupabaseClient,
+  account: string,
+  campaignId: string,
+  weeks: string[],
+): Promise<void> {
+  for (const week of weeks) {
+    await svc
+      .from("weekly_lead_flow_daily")
+      .delete()
+      .eq("account", account)
+      .eq("adversus_campaign_id", campaignId)
+      .gte("day", week)
+      .lte("day", addDays(week, 6));
+  }
+}
+
+/**
  * Opkaldsdelen for én task: ÉN konto + ÉN kampagne + ÉN uge. Fejler kilden,
  * fortsætter emnedelen uændret og linjen viser "–" i stedet for et forkert tal.
  */
@@ -816,16 +885,26 @@ async function processEnreachTask(
   config: Config,
   campaignId: string,
   weekStart: string,
+  flowOnly = false,
 ): Promise<{ scanned: number; nextPage: number | null }> {
   if (!weekStart || !campaignId) return { scanned: 0, nextPage: null };
 
   // Nulstil kun taskens kampagne og uge, så parallelle tasks ikke påvirkes.
-  await svc
-    .from("weekly_lead_closure_stats")
-    .delete()
-    .eq("account", "enreach")
-    .eq("adversus_campaign_id", campaignId)
-    .eq("week_start", weekStart);
+  // Ved flowOnly (backfill/opdatering af leveringsstatus) røres ugetallene ikke.
+  if (!flowOnly) {
+    await svc
+      .from("weekly_lead_closure_stats")
+      .delete()
+      .eq("account", "enreach")
+      .eq("adversus_campaign_id", campaignId)
+      .eq("week_start", weekStart);
+  }
+  await resetFlowDaily(svc, "enreach", campaignId, [weekStart]);
+  const daily = new Map<string, number>();
+  const addDaily = (day: string, user: string, status: string) => {
+    const k = `${day}|closed|${user}|${status}`;
+    daily.set(k, (daily.get(k) ?? 0) + 1);
+  };
 
   const access = await enreachAccess(svc);
   const counts = new Map<string, number>();
@@ -839,6 +918,7 @@ async function processEnreachTask(
     if (lead.status === ENREACH_MCR_STATUS) {
       const mcrKey = `${weekStart}|enreach|${lead.campaignId}||${MCR_STATUS}`;
       counts.set(mcrKey, (counts.get(mcrKey) ?? 0) + 1);
+      addDaily(lead.day, "", MCR_STATUS);
       return;
     }
     // Svaret indeholder kun afsluttede emner (AllClosedStatuses), så intet må
@@ -850,15 +930,18 @@ async function processEnreachTask(
       const dialerKey = ENREACH_DIALER_STATUS[raw] ?? `enreach_${raw}`;
       const key = `${weekStart}|enreach|${lead.campaignId}||${dialerKey}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      addDaily(lead.day, "", dialerKey);
       return;
     }
     if (!lead.user.endsWith(OUR_DOMAIN)) return; // kun vores egne sælgere
     const status = config.alias.get(lead.closure) ?? lead.closure ?? UNKNOWN_BUCKET;
     const key = `${weekStart}|enreach|${lead.campaignId}|${lead.user}|${status}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
+    addDaily(lead.day, `enreach:${lead.user}`, status);
   });
 
-  await saveCounts(svc, config, counts);
+  if (!flowOnly) await saveCounts(svc, config, counts);
+  await saveFlowDaily(svc, "enreach", campaignId, daily);
   // Kun tal logges — aldrig lead-data.
   return { scanned, nextPage: null };
 }
@@ -874,27 +957,33 @@ async function processEnreachTask(
 async function processTask(
   svc: SupabaseClient,
   config: Config,
-  job: { account: AccountKey; campaignId: string; weeks: string[]; nextPage: number },
+  job: { account: AccountKey; campaignId: string; weeks: string[]; nextPage: number; flowOnly?: boolean },
 ): Promise<{ scanned: number; nextPage: number | null }> {
   const account = ACCOUNTS.find((candidate) => candidate.key === job.account);
   if (!account) throw new Error(`Ukendt konto: ${job.account}`);
+  const flowOnly = job.flowOnly === true;
   if (account.kind === "enreach") {
-    return await processEnreachTask(svc, config, job.campaignId, job.weeks[0] ?? "");
+    return await processEnreachTask(svc, config, job.campaignId, job.weeks[0] ?? "", flowOnly);
   }
 
   const auth = authHeader(account);
   const users = await ourUsers(auth);
   const weekSet = new Set(job.weeks);
   const counts = new Map<string, number>();
+  const daily = new Map<string, number>();
 
   if (job.nextPage === 1) {
     // Nulstil kampagnens tal for de berørte uger, så genkørsler ikke lægger oveni.
-    await svc
-      .from("weekly_lead_closure_stats")
-      .delete()
-      .eq("account", job.account)
-      .eq("adversus_campaign_id", job.campaignId)
-      .in("week_start", job.weeks);
+    // Ved flowOnly (backfill/opdatering af leveringsstatus) røres ugetallene ikke.
+    if (!flowOnly) {
+      await svc
+        .from("weekly_lead_closure_stats")
+        .delete()
+        .eq("account", job.account)
+        .eq("adversus_campaign_id", job.campaignId)
+        .in("week_start", job.weeks);
+    }
+    await resetFlowDaily(svc, job.account, job.campaignId, job.weeks);
   }
 
   const { scanned, nextPage } = await streamCampaignPages(
@@ -903,6 +992,11 @@ async function processTask(
     job.campaignId,
     job.nextPage,
     (lead) => {
+      // Modtaget: emnet er oprettet i en af taskens uger (uafhængigt af lukning).
+      if (lead.createdDay && weekSet.has(mondayOf(lead.createdDay))) {
+        const rk = `${lead.createdDay}|received||`;
+        daily.set(rk, (daily.get(rk) ?? 0) + 1);
+      }
       if (!lead.day) return;
       const week = mondayOf(lead.day);
       if (!weekSet.has(week)) return;
@@ -911,11 +1005,15 @@ async function processTask(
       // Årsagen er kun med for invalid; tom = lukket af dialeren (gemmes som NULL).
       const key = `${week}|${job.account}|${job.campaignId}|${lead.user}|${status}|${lead.reason}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      // Samme filter som ugetallene, men pr. dag (leveringsstatus).
+      const dk = `${lead.day}|closed|${job.account}:${lead.user}|${status}`;
+      daily.set(dk, (daily.get(dk) ?? 0) + 1);
     },
 
   );
 
-  await saveCounts(svc, config, counts);
+  if (!flowOnly) await saveCounts(svc, config, counts);
+  await saveFlowDaily(svc, job.account, job.campaignId, daily);
 
   return { scanned, nextPage };
 }
@@ -1166,6 +1264,8 @@ interface RunState {
   /** Manuel afsendelse: mailen sendes selvom der allerede er sendt i dag. */
   forceMail: boolean;
   triggeredBy: string;
+  /** Kun leveringsstatus: ugetal, opkald og mail røres ikke (backfill/opdatering). */
+  flowOnly: boolean;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -1203,6 +1303,7 @@ async function chainNext(state: RunState): Promise<void> {
     send_mail: state.sendMail,
     force_mail: state.forceMail,
     triggered_by: state.triggeredBy,
+    flow_only: state.flowOnly,
   });
   try {
     await fetch(url, {
@@ -1414,6 +1515,8 @@ Deno.serve(async (req) => {
       run_ids?: string[];
       /** Valgfrit: kun disse konti lægges i køen (fx ["enreach"]). */
       accounts?: string[];
+      /** Kun leveringsstatus (Tryg): ugetal, opkald og mail røres ikke. */
+      flow_only?: boolean;
     };
 
     if (body.action === "status") {
@@ -1527,6 +1630,7 @@ Deno.serve(async (req) => {
         sendMail: body.send_mail !== false,
         forceMail: body.force_mail === true,
         triggeredBy,
+        flowOnly: body.flow_only === true,
       };
       const onlyAccounts = Array.isArray(body.accounts) && body.accounts.length > 0
         ? body.accounts.map((a) => safeString(a))
@@ -1546,6 +1650,7 @@ Deno.serve(async (req) => {
       sendMail: body.send_mail !== false,
       forceMail: body.force_mail === true,
       triggeredBy,
+      flowOnly: body.flow_only === true,
     };
     activeRunId = state.runId;
 
@@ -1585,7 +1690,7 @@ Deno.serve(async (req) => {
     try {
       // next_page = 0 betyder at emnerne er hentet, og opkaldsdelen mangler.
       if (task.next_page === 0 && !task.calls_done) {
-        const calls = await processCalls(svc, {
+        const calls = state.flowOnly ? null : await processCalls(svc, {
           account: task.account,
           campaignId: task.campaign_id,
           weekStart: task.week_start,
@@ -1614,6 +1719,7 @@ Deno.serve(async (req) => {
         campaignId: task.campaign_id,
         weeks: taskWeeks,
         nextPage: task.next_page,
+        flowOnly: state.flowOnly,
       });
       await svc
         .from("weekly_lead_closure_tasks")
