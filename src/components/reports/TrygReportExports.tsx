@@ -3,14 +3,13 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
-import { useDownloadTrygReportExport, useRunHjerteforeningenExport, useTrygReportExports } from "@/hooks/useTrygReportExports";
+import { useDownloadTrygReportExport, useTrygReportExports } from "@/hooks/useTrygReportExports";
 
 /** Udtræk (Excel) – vises kun for superadmin. */
 export function TrygReportExports() {
   const { isSuperadmin } = useIsSuperadmin();
   const { data: files = [], isLoading } = useTrygReportExports(isSuperadmin);
   const download = useDownloadTrygReportExport();
-  const hjerte = useRunHjerteforeningenExport();
   if (!isSuperadmin) return null;
 
   return (
@@ -21,17 +20,6 @@ export function TrygReportExports() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <Button
-          size="sm"
-          disabled={hjerte.isPending}
-          onClick={() => hjerte.mutate(undefined, {
-            onSuccess: (d) => toast.success(`${d.rows} lukkede leads hentet`),
-            onError: () => toast.error("Udtrækket fejlede"),
-          })}
-        >
-          {hjerte.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-          Hjerteforeningen – lukkede leads
-        </Button>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {!isLoading && files.length === 0 && <p className="text-sm text-muted-foreground">Ingen udtræk endnu.</p>}
         {files.map((f) => (
