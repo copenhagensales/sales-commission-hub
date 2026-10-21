@@ -19,15 +19,15 @@ const json = (status: number, body: unknown) =>
 
 // Kolonne → mulige masterData-labels (case-insensitiv, eksakt match efter trim).
 const MAPPING: { col: string; labels: string[] }[] = [
-  { col: "Navn", labels: ["navn", "fulde navn", "name", "fuldt navn"] },
-  { col: "Adresse", labels: ["adresse", "address", "vejnavn", "gade"] },
-  { col: "Postnummer", labels: ["postnummer", "postnr", "postnr.", "post nr", "zip", "postal code"] },
-  { col: "By", labels: ["by", "city", "postdistrikt"] },
-  { col: "E-mail", labels: ["e-mail", "email", "mail"] },
-  { col: "Mobilnummer", labels: ["mobil", "mobilnummer", "mobilnr", "mobile", "mobiltelefon"] },
-  { col: "Telefonnummer", labels: ["telefon", "telefonnummer", "telefonnr", "phone", "fastnet"] },
+  { col: "Navn", labels: ["navn1"] },
+  { col: "Adresse", labels: ["adresse"] },
+  { col: "Postnummer", labels: ["postnr"] },
+  { col: "By", labels: ["by"] },
+  { col: "E-mail", labels: [] },
+  { col: "Mobilnummer", labels: ["telefonnummer2"] },
+  { col: "Telefonnummer", labels: ["telefonnummer1"] },
 ];
-const FIRST = ["fornavn", "first name"], LAST = ["efternavn", "last name"];
+
 
 function dkDate(iso: string): string {
   const d = new Date(iso);
@@ -88,10 +88,9 @@ Deno.serve(async (req) => {
         }
         const pick = (labels: string[]) => { for (const l of labels) { const v = md.get(l); if (v) return v; } return ""; };
         const vals = MAPPING.map((m) => pick(m.labels));
-        if (!vals[0]) vals[0] = [pick(FIRST), pick(LAST)].filter(Boolean).join(" ");
 
         let tKey = "";
-        for (const k of ["lastContactedTime", "lastUpdatedTime", "lastModifiedTime", "updated"]) if (s(lead[k])) { tKey = k; break; }
+        for (const k of ["lastUpdatedTime"]) if (s(lead[k])) { tKey = k; break; }
         timeKeyUsed[tKey || "(ingen)"] = (timeKeyUsed[tKey || "(ingen)"] ?? 0) + 1;
 
         let code = "";
