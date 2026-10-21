@@ -67,8 +67,20 @@ function Body({ docKey }: { docKey: string }) {
         )
       }
     >
-      <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-h1:hidden">
-        <ReactMarkdown>{version?.content_md ?? ""}</ReactMarkdown>
+      <div className="space-y-3">
+        <ReactMarkdown
+          components={{
+            h1: () => null,
+            h2: ({ children }) => <h2 className="text-lg font-semibold text-foreground pt-4">{children}</h2>,
+            h3: ({ children }) => <h3 className="font-medium text-foreground pt-2">{children}</h3>,
+            p: ({ children }) => <p className="text-foreground">{children}</p>,
+            ul: ({ children }) => <ul className="list-disc pl-6 space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal pl-6 space-y-1">{children}</ol>,
+            em: ({ children }) => <em className="text-muted-foreground">{children}</em>,
+          }}
+        >
+          {version?.content_md ?? ""}
+        </ReactMarkdown>
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
