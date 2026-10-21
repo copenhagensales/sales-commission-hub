@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import {
-  COMPLIANCE_DOCUMENTS,
   COMPLIANCE_REVIEW_AREAS,
   DPA_REQUIRED_VENDORS,
   REVIEW_WARNING_DAYS,
-  type ComplianceDocumentMeta,
 } from "@/config/complianceDocuments";
+import { useComplianceDocuments } from "@/hooks/useComplianceDocuments";
 import { useDpaDocuments } from "@/hooks/useDpaDocuments";
 import { useComplianceAreaReviews } from "@/hooks/useComplianceAreaReviews";
 
@@ -25,10 +24,6 @@ function addMonths(date: Date, months: number): Date {
   return next;
 }
 
-function nextReviewDate(doc: ComplianceDocumentMeta): Date {
-  return addMonths(new Date(`${doc.approvedAt}T00:00:00`), doc.reviewIntervalMonths);
-}
-
 function formatDa(date: Date): string {
   return date.toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -41,13 +36,24 @@ function formatDa(date: Date): string {
 export function useComplianceReviewStatus() {
   const { data: dpaDocuments = [], isLoading } = useDpaDocuments();
   const { data: areaReviews = [], isLoading: isLoadingReviews } = useComplianceAreaReviews();
+  const { data: complianceDocs = [], isLoading: isLoadingDocs } = useComplianceDocuments();
 
   const items = useMemo<ComplianceReviewItem[]>(() => {
     const now = new Date();
     const result: ComplianceReviewItem[] = [];
 
-    for (const doc of COMPLIANCE_DOCUMENTS) {
-      const due = nextReviewDate(doc);
+    for (const doc of complianceDocs) {
+      if (!doc.current?.approved_at) {
+        result.push({
+          key: `doc-${doc.key}`,
+          title: doc.title,
+          detail: "Afventer Kaspers godkendelse.",
+          href: doc.href,
+          severity: "missing",
+        });
+        continue;
+      }
+      const due = addMonths(new Date(doc.current.approved_at), doc.review_interval_months);
       const daysLeft = Math.ceil((due.getTime() - now.getTime()) / 86_400_000);
       if (daysLeft < 0) {
         result.push({
@@ -119,12 +125,12 @@ export function useComplianceReviewStatus() {
     }
 
     return result;
-  }, [dpaDocuments, areaReviews]);
+  }, [dpaDocuments, areaReviews, complianceDocs]);
 
   return {
     items,
     count: items.length,
     hasOverdue: items.some((i) => i.severity === "overdue"),
-    isLoading: isLoading || isLoadingReviews,
+    isLoading: isLoading || isLoadingReviews || isLoadingDocs,
   };
 }
