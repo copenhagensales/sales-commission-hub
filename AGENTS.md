@@ -10,6 +10,7 @@ Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Ind
 4. Rør aldrig de schemas og funktioner, strukturen ejer: core_*, app_*, overgang og funktioner med præfikset stork_.
 5. Medarbejdere og salg slettes aldrig. Brug status og anonymisering.
 6. Databasen afviser efterhånden ændringer, der bryder punkt 1–4. Får du sådan en afvisning, så stop, forsøg ikke at omgå den, og beskriv ændringen, så den kan tages gennem ændringsproceduren.
+7. Databasen håndhæver nu punkt 1–3: nye tabeller får RLS automatisk (du skal stadig lave reglerne), visninger skal oprettes med `WITH (security_invoker = true)`, nye SECURITY DEFINER-funktioner og ny adgang for anon afvises, og regler, der lader alle indloggede læse CPR, bank, adresse, telefon eller løn, afvises. Brug almindelige funktioner (SECURITY INVOKER) med RLS.
 
 ## Øvrige regler
 

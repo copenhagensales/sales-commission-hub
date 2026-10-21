@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, TrendingUp, TrendingDown, Trophy, Flame, Zap, BarChart3, Lock, Users, Target } from "lucide-react";
@@ -119,12 +120,7 @@ function useLeagueTvData() {
   return useQuery<LeaguePayload>({
     queryKey: ["tv-league-data"],
     queryFn: async () => {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const url = `https://${projectId}.supabase.co/functions/v1/tv-league-data`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" },
-      });
+      const res = await tvEdgeFetch("tv-league-data");
       if (!res.ok) throw new Error("Failed to fetch league data");
       return res.json();
     },

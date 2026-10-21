@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { TrendingUp, Package } from "lucide-react";
@@ -42,6 +43,7 @@ function useUnitedTeamClients() {
 
 function UnitedClientBreakdown({ clients }: { clients: Array<{ id: string; name: string }> }) {
   const tvMode = isTvMode();
+  const { user } = useAuth();
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
 
   const { data: clientSalesData } = useQuery({
@@ -75,7 +77,7 @@ function UnitedClientBreakdown({ clients }: { clients: Array<{ id: string; name:
         };
       }).sort((a, b) => b.salesMonth - a.salesMonth);
     },
-    enabled: clients.length > 0,
+    enabled: clients.length > 0 && !!user,
     staleTime: 30000, refetchInterval: 60000,
   });
 
@@ -120,7 +122,7 @@ function UnitedClientBreakdown({ clients }: { clients: Array<{ id: string; name:
       }));
       return hoursMap;
     },
-    enabled: clients.length > 0,
+    enabled: clients.length > 0 && !!user,
   });
 
   if (tvMode || !clientSalesData || clientSalesData.length === 0) return null;

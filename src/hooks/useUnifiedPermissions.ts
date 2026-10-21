@@ -37,8 +37,10 @@ export interface PagePermission {
 // Fetch all role definitions
 // OPTIMIZED: Extended staleTime to 15 minutes - role definitions rarely change
 export function useRoleDefinitions() {
+  const { user } = useAuth();
   return useQuery({
     queryKey: ['role-definitions'],
+    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('system_role_definitions')
@@ -56,8 +58,10 @@ export function useRoleDefinitions() {
 // Fetch all page permissions
 // OPTIMIZED: Extended staleTime to 15 minutes - permissions rarely change during session
 export function usePagePermissions() {
+  const { user } = useAuth();
   return useQuery({
     queryKey: ['page-permissions'],
+    enabled: !!user,
     queryFn: async () => {
       // Paginated fetch to ensure ALL permissions are retrieved (Supabase default limit is 1000)
       const allPermissions = await fetchAllRows<PagePermission>(
