@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 
 export interface TeamAssistantLeader {
   team_id: string;
@@ -19,10 +18,8 @@ export interface TeamAssistantLeader {
  * Beregninger (løn, ATP, DB) skal bruge de aktive helpers nedenfor.
  */
 export function useTeamAssistantLeaders() {
-  const { user } = useAuth();
   return useQuery({
     queryKey: ["team-assistant-leaders"],
-    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("team_assistant_leaders")
