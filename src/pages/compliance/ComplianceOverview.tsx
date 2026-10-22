@@ -184,6 +184,14 @@ export default function ComplianceOverview() {
       permKey: "menu_compliance_admin",
     },
     {
+      title: "Art. 30: Intern kommunikation – Pulsen (udkast)",
+      description: "Fortegnelse for Pulsen: formål, kategorier, modtagere, slettefrister og forbud mod kundeoplysninger.",
+      icon: Shield,
+      ...docStatus("art30-pulsen"),
+      href: "/compliance/documents/art30-pulsen",
+      permKey: "menu_compliance_admin",
+    },
+    {
       title: "Procedure ved brud på persondatasikkerheden",
       description: "Hvad et brud er, roller, og trinene fra anmeldelse til underretning af kunden inden for 24 timer.",
       icon: AlertTriangle,
