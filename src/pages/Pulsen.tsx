@@ -68,9 +68,11 @@ export default function Pulsen() {
 
   // Kun Huset-indlæg har reaktioner/kommentarer (databasen afviser team-indhold).
   const milestones = usePulsenMilestones(scope, !!me.employeeId);
-  const houseKeys = isHouse
-    ? [...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)), ...(milestones.data ?? []).map((m) => milestoneTargetKey(m.id))]
-    : [];
+  // Indlæg har reaktioner i både Huset og team; milepæle kun i Huset.
+  const houseKeys = [
+    ...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)),
+    ...(isHouse ? (milestones.data ?? []).map((m) => milestoneTargetKey(m.id)) : []),
+  ];
   const fr = useFeedReactions(houseKeys);
 
   const { data: celebrations = [] } = useCelebrations();
@@ -192,7 +194,7 @@ export default function Pulsen() {
                 canModerate={me.canModerate(p)}
                 contextLabel={contextFor(p)}
                 imageUrl={p.image_path ? images.data?.get(p.image_path) : null}
-                interactions={isHouse ? {
+                interactions={!p.pending ? {
                   summary: fr.getReactions(key),
                   comments: fr.getComments(key),
                   canInteract: fr.canInteract,
