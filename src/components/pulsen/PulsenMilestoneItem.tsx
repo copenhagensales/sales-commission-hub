@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { MilestoneBar } from "@/components/pulsen/MilestoneBar";
 import { MilestoneHeroCard } from "@/components/pulsen/MilestoneHeroCard";
 import type { PulsenMilestone, PulsenMilestoneType } from "@/hooks/usePulsen";
-import { pulsenRelativeTime } from "@/lib/pulsen/format";
+import { fillMilestoneDay, pulsenRelativeTime } from "@/lib/pulsen/format";
 
 const ICON: Record<PulsenMilestoneType, LucideIcon> = {
   first_sale: Flag,
@@ -12,12 +12,13 @@ const ICON: Record<PulsenMilestoneType, LucideIcon> = {
   record_pay_period: TrendingUp,
   club: Medal,
   team_day_sales: Users,
+  team_record: Trophy,
   streak: Flame,
   house_record: Trophy,
 };
 const LABEL: Record<PulsenMilestoneType, string> = {
   first_sale: "Første salg", record_day: "Rekord", record_week: "Rekord", record_pay_period: "Rekord",
-  club: "Klub", team_day_sales: "Teamfejring", streak: "Stribe", house_record: "Husrekord",
+  club: "Klub", team_day_sales: "Teamfejring", team_record: "Teamrekord", streak: "Stribe", house_record: "Husrekord",
 };
 
 /** "**x** tekst" -> <b>x</b> tekst. Teksten kommer fra jobbet, ikke fra brugere. */
@@ -27,23 +28,24 @@ export function renderMilestoneText(text: string): ReactNode[] {
   );
 }
 
-export const isHeroMilestone = (m: Pick<PulsenMilestone, "milestone_type" | "level">) =>
-  m.milestone_type === "house_record" || (m.milestone_type === "team_day_sales" && m.level >= 100);
+/** Kun husrekord og teamrekord er store kort (Kasper 22/10). */
+export const isHeroMilestone = (m: Pick<PulsenMilestone, "milestone_type">) =>
+  m.milestone_type === "house_record" || m.milestone_type === "team_record";
 
 const plain = (t: string) => t.replace(/\*\*/g, "");
 const num = (n: number | null | undefined) => Math.round(Number(n ?? 0)).toLocaleString("da-DK");
 
 export function PulsenMilestoneItem({ milestone: m, reaction, now }: { milestone: PulsenMilestone; reaction?: ReactNode; now?: Date }) {
-  const text = m.payload?.text ?? "";
+  const text = fillMilestoneDay(m.payload?.text ?? "", m.payload?.day, now);
   const time = pulsenRelativeTime(m.occurred_at, now);
   if (isHeroMilestone(m)) {
     const house = m.milestone_type === "house_record";
     return (
       <MilestoneHeroCard
-        value={num(house ? m.value : m.level)}
+        value={num(m.value)}
         unit="salg"
         eyebrow={`${LABEL[m.milestone_type]} · ${time}`}
-        title={house ? "Ny husrekord på én dag" : plain(text)}
+        title={house ? "Ny husrekord på én dag" : plain(text).replace(/:.*$/, "")}
         subtitle={house && m.payload?.previous != null ? `Før ${num(m.payload.previous)} salg` : undefined}
         footer={reaction}
       />
