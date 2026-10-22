@@ -1,3 +1,4 @@
+import { clearPushSubscription } from "@/hooks/usePushNotifications";
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag, Upload } from "lucide-react";
 import { PulsenUnreadBadge } from "@/components/pulsen/PulsenUnreadBadge";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
@@ -381,6 +382,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
     try {
+      await clearPushSubscription();
       await supabase.auth.signOut();
     } catch (e) {
       console.error("Logout error:", e);

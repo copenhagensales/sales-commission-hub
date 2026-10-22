@@ -16,6 +16,17 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
   return reg ?? null;
 }
 
+/** Kaldes FØR signOut: sletter enhedens subscription i databasen (kræver stadig session) og afmelder browseren. */
+export async function clearPushSubscription(): Promise<void> {
+  try {
+    const reg = await getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return;
+    await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    await sub.unsubscribe();
+  } catch { /* må aldrig blokere logud */ }
+}
+
 // Ved logud: afmeld browserens abonnement. Serveren deaktiverer det ved næste afsendelse (410).
 if (typeof window !== "undefined") {
   supabase.auth.onAuthStateChange((event) => {
