@@ -407,6 +407,27 @@
       "when": 1792664111561,
       "tag": "0057_pulsen_milestone_candidates_materialize_resolver",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792667572692,
+      "tag": "0058_pulsen_streak_shared_and_subject",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1792667717598,
+      "tag": "0059_profile_stats_use_shared_streak",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1792667791389,
+      "tag": "0060_pulsen_milestone_candidates_v2",
+      "breakpoints": true
     }
   ]
 }

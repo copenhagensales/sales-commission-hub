@@ -13904,6 +13904,7 @@ export type Database = {
           period_key: string
           rarity: number
           shown_in_house: boolean
+          subject_id: string
           team_id: string | null
           updated_at: string
           value: number
@@ -13918,6 +13919,7 @@ export type Database = {
           period_key: string
           rarity?: number
           shown_in_house?: boolean
+          subject_id?: string
           team_id?: string | null
           updated_at?: string
           value?: number
@@ -13932,6 +13934,7 @@ export type Database = {
           period_key?: string
           rarity?: number
           shown_in_house?: boolean
+          subject_id?: string
           team_id?: string | null
           updated_at?: string
           value?: number
@@ -20025,6 +20028,21 @@ export type Database = {
           value: number
         }[]
       }
+      pulsen_milestone_candidates_v2: {
+        Args: { p_from: string; p_to: string; p_types: string[] }
+        Returns: {
+          employee_id: string
+          level: number
+          milestone_type: string
+          occurred_at: string
+          occurred_on: string
+          period_key: string
+          previous: number
+          team_id: string
+          tier: number
+          value: number
+        }[]
+      }
       pulsen_topline: {
         Args: never
         Returns: {
@@ -20036,6 +20054,7 @@ export type Database = {
           yesterday: number
         }[]
       }
+      pulsen_upsert_milestones: { Args: { p_rows: Json }; Returns: number }
       pulsen_visible_team_ids: { Args: never; Returns: string[] }
       purge_eesy_mobile_sensitive: { Args: never; Returns: number }
       quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }
@@ -20141,6 +20160,25 @@ export type Database = {
       }
       sale_is_tdc_erhverv: { Args: { _sale_id: string }; Returns: boolean }
       sale_is_united_client: { Args: { _sale_id: string }; Returns: boolean }
+      sales_streak_min_commission: { Args: never; Returns: number }
+      sales_streak_runs: {
+        Args: {
+          p_comm: number[]
+          p_d: string[]
+          p_emp: string[]
+          p_min: string
+          p_today: string
+        }
+        Returns: {
+          d: string
+          emp: string
+          is_current: boolean
+          island_end: string
+          island_len: number
+          island_start: string
+          pos: number
+        }[]
+      }
       save_integration_secret: {
         Args: {
           p_api_url: string

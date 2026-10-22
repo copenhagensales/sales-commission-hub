@@ -886,6 +886,71 @@ Deno.serve(async (req) => {
               break;
             }
 
+            case "pulsen_content":
+            case "pulsen_milestones": {
+              // Pulsen (trin 8). Indlæg, kommentarer på Pulsen-indhold og billedfiler: retention_days efter oprettelse
+              // og pulsen_config.retention_after_leave_days efter fratræden. Milepæle: retention_days efter occurred_at.
+              // cleanup_mode "dry_run" tæller kun og logger i gdpr_cleanup_log.
+              const policyDry = policy.cleanup_mode === "dry_run" || dryRun;
+              const { data: leaveCfg } = await supabase.from("pulsen_config").select("value").eq("key", "retention_after_leave_days").maybeSingle();
+              const leaveDays = Number(leaveCfg?.value ?? 30);
+              const leaveCut = new Date(); leaveCut.setDate(leaveCut.getDate() - leaveDays);
+              const leaveISO = leaveCut.toISOString().slice(0, 10);
+              const { data: gone } = await supabase.from("employee_master_data")
+                .select("id, auth_user_id").not("employment_end_date", "is", null).lt("employment_end_date", leaveISO);
+              const goneEmp = (gone ?? []).map((g) => g.id);
+              const goneAuth = (gone ?? []).map((g) => g.auth_user_id).filter(Boolean) as string[];
+              const result: Record<string, number> = {};
+              if (policy.data_type === "pulsen_content") {
+                const old = await supabase.from("pulsen_posts").select("id, image_path").lt("created_at", cutoffISO);
+                const left = goneEmp.length
+                  ? await supabase.from("pulsen_posts").select("id, image_path").in("author_employee_id", goneEmp)
+                  : { data: [] as { id: string; image_path: string | null }[] };
+                const posts = new Map<string, string | null>();
+                for (const r of [...(old.data ?? []), ...(left.data ?? [])]) posts.set(r.id, r.image_path);
+                const postKeys = [...posts.keys()].map((id) => `pulsen_post:${id}`);
+                const images = [...posts.values()].filter(Boolean) as string[];
+                const oldC = await supabase.from("feed_comments").select("id").in("target_type", ["pulsen_post", "milestone"]).lt("created_at", cutoffISO);
+                const leftC = goneAuth.length
+                  ? await supabase.from("feed_comments").select("id").in("target_type", ["pulsen_post", "milestone"]).in("user_id", goneAuth)
+                  : { data: [] as { id: string }[] };
+                const commentIds = [...new Set([...(oldC.data ?? []), ...(leftC.data ?? [])].map((c) => c.id))];
+                result.posts = posts.size; result.comments = commentIds.length; result.images = images.length;
+                if (!policyDry) {
+                  if (images.length) await supabase.storage.from("pulsen-images").remove(images);
+                  if (commentIds.length) {
+                    await supabase.from("pulsen_posts").update({ best_answer_comment_id: null }).in("best_answer_comment_id", commentIds);
+                    await supabase.from("feed_comments").delete().in("id", commentIds);
+                  }
+                  if (postKeys.length) {
+                    await supabase.from("feed_reactions").delete().in("target_key", postKeys);
+                    await supabase.from("feed_comments").delete().in("target_key", postKeys);
+                    await supabase.from("pulsen_posts").delete().in("id", [...posts.keys()]);
+                  }
+                }
+              } else {
+                const ms = await supabase.from("pulsen_milestones").select("id").lt("occurred_at", cutoffISO);
+                const ids = (ms.data ?? []).map((m) => m.id);
+                result.milestones = ids.length;
+                if (!policyDry && ids.length) {
+                  const keys = ids.map((id) => `milestone:${id}`);
+                  await supabase.from("feed_reactions").delete().in("target_key", keys);
+                  await supabase.from("feed_comments").delete().in("target_key", keys);
+                  await supabase.from("pulsen_milestones").delete().in("id", ids);
+                }
+              }
+              log("INFO", `${policy.data_type}: ${policyDry ? "[DRY RUN] " : ""}${JSON.stringify(result)}`);
+              if (!dryRun) {
+                await supabase.from("gdpr_cleanup_log").insert({
+                  action: `${policy.data_type}_${policyDry ? "dry_run" : "deleted"}`,
+                  records_affected: Object.values(result).reduce((a, b) => a + b, 0),
+                  details: { ...result, retention_days: policy.retention_days, leave_days: leaveDays, mode: policy.cleanup_mode },
+                  triggered_by: "gdpr-data-cleanup",
+                });
+              }
+              break;
+            }
+
             case "dialer_calls": {
               // Owned by the daily pg_cron job `gdpr-dialer-calls-cleanup`, which
               // calls public.gdpr_run_dialer_calls_cleanup() directly in Postgres.

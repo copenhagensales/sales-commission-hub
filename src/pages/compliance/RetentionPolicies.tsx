@@ -499,6 +499,8 @@ export default function RetentionPolicies() {
                                 <SelectItem value="delete_all">Slet alt</SelectItem>
                               </SelectContent>
                             </Select>
+                          ) : policy.cleanup_mode === "dry_run" ? (
+                            <Badge variant="outline" className="text-xs">Tør-kørsel (logger kun)</Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs">
                               <Trash2 className="h-3 w-3 mr-1" /> Slet alt

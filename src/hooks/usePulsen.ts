@@ -378,7 +378,7 @@ export function usePulsenLatest(enabled: boolean, limit = 3) {
 }
 
 // ---------- Trin 6: milepæle ----------
-export type PulsenMilestoneType = "first_sale" | "record_day" | "record_week" | "record_pay_period" | "club" | "streak" | "team_day_sales" | "house_record";
+export type PulsenMilestoneType = "first_sale" | "record_day" | "record_week" | "record_pay_period" | "club" | "streak" | "team_day_sales" | "team_record" | "house_record";
 export interface PulsenMilestone {
   id: string;
   milestone_type: PulsenMilestoneType;
@@ -387,7 +387,7 @@ export interface PulsenMilestone {
   period_key: string;
   level: number;
   value: number;
-  payload: { text?: string; previous?: number | null } | null;
+  payload: { text?: string; previous?: number | null; day?: string; tier?: number } | null;
   shown_in_house: boolean;
   occurred_at: string;
 }
@@ -400,7 +400,15 @@ export function usePulsenMilestones(scope: PulsenScope, enabled: boolean, limit 
     queryFn: async () => {
       let q = supabase.from("pulsen_milestones")
         .select("id, milestone_type, employee_id, team_id, period_key, level, value, payload, shown_in_house, occurred_at");
-      q = scope.kind === "house" ? q.eq("shown_in_house", true) : q.eq("team_id", scope.teamId);
+      if (scope.kind === "house") {
+        q = q.eq("shown_in_house", true);
+      } else {
+        // Personlige milepæle vises i alle sælgerens teams; teamet afgøres ved læsning via team_members.
+        const { data: members, error: mErr } = await supabase.from("team_members").select("employee_id").eq("team_id", scope.teamId);
+        if (mErr) throw mErr;
+        const ids = [...new Set((members ?? []).map((m) => m.employee_id))];
+        q = ids.length ? q.or(`team_id.eq.${scope.teamId},employee_id.in.(${ids.join(",")})`) : q.eq("team_id", scope.teamId);
+      }
       const { data, error } = await q.order("occurred_at", { ascending: false }).limit(limit);
       if (error) throw error;
       return (data ?? []) as unknown as PulsenMilestone[];

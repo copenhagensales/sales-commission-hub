@@ -38,3 +38,16 @@ export function shortName(first?: string | null, last?: string | null): string {
   if (!f && !l) return "Kollega";
   return l ? `${f} ${l.charAt(0).toUpperCase()}.` : f;
 }
+
+/** Milepælsdato: "i dag" kun samme danske dag, ellers "torsdag 22/10". day = "YYYY-MM-DD". */
+export function pulsenDayLabel(day: string, now: Date = new Date()): string {
+  const today = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" });
+  if (day === today) return "i dag";
+  const d = new Date(`${day}T12:00:00`);
+  return `${format(d, "EEEE", { locale: da })} ${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+/** Erstatter {dag} i milepælstekst med pulsenDayLabel. */
+export function fillMilestoneDay(text: string, day: string | undefined, now: Date = new Date()): string {
+  return day ? text.split("{dag}").join(pulsenDayLabel(day, now)) : text.split(" {dag}").join("").split("{dag}").join("");
+}
