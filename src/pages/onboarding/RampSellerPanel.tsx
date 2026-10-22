@@ -252,7 +252,7 @@ function PanelBody({
             style={{ color: one.kind === "held" ? GREEN : one.kind === "missing" ? RED : MUTED }}
           >
             {one.kind === "held"
-              ? `✓ Holdt ${one.weekday}`
+              ? `✓ Holdt ${one.weekday}${one.by ? ` af ${one.by}` : ""}`
               : one.kind === "missing"
                 ? "Mangler · frist fredag kl. 8"
                 : one.kind === "absence"
