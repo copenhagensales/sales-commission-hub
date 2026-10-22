@@ -13957,6 +13957,7 @@ export type Database = {
           image_path: string | null
           post_type: string
           praised_employee_id: string | null
+          praised_employee_ids: string[]
           team_id: string | null
           updated_at: string
         }
@@ -13975,6 +13976,7 @@ export type Database = {
           image_path?: string | null
           post_type: string
           praised_employee_id?: string | null
+          praised_employee_ids?: string[]
           team_id?: string | null
           updated_at?: string
         }
@@ -13993,6 +13995,7 @@ export type Database = {
           image_path?: string | null
           post_type?: string
           praised_employee_id?: string | null
+          praised_employee_ids?: string[]
           team_id?: string | null
           updated_at?: string
         }
