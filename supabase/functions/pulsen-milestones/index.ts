@@ -1,8 +1,10 @@
-// Pulsen milepæle. Læser KUN salg/stamdata (via pulsen_milestone_candidates_v2) og skriver KUN til pulsen_milestones.
+// Pulsen milepæle. Læser KUN salg/stamdata (via pulsen_milestone_candidates_v2) og skriver KUN til pulsen_milestones
+// (plus push_log via _shared/push.ts ved nye Klub-milepæle).
 // dry_run=true (standard) skriver intet. Skrivning kun via cron-token og kun for milepæle med
 // occurred_at >= pulsen_config.milestones_active_from (ingen bagudposting).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { authUsersForEmployees, sendPush } from "../_shared/push.ts";
 
 type Cand = {
   milestone_type: string; employee_id: string | null; team_id: string | null; period_key: string;
