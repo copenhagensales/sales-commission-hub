@@ -344,6 +344,13 @@
       "when": 1792661201905,
       "tag": "0048_pulsen_core_tables_and_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792661365658,
+      "tag": "0049_pulsen_posts_read_softdelete_fix",
+      "breakpoints": true
     }
   ]
 }
