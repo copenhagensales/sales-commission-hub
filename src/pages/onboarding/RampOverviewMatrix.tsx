@@ -81,7 +81,7 @@ export const STATUS_PILL: Record<SupportGroup, string> = {
 // ---------- Ugens 1-1 (altid den indevaerende uge) ----------
 
 export type OneOnOne =
-  | { kind: "held"; weekday: string }
+  | { kind: "held"; weekday: string; by: string | null }
   | { kind: "missing" }
   | { kind: "absence" }
   | { kind: "not_required" };
@@ -97,7 +97,7 @@ export function oneOnOneOf(
       const { year, week } = isoWeekOf(new Date(x.performed_at));
       return year === m.iso_year && week === m.iso_week;
     });
-    return { kind: "held", weekday: a ? weekdayName(a.performed_at) : "" };
+    return { kind: "held", weekday: a ? weekdayName(a.performed_at) : "", by: a?.performed_by_name ?? null };
   }
   if (m.has_absence || absencePending) return { kind: "absence" };
   if (!m.week_required) return { kind: "not_required" };
@@ -289,8 +289,15 @@ function HistoryCell({ w }: { w: RampWeekStatus }) {
 export function OneOnOneCell({ one, onHold }: { one: OneOnOne; onHold: () => void }) {
   if (one.kind === "held")
     return (
-      <span className="whitespace-nowrap text-[13px] font-extrabold" style={{ color: GREEN }} data-one="held">
-        ✓ Holdt {one.weekday}
+      <span className="flex flex-col leading-tight" data-one="held">
+        <span className="whitespace-nowrap text-[13px] font-extrabold" style={{ color: GREEN }}>
+          ✓ Holdt {one.weekday}
+        </span>
+        {one.by && (
+          <span className="truncate text-[11px] font-semibold" style={{ color: MUTED }} title={one.by}>
+            af {one.by}
+          </span>
+        )}
       </span>
     );
   if (one.kind === "absence")
