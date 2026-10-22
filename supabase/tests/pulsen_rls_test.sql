@@ -56,7 +56,7 @@ BEGIN
   WHERE m.is_active AND m.auth_user_id IS NOT NULL AND NOT public.is_owner(m.auth_user_id)
     AND (SELECT count(*) FROM public.team_members x WHERE x.employee_id = m.id) >= 2
   ORDER BY m.created_at LIMIT 1;
-  SELECT array_agg(team_id ORDER BY team_id)[1], array_agg(team_id ORDER BY team_id)[2] INTO two_t1, two_t2
+  SELECT (array_agg(team_id ORDER BY team_id))[1], (array_agg(team_id ORDER BY team_id))[2] INTO two_t1, two_t2
   FROM public.team_members WHERE employee_id = e_two;
 
   SELECT m.id, m.auth_user_id INTO e_none, u_none FROM public.employee_master_data m
@@ -133,7 +133,6 @@ BEGIN
   EXCEPTION WHEN others THEN ok := true; END;
   IF ok THEN passes := passes + 1; ELSE fails := fails || 'A kunne kommentere B-indlæg'; END IF;
   -- Almindelig medarbejder må ikke skjule
-  UPDATE public.pulsen_posts SET hidden_at = now() WHERE id = p_house AND false; -- no-op sikkerhed
   ok := false;
   BEGIN
     UPDATE public.pulsen_posts SET hidden_at = now() WHERE id = p_house;
@@ -224,9 +223,15 @@ BEGIN
   SELECT count(*) INTO n FROM public.pulsen_posts WHERE id = p_a;
   IF n = 1 THEN passes := passes + 1; ELSE fails := fails || 'Forfatter ser ikke eget skjulte indlæg'; END IF;
   UPDATE public.pulsen_posts SET deleted_at = now() WHERE id = p_a;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n = 1 THEN passes := passes + 1; ELSE fails := fails || 'Forfatter kunne ikke slette eget indlæg'; END IF;
+  EXECUTE 'RESET ROLE';
+  -- Slettet indlæg er usynligt for andre (her: ejer)
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', u_owner, 'role', 'authenticated')::text, true);
+  EXECUTE 'SET LOCAL ROLE authenticated';
   SELECT count(*) INTO n FROM public.pulsen_posts WHERE id = p_a;
-  IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'Slettet indlæg stadig synligt'; END IF;
+  IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'Slettet indlæg synligt for andre'; END IF;
   EXECUTE 'RESET ROLE';
 
-  RAISE EXCEPTION 'PULSEN_RLS_TEST (rullet tilbage) pass=% fail=% %', passes, coalesce(array_length(fails,1),0), fails;
+  RAISE EXCEPTION 'PULSEN_RLS_TEST (rullet tilbage) pass=% fail=% % | baseline r=% c=%', passes, coalesce(array_length(fails,1),0), fails, old_r_total, old_c_total;
 END $$;
