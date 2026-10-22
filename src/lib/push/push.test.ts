@@ -7,10 +7,11 @@ import { readFileSync } from "node:fs";
 const base = { loggedIn: true, standalone: true, supported: true, permission: "default" as const, subscribed: false, dismissedAt: null };
 
 describe("push", () => {
-  it("tekster indeholder ingen tal (beløb) eller kr", () => {
+  it("tekster indeholder ingen tal (beløb) eller kr – kun begrebet 1-1 er tilladt", () => {
     for (const t of Object.values(PUSH_TEXT)) {
-      expect(`${t.title} ${t.body}`).not.toMatch(/\d/);
-      expect(`${t.title} ${t.body}`).not.toMatch(/\bkr\b/i);
+      const s = `${t.title} ${t.body}`.replace(/1-1/g, "");
+      expect(s).not.toMatch(/\d/);
+      expect(s).not.toMatch(/\bkr\b/i);
     }
   });
   it("edge-tekster er identiske med frontend-spejlet", () => {
