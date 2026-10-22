@@ -32,13 +32,29 @@ export interface PulsenPost {
   edited_at: string | null;
   author: PersonRef | null;
   praised: PersonRef | null;
+  praised_employee_ids?: string[];
+  /** Alle roste kolleger i rækkefølge (fyldes efter hentning). */
+  praisedAll?: PersonRef[];
   /** Kun i cachen mens indlægget gemmes. */
   pending?: boolean;
   localImageUrl?: string;
 }
 
 const POST_SELECT =
-  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, image_path, best_answer_comment_id, hidden_at, created_at, edited_at, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
+  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, best_answer_comment_id, hidden_at, created_at, edited_at, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
+
+/** Henter navne på alle roste kolleger, så ros til flere vises korrekt. */
+async function attachPraised(posts: PulsenPost[]): Promise<PulsenPost[]> {
+  const ids = Array.from(new Set(posts.flatMap((p) => p.praised_employee_ids ?? [])));
+  if (ids.length === 0) return posts;
+  const { data, error } = await supabase.from("employee_master_data").select("id, first_name, last_name").in("id", ids);
+  if (error) throw error;
+  const byId = new Map((data ?? []).map((r) => [r.id, r as PersonRef]));
+  return posts.map((p) => ({
+    ...p,
+    praisedAll: (p.praised_employee_ids ?? []).map((id) => byId.get(id)).filter((x): x is PersonRef => !!x),
+  }));
+}
 
 export const scopeKey = (s: PulsenScope) => (s.kind === "house" ? "house" : `team:${s.teamId}`);
 const feedKey = (s: PulsenScope) => ["pulsen-feed", scopeKey(s)];
@@ -117,7 +133,7 @@ export function usePulsenFeed(scope: PulsenScope, enabled: boolean) {
       const from = pageParam * PULSEN_PAGE_SIZE;
       const { data, error } = await q.order("created_at", { ascending: false }).range(from, from + PULSEN_PAGE_SIZE - 1);
       if (error) throw error;
-      return (data ?? []) as unknown as PulsenPost[];
+      return attachPraised((data ?? []) as unknown as PulsenPost[]);
     },
     getNextPageParam: (last, all) => (last.length === PULSEN_PAGE_SIZE ? all.length : undefined),
     enabled,
@@ -164,7 +180,7 @@ export interface NewPulsenPost {
   teamId: string | null;
   postType: Exclude<PulsenPostType, "event">;
   body: string;
-  praised?: { id: string; first_name: string | null; last_name: string | null } | null;
+  praised?: { id: string; first_name: string | null; last_name: string | null }[] | null;
   imageFile?: File | null;
 }
 
@@ -207,7 +223,8 @@ export function usePulsenMutations(author: PersonRef | null) {
           team_id: input.audience === "team" ? input.teamId : null,
           post_type: input.postType,
           body,
-          praised_employee_id: input.postType === "praise" ? input.praised?.id ?? null : null,
+          praised_employee_id: input.postType === "praise" ? input.praised?.[0]?.id ?? null : null,
+          praised_employee_ids: input.postType === "praise" ? (input.praised ?? []).map((p) => p.id) : [],
           image_path: imagePath,
         })
         .select(POST_SELECT)
@@ -216,7 +233,7 @@ export function usePulsenMutations(author: PersonRef | null) {
         if (imagePath) await supabase.storage.from(PULSEN_BUCKET).remove([imagePath]);
         throw error;
       }
-      return data as unknown as PulsenPost;
+      return (await attachPraised([data as unknown as PulsenPost]))[0];
     },
     onMutate: async ({ input, id, localUrl }) => {
       const key = feedKey(input.audience === "house" ? { kind: "house" } : { kind: "team", teamId: input.teamId as string });
@@ -229,14 +246,16 @@ export function usePulsenMutations(author: PersonRef | null) {
         team_id: input.audience === "team" ? input.teamId : null,
         post_type: input.postType,
         body: input.body.trim(),
-        praised_employee_id: input.praised?.id ?? null,
+        praised_employee_id: input.praised?.[0]?.id ?? null,
+        praised_employee_ids: (input.praised ?? []).map((p) => p.id),
+        praisedAll: input.praised ?? [],
         image_path: null,
         best_answer_comment_id: null,
         hidden_at: null,
         created_at: new Date().toISOString(),
         edited_at: null,
         author,
-        praised: input.praised ?? null,
+        praised: input.praised?.[0] ?? null,
         pending: true,
         localImageUrl: localUrl,
       };

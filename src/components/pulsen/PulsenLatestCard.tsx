@@ -6,7 +6,7 @@ import { pulsenRelativeTime, shortName } from "@/lib/pulsen/format";
 
 function lead(p: PulsenLatestItem) {
   const name = shortName(p.author?.first_name, p.author?.last_name);
-  if (p.post_type === "praise") return <><b className="font-extrabold">{name}</b> gav ros til <b className="font-extrabold">{shortName(p.praised?.first_name, p.praised?.last_name)}</b></>;
+  if (p.post_type === "praise") return <><b className="font-extrabold">{name}</b> gav ros til <b className="font-extrabold">{shortName(p.praised?.first_name, p.praised?.last_name)}</b>{(p.praised_employee_ids?.length ?? 0) > 1 && ` +${(p.praised_employee_ids?.length ?? 1) - 1}`}</>;
   if (p.post_type === "question") return <><b className="font-extrabold">{name}</b> spørger</>;
   if (p.post_type === "image") return <><b className="font-extrabold">{name}</b> delte et billede</>;
   return <b className="font-extrabold">{name}</b>;
