@@ -7,7 +7,7 @@ import { useSeasonStandings } from "@/hooks/useLeagueActiveData";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
-import { FeedReactionRow } from "@/components/home/FeedReactionRow";
+import { ReactButton, ReactionBubbles } from "@/components/home/FeedReactionRow";
 import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
@@ -28,12 +28,25 @@ export function CompactLeagueView() {
 
   const podiumKeys = pointsTop3.map((standing) => leagueTargetKey(standing.employee_id));
 
-  const { getReactions, toggleReaction, canInteract } = useFeedReactions(podiumKeys);
+  const { getReactions, setReaction, canInteract } = useFeedReactions(podiumKeys);
 
   const formatPoints = (points: number) =>
     `${new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(points)} pt`;
 
-  const isPodium = (rank: number) => rank >= 1 && rank <= 3;
+  const RANK_STYLES = [
+    "bg-[#FCEFC7] text-[#7A5000]",
+    "bg-[#E8ECEF] text-[#3F4A55]",
+    "bg-[#F6E2D3] text-[#7F421A]",
+  ];
+  const roundsSet = new Set(pointsTop3.map((s) => s.rounds_played || 0));
+  const sharedRounds = pointsTop3.length > 0 && roundsSet.size === 1 ? [...roundsSet][0] : null;
+  const gapText = (index: number) => {
+    const pts = (i: number) => pointsTop3[i]?.total_points || 0;
+    if (index === 0) {
+      return pointsTop3.length > 1 ? `${formatPoints(pts(0) - pts(1))} foran` : "";
+    }
+    return `${formatPoints(pts(index - 1) - pts(index))} efter nr. ${index}`;
+  };
 
   if (!season) return null;
 
@@ -56,7 +69,10 @@ export function CompactLeagueView() {
             <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
             Liga · samlet top 3
           </CardTitle>
-          <span className="text-[13px] text-foreground/70">{enrollmentCount} tilmeldt</span>
+          <span className="text-[13px] text-foreground/70">
+            {enrollmentCount} tilmeldt
+            {sharedRounds !== null && sharedRounds > 0 && ` · ${sharedRounds} runder spillet`}
+          </span>
         </div>
       </CardHeader>
 
@@ -71,9 +87,7 @@ export function CompactLeagueView() {
               return (
                 <div key={standing.id} className="flex items-center gap-2.5 py-4 sm:gap-4">
                   <span
-                    className={`w-5 flex-none text-[18px] font-extrabold tracking-[-0.02em] tabular-nums sm:w-6 sm:text-[20px] ${
-                      rank === 1 ? "text-foreground" : "text-foreground/70"
-                    }`}
+                    className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-[14px] font-bold tabular-nums ${RANK_STYLES[index]}`}
                   >
                     {rank}
                   </span>
@@ -101,26 +115,43 @@ export function CompactLeagueView() {
                       {name}
                       {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
                     </p>
-                    <p className="truncate text-[12px] text-foreground/70 sm:text-[13px]">
-                      {standing.rounds_played
-                        ? `${standing.rounds_played} runder spillet`
-                        : "Ingen runder endnu"}
+                    {sharedRounds === null && (
+                      <p className="truncate text-[12px] text-foreground/70">
+                        {standing.rounds_played ? `${standing.rounds_played} runder spillet` : "Ingen runder endnu"}
+                      </p>
+                    )}
+                    {(() => {
+                      const key = leagueTargetKey(standing.employee_id);
+                      const summary = getReactions(key);
+                      return (
+                        <div className="mt-0.5 flex items-center gap-2">
+                          {summary.total > 0 && (
+                            <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                              <ReactionBubbles summary={summary} size={20} />
+                              <span className="tabular-nums">{summary.total}</span>
+                              <span aria-hidden="true">·</span>
+                            </span>
+                          )}
+                          <ReactButton
+                            summary={summary}
+                            disabled={!canInteract}
+                            className="-ml-3 [&_button]:text-[13px]"
+                            onSet={(reaction) =>
+                              setReaction.mutate({ targetType: "league_round", targetKey: key, reaction })
+                            }
+                          />
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex-none text-right">
+                    <p className="text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+                      {formatPoints(standing.total_points || 0)}
                     </p>
-                    {isPodium(rank) && (
-                      <div className="mt-1.5 flex flex-wrap">
-                        <FeedReactionRow
-                          targetType="league_round"
-                          targetKey={leagueTargetKey(standing.employee_id)}
-                          reactions={getReactions(leagueTargetKey(standing.employee_id))}
-                          disabled={!canInteract}
-                          onToggle={(args) => toggleReaction.mutate(args)}
-                        />
-                      </div>
+                    {gapText(index) && (
+                      <p className="mt-1 text-[12px] text-muted-foreground">{gapText(index)}</p>
                     )}
                   </div>
-                  <span className="flex-none text-[17px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground sm:text-[20px]">
-                    {formatPoints(standing.total_points || 0)}
-                  </span>
                 </div>
 
               );
