@@ -49,11 +49,18 @@ Deno.serve(async (req) => {
     const fromD = new Date(today); fromD.setDate(fromD.getDate() - (days - 1));
     const from = iso(fromD);
 
-    const [{ data: cands, error: cErr }, { data: cfgRows, error: cfgErr }] = await Promise.all([
-      service.rpc("pulsen_milestone_candidates", { p_from: from, p_to: to }),
-      service.from("pulsen_config").select("key, value"),
-    ]);
-    if (cErr) throw cErr;
+    // Én type pr. kald (sekventielt) for at holde hvert kald under databasens statement-timeout.
+    const TYPES = ["first_sale", "record_day", "record_period", "club", "streak", "team_day_sales", "house_record"];
+    const cands: Cand[] = [];
+    const timings: Record<string, number> = {};
+    for (const t of TYPES) {
+      const t0 = Date.now();
+      const { data, error } = await service.rpc("pulsen_milestone_candidates", { p_from: from, p_to: to, p_types: [t] });
+      timings[t] = Date.now() - t0;
+      if (error) throw new Error(`${t}: ${error.message}`);
+      cands.push(...((data ?? []) as Cand[]));
+    }
+    const { data: cfgRows, error: cfgErr } = await service.from("pulsen_config").select("key, value");
     if (cfgErr) throw cfgErr;
     const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
     const order: string[] = cfg.rarity_order ?? [];
@@ -121,7 +128,7 @@ Deno.serve(async (req) => {
         slot.total++; c.shown_in_house ? slot.house++ : slot.team++;
       }
       return json({
-        dry_run: true, from, to, candidates: out.length,
+        dry_run: true, from, to, candidates: out.length, timings_ms: timings,
         per_day_type: perTypeDay,
         examples: out.slice(0, 40).map((c) => ({ type: c.milestone_type, day: c.occurred_on, house: c.shown_in_house, text: c.text })),
         // Kun til visning i lokal test; ingen skrivning
