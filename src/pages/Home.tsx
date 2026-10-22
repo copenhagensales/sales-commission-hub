@@ -56,6 +56,7 @@ import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { CelebrationStrip } from "@/components/home/CelebrationStrip";
+import { PulsenLatestCard } from "@/components/pulsen/PulsenLatestCard";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
@@ -87,7 +88,7 @@ const Home = () => {
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   
-  const { isOwner, canEdit: canEditPermission } = usePermissions();
+  const { isOwner, canEdit: canEditPermission, canView: canViewPermission } = usePermissions();
   const canManageEvents = canEditPermission("action_manage_company_events");
   const lookupAvatar = useAvatarLookup();
 
@@ -378,6 +379,9 @@ const Home = () => {
         {todayCelebrations.length > 0 && (
           <CelebrationStrip celebrations={todayCelebrations} />
         )}
+
+        {/* Seneste fra Pulsen – kompakt, kun Huset */}
+        <PulsenLatestCard enabled={canViewPermission("menu_pulsen")} />
 
 
         {/* ZONE 2: Liga + kommende begivenheder */}
