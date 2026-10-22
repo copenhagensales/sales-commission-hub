@@ -29,8 +29,18 @@ Deno.serve(async (req) => {
     const url = Deno.env.get("SUPABASE_URL")!;
     const service = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    const cronToken = Deno.env.get("PULSEN_CRON_TOKEN");
-    const isCron = !!cronToken && req.headers.get("x-pulsen-cron-token") === cronToken;
+    const { data: cfgRows, error: cfgErr } = await service.from("pulsen_config").select("key, value");
+    if (cfgErr) throw cfgErr;
+    const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
+
+    // Cron: token ligger i vault; her sammenlignes kun med dets sha256 i pulsen_config.
+    const hdr = req.headers.get("x-pulsen-cron-token") ?? "";
+    let isCron = false;
+    if (hdr && typeof cfg.cron_token_sha256 === "string") {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hdr));
+      const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      isCron = hex === cfg.cron_token_sha256;
+    }
     if (!isCron) {
       const auth = req.headers.get("Authorization") ?? "";
       if (!auth.startsWith("Bearer ")) return json({ error: "Ikke logget ind" }, 401);
@@ -53,9 +63,6 @@ Deno.serve(async (req) => {
     const fromD = new Date(toD); fromD.setDate(fromD.getDate() - (days - 1));
     const from = iso(fromD);
 
-    const { data: cfgRows, error: cfgErr } = await service.from("pulsen_config").select("key, value");
-    if (cfgErr) throw cfgErr;
-    const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
     const order: string[] = cfg.rarity_order ?? [];
     const houseMax = Number(cfg.house_daily_max ?? 10);
     const teamMax = Number(cfg.team_daily_max ?? 25);
