@@ -11,7 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { REACTIONS, reactionKeyForEmoji, reactionOption, type ReactionKey } from "@/lib/feedReactions";
 
-export type FeedTargetType = "birthday" | "anniversary" | "league_round";
+/** pulsen_post/milestone: kun Huset-indhold (databasen afviser team-indhold). */
+export type FeedTargetType = "birthday" | "anniversary" | "league_round" | "pulsen_post" | "milestone";
 export interface FeedReactionGroup {
   key: ReactionKey;
   emoji: string;
