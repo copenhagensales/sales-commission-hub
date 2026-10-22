@@ -14,6 +14,7 @@ DECLARE
   u_two uuid; e_two uuid; two_t1 uuid; two_t2 uuid;
   u_none uuid; e_none uuid;
   p_house uuid; p_a uuid; p_b uuid; p_two1 uuid; p_two2 uuid;
+  m_two uuid; m_b uuid; e_t1m uuid; u_t1m uuid; e_t2m uuid; u_t2m uuid;
   n int; ok boolean;
   passes int := 0; fails text[] := '{}';
   old_r_total int; old_c_total int; old_r_vis int; old_c_vis int;
@@ -74,6 +75,52 @@ BEGIN
 
   SELECT count(*) INTO old_r_total FROM public.feed_reactions WHERE target_type IN ('birthday','anniversary','league_round');
   SELECT count(*) INTO old_c_total FROM public.feed_comments WHERE target_type IN ('birthday','anniversary','league_round');
+
+  -- ===== Milepæle (Kasper 22/10): personlig milepæl uden team_id vises i alle sælgerens teams =====
+  INSERT INTO public.pulsen_milestones (milestone_type, employee_id, period_key, shown_in_house)
+    VALUES ('first_sale', e_two, 'TEST-two', false) RETURNING id INTO m_two;
+  INSERT INTO public.pulsen_milestones (milestone_type, employee_id, period_key, shown_in_house)
+    VALUES ('first_sale', e_emp_b, 'TEST-b', false) RETURNING id INTO m_b;
+  -- Unik nøgle (milestone_type, subject_id, period_key, level) afviser dublet
+  ok := false;
+  BEGIN
+    INSERT INTO public.pulsen_milestones (milestone_type, employee_id, period_key, shown_in_house)
+      VALUES ('first_sale', e_two, 'TEST-two', false);
+  EXCEPTION WHEN unique_violation THEN ok := true; END;
+  IF ok THEN passes := passes + 1; ELSE fails := fails || 'Dublet-milepæl tilladt'; END IF;
+  SELECT m.id, m.auth_user_id INTO e_t1m, u_t1m FROM public.team_members tm JOIN public.employee_master_data m ON m.id = tm.employee_id
+    WHERE tm.team_id = two_t1 AND m.id <> e_two AND m.is_active AND m.auth_user_id IS NOT NULL AND NOT public.is_owner(m.auth_user_id)
+      AND NOT EXISTS (SELECT 1 FROM public.team_members x WHERE x.employee_id = m.id AND x.team_id = two_t2)
+    ORDER BY m.created_at LIMIT 1;
+  SELECT m.id, m.auth_user_id INTO e_t2m, u_t2m FROM public.team_members tm JOIN public.employee_master_data m ON m.id = tm.employee_id
+    WHERE tm.team_id = two_t2 AND m.id <> e_two AND m.is_active AND m.auth_user_id IS NOT NULL AND NOT public.is_owner(m.auth_user_id)
+      AND NOT EXISTS (SELECT 1 FROM public.team_members x WHERE x.employee_id = m.id AND x.team_id = two_t1)
+    ORDER BY m.created_at LIMIT 1;
+  IF u_t1m IS NOT NULL THEN
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', u_t1m, 'role', 'authenticated')::text, true);
+    EXECUTE 'SET LOCAL ROLE authenticated';
+    SELECT count(*) INTO n FROM public.pulsen_milestones WHERE id = m_two;
+    IF n = 1 THEN passes := passes + 1; ELSE fails := fails || 'Kollega i team 1 ser ikke to-team-milepæl'; END IF;
+    EXECUTE 'RESET ROLE';
+  END IF;
+  IF u_t2m IS NOT NULL THEN
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', u_t2m, 'role', 'authenticated')::text, true);
+    EXECUTE 'SET LOCAL ROLE authenticated';
+    SELECT count(*) INTO n FROM public.pulsen_milestones WHERE id = m_two;
+    IF n = 1 THEN passes := passes + 1; ELSE fails := fails || 'Kollega i team 2 ser ikke to-team-milepæl'; END IF;
+    EXECUTE 'RESET ROLE';
+  END IF;
+  IF u_t1m IS NULL OR u_t2m IS NULL THEN fails := fails || 'fixture-mangel: kollega i begge teams for to-team-medarbejder'; END IF;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', u_emp_a, 'role', 'authenticated')::text, true);
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  SELECT count(*) INTO n FROM public.pulsen_milestones WHERE id = m_b;
+  IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'A ser team-milepæl for B'; END IF;
+  EXECUTE 'RESET ROLE';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', u_none, 'role', 'authenticated')::text, true);
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  SELECT count(*) INTO n FROM public.pulsen_milestones WHERE id IN (m_two, m_b);
+  IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'Uden team ser team-milepæle'; END IF;
+  EXECUTE 'RESET ROLE';
 
   -- ===== Medarbejder A opretter indlæg =====
   PERFORM set_config('request.jwt.claims', json_build_object('sub', u_emp_a, 'role', 'authenticated')::text, true);
