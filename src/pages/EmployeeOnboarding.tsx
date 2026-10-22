@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import logo from "@/assets/cph-sales-logo.png";
 
 interface InvitationData {
@@ -30,11 +30,7 @@ export default function EmployeeOnboarding() {
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
-
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -67,7 +63,7 @@ export default function EmployeeOnboarding() {
       }
 
       if (invitationData.password_set_at) {
-        setError("Du har allerede oprettet din konto. Log ind med din email og adgangskode.");
+        setError("Din konto er oprettet — log ind med Microsoft");
         setLoading(false);
         return;
       }
@@ -82,31 +78,10 @@ export default function EmployeeOnboarding() {
   };
 
   const handleCreateAccount = async () => {
-    if (!password || password.length < 6) {
-      toast({
-        title: "Ugyldig adgangskode",
-        description: "Adgangskoden skal være mindst 6 tegn.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      toast({
-        title: "Adgangskoder matcher ikke",
-        description: "De to adgangskoder skal være ens.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setCreatingAccount(true);
     try {
       const response = await supabase.functions.invoke("complete-employee-registration", {
-        body: {
-          token,
-          password,
-        },
+        body: { token },
       });
 
       if (response.data?.error) {
@@ -120,7 +95,7 @@ export default function EmployeeOnboarding() {
       setCompleted(true);
       toast({
         title: "Konto oprettet!",
-        description: "Du kan nu logge ind med din email og adgangskode.",
+        description: "Din konto er oprettet — log ind med Microsoft",
       });
     } catch (err) {
       console.error("Account creation error:", err);
@@ -171,7 +146,7 @@ export default function EmployeeOnboarding() {
             <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-2" />
             <CardTitle>Velkommen!</CardTitle>
             <CardDescription>
-              Din konto er nu oprettet. Du kan nu logge ind med din email ({invitation?.email}) og den adgangskode du lige har oprettet.
+              Din konto er oprettet — log ind med Microsoft.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -195,55 +170,17 @@ export default function EmployeeOnboarding() {
           <img src={logo} alt="CPH Sales" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Velkommen til CPH Sales</h1>
           <p className="text-muted-foreground mt-2">
-            Hej {invitation?.first_name}! Opret din adgangskode for at aktivere din konto.
+            Hej {invitation?.first_name}! Aktivér din konto for at komme i gang.
           </p>
         </div>
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">Opret adgangskode</CardTitle>
+            <CardTitle className="text-lg">Log ind med Microsoft</CardTitle>
             <CardDescription>
-              Du vil bruge denne sammen med din email ({invitation?.email}) til at logge ind.
+              Du logger ind med din Microsoft-arbejdskonto ({invitation?.email}). Der skal ikke oprettes en adgangskode.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="password">Adgangskode *</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mindst 6 tegn"
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Bekræft adgangskode *</Label>
-              <Input
-                id="confirmPassword"
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Gentag din adgangskode"
-                required
-              />
-            </div>
-            {password && confirmPassword && password !== confirmPassword && (
-              <p className="text-sm text-destructive">Adgangskoderne matcher ikke</p>
-            )}
-          </CardContent>
         </Card>
 
         <Button
@@ -251,7 +188,7 @@ export default function EmployeeOnboarding() {
           className="w-full"
           size="lg"
           onClick={handleCreateAccount}
-          disabled={creatingAccount || !password || password !== confirmPassword}
+          disabled={creatingAccount}
         >
           {creatingAccount ? (
             <>
