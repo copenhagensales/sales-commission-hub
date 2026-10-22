@@ -37,7 +37,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <LockOverlays>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-[100dvh] bg-background">
         {/* Preview banner at very top */}
         <ViewAsBanner />
         <RolePreviewBanner />
@@ -66,7 +66,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
         
         {/* Mobile header with menu trigger */}
-        <div className={`md:hidden fixed left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10" : "top-0"}`}>
+        <div className={`md:hidden fixed left-0 right-0 z-50 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10 h-14" : "top-0 pt-safe h-[calc(3.5rem+env(safe-area-inset-top,0px))]"}`}>
           <div 
             onClick={() => navigate("/")} 
             className="flex items-center cursor-pointer"
@@ -88,9 +88,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         
         {/* Main content with sidebar margin on desktop */}
         <main className={cn(
-          "min-h-screen transition-all duration-300 ease-in-out",
+          "min-h-[100dvh] transition-all duration-300 ease-in-out",
           isCollapsed ? "md:ml-0" : "md:ml-64",
-          isPreviewMode ? "pt-24 md:pt-10" : "pt-14 md:pt-0"
+          isPreviewMode ? "pt-24 md:pt-10" : "pt-[calc(3.5rem+env(safe-area-inset-top,0px))] md:pt-0"
         )}>
           <div className="p-4 md:p-8">
             {children}

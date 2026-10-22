@@ -220,7 +220,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
   };
 
   const sidebarClasses = isMobile 
-    ? "h-full w-full bg-sidebar overflow-y-auto" 
+    ? "h-full w-full bg-sidebar overflow-y-auto pt-safe pb-safe" 
     : "fixed left-0 top-10 z-40 h-[calc(100vh-40px)] w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto";
 
   const renderNavItem = (item: { name: string; href: string; icon: typeof Users }) => {
