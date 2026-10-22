@@ -32,6 +32,8 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
   const [leadershipMotivation, setLeadershipMotivation] = useState("");
   const [otherComments, setOtherComments] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  // Én anmodnings-id pr. udfyldt formular; genbruges ved genforsøg.
+  const [requestId] = useState(() => crypto.randomUUID());
 
   const showTeamChangeSection = formPurpose === "team_change" || formPurpose === "both";
   const showLeadershipSection = formPurpose === "leadership" || formPurpose === "both";
@@ -56,38 +58,24 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
 
       const wantsTeamChange = showTeamChangeSection ? "yes" : "no";
       const finalLeadershipInterest = showLeadershipSection ? leadershipInterest : "no";
+      const withLeader = showLeadershipSection && (leadershipInterest === "yes" || leadershipInterest === "maybe");
 
-      const { error } = await supabase.from("career_wishes").insert({
-        employee_id: employeeId,
-        wants_team_change: wantsTeamChange as "yes" | "no",
-        desired_team: showTeamChangeSection ? desiredTeam : null,
-        team_change_motivation: showTeamChangeSection ? teamChangeMotivation : null,
-        leadership_interest: finalLeadershipInterest as LeadershipInterest,
-        leadership_role_type: showLeadershipSection && (leadershipInterest === "yes" || leadershipInterest === "maybe") ? leadershipRoleType as LeadershipRoleType : null,
-        leadership_motivation: showLeadershipSection && (leadershipInterest === "yes" || leadershipInterest === "maybe") ? leadershipMotivation : null,
-        other_comments: otherComments || null,
+      const raw: Record<string, string | null> = {
+        oensker_teamskifte: wantsTeamChange,
+        oensket_team: showTeamChangeSection ? desiredTeam : null,
+        teamskifte_motivation: showTeamChangeSection ? teamChangeMotivation : null,
+        lederinteresse: finalLeadershipInterest,
+        lederrolle: withLeader ? leadershipRoleType : null,
+        leder_motivation: withLeader ? leadershipMotivation : null,
+        andet: otherComments || null,
+      };
+      const p = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== null && v !== ""));
+
+      const { error } = await supabase.rpc("stork_karriereoenske_indsend", {
+        p_anmodning: requestId,
+        p,
       });
-
       if (error) throw error;
-
-      // Send email notification
-      try {
-        await supabase.functions.invoke("send-career-wish-notification", {
-          body: {
-            employeeName,
-            employeeDepartment: department,
-            wantsTeamChange,
-            desiredTeam: showTeamChangeSection ? desiredTeam : null,
-            teamChangeMotivation: showTeamChangeSection ? teamChangeMotivation : null,
-            leadershipInterest: finalLeadershipInterest,
-            leadershipRoleType: showLeadershipSection && (leadershipInterest === "yes" || leadershipInterest === "maybe") ? leadershipRoleType : null,
-            leadershipMotivation: showLeadershipSection && (leadershipInterest === "yes" || leadershipInterest === "maybe") ? leadershipMotivation : null,
-            otherComments: otherComments || null,
-          },
-        });
-      } catch (notificationError) {
-        console.error("Failed to send notification:", notificationError);
-      }
     },
     onSuccess: () => {
       setIsSubmitted(true);
