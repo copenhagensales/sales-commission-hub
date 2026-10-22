@@ -20003,13 +20003,8 @@ export type Database = {
         Args: { _audience: string; _team_id: string }
         Returns: boolean
       }
-      pulsen_event_visible: { Args: { _event_id: string }; Returns: boolean }
       pulsen_led_team_ids: { Args: never; Returns: string[] }
       pulsen_member_team_ids: { Args: never; Returns: string[] }
-      pulsen_target_visible: {
-        Args: { _target_key: string; _target_type: string }
-        Returns: boolean
-      }
       pulsen_visible_team_ids: { Args: never; Returns: string[] }
       purge_eesy_mobile_sensitive: { Args: never; Returns: number }
       quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }
