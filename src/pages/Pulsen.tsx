@@ -12,7 +12,6 @@ import { AddEventDialog } from "@/components/home/AddEventDialog";
 import { PulsenComposer } from "@/components/pulsen/PulsenComposer";
 import { PulsenPostCard } from "@/components/pulsen/PulsenPostCard";
 import { PulsenSidebar } from "@/components/pulsen/PulsenSidebar";
-import { PulsenTopline } from "@/components/pulsen/PulsenTopline";
 import { PulsenMilestoneItem } from "@/components/pulsen/PulsenMilestoneItem";
 import { ReactButton } from "@/components/home/FeedReactionRow";
 import { PulsenEmpty, PulsenError, PulsenPostSkeleton } from "@/components/pulsen/PulsenStates";
@@ -248,11 +247,6 @@ export default function Pulsen() {
       <AddEventDialog open={addEventOpen} onOpenChange={setAddEventOpen} />
 
       <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8">
-        {topline.data && (
-          <div className="mx-auto mb-4 w-full max-w-[1004px] 2xl:max-w-[1164px]">
-            <PulsenTopline data={topline.data} teamId={isHouse ? null : team?.id ?? null} />
-          </div>
-        )}
         <div className="mx-auto grid w-full max-w-[1004px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,680px)_300px] 2xl:max-w-[1164px] 2xl:grid-cols-[minmax(0,680px)_460px]">
           <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-4">
