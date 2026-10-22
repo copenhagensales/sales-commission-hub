@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const body = await req.json().catch(() => ({}));
-    if (body?.action === "public_key") return json({ publicKey: Deno.env.get("VAPID_PUBLIC_KEY") ?? null });
 
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

@@ -1,3 +1,4 @@
+import { clearPushSubscription } from "@/hooks/usePushNotifications";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Monitor, LogOut, Home, Settings, PanelLeft } from "lucide-react";
@@ -39,6 +40,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
     try {
+      await clearPushSubscription();
       await supabase.auth.signOut();
     } catch (e) {
       console.error("Logout error:", e);

@@ -16,6 +16,17 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
   return reg ?? null;
 }
 
+/** Kaldes FØR signOut: sletter enhedens subscription i databasen (kræver stadig session) og afmelder browseren. */
+export async function clearPushSubscription(): Promise<void> {
+  try {
+    const reg = await getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return;
+    await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    await sub.unsubscribe();
+  } catch { /* må aldrig blokere logud */ }
+}
+
 // Ved logud: afmeld browserens abonnement. Serveren deaktiverer det ved næste afsendelse (410).
 if (typeof window !== "undefined") {
   supabase.auth.onAuthStateChange((event) => {
@@ -74,7 +85,7 @@ export function usePushNotifications() {
     const perm = await Notification.requestPermission();
     setPermission(perm);
     if (perm !== "granted") throw new Error("Notifikationer blev ikke tilladt.");
-    const { data: keyRes, error: keyErr } = await supabase.functions.invoke("send-push", { body: { action: "public_key" } });
+    const { data: keyRes, error: keyErr } = await supabase.functions.invoke("push-public-key", { body: {} });
     if (keyErr || !keyRes?.publicKey) throw new Error("Kunne ikke hente nøgle.");
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey) });
     const json = sub.toJSON();
