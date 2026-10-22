@@ -264,6 +264,7 @@ export const CompliancePersondatapolitik = lazyPage(() => import("@/pages/compli
 export const ComplianceDatabrudsprocedure = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.DatabrudsprocedurePage })));
 export const ComplianceKonsekvensvurderingProcedure = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.KonsekvensvurderingProcedurePage })));
 export const ComplianceArt30Pulsen = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.Art30PulsenPage })));
+export const ComplianceArt30Push = lazyPage(() => import("@/pages/compliance/MarkdownComplianceDoc").then((m) => ({ default: m.Art30PushPage })));
 export const ComplianceBreachLog = lazyPage(() => import("@/pages/compliance/BreachLog"));
 export const ComplianceImpactAssessments = lazyPage(() => import("@/pages/compliance/ImpactAssessments"));
 

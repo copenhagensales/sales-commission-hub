@@ -192,6 +192,14 @@ export default function ComplianceOverview() {
       permKey: "menu_compliance_admin",
     },
     {
+      title: "Art. 30: Push-notifikationer til medarbejdere (udkast)",
+      description: "Fortegnelse for push-beskeder i Stork-appen: formål, kategorier, modtagere og slettefrister.",
+      icon: Shield,
+      ...docStatus("art30-push"),
+      href: "/compliance/documents/art30-push",
+      permKey: "menu_compliance_admin",
+    },
+    {
       title: "Procedure ved brud på persondatasikkerheden",
       description: "Hvad et brud er, roller, og trinene fra anmeldelse til underretning af kunden inden for 24 timer.",
       icon: AlertTriangle,

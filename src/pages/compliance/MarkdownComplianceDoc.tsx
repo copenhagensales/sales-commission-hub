@@ -126,3 +126,4 @@ export const PersondatapolitikPage = makeMarkdownDocPage("persondatapolitik");
 export const DatabrudsprocedurePage = makeMarkdownDocPage("databrudsprocedure");
 export const KonsekvensvurderingProcedurePage = makeMarkdownDocPage("konsekvensvurdering-procedure");
 export const Art30PulsenPage = makeMarkdownDocPage("art30-pulsen");
+export const Art30PushPage = makeMarkdownDocPage("art30-push");
