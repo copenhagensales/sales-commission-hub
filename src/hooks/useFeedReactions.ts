@@ -9,36 +9,23 @@ import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { REACTIONS, reactionKeyForEmoji, reactionOption, type ReactionKey } from "@/lib/feedReactions";
 
 export type FeedTargetType = "birthday" | "anniversary" | "league_round";
-/** Emoji gemmes som selve symbolet, så udvalget kan udvides uden databaseændring. */
-export type FeedEmoji = string;
-
-/** Udvalget i vælgeren. Labels bruges til skærmlæser og tooltip. */
-export const FEED_EMOJI_OPTIONS: { symbol: string; label: string }[] = [
-  { symbol: "👏", label: "Klap" },
-  { symbol: "🎉", label: "Tillykke" },
-  { symbol: "🔥", label: "Sejt" },
-  { symbol: "❤️", label: "Hjerte" },
-  { symbol: "😄", label: "Smil" },
-  { symbol: "🥳", label: "Fest" },
-  { symbol: "🎂", label: "Fødselsdagskage" },
-  { symbol: "🙌", label: "Hurra" },
-  { symbol: "💪", label: "Stærkt" },
-  { symbol: "⭐", label: "Stjerne" },
-  { symbol: "🏆", label: "Pokal" },
-  { symbol: "🚀", label: "Raket" },
-];
-
-export function emojiLabel(symbol: string): string {
-  return FEED_EMOJI_OPTIONS.find((option) => option.symbol === symbol)?.label ?? "Reaktion";
+export interface FeedReactionGroup {
+  key: ReactionKey;
+  emoji: string;
+  label: string;
+  count: number;
 }
 
+/** Én reaktion pr. bruger (nyeste række tæller); gamle emojis grupperes via feedReactions.ts. */
 export interface FeedReactionSummary {
-  emoji: FeedEmoji;
-  count: number;
-  names: string[];
-  mine: boolean;
+  groups: FeedReactionGroup[];
+  total: number;
+  myReaction: ReactionKey | null;
+  /** Navne på andre end en selv, nyeste først. */
+  otherNames: string[];
 }
 
 export interface FeedCommentView {
@@ -103,7 +90,7 @@ export function useFeedReactions(targetKeys: string[]) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("feed_reactions")
-        .select("id, target_key, user_id, emoji")
+        .select("id, target_key, user_id, emoji, created_at")
         .in("target_key", keys);
 
       if (error) throw error;
@@ -132,38 +119,40 @@ export function useFeedReactions(targetKeys: string[]) {
     queryClient.invalidateQueries({ queryKey: ["feed-comments"] });
   };
 
-  const toggleReaction = useMutation({
+  /** Sætter brugerens ene reaktion. Samme reaktion igen = fjern. Anden reaktion = skift. */
+  const setReaction = useMutation({
     mutationFn: async ({
       targetType,
       targetKey,
-      emoji,
+      reaction,
     }: {
       targetType: FeedTargetType;
       targetKey: string;
-      emoji: FeedEmoji;
+      reaction: ReactionKey;
     }) => {
       if (!myUserId) throw new Error("Du skal være logget ind");
+      const mine = (reactionsQuery.data || [])
+        .filter((r) => r.target_key === targetKey && r.user_id === myUserId)
+        .sort((x, y) => y.created_at.localeCompare(x.created_at));
+      const current = mine[0] ? reactionKeyForEmoji(mine[0].emoji) : null;
 
-      const existing = (reactionsQuery.data || []).find(
-        (r) => r.target_key === targetKey && r.emoji === emoji && r.user_id === myUserId
-      );
-
-      if (existing) {
+      if (current !== reaction) {
+        const { error } = await supabase.from("feed_reactions").insert({
+          target_type: targetType,
+          target_key: targetKey,
+          user_id: myUserId,
+          emoji: reactionOption(reaction).emoji,
+        });
+        if (error) throw error;
+      }
+      // Fjern brugerens egne tidligere reaktioner på samme mål.
+      if (mine.length > 0) {
         const { error } = await supabase
           .from("feed_reactions")
           .delete()
-          .eq("id", existing.id);
+          .in("id", mine.map((r) => r.id));
         if (error) throw error;
-        return;
       }
-
-      const { error } = await supabase.from("feed_reactions").insert({
-        target_type: targetType,
-        target_key: targetKey,
-        user_id: myUserId,
-        emoji,
-      });
-      if (error) throw error;
     },
     onSuccess: invalidate,
   });
@@ -205,21 +194,33 @@ export function useFeedReactions(targetKeys: string[]) {
   });
 
   const getReactions = useCallback(
-    (targetKey: string): FeedReactionSummary[] => {
-      const rows = (reactionsQuery.data || []).filter((r) => r.target_key === targetKey);
-      const order: string[] = [];
-      rows.forEach((r) => {
-        if (!order.includes(r.emoji)) order.push(r.emoji);
+    (targetKey: string): FeedReactionSummary => {
+      const latestByUser = new Map<string, { emoji: string; created_at: string }>();
+      (reactionsQuery.data || [])
+        .filter((r) => r.target_key === targetKey)
+        .forEach((r) => {
+          const prev = latestByUser.get(r.user_id);
+          if (!prev || r.created_at > prev.created_at) latestByUser.set(r.user_id, r);
+        });
+      const counts = new Map<ReactionKey, number>();
+      latestByUser.forEach((r) => {
+        const key = reactionKeyForEmoji(r.emoji);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
       });
-      return order.map((emoji) => {
-        const matching = rows.filter((r) => r.emoji === emoji);
-        return {
-          emoji,
-          count: matching.length,
-          names: matching.map((r) => lookupName(r.user_id)),
-          mine: !!myUserId && matching.some((r) => r.user_id === myUserId),
-        };
-      });
+      const groups = REACTIONS.filter((o) => counts.has(o.key))
+        .map((o) => ({ ...o, count: counts.get(o.key) ?? 0 }))
+        .sort((x, y) => y.count - x.count);
+      const mine = myUserId ? latestByUser.get(myUserId) : undefined;
+      const otherNames = Array.from(latestByUser.entries())
+        .filter(([uid]) => uid !== myUserId)
+        .sort((x, y) => y[1].created_at.localeCompare(x[1].created_at))
+        .map(([uid]) => lookupName(uid));
+      return {
+        groups,
+        total: latestByUser.size,
+        myReaction: mine ? reactionKeyForEmoji(mine.emoji) : null,
+        otherNames,
+      };
     },
     [reactionsQuery.data, lookupName, myUserId]
   );
@@ -241,7 +242,7 @@ export function useFeedReactions(targetKeys: string[]) {
   return {
     getReactions,
     getComments,
-    toggleReaction,
+    setReaction,
     addComment,
     deleteComment,
     isLoading: reactionsQuery.isLoading || commentsQuery.isLoading,
