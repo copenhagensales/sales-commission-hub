@@ -63,6 +63,15 @@ import { QualityFeedbackInbox } from "@/components/quality/QualityFeedbackInbox"
 import { EventGallery } from "@/components/home/EventGallery";
 import { RampCurveCard } from "@/components/ramp/RampCurveCard";
 import { EventRsvpCard } from "@/components/home/EventRsvpCard";
+import {
+  useUpcomingCompanyEvents,
+  useEventAttendees,
+  useToggleEventAttendance,
+  useAddCompanyEvent,
+  useDeleteCompanyEvent,
+  EMPTY_NEW_EVENT,
+  type AttendanceStatus,
+} from "@/hooks/useCompanyEvents";
 
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
@@ -276,64 +285,10 @@ const Home = () => {
     staleTime: 300000,
   });
 
-  // Fetch company events
-  const { data: companyEvents = [] } = useQuery({
-    queryKey: ["home-company-events"],
-    queryFn: async () => {
-      const today = new Date().toISOString().split("T")[0];
-      const { data } = await supabase
-        .from("company_events")
-        .select("*")
-        .gte("event_date", today)
-        .order("event_date", { ascending: true })
-        .limit(5);
-      return data || [];
-    },
-    staleTime: 60000,
-  });
-
-  // Fetch event attendees
-  const { data: eventAttendees = [] } = useQuery({
-    queryKey: ["event-attendees", companyEvents.map(e => e.id)],
-    queryFn: async () => {
-      const eventIds = companyEvents.map(e => e.id);
-      if (eventIds.length === 0) return [];
-      const { data } = await supabase
-        .from("event_attendees")
-        .select(`
-          *,
-          employee:employee_id(id, first_name, last_name)
-        `)
-        .in("event_id", eventIds);
-      return data || [];
-    },
-    enabled: companyEvents.length > 0,
-    staleTime: 30000,
-  });
-
-  // Toggle attendance mutation
-  const toggleAttendanceMutation = useMutation({
-    mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'maybe' | 'not_attending' }) => {
-      if (!employee?.id) throw new Error("Ikke logget ind");
-      
-      const { error } = await supabase
-        .from("event_attendees")
-        .upsert({
-          event_id: eventId,
-          employee_id: employee.id,
-          status: status,
-        }, { onConflict: 'event_id,employee_id' });
-        
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["event-attendees"] });
-      toast.success("Din deltagelse er opdateret");
-    },
-    onError: () => {
-      toast.error("Kunne ikke opdatere deltagelse");
-    }
-  });
+  // Begivenheder – fælles logik i useCompanyEvents (bruges også af Pulsen)
+  const { data: companyEvents = [] } = useUpcomingCompanyEvents();
+  const { data: eventAttendees = [] } = useEventAttendees(companyEvents.map(e => e.id));
+  const toggleAttendanceMutation = useToggleEventAttendance(employee?.id);
 
   // Helper to get attendees for a specific event
   const getEventAttendees = (eventId: string) => {
@@ -341,68 +296,17 @@ const Home = () => {
   };
 
   // Helper to get current user's attendance status
-  const getMyAttendance = (eventId: string): 'attending' | 'maybe' | 'not_attending' | null => {
+  const getMyAttendance = (eventId: string): AttendanceStatus | null => {
     if (!employee?.id) return null;
     const myAttendance = eventAttendees.find(a => a.event_id === eventId && a.employee_id === employee.id);
-    return myAttendance?.status as 'attending' | 'maybe' | 'not_attending' | null;
+    return myAttendance?.status as AttendanceStatus | null;
   };
 
-  // Add event mutation
-  const addEventMutation = useMutation({
-    mutationFn: async (event: typeof newEvent) => {
-      // 1. Insert event
-      const { data: createdEvent, error } = await supabase
-        .from("company_events")
-        .insert({
-          title: event.title,
-          event_date: event.event_date,
-          event_time: event.event_time || null,
-          location: event.location || null,
-          description: event.description || null,
-          show_popup: event.show_popup,
-          requires_registration: event.requires_registration,
-          created_by: user?.id
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      
-      // 2. Insert team invitations if any
-      if (event.invited_teams.length > 0 && createdEvent) {
-        const { error: invError } = await supabase
-          .from("event_team_invitations")
-          .insert(event.invited_teams.map(teamId => ({
-            event_id: createdEvent.id,
-            team_id: teamId
-          })));
-        if (invError) throw invError;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["home-company-events"] });
-      setAddEventOpen(false);
-      setNewEvent({ title: "", event_date: "", event_time: "", location: "", description: "", show_popup: false, requires_registration: false, invited_teams: [] });
-      toast.success("Begivenhed tilføjet");
-    },
-    onError: () => {
-      toast.error("Kunne ikke tilføje begivenhed");
-    }
+  const addEventMutation = useAddCompanyEvent(user?.id, () => {
+    setAddEventOpen(false);
+    setNewEvent({ ...EMPTY_NEW_EVENT, invited_teams: [] });
   });
-
-  // Delete event mutation
-  const deleteEventMutation = useMutation({
-    mutationFn: async (eventId: string) => {
-      const { error } = await supabase
-        .from("company_events")
-        .delete()
-        .eq("id", eventId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["home-company-events"] });
-      toast.success("Begivenhed slettet");
-    }
-  });
+  const deleteEventMutation = useDeleteCompanyEvent();
 
 
   // Use personal weekly stats hook

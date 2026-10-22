@@ -13826,6 +13826,229 @@ export type Database = {
         }
         Relationships: []
       }
+      pulsen_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      pulsen_last_seen: {
+        Row: {
+          employee_id: string
+          last_seen_house: string | null
+          last_seen_team: Json
+          updated_at: string
+        }
+        Insert: {
+          employee_id: string
+          last_seen_house?: string | null
+          last_seen_team?: Json
+          updated_at?: string
+        }
+        Update: {
+          employee_id?: string
+          last_seen_house?: string | null
+          last_seen_team?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulsen_last_seen_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_last_seen_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_last_seen_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulsen_milestones: {
+        Row: {
+          employee_id: string | null
+          id: string
+          level: number
+          milestone_type: string
+          occurred_at: string
+          payload: Json
+          period_key: string
+          rarity: number
+          shown_in_house: boolean
+          team_id: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          employee_id?: string | null
+          id?: string
+          level?: number
+          milestone_type: string
+          occurred_at?: string
+          payload?: Json
+          period_key: string
+          rarity?: number
+          shown_in_house?: boolean
+          team_id?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          employee_id?: string | null
+          id?: string
+          level?: number
+          milestone_type?: string
+          occurred_at?: string
+          payload?: Json
+          period_key?: string
+          rarity?: number
+          shown_in_house?: boolean
+          team_id?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      pulsen_posts: {
+        Row: {
+          audience: string
+          author_employee_id: string
+          best_answer_comment_id: string | null
+          body: string
+          created_at: string
+          deleted_at: string | null
+          event_id: string | null
+          hidden_at: string | null
+          hidden_by: string | null
+          id: string
+          image_path: string | null
+          post_type: string
+          praised_employee_id: string | null
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          audience: string
+          author_employee_id: string
+          best_answer_comment_id?: string | null
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          event_id?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          image_path?: string | null
+          post_type: string
+          praised_employee_id?: string | null
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          audience?: string
+          author_employee_id?: string
+          best_answer_comment_id?: string | null
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          event_id?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          image_path?: string | null
+          post_type?: string
+          praised_employee_id?: string | null
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulsen_posts_author_employee_id_fkey"
+            columns: ["author_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_author_employee_id_fkey"
+            columns: ["author_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_author_employee_id_fkey"
+            columns: ["author_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_best_answer_comment_id_fkey"
+            columns: ["best_answer_comment_id"]
+            isOneToOne: false
+            referencedRelation: "feed_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "company_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_praised_employee_id_fkey"
+            columns: ["praised_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_praised_employee_id_fkey"
+            columns: ["praised_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_posts_praised_employee_id_fkey"
+            columns: ["praised_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quality_checklist_items: {
         Row: {
           checklist_id: string
@@ -19776,6 +19999,18 @@ export type Database = {
         }[]
       }
       pay_period_start: { Args: { ts: string }; Returns: string }
+      pulsen_can_moderate: {
+        Args: { _audience: string; _team_id: string }
+        Returns: boolean
+      }
+      pulsen_event_visible: { Args: { _event_id: string }; Returns: boolean }
+      pulsen_led_team_ids: { Args: never; Returns: string[] }
+      pulsen_member_team_ids: { Args: never; Returns: string[] }
+      pulsen_target_visible: {
+        Args: { _target_key: string; _target_type: string }
+        Returns: boolean
+      }
+      pulsen_visible_team_ids: { Args: never; Returns: string[] }
       purge_eesy_mobile_sensitive: { Args: never; Returns: number }
       quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }
       quality_has_module_access: {
