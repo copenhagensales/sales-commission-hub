@@ -220,15 +220,7 @@ export default function Pulsen() {
           </button>
         ) : (
           <div className="py-6 text-center">
-            {topline.data ? (
-              <p className="text-[15px] font-extrabold tabular-nums text-foreground">
-                I går: {topline.data.house.yesterday.toLocaleString("da-DK")} salg
-                {milestonesYesterday.data != null && ` · ${milestonesYesterday.data} milepæle`}
-                {yesterdayWinner && ` · ${yesterdayWinner.name} vandt dagen`}
-              </p>
-            ) : (
-              <p className="text-[15px] font-extrabold text-foreground">Du er opdateret</p>
-            )}
+            <p className="text-[15px] font-extrabold text-foreground">Du er opdateret</p>
           </div>
         )}
       </div>
