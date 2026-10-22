@@ -1,3 +1,5 @@
+import { InstallStorkProfileCard } from "@/components/pwa/InstallStorkProfileCard";
+import { Smartphone } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -1182,7 +1184,7 @@ export default function MyProfile() {
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="flex-wrap">
+          <TabsList className="h-auto flex-wrap">
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
             <TabsTrigger value="kalender">
               <Calendar className="h-4 w-4 mr-2" />
@@ -1211,6 +1213,10 @@ export default function MyProfile() {
             <TabsTrigger value="gdpr">
               <Shield className="h-4 w-4 mr-2" />
               GDPR
+            </TabsTrigger>
+            <TabsTrigger value="app">
+              <Smartphone className="h-4 w-4 mr-2" />
+              Stork på telefon
             </TabsTrigger>
             <TabsTrigger value="haandbog">
               <BookOpen className="h-4 w-4 mr-2" />
@@ -2255,6 +2261,10 @@ export default function MyProfile() {
 
           <TabsContent value="gdpr" className="mt-6">
             <GdprSettingsCard />
+          </TabsContent>
+
+          <TabsContent value="app" className="mt-6">
+            <InstallStorkProfileCard />
           </TabsContent>
 
           <TabsContent value="haandbog" className="mt-6">
