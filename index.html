@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Minimal AbortController-polyfill til ældre TV-browsere (Chromium < 66, fx Samsung Tizen). Ingen effekt i nye browsere. -->
+    <script>
+      (function () {
+        if (typeof window.AbortController === "function") return;
+        function Sig() { this.aborted = false; this.reason = undefined; this.onabort = null; this._l = []; }
+        Sig.prototype.addEventListener = function (t, fn) { if (t === "abort") this._l.push(fn); };
+        Sig.prototype.removeEventListener = function (t, fn) { this._l = this._l.filter(function (f) { return f !== fn; }); };
+        Sig.prototype.dispatchEvent = function () { return true; };
+        Sig.prototype.throwIfAborted = function () { if (this.aborted) throw this.reason; };
+        function AC() { this.signal = new Sig(); }
+        AC.prototype.abort = function (reason) {
+          var s = this.signal; if (s.aborted) return;
+          s.aborted = true; s.reason = reason !== undefined ? reason : new Error("Aborted");
+          var ev = { type: "abort", target: s };
+          if (typeof s.onabort === "function") s.onabort(ev);
+          s._l.slice().forEach(function (fn) { fn(ev); });
+        };
+        window.AbortController = AC;
+        window.AbortSignal = Sig;
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
