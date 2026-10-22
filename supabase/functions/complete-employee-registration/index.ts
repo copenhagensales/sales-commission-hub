@@ -8,7 +8,8 @@ const corsHeaders = {
 
 interface RegistrationRequest {
   token: string;
-  password: string;
+  /** Ignoreres. Login sker kun med Microsoft. */
+  password?: string;
 }
 
 serve(async (req) => {
@@ -21,18 +22,11 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { token, password }: RegistrationRequest = await req.json();
+    const { token }: RegistrationRequest = await req.json();
 
-    if (!token || !password) {
+    if (!token) {
       return new Response(
-        JSON.stringify({ error: "Missing token or password" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (password.length < 6) {
-      return new Response(
-        JSON.stringify({ error: "Password must be at least 6 characters" }),
+        JSON.stringify({ error: "Missing token" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -54,7 +48,7 @@ serve(async (req) => {
     // Check if already completed
     if (invitation.password_set_at) {
       return new Response(
-        JSON.stringify({ error: "Registration already completed" }),
+        JSON.stringify({ error: "Din konto er oprettet — log ind med Microsoft" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -78,27 +72,13 @@ serve(async (req) => {
     let authUserId: string;
 
     if (existingUser) {
-      // Update existing user's password
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        existingUser.id,
-        { password }
-      );
-
-      if (updateError) {
-        console.error("Password update error:", updateError);
-        return new Response(
-          JSON.stringify({ error: "Failed to update password" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+      // Microsoft-login: eksisterende konto kobles; adgangskoden ændres aldrig.
       authUserId = existingUser.id;
-      console.log(`Password updated for existing user: ${email}`);
+      console.log(`Linked existing user: ${email}`);
     } else {
       // Create new user
       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email,
-        password,
         email_confirm: true,
         user_metadata: {
           first_name,
@@ -137,7 +117,7 @@ serve(async (req) => {
       .update({ used_at: new Date().toISOString() })
       .eq("token", token);
 
-    // Mark invitation password as set and complete
+    // password_set_at betyder nu »konto oprettet«
     const { data: completeResult } = await supabase.rpc("complete_invitation_password", { _token: token });
     
     if (!completeResult?.success) {
@@ -158,7 +138,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Account created successfully",
+        message: "Din konto er oprettet — log ind med Microsoft",
         email
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
