@@ -5,6 +5,8 @@ type Props = {
   /** Kun for "full": "dark" = mørk bund, "light" = lys bund. */
   tone?: "dark" | "light";
   size?: number;
+  /** Kun for "head": aktivt menupunkt (emerald bund) – næbbet følger da currentColor. */
+  active?: boolean;
   className?: string;
 };
 
@@ -12,14 +14,14 @@ const LB = "hsl(var(--cph-light-blue))";
 const ONYX = "hsl(var(--cph-onyx))";
 const EM = "hsl(var(--cph-emerald))";
 
-/** Storkbook-logo. Dekorativt (aria-hidden). Hoved-varianten følger currentColor (krop og næb). */
-export function StorkbookMark({ variant = "full", tone = "light", size = 44, className }: Props) {
+/** Storkbook-logo. Dekorativt (aria-hidden). Hoved-varianten: krop følger currentColor; næb er emerald, men currentColor når aktiv. */
+export function StorkbookMark({ variant = "full", tone = "light", size = 44, active = false, className }: Props) {
   if (variant === "head") {
     return (
       <svg viewBox="56 0 64 64" width={size} height={size} aria-hidden="true" focusable="false" className={cn("shrink-0", className)}>
         <path d="M70 64 C80 46 78 30 82 22" stroke="currentColor" strokeWidth="11" fill="none" strokeLinecap="round" />
         <circle cx="84" cy="19" r="11" fill="currentColor" />
-        <path d="M90 11 L120 25 L90 26 Z" fill="currentColor" />
+        <path d="M90 11 L120 25 L90 26 Z" fill={active ? "currentColor" : EM} />
       </svg>
     );
   }
