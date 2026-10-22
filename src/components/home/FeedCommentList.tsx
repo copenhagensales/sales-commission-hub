@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Smile, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import type { FeedCommentView, FeedTargetType } from "@/hooks/useFeedReactions";
 
 const MAX_LENGTH = 200;
 const COUNTER_FROM = 160;
 const VISIBLE_COUNT = 2;
+const COMMENT_EMOJIS = ["👏", "🔥", "💪", "😂", "❤️", "🎉", "👍", "🙌", "😍", "🚀", "🏆", "😊"];
 
 interface FeedCommentListProps {
   targetType: FeedTargetType;
@@ -86,6 +88,27 @@ export function FeedCommentList({
               {value.length}/{MAX_LENGTH}
             </span>
           )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Indsæt emoji">
+                <Smile className="h-5 w-5" aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-auto rounded-2xl p-1.5">
+              <div className="grid grid-cols-6 gap-1" role="group" aria-label="Emojis">
+                {COMMENT_EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setValue((v) => (v + e).slice(0, MAX_LENGTH))}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl text-[22px] hover:bg-muted"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button type="button" className="h-11" disabled={saving || !value.trim()} onClick={() => void submit()}>
             Send
           </Button>
