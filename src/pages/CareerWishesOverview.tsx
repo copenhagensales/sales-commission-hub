@@ -36,30 +36,39 @@ export default function CareerWishesOverview() {
     queryKey: ["career-wishes-overview"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("career_wishes")
-        .select(`
-          *,
-          employee:employee_master_data!career_wishes_employee_id_fkey(
-            id, first_name, last_name, department, job_title
-          )
-        `)
-        .order("created_at", { ascending: false });
+        .from("stork_karriereoensker")
+        .select("*")
+        .order("oprettet", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        employee: {
+          first_name: r.medarbejder_navn ?? "",
+          last_name: "",
+          department: r.team,
+          job_title: null as string | null,
+        },
+        wants_team_change: r.oensker_teamskifte,
+        desired_team: r.oensket_team,
+        team_change_motivation: r.teamskifte_motivation,
+        leadership_interest: r.lederinteresse,
+        leadership_role_type: r.lederrolle,
+        leadership_motivation: r.leder_motivation,
+        other_comments: r.andet,
+        created_at: r.oprettet as string,
+        reviewed_at: r.behandlet_at,
+        acknowledged_at: r.kvitteret_at,
+      }));
     },
   });
 
   const markAsReviewedMutation = useMutation({
     mutationFn: async ({ id, reviewed }: { id: string; reviewed: boolean }) => {
-      const { error } = await supabase
-        .from("career_wishes")
-        .update({
-          reviewed_at: reviewed ? new Date().toISOString() : null,
-          reviewed_by: reviewed ? user?.id : null,
-        })
-        .eq("id", id);
-
+      const { error } = await supabase.rpc("stork_karriereoenske_behandl", {
+        p_id: id,
+        p_behandlet: reviewed,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -73,15 +82,9 @@ export default function CareerWishesOverview() {
 
   const acknowledgeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.functions.invoke(
-        "send-career-wish-acknowledgement",
-        { body: { wishId: id } }
-      );
+      const { data, error } = await supabase.rpc("stork_karriereoenske_kvitter", { p_id: id });
       if (error) throw error;
-      if (data && (data as { error?: string }).error) {
-        throw new Error((data as { error?: string }).error);
-      }
-      return data as { recipient?: string };
+      return data as { recipient?: string } | null;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["career-wishes-overview"] });

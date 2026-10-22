@@ -267,3 +267,6 @@ verify_jwt = false
 
 [functions.enreach-closure-diagnose]
 verify_jwt = false
+
+[functions.send-udsendelser]
+verify_jwt = true

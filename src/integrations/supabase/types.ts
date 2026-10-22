@@ -19116,6 +19116,32 @@ export type Database = {
           },
         ]
       }
+      stork_karriereoensker: {
+        Row: {
+          aendret: string | null
+          andet: string | null
+          behandlet_af: string | null
+          behandlet_at: string | null
+          id: string | null
+          kvitteret_af: string | null
+          kvitteret_at: string | null
+          leder_motivation: string | null
+          lederinteresse:
+            | Database["public"]["Enums"]["leadership_interest"]
+            | null
+          lederrolle: Database["public"]["Enums"]["leadership_role_type"] | null
+          medarbejder_id: string | null
+          medarbejder_navn: string | null
+          oensker_teamskifte:
+            | Database["public"]["Enums"]["team_change_wish"]
+            | null
+          oensket_team: string | null
+          oprettet: string | null
+          team: string | null
+          teamskifte_motivation: string | null
+        }
+        Relationships: []
+      }
       v_employment_spells_clean: {
         Row: {
           campaign_id: string | null
@@ -20351,6 +20377,30 @@ export type Database = {
           bank_reg_number: string
           cpr_number: string
           id: string
+        }[]
+      }
+      stork_karriereoenske_behandl: {
+        Args: { p_behandlet: boolean; p_id: string }
+        Returns: Json
+      }
+      stork_karriereoenske_indsend: {
+        Args: { p: Json; p_anmodning: string }
+        Returns: Json
+      }
+      stork_karriereoenske_kvitter: { Args: { p_id: string }; Returns: Json }
+      stork_udsendelse_resultat: {
+        Args: { p_fejl?: string; p_id: number; p_lease: string; p_ok: boolean }
+        Returns: undefined
+      }
+      stork_udsendelse_tag: {
+        Args: { p_antal?: number }
+        Returns: {
+          emne: string
+          forsoeg: number
+          html: string
+          id: number
+          lease: string
+          modtager: string
         }[]
       }
       submit_eesy_mobile_request: {
