@@ -364,3 +364,32 @@ export function usePulsenYesterday(enabled: boolean) {
     staleTime: 600000,
   });
 }
+
+export interface PulsenLatestItem extends PulsenPost { reactions: number; comments: number }
+
+/** De nyeste Huset-indlæg til forsidens kompakte kort (samme RLS som feedet). */
+export function usePulsenLatest(enabled: boolean, limit = 3) {
+  return useQuery({
+    queryKey: ["pulsen-latest", limit],
+    queryFn: async (): Promise<PulsenLatestItem[]> => {
+      const { data, error } = await supabase
+        .from("pulsen_posts").select(POST_SELECT)
+        .eq("audience", "house").is("deleted_at", null).is("hidden_at", null)
+        .order("created_at", { ascending: false }).limit(limit);
+      if (error) throw error;
+      const posts = (data ?? []) as unknown as PulsenPost[];
+      if (posts.length === 0) return [];
+      const keys = posts.map((p) => postTargetKey(p.id));
+      const [r, c] = await Promise.all([
+        supabase.from("feed_reactions").select("target_key").in("target_key", keys),
+        supabase.from("feed_comments").select("target_key").in("target_key", keys),
+      ]);
+      if (r.error) throw r.error;
+      if (c.error) throw c.error;
+      const count = (rows: { target_key: string }[] | null, k: string) => (rows ?? []).filter((x) => x.target_key === k).length;
+      return posts.map((p) => ({ ...p, reactions: count(r.data, postTargetKey(p.id)), comments: count(c.data, postTargetKey(p.id)) }));
+    },
+    enabled,
+    staleTime: 60000,
+  });
+}
