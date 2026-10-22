@@ -162,9 +162,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const rows = out.filter((c) => !(c as Out & { _existing?: boolean })._existing).map((c) => ({
+    // Eksisterende rækker opdaterer kun værdi/tekst (upsert ændrer ikke occurred_at eller shown_in_house).
+    const rows = out.map((c) => ({
       milestone_type: c.milestone_type, employee_id: c.employee_id, team_id: c.team_id, period_key: c.period_key,
-      level: c.level, value: c.value ?? 0, previous: undefined, rarity: c.rarity, shown_in_house: c.shown_in_house,
+      level: c.level, value: c.value ?? 0, rarity: c.rarity, shown_in_house: c.shown_in_house,
       occurred_at: c.occurred_at,
       payload: { text: c.text, previous: c.previous, day: dk(c.occurred_at!), tier: c.tier },
     }));
