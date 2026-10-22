@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Lock, Sun, Users } from "lucide-react";
 import { startOfDay } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -42,6 +43,15 @@ export default function Pulsen() {
 
   const feed = usePulsenFeed(scope, !!me.employeeId);
   const posts = useMemo(() => feed.data?.pages.flat() ?? [], [feed.data]);
+  // Link fra forsiden: /pulsen?post=<id> ruller til indlægget, når det er indlæst.
+  const [searchParams] = useSearchParams();
+  const deepPostId = searchParams.get("post");
+  const deepDone = useRef(false);
+  useEffect(() => {
+    if (!deepPostId || deepDone.current || !posts.some((p) => p.id === deepPostId)) return;
+    deepDone.current = true;
+    requestAnimationFrame(() => document.getElementById(`pulsen-post-${deepPostId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [deepPostId, posts]);
   const images = usePulsenImageUrls(posts.filter((p) => p.image_path && !p.localImageUrl).map((p) => p.image_path as string));
 
   const mut = usePulsenMutations(me.self);
