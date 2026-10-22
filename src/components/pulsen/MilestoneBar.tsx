@@ -4,6 +4,9 @@ import { cn } from "@/lib/utils";
 
 interface MilestoneBarProps {
   icon: LucideIcon;
+  /** Valgfrit indhold i ikonfeltet i stedet for ikonet (fx Klub-niveau som tal). */
+  iconContent?: ReactNode;
+  iconLabel?: string;
   tone?: "emerald" | "onyx";
   children: ReactNode;
   time: string;
@@ -11,19 +14,21 @@ interface MilestoneBarProps {
   reaction?: ReactNode;
 }
 
-/** Lille milepælslinje i feedet. Data kommer i trin 6. */
-export function MilestoneBar({ icon: Icon, tone = "emerald", children, time, reaction }: MilestoneBarProps) {
+/** Lille milepælslinje i feedet. */
+export function MilestoneBar({ icon: Icon, iconContent, iconLabel, tone = "emerald", children, time, reaction }: MilestoneBarProps) {
   return (
     <div className="flex min-h-[56px] items-center gap-3 rounded-[18px] bg-card px-2.5 py-2">
       <span
+        aria-label={iconLabel}
+        role={iconLabel ? "img" : undefined}
         className={cn(
-          "flex h-9 w-9 flex-none items-center justify-center rounded-[12px]",
+          "flex h-9 w-9 flex-none flex-col items-center justify-center rounded-[12px]",
           tone === "emerald"
             ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]"
             : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))]"
         )}
       >
-        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+        {iconContent ?? <Icon className="h-[18px] w-[18px]" aria-hidden="true" />}
       </span>
       <p className="min-w-0 flex-1 line-clamp-2 text-[15px] text-foreground [&_b]:font-extrabold [&_b]:tabular-nums">
         {children} <span className="text-muted-foreground">· {time}</span>
