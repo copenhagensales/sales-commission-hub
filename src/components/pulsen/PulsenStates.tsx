@@ -18,7 +18,7 @@ export function PulsenEmpty({ icon: Icon, title, text, action }: { icon: LucideI
 export function PulsenError({ onRetry }: { onRetry: () => void }) {
   return (
     <div role="alert" className="flex flex-col items-center rounded-[24px] bg-card px-8 py-10 text-center">
-      <h2 className="text-[18px] font-extrabold text-foreground">Pulsen kunne ikke hentes</h2>
+      <h2 className="text-[18px] font-extrabold text-foreground">Storkbook kunne ikke hentes</h2>
       <p className="mt-1 text-[15px] text-muted-foreground">Tjek forbindelsen, og prøv igen.</p>
       <button
         type="button"

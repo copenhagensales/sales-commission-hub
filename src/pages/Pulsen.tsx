@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { useSearchParams } from "react-router-dom";
 import { Lock, Sun, Users } from "lucide-react";
 import { startOfDay } from "date-fns";
@@ -34,6 +35,11 @@ type FeedItem =
   | { kind: "milestone"; at: number; milestone: PulsenMilestone };
 
 export default function Pulsen() {
+  useEffect(() => {
+    const prev = document.title;
+    document.title = "Storkbook";
+    return () => { document.title = prev; };
+  }, []);
   const me = usePulsenMe();
   const [tab, setTab] = useState<"house" | "team">("house");
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -47,7 +53,7 @@ export default function Pulsen() {
 
   const feed = usePulsenFeed(scope, !!me.employeeId);
   const posts = useMemo(() => feed.data?.pages.flat() ?? [], [feed.data]);
-  // Link fra forsiden: /pulsen?post=<id> ruller til indlægget, når det er indlæst.
+  // Link fra forsiden: /storkbook?post=<id> ruller til indlægget, når det er indlæst.
   const [searchParams] = useSearchParams();
   const deepPostId = searchParams.get("post");
   const deepDone = useRef(false);
@@ -120,7 +126,7 @@ export default function Pulsen() {
 
   const renderBody = () => {
     if (!me.isLoading && !me.employeeId) {
-      return <PulsenEmpty icon={Lock} title="Ingen adgang til Pulsen" text="Din bruger er ikke koblet til et medarbejderkort. Kontakt din leder." />;
+      return <PulsenEmpty icon={Lock} title="Ingen adgang til Storkbook" text="Din bruger er ikke koblet til et medarbejderkort. Kontakt din leder." />;
     }
     if (me.isLoading || feed.isLoading) {
       return <div className="flex flex-col gap-4"><PulsenPostSkeleton /><PulsenPostSkeleton /><PulsenPostSkeleton /></div>;
@@ -250,7 +256,13 @@ export default function Pulsen() {
         <div className="mx-auto grid w-full max-w-[1004px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,680px)_300px] 2xl:max-w-[1164px] 2xl:grid-cols-[minmax(0,680px)_460px]">
           <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-4">
-              <h1 className="text-[32px] font-black leading-none tracking-[-0.03em] text-foreground">Storkbook</h1>
+              <div className="flex items-center gap-2">
+                <StorkbookMark variant="full" tone="light" size={44} />
+                <h1 aria-label="Storkbook" className="font-['Figtree'] text-[32px] font-black lowercase leading-none tracking-[-0.045em]">
+                  <span aria-hidden="true" className="text-[hsl(var(--cph-onyx))]">stork</span>
+                  <span aria-hidden="true" className="text-[#146c3c]">book</span>
+                </h1>
+              </div>
               <div role="tablist" aria-label="Feed" className="flex rounded-full bg-card p-1">
                 <button type="button" role="tab" aria-selected={isHouse} onClick={() => setTab("house")}
                   className={cn("min-h-[40px] rounded-full px-4 text-[14px] font-extrabold", isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>

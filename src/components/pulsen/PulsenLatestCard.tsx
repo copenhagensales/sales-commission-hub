@@ -18,17 +18,17 @@ export function PulsenLatestCard({ enabled }: { enabled: boolean }) {
   if (!enabled || !data || data.length === 0) return null;
 
   return (
-    <section className="rounded-3xl bg-card px-6 py-5" aria-label="Seneste fra Pulsen">
+    <section className="rounded-3xl bg-card px-6 py-5" aria-label="Seneste fra Storkbook">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Seneste fra Pulsen</h2>
-        <Link to="/pulsen" className="flex min-h-[44px] items-center gap-1 text-[13px] font-extrabold text-foreground hover:text-primary">
+        <h2 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Seneste fra Storkbook</h2>
+        <Link to="/storkbook" className="flex min-h-[44px] items-center gap-1 text-[13px] font-extrabold text-foreground hover:text-primary">
           Se alle <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
       <ul className="divide-y divide-border">
         {data.map((p) => (
           <li key={p.id}>
-            <Link to={`/pulsen?post=${p.id}`} className="flex min-h-[44px] items-center gap-3 py-2 hover:opacity-80">
+            <Link to={`/storkbook?post=${p.id}`} className="flex min-h-[44px] items-center gap-3 py-2 hover:opacity-80">
               <PulsenAvatar employeeId={p.author?.id} name={shortName(p.author?.first_name, p.author?.last_name)} size={28} />
               <p className="min-w-0 flex-1 truncate text-[14px]">
                 {lead(p)}

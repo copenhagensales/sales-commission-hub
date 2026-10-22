@@ -23,7 +23,7 @@ export function PulsenSidebar({ employeeId, onOpenQuestion }: { employeeId: stri
   const myStatus = (id: string) => attendees.find((a) => a.event_id === id && a.employee_id === employeeId)?.status as AttendanceStatus | undefined;
 
   return (
-    <aside className="flex flex-col gap-4" aria-label="Pulsen sidekolonne">
+    <aside className="flex flex-col gap-4" aria-label="Storkbook sidekolonne">
       <SideCard title="Kommer snart">
         {isLoading ? (
           <p className="text-[14px] text-muted-foreground">Henter …</p>

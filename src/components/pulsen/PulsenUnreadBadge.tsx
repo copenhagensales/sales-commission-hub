@@ -9,7 +9,7 @@ export function PulsenUnreadBadge() {
   return (
     <span
       className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--cph-emerald))] px-1.5 text-[11px] font-black tabular-nums text-[hsl(var(--cph-onyx))]"
-      aria-label={`${count} nye i Pulsen`}
+      aria-label={`${count} nye i Storkbook`}
     >
       {formatUnread(count)}
     </span>

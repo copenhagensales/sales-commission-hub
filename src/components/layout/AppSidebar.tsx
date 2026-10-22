@@ -1,5 +1,6 @@
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag, Upload } from "lucide-react";
 import { PulsenUnreadBadge } from "@/components/pulsen/PulsenUnreadBadge";
+import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -587,19 +588,19 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
 
-              {/* Pulsen */}
+              {/* Storkbook (internt: menu_pulsen) */}
               {p.canViewPulsen && (
                 <NavLink
-                  to="/pulsen"
+                  to="/storkbook"
                   onClick={handleNavClick}
                   className={cn(
                     "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/pulsen" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    location.pathname.startsWith("/storkbook") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}
                 >
                   <span className="flex items-center gap-3">
-                    <Activity className="h-4 w-4" />
-                    Pulsen
+                    <StorkbookMark variant="head" size={20} active={location.pathname.startsWith("/storkbook")} />
+                    Storkbook
                   </span>
                   <PulsenUnreadBadge />
                 </NavLink>

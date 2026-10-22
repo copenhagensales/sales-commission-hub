@@ -103,7 +103,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   if (audiences.length === 0) return null;
 
   return (
-    <section aria-label="Skriv i Pulsen" className="rounded-[24px] bg-card p-5">
+    <section aria-label="Skriv i Storkbook" className="rounded-[24px] bg-card p-5">
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
 
       {!open ? (
