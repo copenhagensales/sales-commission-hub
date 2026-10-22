@@ -194,7 +194,7 @@ export interface PricingRule {
   id: string;
   product_id: string;
   name: string;
-  conditions: Record<string, string | NumericCondition>;
+  conditions: Record<string, string | NumericCondition | { operator: "in" | "not_in"; values: string[] }>;
   commission_dkk: number;
   revenue_dkk: number;
   priority: number;
