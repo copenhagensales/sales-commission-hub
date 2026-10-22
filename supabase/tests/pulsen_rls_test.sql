@@ -64,7 +64,6 @@ BEGIN
     AND NOT EXISTS (SELECT 1 FROM public.team_members x WHERE x.employee_id = m.id)
     AND NOT EXISTS (SELECT 1 FROM public.teams t WHERE t.team_leader_id = m.id)
     AND NOT EXISTS (SELECT 1 FROM public.team_assistant_leaders a WHERE a.employee_id = m.id)
-    AND public.has_edit_permission(m.auth_user_id, 'action_pulsen_post_house') IS NOT NULL
   ORDER BY m.created_at LIMIT 1;
 
   IF team_a IS NULL OR e_emp_a IS NULL OR team_b IS NULL OR e_owner IS NULL OR e_two IS NULL OR e_none IS NULL THEN
