@@ -143,7 +143,7 @@ export default function Pulsen() {
                 key={`ms-${m.id}`}
                 milestone={m}
                 reaction={isHouse && m.shown_in_house ? (
-                  <ReactButton summary={fr.getReactions(key)} disabled={!fr.canInteract}
+                  <ReactButton compact summary={fr.getReactions(key)} disabled={!fr.canInteract}
                     onSet={(reaction) => fr.setReaction.mutate({ targetType: "milestone", targetKey: key, reaction })} />
                 ) : undefined}
               />

@@ -15,10 +15,12 @@ interface ReactButtonProps {
   onSet: (reaction: ReactionKey) => void;
   disabled?: boolean;
   className?: string;
+  /** Kun ikon, ingen tekst (Pulsens milepælslinjer). Standard uændret. */
+  compact?: boolean;
 }
 
 /** "Reagér" giver 👏 med ét klik; pilen åbner vælgeren med de 5 reaktioner. */
-export function ReactButton({ summary, onSet, disabled, className }: ReactButtonProps) {
+export function ReactButton({ summary, onSet, disabled, className, compact = false }: ReactButtonProps) {
   const [open, setOpen] = useState(false);
   const mine = summary.myReaction ? reactionOption(summary.myReaction) : null;
 
@@ -41,7 +43,7 @@ export function ReactButton({ summary, onSet, disabled, className }: ReactButton
           ) : (
             <Smile className="h-5 w-5" aria-hidden="true" />
           )}
-          {mine ? mine.label : "Reagér"}
+          {!compact && (mine ? mine.label : "Reagér")}
         </button>
         <PopoverTrigger asChild>
           <button

@@ -347,23 +347,6 @@ export function usePulsenUnanswered(enabled: boolean) {
   });
 }
 
-/** Gårsdagens tal i Pulsen (kun det brugeren kan se – ingen salgstal). */
-export function usePulsenYesterday(enabled: boolean) {
-  return useQuery({
-    queryKey: ["pulsen-yesterday", startOfDay(new Date()).toISOString()],
-    queryFn: async () => {
-      const from = startOfDay(subDays(new Date(), 1)).toISOString();
-      const to = startOfDay(new Date()).toISOString();
-      const [posts, reactions] = await Promise.all([
-        supabase.from("pulsen_posts").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", from).lt("created_at", to),
-        supabase.from("feed_reactions").select("id", { count: "exact", head: true }).gte("created_at", from).lt("created_at", to),
-      ]);
-      return { posts: posts.count ?? 0, reactions: reactions.count ?? 0 };
-    },
-    enabled,
-    staleTime: 600000,
-  });
-}
 
 export interface PulsenLatestItem extends PulsenPost { reactions: number; comments: number }
 
