@@ -1,8 +1,10 @@
-// Pulsen milepæle. Læser KUN salg/stamdata (via pulsen_milestone_candidates_v2) og skriver KUN til pulsen_milestones.
+// Pulsen milepæle. Læser KUN salg/stamdata (via pulsen_milestone_candidates_v2) og skriver KUN til pulsen_milestones
+// (plus push_log via _shared/push.ts ved nye Klub-milepæle).
 // dry_run=true (standard) skriver intet. Skrivning kun via cron-token og kun for milepæle med
 // occurred_at >= pulsen_config.milestones_active_from (ingen bagudposting).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { authUsersForEmployees, sendPush } from "../_shared/push.ts";
 
 type Cand = {
   milestone_type: string; employee_id: string | null; team_id: string | null; period_key: string;
@@ -187,7 +189,15 @@ Deno.serve(async (req) => {
       if (error) throw error;
       written = Number(data ?? 0);
     }
-    return json({ dry_run: false, from, to, written, timings_ms: timings });
+    // Klub-push som ekstra kanal: kun nye milepæle; dedupe pr. periode/niveau. Fejler aldrig kørslen.
+    let pushed = 0;
+    for (const c of out) {
+      if (c.milestone_type !== "club" || !c.employee_id || (c as Out & { _existing?: boolean })._existing) continue;
+      pushed += await sendPush(service, await authUsersForEmployees(service, [c.employee_id]), "klub", {
+        dedupeKey: `${c.period_key}:${c.level}`,
+      });
+    }
+    return json({ dry_run: false, from, to, written, pushed, timings_ms: timings });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e) }, 500);
   }

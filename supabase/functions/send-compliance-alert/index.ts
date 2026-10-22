@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { authUsersForEmails, sendPush } from "../_shared/push.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -267,6 +268,10 @@ const handler = async (req: Request): Promise<Response> => {
     await sendEmail(accessToken, recipients, subject, htmlBody);
 
     console.log(`Compliance-mail sendt til ${recipients.length} modtager(e): ${subject}`);
+    // Push som ekstra kanal (fejler aldrig mailen). Én pr. modtager pr. dag.
+    await sendPush(supabase, await authUsersForEmails(supabase, recipients), "compliance", {
+      dedupeKey: new Date().toISOString().slice(0, 10),
+    });
     return new Response(
       JSON.stringify({
         sent: true,

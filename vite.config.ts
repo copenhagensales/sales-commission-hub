@@ -45,6 +45,8 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // Push/klik-håndtering (public/push-sw.js). Påvirker ikke caching.
+        importScripts: ["/push-sw.js"],
         // Ingen cachet HTML-fallback: navigationer går altid til nettet; offline vises offline.html.
         navigateFallback: null,
         globPatterns: ["**/*.{js,css,woff,woff2,ttf,png,svg,ico,webmanifest}", "offline.html"],

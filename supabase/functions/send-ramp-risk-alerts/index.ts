@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authUsersForEmployees, sendPush } from "../_shared/push.ts";
 import { getRampCcRecipients } from "../_shared/rampCcRecipients.ts";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
@@ -243,8 +244,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Push som ekstra kanal (fejler aldrig mailen). Kun ledere/kopimodtagere – aldrig sælgeren selv.
+    const day = new Date().toISOString().slice(0, 10);
+    const pushEmployeeIds = [
+      ...leaders.filter((l) => l.sellers.length > 0).map((l) => l.leader_id),
+      ...(allSellers.length > 0 ? (await getRampCcRecipients(supabase)).map((c) => c.employeeId) : []),
+    ];
+    const pushed = await sendPush(supabase, await authUsersForEmployees(supabase, pushEmployeeIds), "opstart_flag", { dedupeKey: day });
+
     return new Response(
-      JSON.stringify({ queued, skipped, leaders: leaders.length }),
+      JSON.stringify({ queued, skipped, leaders: leaders.length, pushed }),
       { headers: { ...sharedCorsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

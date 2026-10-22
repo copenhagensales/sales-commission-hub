@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authUsersForEmployees, sendPush } from "../_shared/push.ts";
 import { getRampCcRecipients } from "../_shared/rampCcRecipients.ts";
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
@@ -225,8 +226,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Push som ekstra kanal (fejler aldrig mailen).
+    const pushEmployeeIds = [
+      ...recipients.filter((r) => r.sellers.length > 0).map((r) => r.recipient_id),
+      ...(allSellers.length > 0 ? (await getRampCcRecipients(supabase)).map((c) => c.employeeId) : []),
+    ];
+    const pushed = await sendPush(supabase, await authUsersForEmployees(supabase, pushEmployeeIds), "missing_one_on_one", {
+      dedupeKey: `${monday.getFullYear()}-W${week}`,
+    });
+
     return new Response(
-      JSON.stringify({ queued, skipped, recipients: recipients.length, week }),
+      JSON.stringify({ queued, skipped, recipients: recipients.length, week, pushed }),
       { headers: { ...sharedCorsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

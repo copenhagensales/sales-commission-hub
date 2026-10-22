@@ -1,4 +1,5 @@
 import { InstallStorkProfileCard } from "@/components/pwa/InstallStorkProfileCard";
+import { PushSettingsCard } from "@/components/pwa/PushSettingsCard";
 import { Smartphone } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -2263,8 +2264,9 @@ export default function MyProfile() {
             <GdprSettingsCard />
           </TabsContent>
 
-          <TabsContent value="app" className="mt-6">
+          <TabsContent value="app" className="mt-6 space-y-6">
             <InstallStorkProfileCard />
+            <PushSettingsCard />
           </TabsContent>
 
           <TabsContent value="haandbog" className="mt-6">
