@@ -38,6 +38,7 @@ import { EditEventDialog } from "@/components/home/EditEventDialog";
 import { AddEventDialog } from "@/components/home/AddEventDialog";
 import { useCelebrations } from "@/hooks/useCelebrations";
 import { EventInvitationPopup } from "@/components/home/EventInvitationPopup";
+import { InstallStorkBanner } from "@/components/pwa/InstallStorkBanner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -252,6 +253,7 @@ const Home = () => {
 
   return (
     <MainLayout>
+      <InstallStorkBanner />
       {/* Event Invitation Popup - Shows on first login for invited employees */}
       <EventInvitationPopup 
         employeeId={employee?.id} 
