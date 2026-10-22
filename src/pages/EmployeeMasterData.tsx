@@ -948,6 +948,8 @@ export default function EmployeeMasterData() {
                           <TableHead className="text-xs font-medium text-muted-foreground cursor-pointer" onClick={() => handleSort("team")}>
                             <div className="flex items-center gap-1">Team {sortColumn === "team" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}</div>
                           </TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Arbejdsmail</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Ansat</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
@@ -995,6 +997,8 @@ export default function EmployeeMasterData() {
                             </TableCell>
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
+                            <TableCell className="py-3 text-sm text-muted-foreground max-w-[260px] truncate">{employee.work_email || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                            <TableCell className="py-3 text-sm whitespace-nowrap">{employee.employment_start_date ? new Date(employee.employment_start_date).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) : <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                               <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { setActivatingEmployee(employee); }}} />
                             </TableCell>
@@ -1028,7 +1032,7 @@ export default function EmployeeMasterData() {
                                   className="cursor-pointer hover:bg-muted/40 bg-muted/20 border-b border-border/30"
                                   onClick={() => setShowFutureStarters((v) => !v)}
                                 >
-                                  <TableCell colSpan={5} className="py-3">
+                                  <TableCell colSpan={7} className="py-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       {showFutureStarters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                       <span>Starter senere</span>
@@ -1044,7 +1048,7 @@ export default function EmployeeMasterData() {
                           );
                         })()}
 
-                        {filteredEmployees.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">{t("employees.table.noEmployeesFound")}</TableCell></TableRow>}
+                        {filteredEmployees.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">{t("employees.table.noEmployeesFound")}</TableCell></TableRow>}
                       </TableBody>
                     </Table>
                   )}
