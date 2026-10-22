@@ -46,7 +46,7 @@ export function PulsenMilestoneItem({ milestone: m, reaction, now }: { milestone
         unit="salg"
         eyebrow={`${LABEL[m.milestone_type]} · ${time}`}
         title={house ? "Ny husrekord på én dag" : plain(text).replace(/:.*$/, "")}
-        subtitle={house && m.payload?.previous != null ? `Før ${num(m.payload.previous)} salg` : undefined}
+        subtitle={m.payload?.previous != null ? `Før ${num(m.payload.previous)} salg` : undefined}
         footer={reaction}
       />
     );
