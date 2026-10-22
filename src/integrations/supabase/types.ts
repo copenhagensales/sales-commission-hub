@@ -20013,7 +20013,7 @@ export type Database = {
       pulsen_led_team_ids: { Args: never; Returns: string[] }
       pulsen_member_team_ids: { Args: never; Returns: string[] }
       pulsen_milestone_candidates: {
-        Args: { p_from: string; p_to: string }
+        Args: { p_from: string; p_to: string; p_types: string[] }
         Returns: {
           employee_id: string
           level: number

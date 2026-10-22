@@ -386,6 +386,13 @@
       "when": 1792663806855,
       "tag": "0054_pulsen_milestone_candidates_perf",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1792663906771,
+      "tag": "0055_pulsen_milestone_candidates_by_type",
+      "breakpoints": true
     }
   ]
 }
