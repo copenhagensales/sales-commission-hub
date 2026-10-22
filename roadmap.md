@@ -126,6 +126,6 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 
 ## Kun Microsoft-login (Mathias 22/10)
 - [x] Deaktivér set-user-password, force-password-reset, batch-set-fieldmarketing-passwords
-- [ ] create-employee-user + complete-employee-registration uden adgangskode
-- [ ] Fjern adgangskodefelter i UI (5 filer) + SecurityDashboard-kort
-- [ ] Slå e-mail-login fra i auth-indstillinger
+- [x] create-employee-user + complete-employee-registration uden adgangskode
+- [x] Fjern adgangskodefelter i UI (5 filer) + SecurityDashboard-kort
+- [ ] Slå e-mail-login fra i auth-indstillinger (manuelt af Mathias – se rapport)
