@@ -32,7 +32,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [mode, setMode] = useState<Mode>("post");
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
-  const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null } | null>(null);
+  const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   }, [defaultAudience, canPostHouse, team?.id]);
 
   const reset = () => {
-    setBody(""); setPraised(null); setFile(null); setPreview(null); setMode("post"); setOpen(false);
+    setBody(""); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
   };
 
   const pickMode = (m: Mode) => {
@@ -66,7 +66,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     if (f.size > PULSEN_IMAGE_MAX_BYTES) return toast.error("Billedet må højst fylde 10 MB");
     setFile(f);
     setPreview(URL.createObjectURL(f));
-    setMode("image");
+    setMode((m) => (m === "praise" ? "praise" : "image"));
     setOpen(true);
   };
 
@@ -75,7 +75,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     !busy &&
     body.length <= PULSEN_MAX_CHARS &&
     (mode === "image" ? !!file : body.trim().length > 0) &&
-    (mode !== "praise" || !!praised);
+    (mode !== "praise" || praised.length > 0);
 
   const send = async () => {
     if (!canSend) return;
@@ -86,7 +86,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
       postType: mode,
       body,
       praised: mode === "praise" ? praised : null,
-      imageFile: mode === "image" ? file : null,
+      imageFile: mode === "image" || mode === "praise" ? file : null,
     };
     const localUrl = preview;
     reset();
@@ -113,27 +113,44 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
       ) : (
         <div>
           {mode === "praise" && (
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <button type="button" className="mb-3 flex min-h-[44px] items-center gap-2 rounded-full bg-[hsl(var(--cph-praise))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-praise-foreground))]">
-                  <HandHeart className="h-4 w-4" aria-hidden="true" />
-                  {praised ? `Ros til ${praised.first_name ?? ""} ${praised.last_name ?? ""}`.trim() : "Vælg kollega"}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {praised.map((c) => (
+                <span key={c.id} className="flex min-h-[40px] items-center gap-1 rounded-full bg-[hsl(var(--cph-praise))] pl-4 pr-1 text-[14px] font-extrabold text-[hsl(var(--cph-praise-foreground))]">
+                  {`${c.first_name ?? ""} ${c.last_name ?? ""}`.trim()}
+                  <button type="button" aria-label={`Fjern ${c.first_name ?? ""}`} onClick={() => setPraised((l) => l.filter((x) => x.id !== c.id))} className="flex h-8 w-8 items-center justify-center rounded-full">
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+              {praised.length < 10 && (
+                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="flex min-h-[40px] items-center gap-2 rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[14px] font-extrabold text-foreground">
+                      <HandHeart className="h-4 w-4" aria-hidden="true" />
+                      {praised.length ? "Tilføj kollega" : "Vælg kollega"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-72 rounded-2xl p-0">
+                    <Command>
+                      <CommandInput placeholder="Søg kollega …" />
+                      <CommandList>
+                        <CommandEmpty>{colleagues.isLoading ? "Henter …" : "Ingen fundet"}</CommandEmpty>
+                        {(colleagues.data ?? []).filter((c) => c.id !== myEmployeeId && !praised.some((p) => p.id === c.id)).map((c) => (
+                          <CommandItem key={c.id} value={`${c.first_name} ${c.last_name} ${c.id}`} onSelect={() => { setPraised((l) => [...l, c]); setPickerOpen(false); }}>
+                            {c.first_name} {c.last_name}
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+              {!preview && (
+                <button type="button" onClick={() => fileRef.current?.click()} className="flex min-h-[40px] items-center gap-2 rounded-full px-3 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+                  <ImagePlus className="h-4 w-4" aria-hidden="true" /> Vedhæft billede
                 </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-72 rounded-2xl p-0">
-                <Command>
-                  <CommandInput placeholder="Søg kollega …" />
-                  <CommandList>
-                    <CommandEmpty>{colleagues.isLoading ? "Henter …" : "Ingen fundet"}</CommandEmpty>
-                    {(colleagues.data ?? []).filter((c) => c.id !== myEmployeeId).map((c) => (
-                      <CommandItem key={c.id} value={`${c.first_name} ${c.last_name} ${c.id}`} onSelect={() => { setPraised(c); setPickerOpen(false); }}>
-                        {c.first_name} {c.last_name}
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
           )}
           <textarea
             autoFocus
@@ -148,7 +165,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           {preview && (
             <div className="relative mt-3">
               <img src={preview} alt="Valgt billede" className="max-h-[320px] w-full rounded-[18px] object-cover" />
-              <button type="button" aria-label="Fjern billede" onClick={() => { setFile(null); setPreview(null); setMode("post"); }} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground">
+              <button type="button" aria-label="Fjern billede" onClick={() => { setFile(null); setPreview(null); if (mode === "image") setMode("post"); }} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground">
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>

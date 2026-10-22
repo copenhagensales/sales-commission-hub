@@ -43,12 +43,17 @@ interface Props {
   onBestAnswer: (commentId: string | null) => void;
 }
 
+function joinDanish(names: string[]) {
+  return names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} og ${names[names.length - 1]}`;
+}
+
 export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageUrl, interactions, onEdit, onDelete, onHide, onBestAnswer }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(post.body);
   const [zoom, setZoom] = useState(false);
   const authorName = shortName(post.author?.first_name, post.author?.last_name);
-  const praisedName = post.praised ? `${post.praised.first_name ?? ""} ${post.praised.last_name ?? ""}`.trim() : null;
+  const praisedList = post.praisedAll?.length ? post.praisedAll : post.praised ? [post.praised] : [];
+  const praisedName = praisedList.length ? joinDanish(praisedList.map((p) => `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim())) : null;
   const pill = TYPE_PILL[post.post_type];
   const meta = [contextLabel ?? post.author?.job_title, pulsenRelativeTime(post.created_at)].filter(Boolean).join(" · ");
   const img = post.localImageUrl ?? imageUrl;
