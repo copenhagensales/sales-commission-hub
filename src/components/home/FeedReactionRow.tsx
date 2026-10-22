@@ -44,6 +44,9 @@ export function ReactButton({ summary, onSet, disabled, className, compact = fal
             <Smile className="h-5 w-5" aria-hidden="true" />
           )}
           {!compact && (mine ? mine.label : "Reagér")}
+          {compact && summary.total > 0 && (
+            <span className="tabular-nums" aria-label={`${summary.total} reaktioner`}>{summary.total}</span>
+          )}
         </button>
         <PopoverTrigger asChild>
           <button
