@@ -88,7 +88,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         
         {/* Main content with sidebar margin on desktop */}
         <main className={cn(
-          "min-h-screen transition-all duration-300 ease-in-out",
+          "min-h-[100dvh] transition-all duration-300 ease-in-out",
           isCollapsed ? "md:ml-0" : "md:ml-64",
           isPreviewMode ? "pt-24 md:pt-10" : "pt-14 md:pt-0"
         )}>

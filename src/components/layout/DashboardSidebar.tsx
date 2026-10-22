@@ -59,9 +59,9 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
   };
 
   const sidebarClasses = isMobile 
-    ? "h-full w-full bg-sidebar overflow-y-auto" 
+    ? "h-full w-full bg-sidebar overflow-y-auto pt-safe pb-safe" 
     : cn(
-        "fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar overflow-y-auto transition-all duration-300 ease-in-out",
+        "fixed left-0 top-0 z-40 h-[100dvh] pt-safe pb-safe border-r border-sidebar-border bg-sidebar overflow-y-auto transition-all duration-300 ease-in-out",
         isCollapsed ? "w-0 -translate-x-full opacity-0" : "w-64 translate-x-0 opacity-100"
       );
 

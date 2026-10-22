@@ -13,7 +13,7 @@ export function ViewAsBanner() {
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 z-[200] bg-destructive text-destructive-foreground px-4 py-2 shadow-lg">
+      <div className="fixed top-0 left-0 right-0 z-[200] bg-destructive text-destructive-foreground px-4 py-2 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <Eye className="h-5 w-5 shrink-0" />

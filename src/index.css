@@ -252,6 +252,11 @@
 }
 
 @layer utilities {
+  /* iPhone standalone: hold indhold fri af statuslinje og hjemmeindikator (0 på desktop/TV). */
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .top-safe { top: env(safe-area-inset-top, 0px); }
+
   .text-balance {
     text-wrap: balance;
   }
