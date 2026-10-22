@@ -1,5 +1,6 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
+import { evaluateTextCondition, type TextListCondition } from "../../_shared/textCondition.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
 import {
@@ -202,7 +203,7 @@ function matchPricingRule(
         }
       } else {
         // String condition: exact match
-        if (!leadField || leadField.value !== condValue) {
+        if (!evaluateTextCondition(condValue as string | TextListCondition, leadField?.value)) {
           allConditionsMet = false;
           failedCondition = condKey;
           break;

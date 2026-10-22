@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { evaluateTextCondition, type TextListCondition } from "../_shared/textCondition.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -310,7 +311,7 @@ function matchPricingRule(
           break;
         }
       } else {
-        if (!leadField || leadField.value !== condValue) {
+        if (!evaluateTextCondition(condValue as string | TextListCondition, leadField?.value)) {
           allConditionsMet = false;
           break;
         }

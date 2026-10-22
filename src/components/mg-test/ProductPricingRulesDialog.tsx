@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { isTextListCondition } from "@/lib/pricing/textCondition";
 import {
   useProductClientDisplayName,
   useUpdateProductClientDisplayName,
@@ -428,6 +429,9 @@ export function ProductPricingRulesDialog({
           const ids = (value as any).product_ids as string[] | undefined;
           const count = ids?.length ?? 0;
           return `${key} (${count} produkt${count === 1 ? "" : "er"})`;
+        }
+        if (isTextListCondition(value)) {
+          return `${key} ${value.operator === "in" ? "er en af" : "er ikke"}: ${value.values.join(", ")}`;
         }
         if (value && typeof value === "object" && "operator" in (value as any)) {
           const op = (value as any).operator;
