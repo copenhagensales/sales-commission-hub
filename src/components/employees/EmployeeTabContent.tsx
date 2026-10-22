@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { 
   Search, Plus, FileText, Check, Clock, X, Pencil, Mail, UserCheck, Send, 
   Phone, MessageSquare, ArrowRightLeft, Trash2, MoreHorizontal, ArrowUpDown, 
-  ArrowUp, ArrowDown, Loader2, Eye, EyeOff 
+  ArrowUp, ArrowDown, Loader2 
 } from "lucide-react";
 import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
 
@@ -68,14 +68,12 @@ interface EmployeeTabContentProps {
   // Create dialog props
   createDialogOpen: boolean;
   setCreateDialogOpen: (open: boolean) => void;
-  createData: { first_name: string; last_name: string; email: string; password: string; job_title: string };
-  setCreateData: (data: { first_name: string; last_name: string; email: string; password: string; job_title: string }) => void;
+  createData: { first_name: string; last_name: string; email: string; job_title: string };
+  setCreateData: (data: { first_name: string; last_name: string; email: string; job_title: string }) => void;
   creatingEmployee: boolean;
   handleCreateEmployee: () => void;
   jobPositions: JobPosition[];
   currentUserPosition: string | undefined;
-  showPassword: boolean;
-  setShowPassword: (show: boolean) => void;
 }
 
 export function EmployeeTabContent({
@@ -117,8 +115,6 @@ export function EmployeeTabContent({
   handleCreateEmployee,
   jobPositions,
   currentUserPosition,
-  showPassword,
-  setShowPassword,
 }: EmployeeTabContentProps) {
   const { t } = useTranslation();
 
@@ -162,7 +158,7 @@ export function EmployeeTabContent({
             <EmployeeExcelImport />
             <Dialog open={createDialogOpen} onOpenChange={(open) => {
               setCreateDialogOpen(open);
-              if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+              if (!open) setCreateData({ first_name: "", last_name: "", email: "", job_title: "" });
             }}>
               <DialogTrigger asChild>
                 <Button size="sm"><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
@@ -186,15 +182,7 @@ export function EmployeeTabContent({
                     <Label>Email *</Label>
                     <Input type="email" value={createData.email} onChange={(e) => setCreateData({ ...createData, email: e.target.value })} placeholder="medarbejder@email.dk" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Kodeord *</Label>
-                    <div className="relative">
-                      <Input type={showPassword ? "text" : "password"} value={createData.password} onChange={(e) => setCreateData({ ...createData, password: e.target.value })} placeholder="Mindst 6 tegn" />
-                      <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Medarbejderen logger ind med Microsoft</p>
                   <div className="space-y-2">
                     <Label>Stilling *</Label>
                     <Select value={createData.job_title} onValueChange={(value) => setCreateData({ ...createData, job_title: value })}>

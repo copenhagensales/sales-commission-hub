@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, MoreHorizontal, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -33,9 +33,8 @@ export function StaffEmployeesTab() {
   const [sortColumn, setSortColumn] = useState<"name" | "position" | "team">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", job_title: "" });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
   const [moveToRegularId, setMoveToRegularId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
@@ -242,10 +241,6 @@ export function StaffEmployeesTab() {
       toast({ title: "Email er påkrævet", variant: "destructive" });
       return;
     }
-    if (!createData.password.trim() || createData.password.length < 6) {
-      toast({ title: "Kodeord skal være mindst 6 tegn", variant: "destructive" });
-      return;
-    }
     if (!createData.job_title) {
       toast({ title: "Vælg en stilling", variant: "destructive" });
       return;
@@ -258,7 +253,6 @@ export function StaffEmployeesTab() {
           first_name: createData.first_name.trim(),
           last_name: createData.last_name.trim(),
           email: createData.email.trim().toLowerCase(),
-          password: createData.password,
           job_title: createData.job_title,
           is_staff_employee: true,
         },
@@ -270,7 +264,7 @@ export function StaffEmployeesTab() {
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
       queryClient.invalidateQueries({ queryKey: ["staff-employee-count"] });
       setCreateDialogOpen(false);
-      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+      setCreateData({ first_name: "", last_name: "", email: "", job_title: "" });
       toast({ title: "Backoffice medarbejder oprettet", description: "Medarbejderen kan nu logge ind med den angivne email og kodeord." });
     } catch (error) {
       console.error("Create employee error:", error);
@@ -457,7 +451,7 @@ export function StaffEmployeesTab() {
             </div>
             <Dialog open={createDialogOpen} onOpenChange={(open) => {
               setCreateDialogOpen(open);
-              if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+              if (!open) setCreateData({ first_name: "", last_name: "", email: "", job_title: "" });
             }}>
               <DialogTrigger asChild>
                 <Button><Plus className="mr-2 h-4 w-4" /> Opret backoffice</Button>
@@ -497,26 +491,7 @@ export function StaffEmployeesTab() {
                       placeholder="stabsmedarbejder@email.dk"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Kodeord *</Label>
-                    <div className="relative">
-                      <Input 
-                        type={showPassword ? "text" : "password"}
-                        value={createData.password} 
-                        onChange={(e) => setCreateData({ ...createData, password: e.target.value })} 
-                        placeholder="Mindst 6 tegn"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Medarbejderen logger ind med Microsoft</p>
                   <div className="space-y-2">
                     <Label>Stilling *</Label>
                     <Select 

@@ -8,7 +8,8 @@ const corsHeaders = {
 
 interface CreateUserRequest {
   email: string;
-  password: string;
+  /** Ignoreres (gamle faner). Login sker kun med Microsoft. */
+  password?: string;
   firstName?: string;
   lastName?: string;
   first_name?: string;
@@ -59,15 +60,14 @@ serve(async (req) => {
     const body: CreateUserRequest = await req.json();
     
     const email = body.email;
-    const password = body.password;
     const firstName = body.firstName || body.first_name;
     const lastName = body.lastName || body.last_name || '';
     const jobTitle = body.job_title;
     const isStaffEmployee = body.is_staff_employee;
 
-    if (!email || !password || !firstName) {
+    if (!email || !firstName) {
       return new Response(
-        JSON.stringify({ error: "Email, password og fornavn er påkrævet" }),
+        JSON.stringify({ error: "Email og fornavn er påkrævet" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -84,20 +84,7 @@ serve(async (req) => {
       : null;
     
     if (existingUser) {
-      // Update password for existing user
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        existingUser.id,
-        { password }
-      );
-
-      if (updateError) {
-        console.error("Password update error:", updateError);
-        return new Response(
-          JSON.stringify({ error: updateError.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+      // Microsoft-login: adgangskoden ændres aldrig for eksisterende brugere.
       // Link auth_user_id on employee record
       const { error: linkError } = await supabase
         .from("employee_master_data")
@@ -145,12 +132,11 @@ serve(async (req) => {
         if (roleError) console.error("Error assigning role:", roleError);
       }
 
-      console.log(`Updated password for existing user ${email}`);
       return new Response(
         JSON.stringify({ 
           success: true, 
           userId: existingUser.id,
-          message: "Adgangskode opdateret" 
+          message: "Bruger oprettet — logger ind med Microsoft" 
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -159,7 +145,6 @@ serve(async (req) => {
     // Create auth user
     const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser({
       email,
-      password,
       email_confirm: true,
       user_metadata: {
         name: `${firstName} ${lastName}`.trim(),
@@ -233,7 +218,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         userId: authData.user.id,
-        message: "Bruger oprettet med medarbejder-rolle" 
+        message: "Bruger oprettet — logger ind med Microsoft" 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

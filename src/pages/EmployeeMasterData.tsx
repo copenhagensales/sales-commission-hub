@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2, BellRing, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2, BellRing, ChevronDown, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -143,9 +143,8 @@ export default function EmployeeMasterData() {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
+  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -563,13 +562,8 @@ export default function EmployeeMasterData() {
   });
 
   const handleCreateEmployee = async () => {
-    if (!createData.first_name || !createData.email || !createData.password || !createData.job_title) {
+    if (!createData.first_name || !createData.email || !createData.job_title) {
       toast({ title: t("employees.toast.fillRequired"), variant: "destructive" });
-      return;
-    }
-
-    if (createData.password.length < 6) {
-      toast({ title: t("employees.toast.passwordTooShort"), variant: "destructive" });
       return;
     }
 
@@ -579,7 +573,6 @@ export default function EmployeeMasterData() {
       const response = await supabase.functions.invoke("create-employee-user", {
         body: {
           email: createData.email,
-          password: createData.password,
           firstName: createData.first_name,
           lastName: createData.last_name,
           job_title: createData.job_title,
@@ -630,7 +623,7 @@ export default function EmployeeMasterData() {
         description: t("employees.toast.userCreated", { email: createData.email }) 
       });
       setCreateDialogOpen(false);
-      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
+      setCreateData({ first_name: "", last_name: "", email: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
     } catch (error) {
       console.error("Create error:", error);
       toast({
@@ -876,7 +869,7 @@ export default function EmployeeMasterData() {
                       <EmployeeExcelImport />
                       <Dialog open={createDialogOpen} onOpenChange={(open) => {
                         setCreateDialogOpen(open);
-                        if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
+                        if (!open) setCreateData({ first_name: "", last_name: "", email: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
                       }}>
                         <DialogTrigger asChild>
                           <Button size="sm"><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
@@ -900,15 +893,7 @@ export default function EmployeeMasterData() {
                               <Label>Email *</Label>
                               <Input type="email" value={createData.email} onChange={(e) => setCreateData({ ...createData, email: e.target.value })} placeholder="medarbejder@email.dk" />
                             </div>
-                            <div className="space-y-2">
-                              <Label>Kodeord *</Label>
-                              <div className="relative">
-                                <Input type={showPassword ? "text" : "password"} value={createData.password} onChange={(e) => setCreateData({ ...createData, password: e.target.value })} placeholder="Mindst 6 tegn" />
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword(!showPassword)}>
-                                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </Button>
-                              </div>
-                            </div>
+                            <p className="text-sm text-muted-foreground">Medarbejderen logger ind med Microsoft</p>
                             <div className="space-y-2">
                               <Label>Startdato</Label>
                               <Input type="date" value={createData.employment_start_date} onChange={(e) => setCreateData({ ...createData, employment_start_date: e.target.value })} />
