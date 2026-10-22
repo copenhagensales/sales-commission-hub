@@ -99,9 +99,6 @@ export default function EmployeeDetail() {
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const [sendContractOpen, setSendContractOpen] = useState(false);
-  const [setPasswordOpen, setSetPasswordOpen] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
   const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
@@ -677,16 +674,6 @@ export default function EmployeeDetail() {
               <RotateCcw className="h-4 w-4 mr-2" />
               Nulstil login
             </Button>
-            {canEditEmployees && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setSetPasswordOpen(true)}
-              >
-                <Lock className="h-4 w-4 mr-2" />
-                Sæt ny kode
-              </Button>
-            )}
             <div className="flex items-center gap-2 border-l pl-4 ml-2">
               <Switch 
                 checked={employee.is_active} 
@@ -1377,88 +1364,6 @@ export default function EmployeeDetail() {
             employee={employee}
           />
         )}
-
-        {/* Set Password Dialog - Only for owners */}
-        <Dialog open={setPasswordOpen} onOpenChange={(open) => {
-          setSetPasswordOpen(open);
-          if (!open) setNewPassword("");
-        }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Sæt ny adgangskode</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Ny adgangskode for {employee?.first_name} {employee?.last_name}</Label>
-                <Input
-                  id="new-password"
-                  type="text"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Indtast ny adgangskode (mindst 6 tegn)"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSetPasswordOpen(false)}>
-                Annuller
-              </Button>
-              <Button 
-                disabled={isSettingPassword || newPassword.length < 6}
-                onClick={async () => {
-                  if (!employee?.private_email) {
-                    toast({ 
-                      title: "Mangler email", 
-                      description: "Medarbejderen har ikke en email registreret.",
-                      variant: "destructive"
-                    });
-                    return;
-                  }
-                  
-                  setIsSettingPassword(true);
-                  try {
-                    const { data, error } = await supabase.functions.invoke('set-user-password', {
-                      body: { email: employee.private_email, newPassword }
-                    });
-                    
-                    if (error) {
-                      toast({ 
-                        title: "Fejl", 
-                        description: error.message,
-                        variant: "destructive"
-                      });
-                    } else if (data?.error) {
-                      toast({ 
-                        title: "Fejl", 
-                        description: data.error,
-                        variant: "destructive"
-                      });
-                    } else {
-                      toast({ 
-                        title: data?.created ? "Bruger oprettet" : "Adgangskode opdateret", 
-                        description: data?.created 
-                          ? `Ny bruger oprettet for ${employee.private_email} med den angivne adgangskode`
-                          : `Ny adgangskode er sat for ${employee.private_email}` 
-                      });
-                      setSetPasswordOpen(false);
-                      setNewPassword("");
-                    }
-                  } catch (err) {
-                    toast({ 
-                      title: "Fejl", 
-                      description: "Kunne ikke kontakte serveren",
-                      variant: "destructive"
-                    });
-                  } finally {
-                    setIsSettingPassword(false);
-                  }
-                }}
-              >
-                {isSettingPassword ? "Gemmer..." : "Gem adgangskode"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Activation dialog — start date prefilled from the onboarding cohort */}
         <ActivateEmployeeDialog
