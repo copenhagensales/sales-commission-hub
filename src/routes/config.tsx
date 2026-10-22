@@ -3,6 +3,7 @@ import { MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesR
 import {
   Auth,
   Home,
+  Pulsen,
   Dashboard,
   Agents,
   Sales,
