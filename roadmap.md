@@ -120,3 +120,12 @@ Fuld audit (baggrundsagent) fandt flere afhængigheder end de oprindelige fem:
 - [ ] 5GI: 303 linjer i undtagne kampagner står til 300 kr — afventer beslutning
 - [x] Relatel-salg Jacob Nielson 14/10 rettet til 100% tilskud (låst)
 - [x] Fordele: Eesy Mobil 50%-formular + ejerliste med eksport, CPR-sletning 30 dage efter sendt
+
+## Push-notifikationer (Kasper, ordre 2)
+- [ ] Afventer svar: kobling af feedback/afvist salg (A eller B) og kontakt-mail til VAPID
+
+## Kun Microsoft-login (Mathias 22/10)
+- [x] Deaktivér set-user-password, force-password-reset, batch-set-fieldmarketing-passwords
+- [ ] create-employee-user + complete-employee-registration uden adgangskode
+- [ ] Fjern adgangskodefelter i UI (5 filer) + SecurityDashboard-kort
+- [ ] Slå e-mail-login fra i auth-indstillinger
