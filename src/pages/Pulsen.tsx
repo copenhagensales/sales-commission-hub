@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Lock, Sun, Users } from "lucide-react";
+import { Lock, Sun, Users } from "lucide-react";
 import { startOfDay } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,7 +16,7 @@ import { useCelebrations } from "@/hooks/useCelebrations";
 import {
   useDeleteCompanyEvent, useEventAttendees, useToggleEventAttendance, useUpcomingCompanyEvents, type AttendanceStatus,
 } from "@/hooks/useCompanyEvents";
-import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
+import { useFeedReactions } from "@/hooks/useFeedReactions";
 import {
   postTargetKey, usePulsenFeed, usePulsenImageUrls, usePulsenMe, usePulsenMutations, usePulsenYesterday,
   type PulsenPost, type PulsenScope,
@@ -44,9 +44,7 @@ export default function Pulsen() {
   const posts = useMemo(() => feed.data?.pages.flat() ?? [], [feed.data]);
   const images = usePulsenImageUrls(posts.filter((p) => p.image_path && !p.localImageUrl).map((p) => p.image_path as string));
 
-  const myRef = me.employeeId ? posts.find((p) => p.author_employee_id === me.employeeId)?.author ?? null : null;
-  const author = me.employeeId ? { id: me.employeeId, first_name: myRef?.first_name ?? null, last_name: myRef?.last_name ?? null, job_title: myRef?.job_title ?? null } : null;
-  const mut = usePulsenMutations(author);
+  const mut = usePulsenMutations(me.self);
 
   // Kun Huset-indlæg har reaktioner/kommentarer (databasen afviser team-indhold).
   const houseKeys = isHouse ? posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)) : [];
@@ -250,7 +248,3 @@ export default function Pulsen() {
   );
 }
 
-// Bruges af forsiden/Pulsen til at dele reaktioner på fejringer (samme nøgle).
-export const celebrationKey = (type: "birthday" | "anniversary", employeeId: string, year: number) =>
-  buildTargetKey(type, [employeeId, year]);
-export { CalendarDays };

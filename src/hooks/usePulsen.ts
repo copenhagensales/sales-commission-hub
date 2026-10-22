@@ -78,9 +78,24 @@ export function usePulsenMe() {
     enabled: !!employeeId,
     staleTime: 300000,
   });
+  const self = useQuery({
+    queryKey: ["pulsen-self", employeeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, job_title")
+        .eq("id", employeeId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data as PersonRef | null;
+    },
+    enabled: !!employeeId,
+    staleTime: 600000,
+  });
   const led = ledTeams.data ?? [];
   return {
     employeeId: employeeId ?? null,
+    self: self.data ?? (employeeId ? { id: employeeId, first_name: null, last_name: null } : null),
     isLoading: isLoading || teams.isLoading,
     teams: teams.data ?? [],
     isOwner,

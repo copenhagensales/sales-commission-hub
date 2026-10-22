@@ -4,6 +4,7 @@ import {
   Auth,
   Home,
   Pulsen,
+  PulsenDemo,
   Dashboard,
   Agents,
   Sales,
@@ -204,6 +205,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
   { path: "/pulsen", component: Pulsen, access: "role", positionPermission: "menu_pulsen" },
+  { path: "/pulsen/demo", component: PulsenDemo, access: "role", positionPermission: "menu_pulsen" },
   { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
   
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
