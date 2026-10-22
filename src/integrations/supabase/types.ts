@@ -13946,6 +13946,7 @@ export type Database = {
           body: string
           created_at: string
           deleted_at: string | null
+          edited_at: string | null
           event_id: string | null
           hidden_at: string | null
           hidden_by: string | null
@@ -13963,6 +13964,7 @@ export type Database = {
           body?: string
           created_at?: string
           deleted_at?: string | null
+          edited_at?: string | null
           event_id?: string | null
           hidden_at?: string | null
           hidden_by?: string | null
@@ -13980,6 +13982,7 @@ export type Database = {
           body?: string
           created_at?: string
           deleted_at?: string | null
+          edited_at?: string | null
           event_id?: string | null
           hidden_at?: string | null
           hidden_by?: string | null
@@ -20001,6 +20004,10 @@ export type Database = {
       pay_period_start: { Args: { ts: string }; Returns: string }
       pulsen_can_moderate: {
         Args: { _audience: string; _team_id: string }
+        Returns: boolean
+      }
+      pulsen_house_target_ok: {
+        Args: { _target_key: string; _target_type: string }
         Returns: boolean
       }
       pulsen_led_team_ids: { Args: never; Returns: string[] }

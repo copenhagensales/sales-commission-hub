@@ -35,6 +35,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { EventDetailDialog } from "@/components/home/EventDetailDialog";
 import { EditEventDialog } from "@/components/home/EditEventDialog";
+import { AddEventDialog } from "@/components/home/AddEventDialog";
+import { useCelebrations } from "@/hooks/useCelebrations";
 import { EventInvitationPopup } from "@/components/home/EventInvitationPopup";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,9 +69,7 @@ import {
   useUpcomingCompanyEvents,
   useEventAttendees,
   useToggleEventAttendance,
-  useAddCompanyEvent,
   useDeleteCompanyEvent,
-  EMPTY_NEW_EVENT,
   type AttendanceStatus,
 } from "@/hooks/useCompanyEvents";
 
@@ -83,16 +83,6 @@ const Home = () => {
   const { isPreviewMode, previewEmployee } = useRolePreview();
   
   const [addEventOpen, setAddEventOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({ 
-    title: "", 
-    event_date: "", 
-    event_time: "", 
-    location: "", 
-    description: "",
-    show_popup: false,
-    requires_registration: false,
-    invited_teams: [] as string[]
-  });
   const [celebrationsOpen, setCelebrationsOpen] = useState(true);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
@@ -203,87 +193,13 @@ const Home = () => {
 
   const vacationPay = (personalStats?.periodCommission || 0) * vacationPayRate;
 
-  // Fetch upcoming birthdays and anniversaries (next 14 days)
-  const { data: celebrations = [] } = useQuery({
-    queryKey: ["home-celebrations"],
-    queryFn: async () => {
-      const today = new Date();
-      // Aktive kolleger med fødselsdato fra databasen (ingen CPR i browseren).
-      const { data: employees } = await supabase.rpc("stork_foedselsdage");
-      
-      const results: { employeeId: string; type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
-      
-      const parseBirthday = (iso: string): Date | null => {
-        const [y, m, d] = iso.split("-").map((p) => parseInt(p, 10));
-        if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
-        return new Date(y, m - 1, d);
-      };
-      
-      employees?.forEach(emp => {
-        if (emp.foedselsdato) {
-          const birthDate = parseBirthday(emp.foedselsdato);
-          if (birthDate) {
-            const birthdayThisYear = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
-            const age = differenceInYears(today, birthDate);
-            
-            if ((isSameDay(birthdayThisYear, today) || isAfter(birthdayThisYear, today)) && 
-                isBefore(birthdayThisYear, addDays(today, 14))) {
-              results.push({ 
-                employeeId: emp.id,
-                type: 'birthday', 
-                name: `${emp.first_name} ${emp.last_name}`,
-                years: age + (isAfter(birthdayThisYear, today) ? 1 : 0),
-                date: birthdayThisYear,
-                isToday: isSameDay(birthdayThisYear, today)
-              });
-            }
-          }
-        }
-        
-        if (emp.employment_start_date) {
-          const startDate = parseISO(emp.employment_start_date);
-          const years = differenceInYears(today, startDate);
-          // Only show full-year anniversaries (skip ½-year)
-          if (years >= 1) {
-            const anniversaryThisYear = new Date(today.getFullYear(), startDate.getMonth(), startDate.getDate());
-            const anniversaryYears = years + (isAfter(anniversaryThisYear, today) ? 1 : 0);
-            
-            if ((isSameDay(anniversaryThisYear, today) || isAfter(anniversaryThisYear, today)) && 
-                isBefore(anniversaryThisYear, addDays(today, 14))) {
-              results.push({ 
-                employeeId: emp.id,
-                type: 'anniversary', 
-                name: `${emp.first_name} ${emp.last_name}`,
-                years: anniversaryYears,
-                date: anniversaryThisYear,
-                isToday: isSameDay(anniversaryThisYear, today)
-              });
-            }
-          }
-        }
-      });
-      
-      return results.sort((a, b) => a.date.getTime() - b.date.getTime());
-    },
-    staleTime: 300000,
-  });
+  // Fødselsdage og jubilæer – fælles med Pulsen (useCelebrations)
+  const { data: celebrations = [] } = useCelebrations();
 
   // Only show today's celebrations prominently
   const todayCelebrations = celebrations.filter(c => c.isToday);
   const upcomingCelebrations = celebrations.filter(c => !c.isToday);
 
-  // Fetch teams for event creation
-  const { data: teams = [] } = useQuery({
-    queryKey: ["teams-list"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("teams")
-        .select("id, name")
-        .order("name");
-      return data || [];
-    },
-    staleTime: 300000,
-  });
 
   // Begivenheder – fælles logik i useCompanyEvents (bruges også af Pulsen)
   const { data: companyEvents = [] } = useUpcomingCompanyEvents();
@@ -302,10 +218,6 @@ const Home = () => {
     return myAttendance?.status as AttendanceStatus | null;
   };
 
-  const addEventMutation = useAddCompanyEvent(user?.id, () => {
-    setAddEventOpen(false);
-    setNewEvent({ ...EMPTY_NEW_EVENT, invited_teams: [] });
-  });
   const deleteEventMutation = useDeleteCompanyEvent();
 
 
@@ -483,125 +395,15 @@ const Home = () => {
                 Begivenheder
               </CardTitle>
 
-              <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0">
+              <AddEventDialog
+                open={addEventOpen}
+                onOpenChange={setAddEventOpen}
+                trigger={
+                  <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0" aria-label="Tilføj begivenhed">
                     <Plus className="w-4 h-4" />
                   </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Tilføj begivenhed</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4 max-h-[70vh] overflow-y-auto">
-                    <div className="space-y-2">
-                      <Label htmlFor="title">Titel *</Label>
-                      <Input 
-                        id="title"
-                        value={newEvent.title}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder="Fx Fredagsbar"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Beskrivelse</Label>
-                      <Textarea 
-                        id="description"
-                        value={newEvent.description}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Beskriv begivenheden..."
-                        rows={3}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="date">Dato *</Label>
-                        <Input 
-                          id="date"
-                          type="date"
-                          value={newEvent.event_date}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_date: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="time">Tidspunkt</Label>
-                        <Input 
-                          id="time"
-                          type="time"
-                          value={newEvent.event_time}
-                          onChange={(e) => setNewEvent(prev => ({ ...prev, event_time: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="location">Sted</Label>
-                      <Input 
-                        id="location"
-                        value={newEvent.location}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                        placeholder="Fx Kontoret"
-                      />
-                    </div>
-                    
-                    {/* Team selection */}
-                    {teams.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>Inviter teams</Label>
-                        <div className="flex flex-wrap gap-3">
-                          {teams.map((team) => (
-                            <label key={team.id} className="flex items-center gap-2 cursor-pointer">
-                              <Checkbox
-                                checked={newEvent.invited_teams.includes(team.id)}
-                                onCheckedChange={(checked) => {
-                                  setNewEvent(prev => ({
-                                    ...prev,
-                                    invited_teams: checked 
-                                      ? [...prev.invited_teams, team.id]
-                                      : prev.invited_teams.filter(id => id !== team.id)
-                                  }));
-                                }}
-                              />
-                              <span className="text-sm">{team.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Requires registration toggle */}
-                    <div className="flex items-center justify-between py-2">
-                      <Label htmlFor="requires-registration" className="cursor-pointer">
-                        Kræver tilmelding
-                      </Label>
-                      <Switch
-                        id="requires-registration"
-                        checked={newEvent.requires_registration}
-                        onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, requires_registration: checked }))}
-                      />
-                    </div>
-
-                    {/* Show popup toggle */}
-                    <div className="flex items-center justify-between py-2">
-                      <Label htmlFor="show-popup" className="cursor-pointer">
-                        Vis popup-invitation ved login
-                      </Label>
-                      <Switch
-                        id="show-popup"
-                        checked={newEvent.show_popup}
-                        onCheckedChange={(checked) => setNewEvent(prev => ({ ...prev, show_popup: checked }))}
-                      />
-                    </div>
-                    
-                    <Button 
-                      className="w-full" 
-                      onClick={() => addEventMutation.mutate(newEvent)}
-                      disabled={!newEvent.title || !newEvent.event_date || addEventMutation.isPending}
-                    >
-                      {addEventMutation.isPending ? "Tilføjer..." : "Tilføj begivenhed"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                }
+              />
             </div>
           </CardHeader>
           <CardContent className="flex flex-col px-6 pb-6">

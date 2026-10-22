@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800;900&family=Archivo:wght@500;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;800;900&display=swap');
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -32,6 +32,8 @@
     --cph-onyx-pressed: 210 9% 13%;
     --cph-emerald: 147 73% 55%;
     --cph-white: 0 0% 100%;
+    --cph-praise: 147 67% 90%;
+    --cph-praise-foreground: 147 69% 25%;
 
     --background: 186 28% 92%;
     --foreground: 218 8% 20%;
