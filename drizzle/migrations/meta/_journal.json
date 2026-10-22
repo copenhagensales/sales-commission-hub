@@ -393,6 +393,13 @@
       "when": 1792663906771,
       "tag": "0055_pulsen_milestone_candidates_by_type",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792664049291,
+      "tag": "0056_pulsen_milestone_candidates_pay_period_per_date",
+      "breakpoints": true
     }
   ]
 }
