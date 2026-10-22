@@ -45,8 +45,12 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
     const part = new URL(req.url).searchParams.get("part");
-    if (part !== null && part !== "usage") return json(400, { error: "Invalid part" });
-    const fn = part === "usage" ? "introspect_usage" : "introspect_schema";
+    if (part !== null && part !== "usage" && part !== "v2") return json(400, { error: "Invalid part" });
+    const fn = part === "usage"
+      ? "introspect_usage"
+      : part === "v2"
+      ? "introspect_schema_v2"
+      : "introspect_schema";
     const { data, error } = await svc.rpc(fn);
     if (error) return json(500, { error: "Introspection failed" });
     return json(200, data);

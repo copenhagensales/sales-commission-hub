@@ -19673,6 +19673,7 @@ export type Database = {
       }
       ingestion_scan_fields: { Args: { p_days?: number }; Returns: number }
       introspect_schema: { Args: never; Returns: Json }
+      introspect_schema_v2: { Args: never; Returns: Json }
       introspect_usage: { Args: never; Returns: Json }
       is_active_employee: { Args: { _uid: string }; Returns: boolean }
       is_chat_conversation_member: {
