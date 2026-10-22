@@ -2,6 +2,7 @@
 -- så intet gemmes. Resultatet står i fejlbeskeden: "PULSEN_RLS_TEST ... pass=X fail=Y [fejlliste]".
 -- Kræver en privilegeret forbindelse (kan skifte til rollen authenticated).
 -- Bruger rigtige medarbejdere som testpersoner, men udskriver aldrig id'er eller navne.
+-- v1 (Kasper 22/10): team-indhold har ingen reaktioner/kommentarer; feed-tabellerne er uændrede.
 -- Forventet baseline for eksisterende feed-typer: alle rækker synlige for en almindelig medarbejder.
 DO $$
 DECLARE
@@ -81,10 +82,6 @@ BEGIN
     VALUES (e_emp_a, 'house', 'post', 'TEST hus') RETURNING id INTO p_house;
   INSERT INTO public.pulsen_posts (author_employee_id, audience, team_id, post_type, body)
     VALUES (e_emp_a, 'team', team_a, 'post', 'TEST A') RETURNING id INTO p_a;
-  INSERT INTO public.feed_comments (target_type, target_key, user_id, body)
-    VALUES ('pulsen_post', 'pulsen_post:' || p_a, u_emp_a, 'TEST kommentar A');
-  INSERT INTO public.feed_reactions (target_type, target_key, user_id, emoji)
-    VALUES ('pulsen_post', 'pulsen_post:' || p_a, u_emp_a, '👏');
   -- A må ikke poste i B
   ok := false;
   BEGIN
@@ -106,10 +103,6 @@ BEGIN
   EXECUTE 'SET LOCAL ROLE authenticated';
   INSERT INTO public.pulsen_posts (author_employee_id, audience, team_id, post_type, body)
     VALUES (e_emp_b, 'team', team_b, 'post', 'TEST B') RETURNING id INTO p_b;
-  INSERT INTO public.feed_comments (target_type, target_key, user_id, body)
-    VALUES ('pulsen_post', 'pulsen_post:' || p_b, u_emp_b, 'TEST kommentar B');
-  INSERT INTO public.feed_reactions (target_type, target_key, user_id, emoji)
-    VALUES ('pulsen_post', 'pulsen_post:' || p_b, u_emp_b, '🎉');
   SELECT count(*) INTO n FROM public.pulsen_posts WHERE id = p_a;
   IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'B ser A-indlæg'; END IF;
   EXECUTE 'RESET ROLE';
@@ -121,16 +114,18 @@ BEGIN
   IF n = 2 THEN passes := passes + 1; ELSE fails := fails || 'A ser ikke egne hus/team-indlæg'; END IF;
   SELECT count(*) INTO n FROM public.pulsen_posts WHERE id = p_b;
   IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'A ser B-indlæg'; END IF;
-  SELECT count(*) INTO n FROM public.feed_comments WHERE target_key = 'pulsen_post:' || p_b;
-  IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'A ser B-kommentarer'; END IF;
-  SELECT count(*) INTO n FROM public.feed_reactions WHERE target_key = 'pulsen_post:' || p_b;
-  IF n = 0 THEN passes := passes + 1; ELSE fails := fails || 'A ser B-reaktioner'; END IF;
   ok := false;
   BEGIN
     INSERT INTO public.feed_comments (target_type, target_key, user_id, body)
       VALUES ('pulsen_post', 'pulsen_post:' || p_b, u_emp_a, 'TEST forbudt');
   EXCEPTION WHEN others THEN ok := true; END;
-  IF ok THEN passes := passes + 1; ELSE fails := fails || 'A kunne kommentere B-indlæg'; END IF;
+  IF ok THEN passes := passes + 1; ELSE fails := fails || 'Pulsen-indhold kunne kommenteres via feed_comments (v1 forbyder det)'; END IF;
+  ok := false;
+  BEGIN
+    INSERT INTO public.feed_reactions (target_type, target_key, user_id, emoji)
+      VALUES ('pulsen_post', 'pulsen_post:' || p_a, u_emp_a, '👏');
+  EXCEPTION WHEN others THEN ok := true; END;
+  IF ok THEN passes := passes + 1; ELSE fails := fails || 'Pulsen-indhold kunne få reaktioner via feed_reactions (v1 forbyder det)'; END IF;
   -- Almindelig medarbejder må ikke skjule
   ok := false;
   BEGIN
@@ -180,8 +175,6 @@ BEGIN
   EXECUTE 'SET LOCAL ROLE authenticated';
   SELECT count(*) INTO n FROM public.pulsen_posts WHERE id IN (p_house, p_a, p_b);
   IF n = 3 THEN passes := passes + 1; ELSE fails := fails || format('Ejer ser %s af 3', n); END IF;
-  SELECT count(*) INTO n FROM public.feed_comments WHERE target_key IN ('pulsen_post:' || p_a, 'pulsen_post:' || p_b);
-  IF n = 2 THEN passes := passes + 1; ELSE fails := fails || 'Ejer ser ikke alle kommentarer'; END IF;
   INSERT INTO public.pulsen_posts (author_employee_id, audience, team_id, post_type, body)
     VALUES (e_owner, 'team', two_t1, 'post', 'TEST to1') RETURNING id INTO p_two1;
   INSERT INTO public.pulsen_posts (author_employee_id, audience, team_id, post_type, body)
