@@ -1,6 +1,50 @@
 <!DOCTYPE html>
 <html lang="da">
   <head>
+    <!-- Farver til ældre TV-browsere (Chromium < 65) der ikke forstår "hsl(H S% L% / a)": omskriver reglerne til hsla(H, S, L, a). Ingen effekt i nye browsere. -->
+    <script>
+      (function () {
+        if (!window.CSS || !CSS.supports || CSS.supports("color", "hsl(1 2% 3% / 0.5)")) return;
+        var done = [];
+        function rootVars() {
+          var cs = getComputedStyle(document.documentElement), out = {};
+          for (var i = 0; i < cs.length; i++) { var n = cs[i]; if (n.indexOf("--") === 0) out[n] = cs.getPropertyValue(n).trim(); }
+          return out;
+        }
+        function conv(text, vars) {
+          return text.replace(/hsl\(\s*var\((--[\w-]+)\)\s*(?:\/\s*([\d.]+%?|var\(--[\w-]+\)))?\s*\)/g, function (m, name, a) {
+            var v = vars[name]; if (!v) return m;
+            var p = v.split(/\s+/); if (p.length < 3) return m;
+            var alpha = a ? (a.indexOf("var(") === 0 ? (vars[a.slice(4, -1)] || "1") : a) : "1";
+            if (alpha.indexOf("%") > 0) alpha = parseFloat(alpha) / 100;
+            return "hsla(" + p[0] + ", " + p[1] + ", " + p[2] + ", " + alpha + ")";
+          }).replace(/hsl\(([\d.]+)\s+([\d.]+%)\s+([\d.]+%)\s*(?:\/\s*([\d.]+%?))?\)/g, function (m, h, s, l, a) {
+            var alpha = a ? (a.indexOf("%") > 0 ? parseFloat(a) / 100 : a) : 1;
+            return "hsla(" + h + ", " + s + ", " + l + ", " + alpha + ")";
+          });
+        }
+        function fix() {
+          var vars = rootVars(), css = "";
+          for (var i = 0; i < document.styleSheets.length; i++) {
+            var sh = document.styleSheets[i];
+            if (done.indexOf(sh) >= 0 || (sh.ownerNode && sh.ownerNode.id === "legacy-hsl")) continue;
+            var rules; try { rules = sh.cssRules; } catch (e) { continue; }
+            if (!rules) continue;
+            done.push(sh);
+            for (var j = 0; j < rules.length; j++) {
+              var t = rules[j].cssText;
+              if (t.indexOf("hsl(") >= 0) css += conv(t, vars) + "\n";
+            }
+          }
+          if (!css) return;
+          var el = document.createElement("style"); el.id = "legacy-hsl-" + done.length;
+          el.textContent = css; document.head.appendChild(el); done.push(el.sheet);
+        }
+        document.addEventListener("DOMContentLoaded", fix);
+        window.addEventListener("load", fix);
+        setTimeout(fix, 3000);
+      })();
+    </script>
     <!-- Minimal AbortController-polyfill til ældre TV-browsere (Chromium < 66, fx Samsung Tizen). Ingen effekt i nye browsere. -->
     <script>
       (function () {
