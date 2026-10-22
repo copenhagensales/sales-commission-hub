@@ -1,5 +1,5 @@
 import type { RouteConfig } from "./types";
-import { MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesRedirect } from "./redirects";
+import { PulsenRedirect, PulsenDemoRedirect, MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesRedirect } from "./redirects";
 import {
   Auth,
   Home,
@@ -205,8 +205,10 @@ export const routes: RouteConfig[] = [
   { path: "/reset-password", component: ResetPassword, access: "public" },
 
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
-  { path: "/pulsen", component: Pulsen, access: "role", positionPermission: "menu_pulsen" },
-  { path: "/pulsen/demo", component: PulsenDemo, access: "role", positionPermission: "menu_pulsen" },
+  { path: "/storkbook", component: Pulsen, access: "role", positionPermission: "menu_pulsen" },
+  { path: "/storkbook/demo", component: PulsenDemo, access: "role", positionPermission: "menu_pulsen" },
+  { path: "/pulsen", component: PulsenRedirect, access: "protected" },
+  { path: "/pulsen/demo", component: PulsenDemoRedirect, access: "protected" },
   { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
   
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
