@@ -10,9 +10,10 @@ export function PushSettingsCard() {
   const { standalone, ios } = useInstallStork();
   const push = usePushNotifications();
 
-  const status = !push.supported
-    ? ios && !standalone ? "Installér Stork på hjemmeskærmen først (iOS 16.4 eller nyere)." : "Denne browser understøtter ikke notifikationer."
-    : push.permission === "denied" ? "Notifikationer er blokeret i telefonens indstillinger."
+  const status = !standalone
+    ? "Notifikationer slås til i Stork-appen på telefonen: åbn Stork fra ikonet på hjemmeskærmen og kom tilbage hertil. Kontakterne nedenfor gælder alle dine enheder."
+    : !push.supported ? (ios ? "Kræver iOS 16.4 eller nyere." : "Denne telefon understøtter ikke notifikationer.")
+    : push.permission === "denied" ? "Notifikationer er blokeret for Stork i telefonens indstillinger."
     : push.subscribed ? "Slået til på denne enhed." : "Slået fra på denne enhed.";
 
   return (
