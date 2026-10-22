@@ -393,3 +393,115 @@ export function usePulsenLatest(enabled: boolean, limit = 3) {
     staleTime: 60000,
   });
 }
+
+// ---------- Trin 6: milepæle ----------
+export type PulsenMilestoneType = "first_sale" | "record_day" | "record_week" | "record_pay_period" | "club" | "streak" | "team_day_sales" | "house_record";
+export interface PulsenMilestone {
+  id: string;
+  milestone_type: PulsenMilestoneType;
+  employee_id: string | null;
+  team_id: string | null;
+  period_key: string;
+  level: number;
+  value: number;
+  payload: { text?: string; previous?: number | null } | null;
+  shown_in_house: boolean;
+  occurred_at: string;
+}
+export const milestoneTargetKey = (id: string) => `milestone:${id}`;
+
+/** Milepæle for Huset (shown_in_house) eller ét team. RLS afgør synlighed. */
+export function usePulsenMilestones(scope: PulsenScope, enabled: boolean, limit = 50) {
+  return useQuery({
+    queryKey: ["pulsen-milestones", scopeKey(scope), limit],
+    queryFn: async () => {
+      let q = supabase.from("pulsen_milestones")
+        .select("id, milestone_type, employee_id, team_id, period_key, level, value, payload, shown_in_house, occurred_at");
+      q = scope.kind === "house" ? q.eq("shown_in_house", true) : q.eq("team_id", scope.teamId);
+      const { data, error } = await q.order("occurred_at", { ascending: false }).limit(limit);
+      if (error) throw error;
+      return (data ?? []) as unknown as PulsenMilestone[];
+    },
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+// ---------- Trin 7: toplinje ----------
+export interface PulsenToplineTeam { id: string; name: string; today: number; lastWeek: number; yesterday: number }
+export interface PulsenTopline {
+  house: { today: number; lastWeek: number; yesterday: number };
+  teams: PulsenToplineTeam[];
+  computedAt: string;
+}
+/** Husets og teamenes salg i dag (samme tælling som TV-boards/kpi sales_count). Kun aggregater. */
+export function usePulsenTopline(enabled: boolean) {
+  return useQuery({
+    queryKey: ["pulsen-topline"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("pulsen-topline", { method: "POST" });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      return data as PulsenTopline;
+    },
+    enabled,
+    staleTime: 60000,
+    refetchInterval: 120000,
+  });
+}
+
+/** Antal milepæle i Huset i går (til bundlinjen). */
+export function usePulsenMilestonesYesterday(enabled: boolean) {
+  return useQuery({
+    queryKey: ["pulsen-milestones-yesterday", startOfDay(new Date()).toISOString()],
+    queryFn: async () => {
+      const from = startOfDay(subDays(new Date(), 1)).toISOString();
+      const to = startOfDay(new Date()).toISOString();
+      const { count, error } = await supabase.from("pulsen_milestones").select("id", { count: "exact", head: true })
+        .eq("shown_in_house", true).gte("occurred_at", from).lt("occurred_at", to);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled,
+    staleTime: 600000,
+  });
+}
+
+// ---------- Trin 7: ulæst-badge ----------
+const UNREAD_KEY = ["pulsen-unread"];
+/** Nye Huset-elementer (indlæg + milepæle) siden sidste besøg. Cache 2 min. */
+export function usePulsenUnread(employeeId: string | null | undefined) {
+  return useQuery({
+    queryKey: [...UNREAD_KEY, employeeId],
+    queryFn: async () => {
+      const { data: seen, error: sErr } = await supabase.from("pulsen_last_seen").select("last_seen_house").eq("employee_id", employeeId as string).maybeSingle();
+      if (sErr) throw sErr;
+      const since = seen?.last_seen_house ?? new Date(0).toISOString();
+      const [posts, ms] = await Promise.all([
+        supabase.from("pulsen_posts").select("id", { count: "exact", head: true })
+          .eq("audience", "house").is("deleted_at", null).is("hidden_at", null).neq("author_employee_id", employeeId as string).gt("created_at", since),
+        supabase.from("pulsen_milestones").select("id", { count: "exact", head: true }).eq("shown_in_house", true).gt("occurred_at", since),
+      ]);
+      if (posts.error) throw posts.error;
+      if (ms.error) throw ms.error;
+      return (posts.count ?? 0) + (ms.count ?? 0);
+    },
+    enabled: !!employeeId,
+    staleTime: 120000,
+  });
+}
+
+/** Markér Huset som set, når Pulsen åbnes. */
+export function useMarkPulsenSeen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (employeeId: string) => {
+      const { error } = await supabase.from("pulsen_last_seen")
+        .upsert({ employee_id: employeeId, last_seen_house: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "employee_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.setQueriesData({ queryKey: UNREAD_KEY }, 0),
+  });
+}
+
+export const formatUnread = (n: number) => (n > 9 ? "9+" : String(n));
