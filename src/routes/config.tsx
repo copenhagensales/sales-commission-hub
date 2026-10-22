@@ -3,6 +3,7 @@ import { MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesR
 import {
   Auth,
   Home,
+  Pulsen,
   Dashboard,
   Agents,
   Sales,
@@ -202,6 +203,7 @@ export const routes: RouteConfig[] = [
   { path: "/reset-password", component: ResetPassword, access: "public" },
 
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
+  { path: "/pulsen", component: Pulsen, access: "role", positionPermission: "menu_pulsen" },
   { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
   
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },

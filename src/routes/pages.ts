@@ -7,6 +7,7 @@ export const TdcSalgPublic = lazy(() => import("@/pages/TdcSalgPublic"));
 const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
 export const Auth = lazyPage(() => import("@/pages/Auth"));
+export const Pulsen = lazyPage(() => import("@/pages/Pulsen"));
 export const Dashboard = lazyPage(() => import("@/pages/Dashboard"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
 export const Sales = lazyPage(() => import("@/pages/Sales"));
