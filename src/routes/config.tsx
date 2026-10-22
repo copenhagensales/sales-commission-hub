@@ -187,6 +187,7 @@ import {
   CompliancePersondatapolitik,
   ComplianceDatabrudsprocedure,
   ComplianceKonsekvensvurderingProcedure,
+  ComplianceArt30Pulsen,
   ComplianceBreachLog,
   ComplianceImpactAssessments,
   ShortLinkRedirect,
@@ -545,6 +546,7 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/documents/persondatapolitik", component: CompliancePersondatapolitik, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/documents/databrudsprocedure", component: ComplianceDatabrudsprocedure, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/documents/konsekvensvurdering-procedure", component: ComplianceKonsekvensvurderingProcedure, access: "role", positionPermission: "menu_compliance_admin" },
+  { path: "/compliance/documents/art30-pulsen", component: ComplianceArt30Pulsen, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/breach-log", component: ComplianceBreachLog, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/impact-assessments", component: ComplianceImpactAssessments, access: "role", positionPermission: "menu_compliance_admin" },
 

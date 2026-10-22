@@ -76,7 +76,12 @@ Deno.serve(async (req) => {
     const timings: Record<string, number> = {};
     for (const t of TYPES) {
       const t0 = Date.now();
-      const { data, error } = await service.rpc("pulsen_milestone_candidates_v2", { p_from: from, p_to: to, p_types: [t] });
+      let { data, error } = await service.rpc("pulsen_milestone_candidates_v2", { p_from: from, p_to: to, p_types: [t] });
+      // Ét genforsøg ved timeout (fx når andre job kører samtidig).
+      if (error && /statement timeout/i.test(error.message)) {
+        await new Promise((r) => setTimeout(r, 3000));
+        ({ data, error } = await service.rpc("pulsen_milestone_candidates_v2", { p_from: from, p_to: to, p_types: [t] }));
+      }
       timings[t] = Date.now() - t0;
       if (error) throw new Error(`${t}: ${error.message}`);
       cands.push(...((data ?? []) as Cand[]));
