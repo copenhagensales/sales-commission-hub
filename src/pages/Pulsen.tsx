@@ -12,6 +12,9 @@ import { AddEventDialog } from "@/components/home/AddEventDialog";
 import { PulsenComposer } from "@/components/pulsen/PulsenComposer";
 import { PulsenPostCard } from "@/components/pulsen/PulsenPostCard";
 import { PulsenSidebar } from "@/components/pulsen/PulsenSidebar";
+import { PulsenTopline } from "@/components/pulsen/PulsenTopline";
+import { PulsenMilestoneItem } from "@/components/pulsen/PulsenMilestoneItem";
+import { ReactButton } from "@/components/home/FeedReactionRow";
 import { PulsenEmpty, PulsenError, PulsenPostSkeleton } from "@/components/pulsen/PulsenStates";
 import { useCelebrations } from "@/hooks/useCelebrations";
 import {
@@ -19,15 +22,17 @@ import {
 } from "@/hooks/useCompanyEvents";
 import { useFeedReactions } from "@/hooks/useFeedReactions";
 import {
-  postTargetKey, usePulsenFeed, usePulsenImageUrls, usePulsenMe, usePulsenMutations, usePulsenYesterday,
-  type PulsenPost, type PulsenScope,
+  milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, usePulsenMe, usePulsenMilestones,
+  usePulsenMilestonesYesterday, usePulsenMutations, usePulsenTopline,
+  type PulsenMilestone, type PulsenPost, type PulsenScope,
 } from "@/hooks/usePulsen";
 import { cn } from "@/lib/utils";
 
 type FeedItem =
   | { kind: "post"; at: number; post: PulsenPost }
   | { kind: "event"; at: number; eventId: string }
-  | { kind: "celebrations"; at: number };
+  | { kind: "celebrations"; at: number }
+  | { kind: "milestone"; at: number; milestone: PulsenMilestone };
 
 export default function Pulsen() {
   const me = usePulsenMe();
@@ -57,7 +62,10 @@ export default function Pulsen() {
   const mut = usePulsenMutations(me.self);
 
   // Kun Huset-indlæg har reaktioner/kommentarer (databasen afviser team-indhold).
-  const houseKeys = isHouse ? posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)) : [];
+  const milestones = usePulsenMilestones(scope, !!me.employeeId);
+  const houseKeys = isHouse
+    ? [...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)), ...(milestones.data ?? []).map((m) => milestoneTargetKey(m.id))]
+    : [];
   const fr = useFeedReactions(houseKeys);
 
   const { data: celebrations = [] } = useCelebrations();
@@ -66,10 +74,26 @@ export default function Pulsen() {
   const { data: attendees = [] } = useEventAttendees(events.map((e) => e.id));
   const toggleAttendance = useToggleEventAttendance(me.employeeId);
   const deleteEvent = useDeleteCompanyEvent();
-  const yesterday = usePulsenYesterday(!!me.employeeId);
+  const topline = usePulsenTopline(!!me.employeeId);
+  const milestonesYesterday = usePulsenMilestonesYesterday(!!me.employeeId);
+  // Ulæst-badge nulstilles, når siden åbnes.
+  const markSeen = useMarkPulsenSeen();
+  const seenDone = useRef(false);
+  useEffect(() => {
+    if (!me.employeeId || seenDone.current) return;
+    seenDone.current = true;
+    markSeen.mutate(me.employeeId);
+  }, [me.employeeId, markSeen]);
+  const yesterdayWinner = topline.data?.teams.reduce<{ name: string; yesterday: number } | null>(
+    (best, t) => (t.yesterday > (best?.yesterday ?? 0) ? t : best), null);
 
   const items: FeedItem[] = useMemo(() => {
     const list: FeedItem[] = posts.map((p) => ({ kind: "post", at: new Date(p.created_at).getTime(), post: p }));
+    const oldestPost = feed.hasNextPage && posts.length ? new Date(posts[posts.length - 1].created_at).getTime() : -Infinity;
+    (milestones.data ?? []).forEach((m) => {
+      const at = new Date(m.occurred_at).getTime();
+      if (at >= oldestPost) list.push({ kind: "milestone", at, milestone: m });
+    });
     if (isHouse) {
       const oldest = feed.hasNextPage && posts.length ? new Date(posts[posts.length - 1].created_at).getTime() : -Infinity;
       events.forEach((e) => {
@@ -79,7 +103,7 @@ export default function Pulsen() {
       if (todayCelebrations.length) list.push({ kind: "celebrations", at: startOfDay(new Date()).getTime() });
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [posts, events, isHouse, todayCelebrations.length, feed.hasNextPage]);
+  }, [posts, events, isHouse, todayCelebrations.length, feed.hasNextPage, milestones.data]);
 
   const attendingFor = (id: string) => attendees.filter((a) => a.event_id === id && a.status === "attending");
   const myStatus = (id: string) => (attendees.find((a) => a.event_id === id && a.employee_id === me.employeeId)?.status ?? null) as AttendanceStatus | null;
@@ -111,13 +135,27 @@ export default function Pulsen() {
     return (
       <div className="flex flex-col gap-4">
         {items.map((item) => {
-          if (item.kind === "celebrations") return <CelebrationStrip key="celebrations" celebrations={todayCelebrations} />;
+          if (item.kind === "milestone") {
+            const m = item.milestone;
+            const key = milestoneTargetKey(m.id);
+            return (
+              <PulsenMilestoneItem
+                key={`ms-${m.id}`}
+                milestone={m}
+                reaction={isHouse && m.shown_in_house ? (
+                  <ReactButton summary={fr.getReactions(key)} disabled={!fr.canInteract}
+                    onSet={(reaction) => fr.setReaction.mutate({ targetType: "milestone", targetKey: key, reaction })} />
+                ) : undefined}
+              />
+            );
+          }
+          if (item.kind === "celebrations") return <CelebrationStrip key="celebrations" variant="flat" celebrations={todayCelebrations} />;
           if (item.kind === "event") {
             const e = events.find((x) => x.id === item.eventId);
             if (!e) return null;
             const att = attendingFor(e.id);
             return (
-              <EventRsvpCard
+              <EventRsvpCard variant="flat"
                   key={`event-${e.id}`}
                   title={e.title}
                   eventDate={e.event_date}
@@ -177,11 +215,14 @@ export default function Pulsen() {
           </button>
         ) : (
           <div className="py-6 text-center">
-            <p className="text-[15px] font-extrabold text-foreground">Du er opdateret</p>
-            {yesterday.data && (
-              <p className="mt-1 text-[13px] tabular-nums text-muted-foreground">
-                I går i Pulsen: {yesterday.data.posts} indlæg · {yesterday.data.reactions} reaktioner
+            {topline.data ? (
+              <p className="text-[15px] font-extrabold tabular-nums text-foreground">
+                I går: {topline.data.house.yesterday.toLocaleString("da-DK")} salg
+                {milestonesYesterday.data != null && ` · ${milestonesYesterday.data} milepæle`}
+                {yesterdayWinner && ` · ${yesterdayWinner.name} vandt dagen`}
               </p>
+            ) : (
+              <p className="text-[15px] font-extrabold text-foreground">Du er opdateret</p>
             )}
           </div>
         )}
@@ -207,6 +248,11 @@ export default function Pulsen() {
       <AddEventDialog open={addEventOpen} onOpenChange={setAddEventOpen} />
 
       <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8">
+        {topline.data && (
+          <div className="mx-auto mb-4 w-full max-w-[1004px] 2xl:max-w-[1164px]">
+            <PulsenTopline data={topline.data} teamId={isHouse ? null : team?.id ?? null} />
+          </div>
+        )}
         <div className="mx-auto grid w-full max-w-[1004px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,680px)_300px] 2xl:max-w-[1164px] 2xl:grid-cols-[minmax(0,680px)_460px]">
           <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-4">
