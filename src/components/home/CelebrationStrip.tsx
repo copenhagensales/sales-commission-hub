@@ -18,9 +18,11 @@ export interface Celebration {
 
 interface CelebrationStripProps {
   celebrations: Celebration[];
+  /** "flat" = Pulsen-kort uden kant. Forsiden bruger standard. */
+  variant?: "default" | "flat";
 }
 
-export function CelebrationStrip({ celebrations }: CelebrationStripProps) {
+export function CelebrationStrip({ celebrations, variant = "default" }: CelebrationStripProps) {
   const targets = celebrations.map((celebration) => ({
     celebration,
     key: buildTargetKey(celebration.type, [
@@ -41,7 +43,7 @@ export function CelebrationStrip({ celebrations }: CelebrationStripProps) {
   if (celebrations.length === 0) return null;
 
   return (
-    <Card className="border border-border bg-card rounded-3xl animate-fade-in">
+    <Card className={variant === "flat" ? "border-0 bg-card rounded-3xl animate-fade-in" : "border border-border bg-card rounded-3xl animate-fade-in"}>
       <CardContent className="py-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {targets.map(({ celebration, key }) => (

@@ -20012,6 +20012,30 @@ export type Database = {
       }
       pulsen_led_team_ids: { Args: never; Returns: string[] }
       pulsen_member_team_ids: { Args: never; Returns: string[] }
+      pulsen_milestone_candidates: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          employee_id: string
+          level: number
+          milestone_type: string
+          occurred_on: string
+          period_key: string
+          previous: number
+          team_id: string
+          value: number
+        }[]
+      }
+      pulsen_topline: {
+        Args: never
+        Returns: {
+          last_30d: number
+          last_week_same_time: number
+          team_id: string
+          team_name: string
+          today: number
+          yesterday: number
+        }[]
+      }
       pulsen_visible_team_ids: { Args: never; Returns: string[] }
       purge_eesy_mobile_sensitive: { Args: never; Returns: number }
       quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }

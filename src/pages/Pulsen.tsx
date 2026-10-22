@@ -111,13 +111,13 @@ export default function Pulsen() {
     return (
       <div className="flex flex-col gap-4">
         {items.map((item) => {
-          if (item.kind === "celebrations") return <CelebrationStrip key="celebrations" celebrations={todayCelebrations} />;
+          if (item.kind === "celebrations") return <CelebrationStrip key="celebrations" variant="flat" celebrations={todayCelebrations} />;
           if (item.kind === "event") {
             const e = events.find((x) => x.id === item.eventId);
             if (!e) return null;
             const att = attendingFor(e.id);
             return (
-              <EventRsvpCard
+              <EventRsvpCard variant="flat"
                   key={`event-${e.id}`}
                   title={e.title}
                   eventDate={e.event_date}

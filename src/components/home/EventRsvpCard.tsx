@@ -32,6 +32,8 @@ interface EventRsvpCardProps {
   onOpenDetail: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** "flat" = Pulsen-kort: uden kant, radius 24. Forsiden bruger standard. */
+  variant?: "default" | "flat";
 }
 
 const STATUS_LABEL: Record<RsvpStatus, string> = {
@@ -56,6 +58,7 @@ export function EventRsvpCard({
   onEdit,
   onDelete,
   attendees = [],
+  variant = "default",
 }: EventRsvpCardProps) {
   const lookupAvatar = useAvatarLookup();
   // Udvalgte: dem med profilbillede først, maks. 5
@@ -90,10 +93,12 @@ export function EventRsvpCard({
   return (
     <div
       className={cn(
-        "rounded-2xl p-4",
+        variant === "flat" ? "rounded-3xl p-5" : "rounded-2xl p-4",
         featured
           ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-          : "border border-[hsl(var(--cph-onyx)/0.12)] bg-card text-foreground",
+          : variant === "flat"
+            ? "bg-card text-foreground"
+            : "border border-[hsl(var(--cph-onyx)/0.12)] bg-card text-foreground",
       )}
     >
       <div className="flex items-start gap-3">

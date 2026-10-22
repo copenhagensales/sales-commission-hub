@@ -25,7 +25,7 @@ export function MilestoneBar({ icon: Icon, tone = "emerald", children, time, rea
       >
         <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
       </span>
-      <p className="min-w-0 flex-1 truncate text-[15px] text-foreground [&_b]:font-extrabold [&_b]:tabular-nums">
+      <p className="min-w-0 flex-1 line-clamp-2 text-[15px] text-foreground [&_b]:font-extrabold [&_b]:tabular-nums">
         {children} <span className="text-muted-foreground">· {time}</span>
       </p>
       {reaction && <div className="flex-none">{reaction}</div>}

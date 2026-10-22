@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import type { FeedCommentView, FeedTargetType } from "@/hooks/useFeedReactions";
 
 const MAX_LENGTH = 200;
+const COUNTER_FROM = 160;
 const VISIBLE_COUNT = 2;
 
 interface FeedCommentListProps {
@@ -80,6 +81,11 @@ export function FeedCommentList({
             className="h-11 rounded-xl text-[14px]"
             aria-label="Din besked, højst 200 tegn"
           />
+          {value.length >= COUNTER_FROM && (
+            <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground" aria-live="polite">
+              {value.length}/{MAX_LENGTH}
+            </span>
+          )}
           <Button type="button" className="h-11" disabled={saving || !value.trim()} onClick={() => void submit()}>
             Send
           </Button>
