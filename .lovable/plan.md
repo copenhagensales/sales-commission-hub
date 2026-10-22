@@ -3,6 +3,7 @@
 Én Word-fil (`TDC_Opsummering_skabelon.docx`) i Filer med opsummeringsteksten fra "2. Opsummering" i TDC Salgsværktøj (typen "Ny implementeringsopsummering", som værktøjet bruger). Teksten er den samme, som værktøjet laver i dag, og alle valg står med.
 
 ## Opbygning
+- **Hovedvalg øverst: Omstilling eller Mobile-only.** Hvert afsnit, der kun gælder den ene løsning, mærkes "(Kun omstilling)" eller "(Kun mobile-only)", så sælgeren kan se, hvad der skal med.
 - **Faste afsnit** uden markering.
 - **Valgfrie afsnit** med titlen "(Valgfrit)" i grå kursiv, fx mobilt bredbånd, router, omstilling, tilskud og opstart.
 - **Enten/eller-valg** med titlen "(Vælg én)", fx Standard/Avanceret omstilling, opstartstidspunkt og bredbåndstype.
