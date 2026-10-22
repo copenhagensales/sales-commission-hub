@@ -107,8 +107,8 @@ export default function Pulsen() {
             if (!e) return null;
             const att = attendingFor(e.id);
             return (
-              <div key={`event-${e.id}`} className="rounded-[24px] bg-card p-1">
-                <EventRsvpCard
+              <EventRsvpCard
+                  key={`event-${e.id}`}
                   title={e.title}
                   eventDate={e.event_date}
                   eventTime={e.event_time}
@@ -127,7 +127,6 @@ export default function Pulsen() {
                   onEdit={() => setEditEventId(e.id)}
                   onDelete={() => deleteEvent.mutate(e.id)}
                 />
-              </div>
             );
           }
           const p = item.post;
