@@ -90,7 +90,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <main className={cn(
           "min-h-[100dvh] transition-all duration-300 ease-in-out",
           isCollapsed ? "md:ml-0" : "md:ml-64",
-          isPreviewMode ? "pt-24 md:pt-10" : "pt-14 md:pt-0"
+          isPreviewMode ? "pt-24 md:pt-10" : "pt-[calc(3.5rem+env(safe-area-inset-top,0px))] md:pt-0"
         )}>
           <div className="p-4 md:p-8">
             {children}
