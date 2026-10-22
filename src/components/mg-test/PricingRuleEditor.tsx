@@ -32,6 +32,7 @@ import { da } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { isTextListCondition, type TextListCondition } from "@/lib/pricing/textCondition";
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
@@ -67,6 +68,78 @@ const NUMERIC_CONDITION_KEYS = ["Dækningssum"];
 
 // Companion-product condition key. Only shown for Relatel products.
 const COMPANION_CONDITION_KEY = "Solgt sammen med";
+
+
+// Tekstbetingelse: "=" gemmes som ren streng (uændret format), "en af"/"ikke lig med" som { operator, values }.
+const TEXT_OPERATORS = [
+  { value: "eq", label: "=" },
+  { value: "in", label: "en af de valgte" },
+  { value: "not_in", label: "ikke lig med" },
+] as const;
+
+function TextConditionInput({
+  options,
+  value,
+  onChange,
+}: {
+  options: string[];
+  value: string | TextListCondition;
+  onChange: (next: string | TextListCondition) => void;
+}) {
+  const operator = typeof value === "string" ? "eq" : value.operator;
+  const selected = typeof value === "string" ? (value ? [value] : []) : value.values;
+
+  const changeOperator = (op: string) => {
+    if (op === "eq") onChange(selected[0] ?? options[0] ?? "");
+    else onChange({ operator: op as TextListCondition["operator"], values: selected });
+  };
+  const toggle = (opt: string) => {
+    if (typeof value === "string") return;
+    const values = selected.includes(opt) ? selected.filter((v) => v !== opt) : [...selected, opt];
+    onChange({ operator: value.operator, values });
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select value={operator} onValueChange={changeOperator}>
+        <SelectTrigger className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TEXT_OPERATORS.map((op) => (
+            <SelectItem key={op.value} value={op.value}>
+              {op.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {operator === "eq" ? (
+        <Select value={value as string} onValueChange={(v) => onChange(v)}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          {options.map((option) => (
+            <label key={option} className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <Checkbox checked={selected.includes(option)} onCheckedChange={() => toggle(option)} />
+              {option}
+            </label>
+          ))}
+          {selected.length === 0 && <span className="text-xs text-destructive">Vælg mindst én</span>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Operators for numeric conditions
 const NUMERIC_OPERATORS = [
@@ -109,7 +182,7 @@ interface PricingRule {
   product_id: string;
   campaign_mapping_ids: string[] | null;
   campaign_match_mode?: "include" | "exclude" | null;
-  conditions: Record<string, string | NumericConditionValue | CompanionConditionValue>;
+  conditions: Record<string, string | NumericConditionValue | CompanionConditionValue | TextListCondition>;
   commission_dkk: number;
   revenue_dkk: number;
   priority: number;
@@ -271,7 +344,7 @@ export function PricingRuleEditor({
   );
   const [campaignsOpen, setCampaignsOpen] = useState(false);
   const [conditions, setConditions] = useState<
-    Record<string, string | NumericConditionValue | CompanionConditionValue>
+    Record<string, string | NumericConditionValue | CompanionConditionValue | TextListCondition>
   >(existingRule?.conditions || {});
   const [commission, setCommission] = useState(
     existingRule?.commission_dkk?.toString() || baseCommission.toString()
@@ -363,6 +436,9 @@ export function PricingRuleEditor({
       for (const [k, v] of Object.entries(conditions)) {
         if (isCompanionCondition(v) && v.product_ids.length === 0) {
           throw new Error(`Betingelsen "${k}" skal have mindst ét produkt valgt`);
+        }
+        if (isTextListCondition(v) && v.values.length === 0) {
+          throw new Error(`Betingelsen "${displayConditionKey(k)}" skal have mindst én værdi valgt`);
         }
       }
       // Convert conditions to JSON-compatible format for Supabase
@@ -471,7 +547,7 @@ export function PricingRuleEditor({
     }
   };
 
-  const updateCondition = (key: string, value: string | NumericConditionValue | CompanionConditionValue) => {
+  const updateCondition = (key: string, value: string | NumericConditionValue | CompanionConditionValue | TextListCondition) => {
     setConditions((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -788,22 +864,11 @@ export function PricingRuleEditor({
                     ) : (
                       // String condition UI: equals + dropdown
                       <>
-                        <span className="text-muted-foreground">=</span>
-                        <Select
-                          value={value as string}
-                          onValueChange={(newValue) => updateCondition(key, newValue)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CONDITION_OPTIONS[key]?.map((option) => (
-                              <SelectItem key={option} value={option}>
-                                {option}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <TextConditionInput
+                          options={CONDITION_OPTIONS[key] ?? []}
+                          value={value as string | TextListCondition}
+                          onChange={(next) => updateCondition(key, next)}
+                        />
                       </>
                     )}
 
