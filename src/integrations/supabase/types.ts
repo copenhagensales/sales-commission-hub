@@ -14058,6 +14058,99 @@ export type Database = {
           },
         ]
       }
+      push_log: {
+        Row: {
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          push_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          push_type: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          push_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_preferences: {
+        Row: {
+          compliance: boolean
+          klub: boolean
+          missing_one_on_one: boolean
+          opstart_flag: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          compliance?: boolean
+          klub?: boolean
+          missing_one_on_one?: boolean
+          opstart_flag?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          compliance?: boolean
+          klub?: boolean
+          missing_one_on_one?: boolean
+          opstart_flag?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          deactivated_at: string | null
+          endpoint: string
+          id: string
+          is_active: boolean
+          last_success_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          deactivated_at?: string | null
+          endpoint: string
+          id?: string
+          is_active?: boolean
+          last_success_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          deactivated_at?: string | null
+          endpoint?: string
+          id?: string
+          is_active?: boolean
+          last_success_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       quality_checklist_items: {
         Row: {
           checklist_id: string
@@ -20060,6 +20153,7 @@ export type Database = {
       pulsen_upsert_milestones: { Args: { p_rows: Json }; Returns: number }
       pulsen_visible_team_ids: { Args: never; Returns: string[] }
       purge_eesy_mobile_sensitive: { Args: never; Returns: number }
+      push_log_retention_run: { Args: never; Returns: number }
       quality_can_view_all: { Args: { _user_id?: string }; Returns: boolean }
       quality_has_module_access: {
         Args: { _user_id?: string }
