@@ -64,6 +64,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "🏠",
     permissions: [
       { key: "menu_home", label: "Hjem", description: "Adgang til hjem oversigt", hasEditOption: false },
+      { key: "menu_pulsen", label: "Pulsen", description: "Adgang til Pulsen (husets feed)", hasEditOption: false },
+      { key: "action_pulsen_post_house", label: "Pulsen: post i Huset", description: "Må dele indlæg med hele huset", hasEditOption: true },
+      { key: "action_pulsen_moderate", label: "Pulsen: moderér", description: "Må skjule andres indlæg (synlighed styrer team/alle)", hasEditOption: true },
       {
         key: "menu_home_goals",
         label: "Hjem mål",

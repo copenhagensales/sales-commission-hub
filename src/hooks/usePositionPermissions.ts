@@ -682,6 +682,7 @@ export function usePermissions() {
     canViewDashboards: canView("menu_dashboards"),
     // Personal menu (Mit Hjem)
     canViewHome: hasPermission("menu_home"),
+    canViewPulsen: hasPermission("menu_pulsen"),
     canViewH2h: hasPermission("menu_h2h"),
     canViewCommissionLeague: hasPermission("menu_commission_league"),
     canViewMyProfile: canView("menu_my_profile"),
