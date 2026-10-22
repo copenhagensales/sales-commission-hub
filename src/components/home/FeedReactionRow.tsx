@@ -1,107 +1,140 @@
 import { useState } from "react";
-import { SmilePlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, Smile } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  FEED_EMOJI_OPTIONS,
-  emojiLabel,
-  type FeedEmoji,
-  type FeedReactionSummary,
-  type FeedTargetType,
-} from "@/hooks/useFeedReactions";
+  DEFAULT_REACTION,
+  REACTIONS,
+  reactionOption,
+  type ReactionKey,
+} from "@/lib/feedReactions";
+import type { FeedReactionSummary } from "@/hooks/useFeedReactions";
 
-interface FeedReactionRowProps {
-  targetType: FeedTargetType;
-  targetKey: string;
-  reactions: FeedReactionSummary[];
-  onToggle: (args: { targetType: FeedTargetType; targetKey: string; emoji: FeedEmoji }) => void;
+interface ReactButtonProps {
+  summary: FeedReactionSummary;
+  onSet: (reaction: ReactionKey) => void;
   disabled?: boolean;
   className?: string;
 }
 
-export function FeedReactionRow({
-  targetType,
-  targetKey,
-  reactions,
-  onToggle,
-  disabled = false,
-  className,
-}: FeedReactionRowProps) {
+/** "Reagér" giver 👏 med ét klik; pilen åbner vælgeren med de 5 reaktioner. */
+export function ReactButton({ summary, onSet, disabled, className }: ReactButtonProps) {
   const [open, setOpen] = useState(false);
-
-  const pick = (emoji: string) => {
-    onToggle({ targetType, targetKey, emoji });
-    setOpen(false);
-  };
+  const mine = summary.myReaction ? reactionOption(summary.myReaction) : null;
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
-        {reactions.map(({ emoji, count, names, mine }) => {
-          const label = emojiLabel(emoji);
-          return (
-            <Tooltip key={emoji}>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-pressed={mine}
-                  aria-label={`${label} — ${count}${mine ? ", din reaktion er givet" : ""}`}
-                  disabled={disabled}
-                  onClick={() => onToggle({ targetType, targetKey, emoji })}
-                  className={cn(
-                    "h-8 gap-1.5 rounded-full border px-2.5 text-[13px] font-semibold",
-                    mine
-                      ? "border-[hsl(var(--cph-onyx))] bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
-                      : "border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <span aria-hidden="true">{emoji}</span>
-                  <span className="tabular-nums">{count}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {names.length > 0 ? `${label}: ${names.join(", ")}` : `${label} — ingen endnu`}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={disabled}
-              aria-label="Vælg en reaktion"
-              className="h-8 w-8 flex-none rounded-full border-border bg-background p-0 text-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <SmilePlus className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto p-2">
-            <div className="grid grid-cols-6 gap-1">
-              {FEED_EMOJI_OPTIONS.map(({ symbol, label }) => (
-                <Button
-                  key={symbol}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label={label}
-                  className="h-9 w-9 p-0 text-[18px]"
-                  onClick={() => pick(symbol)}
-                >
-                  <span aria-hidden="true">{symbol}</span>
-                </Button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+    <Popover open={open} onOpenChange={setOpen}>
+      <div className={cn("flex items-center", className)}>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onSet(summary.myReaction ?? DEFAULT_REACTION)}
+          aria-pressed={!!mine}
+          aria-label={mine ? `Din reaktion: ${mine.label}. Klik for at fjerne` : "Reagér med Godt gået"}
+          className={cn(
+            "flex min-h-[44px] items-center gap-2 rounded-l-xl px-3 text-[14px] font-semibold transition-colors hover:bg-muted disabled:opacity-50",
+            mine ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          {mine ? (
+            <span aria-hidden="true" className="text-[18px] leading-none">{mine.emoji}</span>
+          ) : (
+            <Smile className="h-5 w-5" aria-hidden="true" />
+          )}
+          {mine ? mine.label : "Reagér"}
+        </button>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label="Vælg reaktion"
+            className="flex min-h-[44px] min-w-[32px] items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
       </div>
-    </TooltipProvider>
+      <PopoverContent align="start" className="w-auto rounded-2xl p-1.5">
+        <div className="flex gap-1" role="group" aria-label="Reaktioner">
+          {REACTIONS.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              aria-pressed={summary.myReaction === r.key}
+              onClick={() => {
+                onSet(r.key);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex min-h-[56px] min-w-[60px] flex-col items-center justify-center gap-1 rounded-xl px-1.5 transition-colors hover:bg-muted",
+                summary.myReaction === r.key && "bg-muted"
+              )}
+            >
+              <span aria-hidden="true" className="text-[24px] leading-none">{r.emoji}</span>
+              <span className="text-[11px] text-muted-foreground">{r.label}</span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function ReactionBubbles({ summary, size = 24 }: { summary: FeedReactionSummary; size?: number }) {
+  return (
+    <span className="flex" aria-hidden="true">
+      {summary.groups.slice(0, 3).map((g, i) => (
+        <span
+          key={g.key}
+          style={{ width: size, height: size, fontSize: size * 0.6, zIndex: 3 - i }}
+          className={cn(
+            "relative flex items-center justify-center rounded-full border border-border bg-card leading-none",
+            i > 0 && "-ml-1.5"
+          )}
+        >
+          {g.emoji}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function summaryText(summary: FeedReactionSummary): string {
+  const others = summary.otherNames;
+  if (summary.myReaction) {
+    return others.length === 0 ? "Dig" : `Dig og ${others.length} ${others.length === 1 ? "anden" : "andre"}`;
+  }
+  if (others.length === 1) return others[0];
+  if (others.length === 2) return `${others[0]} og ${others[1]}`;
+  const rest = others.length - 2;
+  return `${others[0]}, ${others[1]} og ${rest} ${rest === 1 ? "anden" : "andre"}`;
+}
+
+/** LinkedIn-agtig opsummering; klik folder fordelingen ud. */
+export function ReactionSummaryLine({ summary }: { summary: FeedReactionSummary }) {
+  const [open, setOpen] = useState(false);
+  if (summary.total === 0) return null;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`${summary.total} reaktioner. Vis fordeling`}
+        className="flex min-h-[44px] items-center gap-2 text-[13px] text-muted-foreground hover:underline"
+      >
+        <ReactionBubbles summary={summary} />
+        <span className="truncate">{summaryText(summary)}</span>
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5 pb-2">
+          {summary.groups.map((g) => (
+            <span key={g.key} className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[12px] text-foreground">
+              {g.emoji} {g.label} · {g.count}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
