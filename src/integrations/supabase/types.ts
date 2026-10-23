@@ -1449,6 +1449,8 @@ export type Database = {
           id: string
           location_id: string
           placement_id: string | null
+          price_model: string | null
+          price_note: string | null
           start_date: string
           status: string
           total_price: number | null
@@ -1473,6 +1475,8 @@ export type Database = {
           id?: string
           location_id: string
           placement_id?: string | null
+          price_model?: string | null
+          price_note?: string | null
           start_date: string
           status?: string
           total_price?: number | null
@@ -1497,6 +1501,8 @@ export type Database = {
           id?: string
           location_id?: string
           placement_id?: string | null
+          price_model?: string | null
+          price_note?: string | null
           start_date?: string
           status?: string
           total_price?: number | null
@@ -2048,6 +2054,39 @@ export type Database = {
           tip_text?: string | null
           title?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      booking_price_audit: {
+        Row: {
+          booking_id: string
+          changed_at: string
+          changed_by: string | null
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          reason: string | null
+        }
+        Insert: {
+          booking_id: string
+          changed_at?: string
+          changed_by?: string | null
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          reason?: string | null
+        }
+        Update: {
+          booking_id?: string
+          changed_at?: string
+          changed_by?: string | null
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          reason?: string | null
         }
         Relationships: []
       }
@@ -12052,22 +12091,40 @@ export type Database = {
           created_at: string | null
           daily_rate: number
           id: string
+          list_4day_price: number | null
+          list_5day_price: number | null
+          list_day_price: number | null
+          list_week_price: number | null
           location_id: string
           name: string
+          price_needs_confirmation: boolean
+          price_note: string | null
         }
         Insert: {
           created_at?: string | null
           daily_rate?: number
           id?: string
+          list_4day_price?: number | null
+          list_5day_price?: number | null
+          list_day_price?: number | null
+          list_week_price?: number | null
           location_id: string
           name: string
+          price_needs_confirmation?: boolean
+          price_note?: string | null
         }
         Update: {
           created_at?: string | null
           daily_rate?: number
           id?: string
+          list_4day_price?: number | null
+          list_5day_price?: number | null
+          list_day_price?: number | null
+          list_week_price?: number | null
           location_id?: string
           name?: string
+          price_needs_confirmation?: boolean
+          price_note?: string | null
         }
         Relationships: [
           {
@@ -16472,6 +16529,8 @@ export type Database = {
       }
       supplier_discount_rules: {
         Row: {
+          agreement_end: string | null
+          agreement_start: string | null
           created_at: string
           description: string | null
           discount_percent: number
@@ -16485,6 +16544,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agreement_end?: string | null
+          agreement_start?: string | null
           created_at?: string
           description?: string | null
           discount_percent: number
@@ -16498,6 +16559,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agreement_end?: string | null
+          agreement_start?: string | null
           created_at?: string
           description?: string | null
           discount_percent?: number
@@ -16587,6 +16650,7 @@ export type Database = {
           location_name: string
           location_type: string
           max_discount_percent: number | null
+          note: string | null
           updated_at: string
         }
         Insert: {
@@ -16597,6 +16661,7 @@ export type Database = {
           location_name: string
           location_type: string
           max_discount_percent?: number | null
+          note?: string | null
           updated_at?: string
         }
         Update: {
@@ -16607,6 +16672,7 @@ export type Database = {
           location_name?: string
           location_type?: string
           max_discount_percent?: number | null
+          note?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -20108,6 +20174,15 @@ export type Database = {
         Args: { p_qualification_start: string }
         Returns: string
       }
+      list_price_gross: {
+        Args: {
+          p_booked_days: number[]
+          p_end: string
+          p_placement_id: string
+          p_start: string
+        }
+        Returns: number
+      }
       log_salary_access: {
         Args: { p_access_type?: string; p_employee_id: string; p_field: string }
         Returns: undefined
@@ -20434,6 +20509,15 @@ export type Database = {
           _subscription: string
         }
         Returns: string
+      }
+      supplier_discount_basis: {
+        Args: {
+          p_at: string
+          p_exclude_booking_id: string
+          p_inclusive: boolean
+          p_location_type: string
+        }
+        Returns: number
       }
       sync_cohort_team_memberships: { Args: never; Returns: Json }
       sync_personnel_salary: {
