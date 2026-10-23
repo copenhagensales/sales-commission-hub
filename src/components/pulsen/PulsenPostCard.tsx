@@ -49,6 +49,8 @@ function joinDanish(names: string[]) {
 
 export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageUrl, interactions, onEdit, onDelete, onHide, onBestAnswer }: Props) {
   const [editing, setEditing] = useState(false);
+  // Reserveret plads (4:3) indtil billedets egne mål kendes, så feedet ikke hopper.
+  const [imgRatio, setImgRatio] = useState<string | null>(null);
   const [draft, setDraft] = useState(post.body);
   const [zoom, setZoom] = useState(false);
   const authorName = shortName(post.author?.first_name, post.author?.last_name);
@@ -142,8 +144,10 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
 
       {img && (
         <>
-          <button type="button" onClick={() => setZoom(true)} aria-label="Vis billedet i fuld størrelse" className="mt-3 block w-full overflow-hidden rounded-[18px]">
-            <img src={img} alt="" loading="lazy" className="max-h-[520px] w-full object-cover" />
+          <button type="button" onClick={() => setZoom(true)} aria-label="Vis billedet i fuld størrelse" className="mt-3 block w-full overflow-hidden rounded-[18px] bg-muted active:opacity-90">
+            <img src={img} alt="" loading="lazy" className="max-h-[520px] w-full object-cover"
+              style={{ aspectRatio: imgRatio ?? "4 / 3" }}
+              onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setImgRatio(`${t.naturalWidth} / ${t.naturalHeight}`); }} />
           </button>
           <Dialog open={zoom} onOpenChange={setZoom}>
             <DialogContent className="max-w-[min(96vw,1400px)] border-0 bg-transparent p-0 shadow-none">
