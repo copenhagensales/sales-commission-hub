@@ -512,7 +512,7 @@ export default function Settings() {
         {/* API Integrations Section */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="h-5 w-5" />
@@ -612,7 +612,7 @@ export default function Settings() {
                             value={editForm.sync_frequency_minutes}
                             onValueChange={(value) => setEditForm({ ...editForm, sync_frequency_minutes: value })}
                           >
-                            <SelectTrigger className="w-[200px]">
+                            <SelectTrigger className="w-[200px] max-md:w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -628,7 +628,7 @@ export default function Settings() {
                     ) : (
                       <>
                         <div 
-                          className="flex items-center justify-between cursor-pointer"
+                          className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 cursor-pointer"
                           onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
                         >
                           <div className="flex items-center gap-3">
@@ -655,7 +655,7 @@ export default function Settings() {
                         {expandedId === integration.id && (
                           <div className="mt-4 space-y-4">
                             {/* Info and Actions Row */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-2">
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
@@ -720,7 +720,7 @@ export default function Settings() {
                                   {availableDataSources[integration.type].map((source) => (
                                     <div
                                       key={source.key}
-                                      className="flex items-center justify-between p-3 rounded-lg bg-background/50 border"
+                                      className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 p-3 rounded-lg bg-background/50 border"
                                     >
                                       <div className="flex items-center gap-3">
                                         <Checkbox
@@ -763,7 +763,7 @@ export default function Settings() {
                                   {integration.secrets.map((secret) => (
                                     <div
                                       key={secret}
-                                      className="flex items-center justify-between p-2 rounded bg-background/50 border text-sm"
+                                      className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 p-2 rounded bg-background/50 border text-sm"
                                     >
                                       <div className="flex items-center gap-2">
                                         <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
@@ -789,7 +789,7 @@ export default function Settings() {
         {/* Webhooks Section */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Send className="h-5 w-5" />
@@ -891,7 +891,7 @@ export default function Settings() {
                     ) : (
                       <>
                         <div 
-                          className="flex items-center justify-between cursor-pointer"
+                          className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 cursor-pointer"
                           onClick={() => setExpandedWebhookId(expandedWebhookId === webhook.id ? null : webhook.id)}
                         >
                           <div className="flex items-center gap-3">
@@ -1001,7 +1001,7 @@ export default function Settings() {
                                   {webhookEvents[webhook.type].map((event: any) => (
                                     <div
                                       key={event.id}
-                                      className="flex items-center justify-between p-3 rounded-lg bg-background/50 border text-sm cursor-pointer hover:bg-background/70"
+                                      className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 p-3 rounded-lg bg-background/50 border text-sm cursor-pointer hover:bg-background/70"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedEvent(event);
@@ -1079,7 +1079,7 @@ export default function Settings() {
         {/* Other Data Sources Section */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Database className="h-5 w-5" />
@@ -1096,7 +1096,7 @@ export default function Settings() {
             <Card className="bg-muted/30">
               <CardContent className="p-4">
                 <div 
-                  className="flex items-center justify-between cursor-pointer"
+                  className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 cursor-pointer"
                   onClick={() => setExpandedId(expandedId === "tdc-ann" ? null : "tdc-ann")}
                 >
                   <div className="flex items-center gap-3">

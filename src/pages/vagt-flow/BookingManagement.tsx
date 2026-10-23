@@ -1,3 +1,4 @@
+import { SkeletonList } from "@/components/mobile";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle, ClipboardCheck } from "lucide-react";
@@ -127,6 +128,7 @@ export default function BookingManagement() {
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <div className="max-md:max-w-full max-md:overflow-x-auto max-md:overscroll-x-contain">
           <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-auto gap-1">
             {visibleTabs.map(tab => (
               <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 px-3">
@@ -135,10 +137,11 @@ export default function BookingManagement() {
               </TabsTrigger>
             ))}
           </TabsList>
+          </div>
 
           {visibleTabs.some(t => t.value === "book-week") && (
             <TabsContent value="book-week" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <BookWeekContent />
               </Suspense>
             </TabsContent>
@@ -146,7 +149,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "bookings") && (
             <TabsContent value="bookings" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <BookingsContent />
               </Suspense>
             </TabsContent>
@@ -154,7 +157,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "markets") && (
             <TabsContent value="markets" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <MarketsContent />
               </Suspense>
             </TabsContent>
@@ -162,7 +165,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "locations") && (
             <TabsContent value="locations" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <LocationsContent />
               </Suspense>
             </TabsContent>
@@ -170,7 +173,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "vagtplan-fm") && (
             <TabsContent value="vagtplan-fm" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <VagtplanFMContent />
               </Suspense>
             </TabsContent>
@@ -178,7 +181,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "hotels") && (
             <TabsContent value="hotels" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <HotelsContent />
               </Suspense>
             </TabsContent>
@@ -186,7 +189,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "okonomi") && (
             <TabsContent value="okonomi" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <LocationProfitabilityContent />
               </Suspense>
             </TabsContent>
@@ -194,7 +197,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "okonomi-butikker") && (
             <TabsContent value="okonomi-butikker" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <LocationHistoryContent />
               </Suspense>
             </TabsContent>
@@ -202,7 +205,7 @@ export default function BookingManagement() {
 
           {visibleTabs.some(t => t.value === "checklist") && (
             <TabsContent value="checklist" className="mt-6">
-              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <Suspense fallback={<SkeletonList />}>
                 <FmChecklistContent />
               </Suspense>
             </TabsContent>

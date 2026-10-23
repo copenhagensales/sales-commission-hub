@@ -365,7 +365,7 @@ export default function PulseSurveyResults() {
               <Input 
                 readOnly 
                 value={publicSurveyLink} 
-                className="font-mono text-sm"
+                className="font-mono text-base md:text-sm"
               />
               <Button
                 variant="outline"

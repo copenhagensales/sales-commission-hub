@@ -188,6 +188,8 @@ export default function Pulsen() {
         })}
 
         {feed.hasNextPage ? (
+          <>
+          <AutoLoadSentinel onVisible={() => { if (!feed.isFetchingNextPage) feed.fetchNextPage(); }} />
           <button
             type="button"
             onClick={() => feed.fetchNextPage()}
@@ -196,6 +198,7 @@ export default function Pulsen() {
           >
             {feed.isFetchingNextPage ? "Henter …" : "Indlæs flere"}
           </button>
+          </>
         ) : (
           <div className="py-6 text-center">
             <p className="text-[15px] font-extrabold text-foreground">Du er opdateret</p>
@@ -313,3 +316,18 @@ export default function Pulsen() {
   );
 }
 
+
+/** Henter næste side, når bunden af feedet nærmer sig skærmen (uendelig rulning; knappen bliver som reserve). */
+function AutoLoadSentinel({ onVisible }: { onVisible: () => void }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const cb = useRef(onVisible);
+  cb.current = onVisible;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) cb.current(); }, { rootMargin: "600px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return <div ref={ref} aria-hidden="true" className="h-px" />;
+}
