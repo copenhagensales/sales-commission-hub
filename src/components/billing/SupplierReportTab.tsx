@@ -1,3 +1,4 @@
+import { useIsPhone } from "@/components/mobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadExcelAoa } from "@/utils/excel";
@@ -55,6 +56,8 @@ interface LocationException {
 }
 
 export function SupplierReportTab() {
+  const isPhone = useIsPhone();
+  const [phoneAsTable, setPhoneAsTable] = useState(false);
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
@@ -790,6 +793,51 @@ export function SupplierReportTab() {
                   Leverandørrapport: {selectedLocationType}
                 </h2>
               </div>
+              {isPhone && (
+                <button type="button" onClick={() => setPhoneAsTable((v) => !v)}
+                  className="mb-2 min-h-[44px] rounded-full px-3 text-[14px] font-semibold text-primary active:opacity-70">
+                  {phoneAsTable ? "Vis som kort" : "Vis som tabel"}
+                </button>
+              )}
+              {isPhone && !phoneAsTable ? (
+                <ul className="flex flex-col gap-3">
+                  {locationDiscounts.map((loc: any) => (
+                    <li key={loc.location?.id} className={`rounded-2xl border border-border bg-card p-4 ${loc.isExcluded ? "opacity-60" : ""}`}>
+                      <p className="text-[16px] font-bold">{loc.location?.name}</p>
+                      <p className="text-[14px] text-muted-foreground">{loc.client?.name || "Ukendt"} · {loc.location?.address_city || "-"} · {loc.bookings.length} booking{loc.bookings.length === 1 ? "" : "er"}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {loc.isExcluded && <Badge variant="destructive">Udelukket</Badge>}
+                        {loc.isOutsideAgreement && <Badge variant="secondary">Spørg om pris</Badge>}
+                        {loc.maxDiscount != null && !loc.isExcluded && <Badge variant="outline">Max {loc.maxDiscount}%</Badge>}
+                        {loc.missingLocked && <Badge variant="destructive">Ingen låst sats</Badge>}
+                        {loc.missingRate && <Badge variant="destructive">Mangler dagspris</Badge>}
+                      </div>
+                      <dl className="mt-2 space-y-1 text-[15px]">
+                        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Dage</dt><dd className="tabular-nums">{loc.totalDays}</dd></div>
+                        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Dagspris</dt><dd className="tabular-nums">{loc.usesTotalPrice ? "samlet" : fmtKr(loc.dailyRate)}</dd></div>
+                        {hasSurcharge && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Merpris</dt><dd className="tabular-nums">{loc.surchargeAmount > 0 ? fmtKr(loc.surchargeAmount) : "-"}</dd></div>}
+                        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Beløb</dt><dd className="font-semibold tabular-nums">{fmtKr(loc.totalAmount)}</dd></div>
+                        {showDiscountCols && <>
+                          <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Rabat</dt><dd className="tabular-nums">{loc.isExcluded ? "Separat" : `-${loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%`}</dd></div>
+                          <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Efter rabat</dt><dd className="font-semibold tabular-nums">{loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}</dd></div>
+                        </>}
+                      </dl>
+                      <details className="mt-2">
+                        <summary className="flex min-h-[44px] cursor-pointer items-center text-[14px] font-semibold text-primary">Uger</summary>
+                        <ul className="space-y-1 text-[15px]">
+                          {getWeekRows(loc).map((w) => (
+                            <li key={w.start.toISOString()} className="flex justify-between gap-3">
+                              <span>Uge {w.week} · {format(w.start, "d/M")}–{format(w.end, "d/M")} · {w.dayCount} dg</span>
+                              <span className="tabular-nums">{fmtKr(w.gross)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </li>
+                  ))}
+                  <li className="rounded-2xl border border-border bg-muted/50 p-4 text-[15px] font-bold flex justify-between"><span>Subtotal</span><span>{totalAmountAll.toLocaleString("da-DK")} kr</span></li>
+                </ul>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -962,6 +1010,7 @@ export function SupplierReportTab() {
                   </TableRow>
                 </TableFooter>
               </Table>
+              )}
               {isAnnualRevenue && anyMissingLocked && (
                 <p className="mt-3 text-sm text-destructive">
                   En eller flere bookinger mangler en låst rabatsats og regnes med 0 % rabat. Ret det før rapporten godkendes.
