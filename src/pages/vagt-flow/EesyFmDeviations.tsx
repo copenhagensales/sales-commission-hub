@@ -465,6 +465,8 @@ function ClaimEditDialog({
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                type="tel"
+                inputMode="tel"
                 placeholder="12345678"
               />
             </div>

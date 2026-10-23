@@ -1,3 +1,4 @@
+import { ResponsiveTable, useIsPhone } from "@/components/mobile";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -153,6 +154,8 @@ export default function VagtVehicles() {
     });
   };
 
+  const isPhone = useIsPhone();
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -170,6 +173,26 @@ export default function VagtVehicles() {
           <CardContent className="pt-6">
             {isLoading ? (
               <p>Indlæser...</p>
+            ) : isPhone ? (
+              <ResponsiveTable
+                rows={vehicles ?? []}
+                rowKey={(v) => v.id}
+                columns={[
+                  { key: "name", header: "Navn", isTitle: true, cell: (v) => v.name },
+                  { key: "plate", header: "Nummerplade", isKey: true, cell: (v) => v.license_plate },
+                  { key: "status", header: "Status", isKey: true, cell: (v) => (
+                    <Badge variant={v.is_active ? "default" : "secondary"}>{v.is_active ? "Aktiv" : "Inaktiv"}</Badge>
+                  ) },
+                  { key: "notes", header: "Noter", cell: (v) => v.notes || "-" },
+                ]}
+                actions={(v) => (
+                  <>
+                    <Button variant="outline" onClick={() => setShowMileageDialog(v)}><Gauge className="h-4 w-4 mr-2" />Km</Button>
+                    <Button variant="outline" onClick={() => openEditDialog(v)}><Edit className="h-4 w-4 mr-2" />Redigér</Button>
+                    <Button variant="outline" onClick={() => setShowDeleteDialog(v.id)}><Trash2 className="h-4 w-4 mr-2 text-destructive" />Slet</Button>
+                  </>
+                )}
+              />
             ) : (
               <Table>
                 <TableHeader>

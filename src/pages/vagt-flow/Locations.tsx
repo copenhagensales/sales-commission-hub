@@ -1,3 +1,4 @@
+import { useIsPhone } from "@/components/mobile";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,8 @@ export default function VagtLocations() {
     daily_rate: 1000,
   });
   const navigate = useNavigate();
+  const isPhone = useIsPhone();
+  const [phoneAsTable, setPhoneAsTable] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -308,7 +311,7 @@ export default function VagtLocations() {
 
         <Card>
           <CardContent className="pt-6">
-            <div className="flex gap-4 mb-6">
+            <div className="flex gap-4 mb-6 max-md:flex-col">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -319,7 +322,7 @@ export default function VagtLocations() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] max-md:w-full">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -334,7 +337,36 @@ export default function VagtLocations() {
 
             {isLoading ? (
               <p>Indlæser...</p>
+            ) : isPhone && !phoneAsTable ? (
+              <div>
+                <button type="button" onClick={() => setPhoneAsTable(true)}
+                  className="mb-2 min-h-[44px] rounded-full px-3 text-[14px] font-semibold text-primary active:opacity-70">Vis som tabel</button>
+                <ul className="flex flex-col gap-3">
+                  {filteredLocations?.map((loc) => {
+                    const params = weekParam && yearParam ? `?week=${weekParam}&year=${yearParam}` : "";
+                    const address = [loc.address_street, loc.address_postal_code, loc.address_city].filter(Boolean).join(", ");
+                    return (
+                      <li key={loc.id}>
+                        <button type="button" onClick={() => navigate(`/vagt-flow/locations/${loc.id}${params}`)}
+                          className="flex min-h-[44px] w-full items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left active:bg-muted">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[16px] font-bold">{loc.is_favorite ? "★ " : ""}{loc.name}</p>
+                            <p className="text-[14px] text-muted-foreground">{address || "-"}</p>
+                            <p className="text-[14px] text-muted-foreground">{loc.type || "-"}</p>
+                          </div>
+                          <Badge className={`${statusColors[loc.status || "Ny"]} text-white`}>{loc.status || "Ny"}</Badge>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             ) : (
+              <div>
+              {isPhone && (
+                <button type="button" onClick={() => setPhoneAsTable(false)}
+                  className="mb-2 min-h-[44px] rounded-full px-3 text-[14px] font-semibold text-primary active:opacity-70">Vis som kort</button>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -506,6 +538,7 @@ export default function VagtLocations() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
