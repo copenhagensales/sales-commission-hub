@@ -440,7 +440,7 @@ export function SupplierReportTab() {
     const { total } = calcBookingTotal(booking, yearStart, periodEnd);
     const locName = booking.location?.name?.toLowerCase() || "";
     const exc = exceptionMap.get(locName);
-    if (exc?.exception_type === "excluded") return sum;
+    if (exc?.exception_type === "excluded" || exc?.exception_type === "outside_agreement") return sum;
     return sum + total;
   }, 0) || 0;
 
@@ -448,7 +448,7 @@ export function SupplierReportTab() {
   const totalAmountNonExcluded = locationEntries.reduce((sum, loc) => {
     const locName = loc.location?.name?.toLowerCase() || "";
     const exc = exceptionMap.get(locName);
-    if (exc?.exception_type === "excluded") return sum;
+    if (exc?.exception_type === "excluded" || exc?.exception_type === "outside_agreement") return sum;
     return sum + loc.totalAmount;
   }, 0);
 
@@ -555,6 +555,8 @@ export function SupplierReportTab() {
         discountAmount,
         finalAmount: loc.totalAmount - discountAmount,
         isExcluded: exc?.exception_type === "excluded",
+        // Uden for aftale: tæller ikke i trappen; satsen er den låste/manuelle på bookingen
+        isOutsideAgreement: exc?.exception_type === "outside_agreement",
         maxDiscount: exc?.exception_type === "max_discount" ? exc.max_discount_percent ?? null : null,
       };
     }
@@ -649,6 +651,7 @@ export function SupplierReportTab() {
         discountAmount: loc.discountAmount,
         finalAmount: loc.finalAmount,
         isExcluded: loc.isExcluded,
+        isOutsideAgreement: !!loc.isOutsideAgreement,
         minDate: loc.minDate,
         maxDate: loc.maxDate,
         // Revisionsspor for de låste satser (annual_revenue)
@@ -818,6 +821,7 @@ export function SupplierReportTab() {
                             {loc.location?.name}
                             <Badge variant="outline" className="text-xs font-normal">{loc.client?.name || "Ukendt"}</Badge>
                             {loc.isExcluded && <Badge variant="destructive" className="text-xs">Udelukket</Badge>}
+                            {loc.isOutsideAgreement && <Badge variant="secondary" className="text-xs">Uden for aftale</Badge>}
                             {loc.maxDiscount != null && !loc.isExcluded && (
                               <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
                             )}

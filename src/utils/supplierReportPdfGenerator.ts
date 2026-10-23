@@ -144,7 +144,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
           ${config.exceptions
             .map(
               (exc) =>
-                `<li><strong>${exc.name}</strong>: ${exc.type === "excluded" ? "Pris aftales separat" : `Max ${exc.maxDiscount}% rabat`}</li>`
+                `<li><strong>${exc.name}</strong>: ${exc.type === "excluded" ? "Pris aftales separat" : exc.type === "outside_agreement" ? "Uden for aftale – pris aftales fra gang til gang" : `Max ${exc.maxDiscount}% rabat`}</li>`
             )
             .join("")}
         </ul>

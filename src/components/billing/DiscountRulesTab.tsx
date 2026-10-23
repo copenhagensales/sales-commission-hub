@@ -353,7 +353,7 @@ export function DiscountRulesTab() {
                     <TableCell>{exc.location_name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {exc.exception_type === "excluded" ? "Udelukket" : "Max rabat"}
+                        {exc.exception_type === "excluded" ? "Udelukket" : exc.exception_type === "outside_agreement" ? "Uden for aftale" : "Max rabat"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -514,6 +514,7 @@ export function DiscountRulesTab() {
                 <SelectContent>
                   <SelectItem value="max_discount">Max rabat</SelectItem>
                   <SelectItem value="excluded">Udelukket (pris aftales separat)</SelectItem>
+                  <SelectItem value="outside_agreement">Uden for aftale (pris aftales fra gang til gang)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
