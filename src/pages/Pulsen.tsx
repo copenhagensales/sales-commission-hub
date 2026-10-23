@@ -1,3 +1,4 @@
+import { StickyOnPhone, useIsPhone } from "@/components/mobile";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { useSearchParams } from "react-router-dom";
@@ -50,7 +51,14 @@ export default function Pulsen() {
   const isHouse = scope.kind === "house";
 
   const feed = usePulsenFeed(scope, !!me.employeeId);
-  const posts = useMemo(() => feed.data?.pages.flat() ?? [], [feed.data]);
+  // Dubletfilter: et indlæg kan glide over i næste side, hvis der kommer nye til imellem to hentninger.
+  const posts = useMemo(() => {
+    const seen = new Set<string>();
+    return (feed.data?.pages.flat() ?? []).filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  }, [feed.data]);
+  const isPhone = useIsPhone();
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const pull = usePullToRefresh(isPhone, () => feed.refetch());
   // Link fra forsiden: /storkbook?post=<id> ruller til indlægget, når det er indlæst.
   const [searchParams] = useSearchParams();
   const composeParam = searchParams.get("compose");
@@ -264,7 +272,16 @@ export default function Pulsen() {
               </div>
             </header>
 
+            {isPhone && pull.offset > 0 && (
+              <div className="flex justify-center" style={{ height: pull.offset }} aria-live="polite">
+                <span className="self-end text-[14px] font-semibold text-muted-foreground">
+                  {pull.refreshing ? "Opdaterer …" : pull.offset >= PULL_THRESHOLD ? "Slip for at opdatere" : "Træk for at opdatere"}
+                </span>
+              </div>
+            )}
+
             {me.employeeId && (
+              <div ref={composerRef} className="scroll-mt-20">
               <PulsenComposer
                 myEmployeeId={me.employeeId}
                 canPostHouse={me.canPostHouse}
@@ -275,6 +292,18 @@ export default function Pulsen() {
                 onOpenEvent={() => setAddEventOpen(true)}
                 initialMode={initialCompose}
               />
+              </div>
+            )}
+            {me.employeeId && isPhone && (
+              <StickyOnPhone>
+                <button type="button" onClick={() => {
+                    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    composerRef.current?.querySelector<HTMLElement>("textarea, [contenteditable=true], button")?.focus({ preventScroll: true });
+                  }}
+                  className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[16px] font-extrabold text-[hsl(var(--cph-light-blue))] active:opacity-80">
+                  Nyt indlæg
+                </button>
+              </StickyOnPhone>
             )}
 
             {me.employeeId && (
@@ -330,4 +359,43 @@ function AutoLoadSentinel({ onVisible }: { onVisible: () => void }) {
     return () => io.disconnect();
   }, []);
   return <div ref={ref} aria-hidden="true" className="h-px" />;
+}
+
+const PULL_THRESHOLD = 64;
+
+/** Træk-ned for at opdatere på telefon. Kun når siden står helt øverst; bruger feedets eksisterende refetch. */
+function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<unknown>) {
+  const [offset, setOffset] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const cb = useRef(onRefresh);
+  cb.current = onRefresh;
+  useEffect(() => {
+    if (!enabled) return;
+    let startY: number | null = null;
+    let current = 0;
+    const onStart = (e: TouchEvent) => { startY = window.scrollY <= 0 ? e.touches[0].clientY : null; };
+    const onMove = (e: TouchEvent) => {
+      if (startY == null) return;
+      const dy = e.touches[0].clientY - startY;
+      current = dy > 0 && window.scrollY <= 0 ? Math.min(96, dy * 0.5) : 0;
+      setOffset(current);
+    };
+    const onEnd = () => {
+      if (startY != null && current >= PULL_THRESHOLD) {
+        setRefreshing(true);
+        setOffset(40);
+        cb.current().finally(() => { setRefreshing(false); setOffset(0); });
+      } else setOffset(0);
+      startY = null; current = 0;
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+    };
+  }, [enabled]);
+  return { offset, refreshing };
 }
