@@ -1,3 +1,5 @@
+import { BottomSheet, ResponsiveTable, useIsPhone } from "@/components/mobile";
+import { SlidersHorizontal } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -652,6 +654,10 @@ export default function EditSalesRegistrations() {
     });
   };
 
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterCount = (selectedSellerId !== "all" ? 1 : 0) + (selectedClientId !== "all" ? 1 : 0);
+
   return (
     <VagtFlowLayout>
       <div className="space-y-6">
@@ -676,6 +682,13 @@ export default function EditSalesRegistrations() {
                 </div>
               </div>
 
+              {isPhone ? (
+                <>
+                  <Button variant="outline" className="min-h-11 w-full" onClick={() => setFiltersOpen(true)}>
+                    <SlidersHorizontal className="h-4 w-4 mr-2" />Filtre{filterCount > 0 ? ` (${filterCount})` : ""}
+                  </Button>
+                  <BottomSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Filtre">
+                    <div className="flex flex-col gap-4 px-2 [&_button[role=combobox]]:min-h-11">
               {/* Date Range */}
               <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-1">
@@ -734,6 +747,71 @@ export default function EditSalesRegistrations() {
                   </SelectContent>
                 </Select>
               </div>
+                    </div>
+                  </BottomSheet>
+                </>
+              ) : (
+                <>
+              {/* Date Range */}
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Fra</Label>
+                  <Input
+                    type="date"
+                    value={dateRange.from}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
+                    className="h-10 w-[140px]"
+                  />
+                </div>
+                <span className="text-muted-foreground mt-5">–</span>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Til</Label>
+                  <Input
+                    type="date"
+                    value={dateRange.to}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
+                    className="h-10 w-[140px]"
+                  />
+                </div>
+              </div>
+
+              {/* Seller filter */}
+              <div className="flex flex-col gap-1 min-w-[180px]">
+                <Label className="text-xs text-muted-foreground">Sælger</Label>
+                <Select value={selectedSellerId} onValueChange={setSelectedSellerId}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Alle sælgere" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle sælgere</SelectItem>
+                    {sellers?.map((seller) => (
+                      <SelectItem key={seller.id} value={seller.id}>
+                        {seller.first_name} {seller.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Client filter */}
+              <div className="flex flex-col gap-1 min-w-[180px]">
+                <Label className="text-xs text-muted-foreground">Kunde</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Alle kunder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle kunder</SelectItem>
+                    {clients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -834,6 +912,23 @@ export default function EditSalesRegistrations() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="border-t">
+                          {isPhone ? (
+                            <div className="p-3">
+                              <ResponsiveTable
+                                rows={group.sales}
+                                rowKey={(sale) => sale.id}
+                                columns={[
+                                  { key: "product", header: "Produkt", isTitle: true, cell: (sale) => sale.product_name || "-" },
+                                  { key: "time", header: "Tidspunkt", isKey: true, cell: (sale) => sale.registered_at ? format(parseISO(sale.registered_at), "HH:mm", { locale: da }) : "-" },
+                                  { key: "provi", header: "Provi", isKey: true, cell: (sale) => `${sale.commission_dkk?.toLocaleString("da-DK")} kr` },
+                                  { key: "oms", header: "Oms", isKey: true, cell: (sale) => `${sale.revenue_dkk?.toLocaleString("da-DK")} kr` },
+                                  { key: "phone", header: "Telefon", cell: (sale) => sale.phone_number || "-" },
+                                  { key: "comment", header: "Kommentar", cell: (sale) => sale.comment || "-" },
+                                  { key: "claim", header: "Claim/Reimport", cell: (sale) => sale.claim_reimport ? "Ja" : "Nej" },
+                                ]}
+                              />
+                            </div>
+                          ) : (
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -880,6 +975,7 @@ export default function EditSalesRegistrations() {
                               ))}
                             </TableBody>
                           </Table>
+                          )}
                         </div>
                       </CollapsibleContent>
                     </div>
