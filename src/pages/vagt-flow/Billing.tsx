@@ -1,3 +1,5 @@
+import { BottomSheet, ResponsiveTable, useIsPhone } from "@/components/mobile";
+import { SlidersHorizontal } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -310,6 +312,10 @@ function BillingOverviewTab() {
 
   const totalDiscount = totalAmount - nettoAmount;
 
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = (clientFilter !== "all" ? 1 : 0) + (locationTypeFilter !== "all" ? 1 : 0) + (periodType !== "month" ? 1 : 0);
+
   const monthOptions = [];
   for (let i = -6; i <= 6; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -325,6 +331,58 @@ function BillingOverviewTab() {
 
   return (
     <div className="space-y-6">
+      {isPhone ? (
+        <>
+          <Button variant="outline" className="min-h-11 w-full" onClick={() => setFiltersOpen(true)}>
+            <SlidersHorizontal className="h-4 w-4 mr-2" />Filtre{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          </Button>
+          <BottomSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Filtre">
+            <div className="flex flex-col gap-3 px-2 [&_button[role=combobox]]:w-full [&_button[role=combobox]]:min-h-11">
+        <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">Måned</SelectItem>
+            <SelectItem value="payroll">Lønperiode (15.–14.)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={clientFilter} onValueChange={setClientFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Alle kunder" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle kunder</SelectItem>
+            {fieldmarketingClients?.map((client: any) => (
+              <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={locationTypeFilter} onValueChange={setLocationTypeFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Alle typer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle typer</SelectItem>
+            {locationTypes.map((type: string) => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+            </div>
+          </BottomSheet>
+        </>
+      ) : (
       <div className="flex items-center gap-3 max-md:flex-wrap">
         <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
           <SelectTrigger className="w-[180px]">
@@ -368,6 +426,7 @@ function BillingOverviewTab() {
           </SelectContent>
         </Select>
       </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -472,6 +531,29 @@ function BillingOverviewTab() {
             <p className="text-muted-foreground py-8 text-center">
               Ingen bookinger fundet for den valgte periode
             </p>
+          ) : isPhone ? (
+            <ResponsiveTable
+              rows={Object.entries(bookingsByLocation || {}) as [string, any][]}
+              rowKey={([k]) => k}
+              columns={[
+                { key: "loc", header: "Lokation", isTitle: true, cell: ([, loc]) => (
+                  <div><p>{loc.location?.name}</p>{loc.location?.address_city && <p className="text-sm font-normal text-muted-foreground">{loc.location.address_city}</p>}</div>
+                ) },
+                { key: "client", header: "Kunde", isKey: true, cell: ([, loc]) => loc.client?.name || "Ukendt kunde" },
+                { key: "days", header: "Dage", isKey: true, cell: ([, loc]) => loc.totalDays },
+                { key: "amount", header: "Beløb", isKey: true, cell: ([, loc]) => `${Math.round(loc.totalAmount).toLocaleString("da-DK")} kr` },
+                { key: "bookings", header: "Bookinger", cell: ([, loc]) => loc.bookings.length },
+                { key: "rate", header: "Dagspris", cell: ([, loc]) => loc.usesTotalPrice ? "samlet" : `${Math.round(loc.dailyRate).toLocaleString("da-DK")} kr` },
+                { key: "weeks", header: "Uger & dage", cell: ([, loc]) => (
+                  <div className="space-y-1">
+                    {[...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()].sort(([x], [y]) => x - y).map(([week, daysSet]) => {
+                      const isFullWeek = [0, 1, 2, 3, 4].every(d => daysSet.has(d));
+                      return <div key={week}>Uge {week}: {isFullWeek ? "Man–Fre" : [...daysSet].sort((x, y) => x - y).map(d => WEEKDAY_NAMES[d]).join(", ")}</div>;
+                    })}
+                  </div>
+                ) },
+              ]}
+            />
           ) : (
             <Table>
               <TableHeader>
