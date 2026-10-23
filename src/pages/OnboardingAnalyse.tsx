@@ -553,13 +553,13 @@ export default function OnboardingAnalyse() {
   return (
     <MainLayout>
     <div className="container mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
         <div>
           <h1 className="text-2xl font-bold">Onboarding Analyse</h1>
           <p className="text-muted-foreground text-sm">60-dages churn breakdown per team og måned</p>
         </div>
         <Select value={periodKey} onValueChange={setPeriodKey}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[200px] max-md:w-full max-md:min-h-11">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -668,7 +668,7 @@ export default function OnboardingAnalyse() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setSelectedTeams(new Set())}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              className={`px-3 py-1 max-md:min-h-11 max-md:text-sm rounded-full text-xs font-medium border transition-colors ${
                 selectedTeams.size === 0
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-muted text-muted-foreground border-border hover:bg-accent"
@@ -680,7 +680,7 @@ export default function OnboardingAnalyse() {
               <button
                 key={team}
                 onClick={() => toggleSelectedTeam(team)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1 max-md:min-h-11 max-md:text-sm rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
                   selectedTeams.size === 0 || selectedTeams.has(team)
                     ? "border-foreground/30 bg-background text-foreground"
                     : "border-border bg-muted/50 text-muted-foreground/50 hover:bg-accent"
