@@ -77,7 +77,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
         </div>
         <span className="flex items-center gap-2 rounded-full bg-[#d6f7e5] px-3 py-1.5 text-[12px] font-extrabold text-[#146c3c]">
           <LiveDot />
-          {count > 0 ? `${count} ${count === 1 ? "ny" : "nye"} siden dit sidste besøg` : "Du har set det hele – vær den første i dag"}
+          {storkLine(count)}
         </span>
         <Link to="/storkbook" className="ml-auto flex min-h-[44px] items-center gap-1 rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))]">
           Åbn Storkbook <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -197,3 +197,28 @@ function Lead({ p }: { p: PulsenPost }) {
 }
 
 const Skel = ({ h }: { h: number }) => <div className="animate-pulse rounded-[24px] bg-[hsl(var(--cph-light-blue))]" style={{ height: h }} />;
+
+/** Sjove storke-linjer til ulæst-pillen. Vælges pr. dag/time, så teksten ikke skifter ved hver genindlæsning. */
+const STORK_EMPTY = [
+  "Storken har læst det hele – din tur til at kvække",
+  "Helt stille i reden. Læg det første æg i dag",
+  "Storken står på ét ben og venter på nyt",
+  "Intet nyt i reden – vær den første fugl",
+  "Storken har pudset fjerene. Nu mangler den bare noget at læse",
+];
+const STORK_MORNING = "Storken er tidligt oppe – ingen har sagt noget endnu";
+const STORK_NIGHT = "Storken er på vej i seng – men reden er åben";
+const STORK_NEW = [
+  (n: number) => `Storken har fløjet ${n} ${n === 1 ? "nyhed" : "nyheder"} ind`,
+  (n: number) => `${n} ${n === 1 ? "nyt æg" : "nye æg"} i reden siden sidst`,
+  (n: number) => `Kvæk! ${n} ${n === 1 ? "ny" : "nye"} siden dit sidste besøg`,
+];
+
+function storkLine(count: number, now = new Date()): string {
+  const seed = now.getDate() + now.getHours();
+  if (count > 0) return STORK_NEW[seed % STORK_NEW.length](count);
+  const h = now.getHours();
+  if (h < 8) return STORK_MORNING;
+  if (h >= 21) return STORK_NIGHT;
+  return STORK_EMPTY[seed % STORK_EMPTY.length];
+}
