@@ -34,6 +34,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
 };
 
 export function HotelExpensesTab() {
+  const isPhone = useIsPhone();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [periodType, setPeriodType] = useState<"month" | "payroll">("month");
