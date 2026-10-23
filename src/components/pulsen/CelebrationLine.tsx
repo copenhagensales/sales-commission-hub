@@ -40,14 +40,14 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
   const what = c.type === "birthday" ? "har fødselsdag 🇩🇰" : `${c.years} års jubilæum`;
   return (
     <div className={cn(variant === "line" ? "rounded-[20px] bg-card px-4 py-2" : "rounded-[16px] border border-dashed border-border px-3 py-1")}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {variant === "line" && <span className="hidden whitespace-nowrap text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground sm:inline">I dag</span>}
         <PulsenAvatar employeeId={c.employeeId} name={c.name} size={32} />
         <p className="min-w-0 flex-1 truncate text-[14px]">
           <b className="font-extrabold">{short(c.name)}</b> {what}
           {greetings > 0 && <span className="text-muted-foreground"> · {greetings} {greetings === 1 ? "hilsen" : "hilsner"}</span>}
         </p>
-        <div className="ml-auto flex flex-none items-center gap-2">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           {summary.total > 0 && <ReactionBubbles summary={summary} size={22} />}
           <ReactButton compact summary={summary} disabled={!fr.canInteract} className="flex-none"
             onSet={(reaction) => fr.setReaction.mutate({ targetType: c.type, targetKey: key, reaction })} />
