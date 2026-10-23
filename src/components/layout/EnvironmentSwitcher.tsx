@@ -24,13 +24,14 @@ export function EnvironmentSwitcher({ className, compact = false }: EnvironmentS
         variant="default"
         onClick={isMainMode ? switchToDashboard : switchToMain}
         className={cn(
-          "gap-2 h-12 px-4 rounded-2xl border border-[hsl(var(--cph-emerald)/0.5)]",
+          "gap-2 h-12 max-md:min-h-11 max-md:min-w-11 px-4 rounded-2xl border border-[hsl(var(--cph-emerald)/0.5)]",
           "bg-[hsl(var(--cph-emerald)/0.16)] text-[hsl(var(--cph-emerald))]",
           "hover:bg-[hsl(var(--cph-emerald)/0.26)] hover:text-[hsl(var(--cph-emerald))]",
           "transition-all duration-200",
           className
         )}
         title={isMainMode ? "Gå til Dashboards" : "Gå til Hovedsystem"}
+        aria-label={isMainMode ? "Gå til Dashboards" : "Gå til Hovedsystem"}
       >
         <LayoutDashboard className="h-5 w-5" />
         <span className="text-sm font-extrabold">Dashboards</span>

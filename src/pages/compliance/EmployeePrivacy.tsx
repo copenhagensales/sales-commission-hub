@@ -34,7 +34,7 @@ export default function EmployeePrivacy() {
   return (
     <MainLayout>
       <div className="max-w-3xl mx-auto space-y-6 p-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/compliance")} className="gap-2 text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/compliance")} className="gap-2 text-muted-foreground max-md:hidden">
           <ArrowLeft className="h-4 w-4" /> Tilbage til oversigt
         </Button>
 

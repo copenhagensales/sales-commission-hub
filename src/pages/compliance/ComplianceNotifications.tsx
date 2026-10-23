@@ -128,7 +128,7 @@ export default function ComplianceNotifications() {
           variant="ghost"
           size="sm"
           onClick={() => navigate("/compliance")}
-          className="gap-2 text-muted-foreground"
+          className="gap-2 text-muted-foreground max-md:hidden"
         >
           <ArrowLeft className="h-4 w-4" /> Tilbage til oversigt
         </Button>

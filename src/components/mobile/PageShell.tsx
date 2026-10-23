@@ -88,7 +88,7 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
     <>
       <TopBar title={title ?? "Stork"} showBack={showBack} right={<>{right}{moreButton}</>} />
       <div
-        className={cn("min-w-0 max-w-full overflow-x-hidden")}
+        className={cn("min-w-0 max-w-full overflow-x-hidden [&_iframe]:max-w-full [&_img]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto")}
         style={{ paddingBottom: `calc(${BOTTOM_NAV_HEIGHT + stickyActionSpace}px + env(safe-area-inset-bottom, 0px) + 16px)` }}
       >
         <MoreActionsContext.Provider value={ctx}>{children}</MoreActionsContext.Provider>

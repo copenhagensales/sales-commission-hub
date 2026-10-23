@@ -1,3 +1,4 @@
+import { YearSelect } from "@/components/mobile/YearSelect";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Target, Plus, Pencil, Trash2, Users, Calendar, Lightbulb, ChevronDown, ChevronUp, Sparkles, RotateCcw } from "lucide-react";
 import { useState, useMemo } from "react";
@@ -274,16 +275,8 @@ export default function TeamGoals() {
             <div className="flex flex-wrap gap-4">
               <div className="w-32">
                 <Label className="text-xs text-muted-foreground mb-1 block">År</Label>
-                <Select value={String(filterYear)} onValueChange={(v) => setFilterYear(Number(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <YearSelect value={filterYear} onChange={setFilterYear}
+                  years={[currentYear - 1, currentYear, currentYear + 1]} />
               </div>
               <div className="w-40">
                 <Label className="text-xs text-muted-foreground mb-1 block">Måned</Label>
