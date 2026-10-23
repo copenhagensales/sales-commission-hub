@@ -7,17 +7,17 @@ import { ViewAsBanner } from "./ViewAsBanner";
 import { CompleteProfileBanner } from "./CompleteProfileBanner";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { LeagueAnnouncementPopup } from "@/components/league/LeagueAnnouncementPopup";
 import { PulseSurveyPopup } from "@/components/pulse/PulseSurveyPopup";
 import { CodeOfConductReminderPopup } from "@/components/code-of-conduct/CodeOfConductReminderPopup";
-import { Menu, PanelLeft } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { cn } from "@/lib/utils";
+import { PageShell, DraftGuardNavigationListener, useBottomTabs, useIsPhone } from "@/components/mobile";
 
 // Context for sidebar state
 interface SidebarContextType {
@@ -43,7 +43,10 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const { isPreviewMode } = useRolePreview();
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isPhone = useIsPhone();
+  const { pathname } = useLocation();
+  const tabs = useBottomTabs();
+  const isTabRoot = tabs.some((t) => t.to === pathname) || pathname === "/";
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Choose sidebar based on preview mode
@@ -62,6 +65,19 @@ export function MainLayout({ children }: MainLayoutProps) {
           {/* Complete profile banner for new employees */}
           {!isPreviewMode && <CompleteProfileBanner />}
           
+          <DraftGuardNavigationListener />
+          {isPhone ? (
+            /* Telefon (< 768 px): topbjælke + bundnavigation; den gamle menu ligger under »Mere«. */
+            <PageShell
+              title={<img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" onClick={() => navigate("/")} />}
+              showBack={!isTabRoot}
+              right={<EnvironmentSwitcher compact />}
+              moreMenu={(close) => <SidebarComponent isMobile onNavigate={close} />}
+            >
+              <main className="min-w-0 p-4">{children}</main>
+            </PageShell>
+          ) : (
+            <>
           {/* Desktop sidebar */}
           <div className="hidden md:block">
             <SidebarComponent isCollapsed={isCollapsed} onToggle={toggle} />
@@ -82,44 +98,20 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           )}
           
-          {/* Mobile header with burger menu */}
-          <div className={`md:hidden fixed left-0 right-0 z-50 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10 h-16" : "top-0 pt-safe h-[calc(4rem+env(safe-area-inset-top,0px))]"}`}>
-            <div 
-              onClick={() => navigate("/")} 
-              className="flex items-center cursor-pointer"
-            >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Environment Switcher - Mobile */}
-              <EnvironmentSwitcher compact />
-              
-              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 border-primary h-12 w-12">
-                    <Menu className="h-7 w-7" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-                  <SidebarComponent isMobile onNavigate={() => setMobileMenuOpen(false)} />
-                </SheetContent>
-              </Sheet>
-            </div>
-          </div>
-          
-          
           {/* Main content with responsive margin */}
           <main className={cn(
             "min-h-[100dvh] transition-all duration-300 ease-in-out",
             isCollapsed ? "md:ml-0" : "md:ml-64",
-            isPreviewMode ? "pt-26 md:pt-10" : "pt-[calc(4rem+env(safe-area-inset-top,0px))] md:pt-0"
+            isPreviewMode ? "pt-10" : "pt-0"
           )}>
             <div className="p-4 md:p-8">
               {children}
             </div>
           </main>
           
+            </>
+          )}
+
           {/* Popup for pending absence requests - shown to team leaders (skip in preview mode) */}
           {!isPreviewMode && <PendingAbsencePopup />}
           

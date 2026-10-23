@@ -1,5 +1,6 @@
 import { lazy } from "react";
-export { default as Home } from "@/pages/Home";
+// Hjem hentes også sent, så grafbiblioteket (recharts) ikke ligger i første indlæsning.
+export const Home = lazy(() => import("@/pages/Home"));
 
 export const TdcOpsummeringPublic = lazy(() => import("@/pages/TdcOpsummeringPublic"));
 export const TdcSalgPublic = lazy(() => import("@/pages/TdcSalgPublic"));

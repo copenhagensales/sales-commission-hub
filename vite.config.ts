@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         scope: "/",
         display: "standalone",
-        orientation: "portrait-primary",
+        orientation: "any",
         theme_color: "#2e3136",
         background_color: "#e6f0f1",
         lang: "da",
@@ -91,22 +91,13 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-twilio': ['@twilio/voice-sdk'],
-          'vendor-recharts': ['recharts'],
-          'vendor-tiptap': [
-            '@tiptap/react',
-            '@tiptap/starter-kit',
-            '@tiptap/extension-placeholder',
-            '@tiptap/extension-table',
-            '@tiptap/extension-table-cell',
-            '@tiptap/extension-table-header',
-            '@tiptap/extension-table-row',
-            '@tiptap/extension-text-align',
-            '@tiptap/extension-underline',
-          ],
-          'vendor-xlsx': ['exceljs'],
-          'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+        // Kun biblioteker, der hentes sent, får egne navngivne chunks. Biblioteker må aldrig lægges i en
+        // manuel chunk sammen med fælles hjælpere, da det får første indlæsning til at forudindlæse dem.
+        manualChunks(id: string) {
+          if (!id.includes("/node_modules/")) return undefined;
+          if (id.includes("/node_modules/@twilio/")) return "vendor-twilio";
+          if (id.includes("/node_modules/exceljs/")) return "vendor-xlsx";
+          return undefined;
         },
       },
     },

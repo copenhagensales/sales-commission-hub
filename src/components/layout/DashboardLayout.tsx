@@ -4,14 +4,14 @@ import { LockOverlays } from "./LockOverlays";
 import { RolePreviewBanner } from "./RolePreviewBanner";
 import { ViewAsBanner } from "./ViewAsBanner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
-import { useNavigate } from "react-router-dom";
-import { Menu, PanelLeft } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { cn } from "@/lib/utils";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { isTvMode } from "@/utils/tvMode";
+import { PageShell, DraftGuardNavigationListener, useBottomTabs, useIsPhone } from "@/components/mobile";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -20,7 +20,10 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { isPreviewMode } = useRolePreview();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isPhone = useIsPhone();
+  const { pathname } = useLocation();
+  const tabs = useBottomTabs();
+  const isTabRoot = tabs.some((t) => t.to === pathname);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Detect TV mode - skip all auth-dependent components
@@ -42,6 +45,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <ViewAsBanner />
         <RolePreviewBanner />
         
+        <DraftGuardNavigationListener />
+        {isPhone ? (
+          /* Telefon (< 768 px): topbjælke + bundnavigation; dashboard-menuen ligger under »Mere«. */
+          <PageShell
+            title={<img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" onClick={() => navigate("/")} />}
+            showBack={!isTabRoot}
+            moreMenu={(close) => <DashboardSidebar isMobile onNavigate={close} />}
+          >
+            <main className="min-w-0 p-4">{children}</main>
+          </PageShell>
+        ) : (
+          <>
         {/* Desktop sidebar */}
         <div className="hidden md:block">
           <DashboardSidebar 
@@ -65,38 +80,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </Button>
         )}
         
-        {/* Mobile header with menu trigger */}
-        <div className={`md:hidden fixed left-0 right-0 z-50 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10 h-14" : "top-0 pt-safe h-[calc(3.5rem+env(safe-area-inset-top,0px))]"}`}>
-          <div 
-            onClick={() => navigate("/")} 
-            className="flex items-center cursor-pointer"
-          >
-            <img src={cphSalesLogo} alt="CPH Sales" className="h-12 w-auto object-contain" />
-          </div>
-          
-          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 border-primary h-12 w-12">
-                <Menu className="h-7 w-7" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-              <DashboardSidebar isMobile onNavigate={() => setSidebarOpen(false)} />
-            </SheetContent>
-          </Sheet>
-        </div>
-        
         {/* Main content with sidebar margin on desktop */}
         <main className={cn(
           "min-h-[100dvh] transition-all duration-300 ease-in-out",
           isCollapsed ? "md:ml-0" : "md:ml-64",
-          isPreviewMode ? "pt-24 md:pt-10" : "pt-[calc(3.5rem+env(safe-area-inset-top,0px))] md:pt-0"
+          isPreviewMode ? "pt-10" : "pt-0"
         )}>
           <div className="p-4 md:p-8">
             {children}
           </div>
         </main>
         
+          </>
+        )}
+
         {/* Softphone Widget */}
         <SoftphoneWidget />
       </div>
