@@ -205,8 +205,9 @@ function MilestonesSheet({ open, onOpenChange, houseItems, teamId, teamName, ena
 
 /** Lille onyx-version til forsiden: 3 rækker + antal. */
 export function TodayMilestonesMini({ enabled }: { enabled: boolean }) {
-  const q = usePulsenMilestonesToday({ kind: "house" }, enabled, 3);
-  const items = q.data?.items ?? [];
+  // Samme cache som Storkbook-siden (dagens milepæle er få); forsiden viser kun 3.
+  const q = usePulsenMilestonesToday({ kind: "house" }, enabled);
+  const items = (q.data?.items ?? []).slice(0, 3);
   const fr = useFeedReactions(items.map((m) => milestoneTargetKey(m.id)));
   const count = q.data?.count ?? 0;
   return (
@@ -218,6 +219,8 @@ export function TodayMilestonesMini({ enabled }: { enabled: boolean }) {
       </div>
       {q.isLoading ? (
         <div className="mt-3 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-xl bg-[hsl(var(--cph-light-blue)/0.12)]" />)}</div>
+      ) : q.isError ? (
+        <button type="button" onClick={() => q.refetch()} className="mt-3 min-h-[44px] text-left text-[14px] font-extrabold">Kunne ikke hentes · Prøv igen</button>
       ) : items.length === 0 ? (
         <p className="mt-3 text-[14px] opacity-75">Ingen milepæle endnu i dag.</p>
       ) : (
