@@ -98,6 +98,7 @@ export const LoginLog = lazyPage(() => import("@/pages/LoginLog"));
 
 // Team Dashboards
 export const DashboardHome = lazyPage(() => import("@/pages/dashboards/DashboardHome"));
+export const HiperDashboard = lazyPage(() => import("@/pages/HiperDashboard"));
 export const EesyTmDashboard = lazyPage(() => import("@/pages/EesyTmDashboard"));
 export const FieldmarketingDashboardFull = lazyPage(() => import("@/pages/dashboards/FieldmarketingDashboardFull"));
 export const AseFmDashboard = lazyPage(() => import("@/pages/dashboards/AseFmDashboard"));
