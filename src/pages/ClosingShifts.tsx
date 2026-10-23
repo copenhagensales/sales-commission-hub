@@ -404,7 +404,7 @@ export default function ClosingShifts() {
 
   return (
     <MainLayout>
-      <div className="p-6 space-y-6">
+      <div className="p-6 max-md:p-0 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Påmindelser</h1>
           <p className="text-muted-foreground mt-1">
@@ -436,7 +436,7 @@ export default function ClosingShifts() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 max-md:flex-wrap">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>Afsendelsestidspunkt (dansk tid):</span>
