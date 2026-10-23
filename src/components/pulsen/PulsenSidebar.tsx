@@ -14,7 +14,7 @@ function SideCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-export function PulsenSidebar({ employeeId, onOpenQuestion }: { employeeId: string | null; onOpenQuestion: (id: string) => void }) {
+export function PulsenSidebar({ employeeId, onOpenQuestion, top, className }: { employeeId: string | null; onOpenQuestion: (id: string) => void; top?: React.ReactNode; className?: string }) {
   const { data: events = [], isLoading } = useUpcomingCompanyEvents();
   const next = events.slice(0, 3);
   const { data: attendees = [] } = useEventAttendees(events.map((e) => e.id));
@@ -23,7 +23,8 @@ export function PulsenSidebar({ employeeId, onOpenQuestion }: { employeeId: stri
   const myStatus = (id: string) => attendees.find((a) => a.event_id === id && a.employee_id === employeeId)?.status as AttendanceStatus | undefined;
 
   return (
-    <aside className="flex flex-col gap-4" aria-label="Storkbook sidekolonne">
+    <aside className={cn("flex flex-col gap-4", className)} aria-label="Storkbook sidekolonne">
+      {top}
       <SideCard title="Kommer snart">
         {isLoading ? (
           <p className="text-[14px] text-muted-foreground">Henter …</p>
@@ -51,11 +52,11 @@ export function PulsenSidebar({ employeeId, onOpenQuestion }: { employeeId: stri
                     aria-label={mine === "attending" ? `Du deltager i ${e.title}` : `Tilmeld dig ${e.title}`}
                     onClick={() => toggle.mutate({ eventId: e.id, status: mine === "attending" ? "not_attending" : "attending" })}
                     className={cn(
-                      "min-h-[44px] flex-none rounded-full px-3 text-[13px] font-extrabold",
-                      mine === "attending" ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]" : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                      "min-h-[36px] flex-none rounded-full px-3 text-[12px] font-extrabold",
+                      mine === "attending" ? "bg-[#d6f7e5] text-[#146c3c]" : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
                     )}
                   >
-                    {mine === "attending" ? "Tilmeldt" : "Tilmeld"}
+                    {mine === "attending" ? "✓ Tilmeldt" : "Tilmeld"}
                   </button>
                 </li>
               );

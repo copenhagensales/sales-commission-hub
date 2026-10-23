@@ -58,7 +58,7 @@ import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 import { HeroPerformanceCard } from "@/components/home/HeroPerformanceCard";
 import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { CelebrationStrip } from "@/components/home/CelebrationStrip";
-import { PulsenLatestCard } from "@/components/pulsen/PulsenLatestCard";
+import { HomeStorkbookModule } from "@/components/pulsen/HomeStorkbookModule";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
@@ -376,16 +376,18 @@ const Home = () => {
           />
         </div>
 
+        {/* Storkbook-modul – erstatter det store fødselsdagskort og "Seneste fra Storkbook" */}
+        {canViewPermission("menu_pulsen") && (
+          <HomeStorkbookModule employeeId={employee?.id} firstName={firstName} celebrations={todayCelebrations} />
+        )}
+
         {/* Din opstart – kun inden for de første 40 arbejdsdage */}
         <RampCurveCard hideWhenCompleted />
 
-        {/* Today's Celebrations - Only if there are any */}
-        {todayCelebrations.length > 0 && (
+        {/* Uden Storkbook-adgang vises fejringerne som før */}
+        {!canViewPermission("menu_pulsen") && todayCelebrations.length > 0 && (
           <CelebrationStrip celebrations={todayCelebrations} />
         )}
-
-        {/* Seneste fra Pulsen – kompakt, kun Huset */}
-        <PulsenLatestCard enabled={canViewPermission("menu_pulsen")} />
 
 
         {/* ZONE 2: Liga + kommende begivenheder */}

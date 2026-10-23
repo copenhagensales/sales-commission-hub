@@ -60,6 +60,24 @@ export const scopeKey = (s: PulsenScope) => (s.kind === "house" ? "house" : `tea
 const feedKey = (s: PulsenScope) => ["pulsen-feed", scopeKey(s)];
 export const postTargetKey = (id: string) => `pulsen_post:${id}`;
 
+/** Den indloggedes eget navn/rolle til optimistiske indlæg. */
+export function usePulsenSelf(employeeId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pulsen-self", employeeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, job_title")
+        .eq("id", employeeId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data as PersonRef | null;
+    },
+    enabled: !!employeeId,
+    staleTime: 600000,
+  });
+}
+
 export function usePulsenMe() {
   const { data: employeeId, isLoading } = useCurrentEmployeeId();
   const { isOwner, canEdit } = usePermissions();
@@ -94,20 +112,7 @@ export function usePulsenMe() {
     enabled: !!employeeId,
     staleTime: 300000,
   });
-  const self = useQuery({
-    queryKey: ["pulsen-self", employeeId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, job_title")
-        .eq("id", employeeId as string)
-        .maybeSingle();
-      if (error) throw error;
-      return data as PersonRef | null;
-    },
-    enabled: !!employeeId,
-    staleTime: 600000,
-  });
+  const self = usePulsenSelf(employeeId);
   const led = ledTeams.data ?? [];
   return {
     employeeId: employeeId ?? null,
@@ -367,32 +372,34 @@ export function usePulsenUnanswered(enabled: boolean) {
 }
 
 
-export interface PulsenLatestItem extends PulsenPost { reactions: number; comments: number }
-
-/** De nyeste Huset-indlæg til forsidens kompakte kort (samme RLS som feedet). */
-export function usePulsenLatest(enabled: boolean, limit = 3) {
+/** De nyeste Huset-indlæg til forsidens Storkbook-modul (samme RLS som feedet). Tællinger kommer fra useFeedReactions. */
+export function usePulsenLatestPosts(enabled: boolean, limit = 3) {
   return useQuery({
-    queryKey: ["pulsen-latest", limit],
-    queryFn: async (): Promise<PulsenLatestItem[]> => {
+    queryKey: ["pulsen-latest-posts", limit],
+    queryFn: async (): Promise<PulsenPost[]> => {
       const { data, error } = await supabase
         .from("pulsen_posts").select(POST_SELECT)
         .eq("audience", "house").is("deleted_at", null).is("hidden_at", null)
         .order("created_at", { ascending: false }).limit(limit);
       if (error) throw error;
-      const posts = (data ?? []) as unknown as PulsenPost[];
-      if (posts.length === 0) return [];
-      const keys = posts.map((p) => postTargetKey(p.id));
-      const [r, c] = await Promise.all([
-        supabase.from("feed_reactions").select("target_key").in("target_key", keys),
-        supabase.from("feed_comments").select("target_key").in("target_key", keys),
-      ]);
-      if (r.error) throw r.error;
-      if (c.error) throw c.error;
-      const count = (rows: { target_key: string }[] | null, k: string) => (rows ?? []).filter((x) => x.target_key === k).length;
-      return posts.map((p) => ({ ...p, reactions: count(r.data, postTargetKey(p.id)), comments: count(c.data, postTargetKey(p.id)) }));
+      return attachPraised((data ?? []) as unknown as PulsenPost[]);
     },
     enabled,
     staleTime: 60000,
+  });
+}
+
+/** Tidspunkt for sidste besøg i Storkbook (læses kun; nulstilles kun af /storkbook). */
+export function usePulsenLastSeen(employeeId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pulsen-last-seen", employeeId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("pulsen_last_seen").select("last_seen_house").eq("employee_id", employeeId as string).maybeSingle();
+      if (error) throw error;
+      return data?.last_seen_house ?? null;
+    },
+    enabled: !!employeeId,
+    staleTime: 120000,
   });
 }
 
@@ -436,6 +443,34 @@ export function usePulsenMilestones(scope: PulsenScope, enabled: boolean, limit 
     },
     enabled,
     staleTime: 60000,
+  });
+}
+
+/** Dagens milepæle (dansk døgn) for Huset eller ét team: de nyeste `limit` + samlet antal. */
+export function usePulsenMilestonesToday(scope: PulsenScope, enabled: boolean, limit = 100) {
+  const day = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" });
+  return useQuery({
+    queryKey: ["pulsen-milestones-today", scopeKey(scope), day, limit],
+    queryFn: async () => {
+      let q = supabase.from("pulsen_milestones")
+        .select("id, milestone_type, employee_id, team_id, period_key, level, value, payload, shown_in_house, occurred_at", { count: "exact" })
+        .neq("milestone_type", "first_sale")
+        .gte("occurred_at", startOfDay(new Date()).toISOString());
+      if (scope.kind === "house") {
+        q = q.eq("shown_in_house", true);
+      } else {
+        const { data: members, error: mErr } = await supabase.from("team_members").select("employee_id").eq("team_id", scope.teamId);
+        if (mErr) throw mErr;
+        const ids = [...new Set((members ?? []).map((m) => m.employee_id))];
+        q = ids.length ? q.or(`team_id.eq.${scope.teamId},employee_id.in.(${ids.join(",")})`) : q.eq("team_id", scope.teamId);
+      }
+      const { data, error, count } = await q.order("occurred_at", { ascending: false }).limit(limit);
+      if (error) throw error;
+      return { items: (data ?? []) as unknown as PulsenMilestone[], count: count ?? 0 };
+    },
+    enabled,
+    staleTime: 60000,
+    refetchInterval: 120000,
   });
 }
 

@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { useSearchParams } from "react-router-dom";
-import { Lock, Sun, Users } from "lucide-react";
-import { startOfDay } from "date-fns";
+import { ChevronDown, Lock, Sun, Users } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CelebrationStrip } from "@/components/home/CelebrationStrip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CelebrationLines } from "@/components/pulsen/CelebrationLine";
+import { TodayMilestonesCard } from "@/components/pulsen/TodayMilestones";
+import { MilestoneHeroCard } from "@/components/pulsen/MilestoneHeroCard";
 import { EventRsvpCard } from "@/components/home/EventRsvpCard";
 import { EventDetailDialog } from "@/components/home/EventDetailDialog";
 import { EditEventDialog } from "@/components/home/EditEventDialog";
 import { AddEventDialog } from "@/components/home/AddEventDialog";
-import { PulsenComposer } from "@/components/pulsen/PulsenComposer";
+import { PulsenComposer, type Mode as ComposeMode } from "@/components/pulsen/PulsenComposer";
 import { PulsenPostCard } from "@/components/pulsen/PulsenPostCard";
 import { PulsenSidebar } from "@/components/pulsen/PulsenSidebar";
-import { PulsenMilestoneItem } from "@/components/pulsen/PulsenMilestoneItem";
 import { ReactButton } from "@/components/home/FeedReactionRow";
 import { PulsenEmpty, PulsenError, PulsenPostSkeleton } from "@/components/pulsen/PulsenStates";
 import { useCelebrations } from "@/hooks/useCelebrations";
@@ -22,17 +22,15 @@ import {
 } from "@/hooks/useCompanyEvents";
 import { useFeedReactions } from "@/hooks/useFeedReactions";
 import {
-  milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, usePulsenMe, usePulsenMilestones,
-  usePulsenMilestonesYesterday, usePulsenMutations, usePulsenTopline,
-  type PulsenMilestone, type PulsenPost, type PulsenScope,
+  milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, usePulsenMe,
+  usePulsenMilestonesToday, usePulsenMutations,
+  type PulsenPost, type PulsenScope,
 } from "@/hooks/usePulsen";
 import { cn } from "@/lib/utils";
 
 type FeedItem =
   | { kind: "post"; at: number; post: PulsenPost }
-  | { kind: "event"; at: number; eventId: string }
-  | { kind: "celebrations"; at: number }
-  | { kind: "milestone"; at: number; milestone: PulsenMilestone };
+  | { kind: "event"; at: number; eventId: string };
 
 export default function Pulsen() {
   useEffect(() => {
@@ -55,6 +53,8 @@ export default function Pulsen() {
   const posts = useMemo(() => feed.data?.pages.flat() ?? [], [feed.data]);
   // Link fra forsiden: /storkbook?post=<id> ruller til indlægget, når det er indlæst.
   const [searchParams] = useSearchParams();
+  const composeParam = searchParams.get("compose");
+  const initialCompose = (["post", "praise", "question", "image"].includes(composeParam ?? "") ? composeParam : null) as ComposeMode | null;
   const deepPostId = searchParams.get("post");
   const deepDone = useRef(false);
   useEffect(() => {
@@ -66,12 +66,13 @@ export default function Pulsen() {
 
   const mut = usePulsenMutations(me.self);
 
-  // Kun Huset-indlæg har reaktioner/kommentarer (databasen afviser team-indhold).
-  const milestones = usePulsenMilestones(scope, !!me.employeeId);
+  // Dagens højdepunkt: kun husrekord/teamrekord, højst ét (samme hook som højrekolonnen).
+  const today = usePulsenMilestonesToday(scope, !!me.employeeId);
+  const highlight = (today.data?.items ?? []).find((m) => m.milestone_type === "house_record" || m.milestone_type === "team_record") ?? null;
   // Indlæg har reaktioner i både Huset og team; milepæle kun i Huset.
   const houseKeys = [
     ...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)),
-    ...(isHouse ? (milestones.data ?? []).map((m) => milestoneTargetKey(m.id)) : []),
+    ...(isHouse && highlight ? [milestoneTargetKey(highlight.id)] : []),
   ];
   const fr = useFeedReactions(houseKeys);
 
@@ -81,8 +82,6 @@ export default function Pulsen() {
   const { data: attendees = [] } = useEventAttendees(events.map((e) => e.id));
   const toggleAttendance = useToggleEventAttendance(me.employeeId);
   const deleteEvent = useDeleteCompanyEvent();
-  const topline = usePulsenTopline(!!me.employeeId);
-  const milestonesYesterday = usePulsenMilestonesYesterday(!!me.employeeId);
   // Ulæst-badge nulstilles, når siden åbnes.
   const markSeen = useMarkPulsenSeen();
   const seenDone = useRef(false);
@@ -91,26 +90,18 @@ export default function Pulsen() {
     seenDone.current = true;
     markSeen.mutate(me.employeeId);
   }, [me.employeeId, markSeen]);
-  const yesterdayWinner = topline.data?.teams.reduce<{ name: string; yesterday: number } | null>(
-    (best, t) => (t.yesterday > (best?.yesterday ?? 0) ? t : best), null);
 
   const items: FeedItem[] = useMemo(() => {
     const list: FeedItem[] = posts.map((p) => ({ kind: "post", at: new Date(p.created_at).getTime(), post: p }));
     const oldestPost = feed.hasNextPage && posts.length ? new Date(posts[posts.length - 1].created_at).getTime() : -Infinity;
-    (milestones.data ?? []).forEach((m) => {
-      const at = new Date(m.occurred_at).getTime();
-      if (at >= oldestPost) list.push({ kind: "milestone", at, milestone: m });
-    });
     if (isHouse) {
-      const oldest = feed.hasNextPage && posts.length ? new Date(posts[posts.length - 1].created_at).getTime() : -Infinity;
       events.forEach((e) => {
         const at = new Date(e.created_at).getTime();
-        if (at >= oldest) list.push({ kind: "event", at, eventId: e.id });
+        if (at >= oldestPost) list.push({ kind: "event", at, eventId: e.id });
       });
-      if (todayCelebrations.length) list.push({ kind: "celebrations", at: startOfDay(new Date()).getTime() });
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [posts, events, isHouse, todayCelebrations.length, feed.hasNextPage, milestones.data]);
+  }, [posts, events, isHouse, feed.hasNextPage]);
 
   const attendingFor = (id: string) => attendees.filter((a) => a.event_id === id && a.status === "attending");
   const myStatus = (id: string) => (attendees.find((a) => a.event_id === id && a.employee_id === me.employeeId)?.status ?? null) as AttendanceStatus | null;
@@ -142,21 +133,6 @@ export default function Pulsen() {
     return (
       <div className="flex flex-col gap-4">
         {items.map((item) => {
-          if (item.kind === "milestone") {
-            const m = item.milestone;
-            const key = milestoneTargetKey(m.id);
-            return (
-              <PulsenMilestoneItem
-                key={`ms-${m.id}`}
-                milestone={m}
-                reaction={isHouse && m.shown_in_house ? (
-                  <ReactButton compact summary={fr.getReactions(key)} disabled={!fr.canInteract}
-                    onSet={(reaction) => fr.setReaction.mutate({ targetType: "milestone", targetKey: key, reaction })} />
-                ) : undefined}
-              />
-            );
-          }
-          if (item.kind === "celebrations") return <CelebrationStrip key="celebrations" variant="flat" celebrations={todayCelebrations} />;
           if (item.kind === "event") {
             const e = events.find((x) => x.id === item.eventId);
             if (!e) return null;
@@ -247,7 +223,7 @@ export default function Pulsen() {
       <AddEventDialog open={addEventOpen} onOpenChange={setAddEventOpen} />
 
       <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8">
-        <div className="mx-auto grid w-full max-w-[1004px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,680px)_300px] 2xl:max-w-[1164px] 2xl:grid-cols-[minmax(0,680px)_460px]">
+        <div className="mx-auto grid w-full max-w-[1004px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,680px)_320px]">
           <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
@@ -262,23 +238,27 @@ export default function Pulsen() {
                   className={cn("min-h-[40px] rounded-full px-4 text-[14px] font-extrabold", isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                   Huset
                 </button>
-                {team && (
+                {team && me.teams.length > 1 ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" role="tab" aria-selected={!isHouse} aria-label={`Team: ${team.name}. Vælg team`}
+                        className={cn("flex min-h-[40px] max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                        <span className="truncate">{team.name}</span><ChevronDown className="h-4 w-4 flex-none" aria-hidden="true" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="rounded-2xl">
+                      {me.teams.map((t) => (
+                        <DropdownMenuItem key={t.id} className="min-h-[44px] font-extrabold" onSelect={() => { setTeamId(t.id); setTab("team"); }}>{t.name}</DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : team && (
                   <button type="button" role="tab" aria-selected={!isHouse} onClick={() => setTab("team")}
                     className={cn("min-h-[40px] max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                     {team.name}
                   </button>
                 )}
               </div>
-              {me.teams.length > 1 && (
-                <Select value={team?.id} onValueChange={(v) => { setTeamId(v); setTab("team"); }}>
-                  <SelectTrigger aria-label="Vælg team" className="h-11 w-[200px] rounded-full border-0 bg-card font-extrabold">
-                    <SelectValue placeholder="Vælg team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {me.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
             </header>
 
             {me.employeeId && (
@@ -290,13 +270,43 @@ export default function Pulsen() {
                 team={team}
                 onSubmit={(input, localUrl) => mut.create.mutateAsync({ input, id: crypto.randomUUID(), localUrl: localUrl ?? undefined })}
                 onOpenEvent={() => setAddEventOpen(true)}
+                initialMode={initialCompose}
+              />
+            )}
+
+            {me.employeeId && (
+              <TodayMilestonesCard layout="strip" isHouse={isHouse} teamId={team?.id ?? null} teamName={team?.name ?? null} enabled />
+            )}
+
+            {isHouse && <CelebrationLines celebrations={todayCelebrations} />}
+
+            {highlight && (
+              <MilestoneHeroCard
+                value={Math.round(Number(highlight.value)).toLocaleString("da-DK")}
+                unit="salg"
+                eyebrow={`Dagens højdepunkt · ${highlight.milestone_type === "house_record" ? "Husrekord" : "Teamrekord"}`}
+                title={highlight.milestone_type === "house_record" ? "Ny husrekord på én dag" : (highlight.payload?.text ?? "Ny teamrekord").replace(/\*\*/g, "").replace(/:.*$/, "")}
+                subtitle={highlight.payload?.previous != null ? `Før: ${Math.round(Number(highlight.payload.previous)).toLocaleString("da-DK")} salg` : undefined}
+                footer={isHouse && highlight.shown_in_house ? (
+                  <ReactButton compact summary={fr.getReactions(milestoneTargetKey(highlight.id))} disabled={!fr.canInteract}
+                    onSet={(reaction) => fr.setReaction.mutate({ targetType: "milestone", targetKey: milestoneTargetKey(highlight.id), reaction })} />
+                ) : undefined}
               />
             )}
 
             {renderBody()}
+
+            <PulsenSidebar className="lg:hidden" employeeId={me.employeeId} onOpenQuestion={scrollToPost} />
           </div>
 
-          <PulsenSidebar employeeId={me.employeeId} onOpenQuestion={scrollToPost} />
+          <div className="hidden lg:block">
+            <PulsenSidebar
+              className="sticky top-6"
+              employeeId={me.employeeId}
+              onOpenQuestion={scrollToPost}
+              top={me.employeeId ? <TodayMilestonesCard layout="card" isHouse={isHouse} teamId={team?.id ?? null} teamName={team?.name ?? null} enabled /> : null}
+            />
+          </div>
         </div>
       </div>
     </MainLayout>
