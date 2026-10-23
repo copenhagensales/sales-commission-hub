@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Menu } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsPhone } from "./useIsPhone";
 import { BottomNav, BOTTOM_NAV_HEIGHT, tabRootFor, useBottomTabs } from "./BottomNav";
 import { BottomSheet } from "./BottomSheet";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ interface PageShellProps {
  * På ≥ 768 px renderes kun children uændret.
  */
 export function PageShell({ children, title, showBack, right, moreMenu, stickyActionSpace = 0 }: PageShellProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsPhone();
   const [moreOpen, setMoreOpen] = useState(false);
   if (!isMobile) return <>{children}</>;
 

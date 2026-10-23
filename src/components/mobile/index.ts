@@ -9,3 +9,4 @@ export { SkeletonList, SkeletonCard, SkeletonKpi, RouteSkeleton } from "./Skelet
 export { KpiCard, KpiGrid, ChartFrame } from "./KpiCard";
 export { useDraftGuard, hasUnsentDrafts, requestSafeReload, DraftGuardNavigationListener } from "./DraftGuard";
 export { InstallHint } from "./InstallHint";
+export { useIsPhone } from "./useIsPhone";

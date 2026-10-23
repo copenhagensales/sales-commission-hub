@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsPhone } from "./useIsPhone";
 import { cn } from "@/lib/utils";
 
 export interface ResponsiveColumn<T> {
@@ -27,7 +27,7 @@ interface ResponsiveTableProps<T> {
  * Alle felter og handlinger kan nås i begge visninger.
  */
 export function ResponsiveTable<T>({ columns, rows, rowKey, actions, empty }: ResponsiveTableProps<T>) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsPhone();
   const [asTable, setAsTable] = useState(false);
   if (rows.length === 0) return <>{empty ?? <p className="p-4 text-muted-foreground">Ingen rækker.</p>}</>;
 
