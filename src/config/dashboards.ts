@@ -82,6 +82,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     permissionKey: "menu_dashboard_eesy_tm_monthly_goal"
   },
   {
+    slug: "hiper-monthly-goal",
+    name: "Hiper Månedsmål",
+    path: "/dashboards/hiper-monthly-goal",
+    description: "Hiper-teamets månedsmål – fælles og individuelle progressbarer",
+    permissionKey: "menu_dashboard_eesy_tm_monthly_goal"
+  },
+  {
     slug: "relatel-monthly-goal",
     name: "Relatel Månedsmål",
     path: "/dashboards/relatel-monthly-goal",

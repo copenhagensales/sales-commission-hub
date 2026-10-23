@@ -430,6 +430,42 @@ Deno.serve(async (req) => {
 
 
     // Første sælger der når sit individuelle månedsmål — låses permanent i DB
+    if (action === "hiper-monthly-goal") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const monthKey = url.searchParams.get("monthKey") || "";
+      if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+        return new Response(JSON.stringify({ error: "Ugyldig monthKey" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const cacheKey = `hiper-monthly-goal-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: hiperTeam } = await supabase.from("teams").select("id").eq("name", "Hiper").maybeSingle();
+      if (!hiperTeam?.id) {
+        return new Response(JSON.stringify({ sellers: [], items: [], goals: [], warning: "Teamet Hiper findes ikke" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleVoiceMonthlyGoal(
+        supabase,
+        null,
+        HIPER_BOARD_KEY_EF,
+        start,
+        end,
+        monthKey,
+        corsHeaders,
+        cacheKey,
+        hiperTeam.id,
+      );
+    }
+
     if (action === "monthly-goal-first-achiever") {
       return await handleMonthlyGoalFirstAchiever(supabase, req, corsHeaders);
     }
@@ -2917,35 +2953,73 @@ const YOUSEE_FM_CLIENT_ID_EF = "5011a7cd-bf07-4838-a63f-55a12c604b40";
 const YOUSEE_FM_BOARD_KEY_EF = "yousee-fm-monthly-goal";
 const EESY_TM_CLIENT_ID_EF = "81993a7b-ff24-46b8-8ffb-37a83138ddba";
 const EESY_TM_BOARD_KEY_EF = "eesy-tm-monthly-goal";
+const HIPER_BOARD_KEY_EF = "hiper-monthly-goal";
 
 async function handleVoiceMonthlyGoal(
   supabase: any,
-  clientId: string,
+  clientId: string | null,
   boardKey: string,
   startIso: string,
   endIso: string,
   monthKey: string,
   corsHeaders: Record<string, string>,
   cacheKey?: string,
+  /** Team-scope (Hiper): salg fra teamets aktive medlemmer på alle klienter. */
+  teamId?: string,
 ) {
   try {
     const warnings: string[] = [];
 
-    // 1. Salgslinjer på klienten i perioden
+    // 0. Team-scope: teamets aktive medlemmer og deres salgs-e-mails
+    const teamMemberIds: string[] = [];
+    const teamEmails: string[] = [];
+    if (teamId) {
+      const { data: memberRows, error: tmError } = await supabase
+        .from("team_members")
+        .select("employee_id, employee_master_data!inner(is_active, work_email)")
+        .eq("team_id", teamId)
+        .eq("employee_master_data.is_active", true);
+      if (tmError) throw tmError;
+      const emailSet = new Set<string>();
+      for (const m of (memberRows || []) as any[]) {
+        if (!m.employee_id) continue;
+        teamMemberIds.push(m.employee_id);
+        const we = m.employee_master_data?.work_email;
+        if (we) { emailSet.add(String(we)); emailSet.add(String(we).toLowerCase()); }
+      }
+      if (teamMemberIds.length > 0) {
+        const { data: maps, error: mErr } = await supabase
+          .from("employee_agent_mapping")
+          .select("agents(email)")
+          .in("employee_id", teamMemberIds);
+        if (mErr) throw mErr;
+        for (const m of (maps || []) as any[]) {
+          const e = m.agents?.email;
+          if (e) { emailSet.add(String(e)); emailSet.add(String(e).toLowerCase()); }
+        }
+      }
+      teamEmails.push(...emailSet);
+    }
+
+    // 1. Salgslinjer på klienten (eller fra teamets medlemmer) i perioden
     const items: { agentEmail: string | null; productId: string | null; productName: string | null; quantity: number; saleDate: string | null }[] = [];
     const saleEmails = new Set<string>();
     try {
       const pageSize = 1000;
       let from = 0;
-      while (true) {
-        const { data, error } = await supabase
+      while (!teamId || teamEmails.length > 0) {
+        let q = supabase
           .from("sales")
           .select(
-            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id, products(name))",
-          )
-          .eq("client_campaigns.client_id", clientId)
+            teamId
+              ? "agent_email, validation_status, sale_datetime, sale_items(quantity, product_id, products(name))"
+              : "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id, products(name))",
+          );
+        q = teamId ? q.in("agent_email", teamEmails) : q.eq("client_campaigns.client_id", clientId);
+        const { data, error } = await q
           .gte("sale_datetime", startIso)
           .lte("sale_datetime", endIso)
+          .order("id")
           .range(from, from + pageSize - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
@@ -2997,8 +3071,9 @@ async function handleVoiceMonthlyGoal(
       const employeeIds = new Set<string>(
         goals.map((g) => g.employeeId).filter((id): id is string => Boolean(id)),
       );
+      for (const id of teamMemberIds) employeeIds.add(id);
 
-      if (saleEmails.size > 0) {
+      if (!teamId && saleEmails.size > 0) {
         const emailList = Array.from(saleEmails);
         const { data: agentRows, error: agentError } = await supabase
           .from("agents")
@@ -3021,10 +3096,9 @@ async function handleVoiceMonthlyGoal(
 
       // Aktive medlemmer af klientens team(s), så teamlederen kan sætte mål
       // på alle — også før de har lavet salg i måneden.
-      const { data: teamClientRows, error: tcError } = await supabase
-        .from("team_clients")
-        .select("team_id")
-        .eq("client_id", clientId);
+      const { data: teamClientRows, error: tcError } = teamId
+        ? { data: [], error: null }
+        : await supabase.from("team_clients").select("team_id").eq("client_id", clientId);
       if (tcError) throw tcError;
       const teamIds = (teamClientRows || []).map((r: any) => r.team_id).filter(Boolean);
       if (teamIds.length > 0) {

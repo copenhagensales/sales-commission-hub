@@ -28,6 +28,7 @@ import RelatelMonthlyGoalBoard from "@/pages/dashboards/RelatelMonthlyGoalBoard"
 import EesyFmMonthlyGoalBoard from "@/pages/dashboards/EesyFmMonthlyGoalBoard";
 import YouseeFmMonthlyGoalBoard from "@/pages/dashboards/YouseeFmMonthlyGoalBoard";
 import EesyTmMonthlyGoalBoard from "@/pages/dashboards/EesyTmMonthlyGoalBoard";
+import HiperMonthlyGoalBoard from "@/pages/dashboards/HiperMonthlyGoalBoard";
 
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
@@ -40,6 +41,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "eesy-fm-monthly-goal": EesyFmMonthlyGoalBoard,
   "yousee-fm-monthly-goal": YouseeFmMonthlyGoalBoard,
   "eesy-tm-monthly-goal": EesyTmMonthlyGoalBoard,
+  "hiper-monthly-goal": HiperMonthlyGoalBoard,
   "relatel": RelatelDashboard,
   "united": UnitedDashboard,
   "cs-top-20": CsTop20Dashboard,
