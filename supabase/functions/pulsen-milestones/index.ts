@@ -73,7 +73,8 @@ Deno.serve(async (req) => {
     if (!dryRun && !activeFrom) return json({ error: "milestones_active_from mangler" }, 409);
 
     // Én type pr. kald for at holde hvert kald under statement-timeout.
-    const TYPES = ["first_sale", "record_day", "record_period", "club", "streak", "team_day_sales", "team_record", "house_record"];
+    // first_sale fejres ikke (Kasper 23/10-2026).
+    const TYPES = ["record_day", "record_period", "club", "streak", "team_day_sales", "team_record", "house_record"];
     const cands: Cand[] = [];
     const timings: Record<string, number> = {};
     for (const t of TYPES) {

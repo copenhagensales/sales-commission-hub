@@ -418,7 +418,9 @@ export function usePulsenMilestones(scope: PulsenScope, enabled: boolean, limit 
     queryKey: ["pulsen-milestones", scopeKey(scope), limit],
     queryFn: async () => {
       let q = supabase.from("pulsen_milestones")
-        .select("id, milestone_type, employee_id, team_id, period_key, level, value, payload, shown_in_house, occurred_at");
+        .select("id, milestone_type, employee_id, team_id, period_key, level, value, payload, shown_in_house, occurred_at")
+        // Første salg fejres ikke længere (Kasper 23/10-2026); gamle rækker bevares, men vises ikke.
+        .neq("milestone_type", "first_sale");
       if (scope.kind === "house") {
         q = q.eq("shown_in_house", true);
       } else {
@@ -490,7 +492,7 @@ export function usePulsenUnread(employeeId: string | null | undefined) {
       const [posts, ms] = await Promise.all([
         supabase.from("pulsen_posts").select("id", { count: "exact", head: true })
           .eq("audience", "house").is("deleted_at", null).is("hidden_at", null).neq("author_employee_id", employeeId as string).gt("created_at", since),
-        supabase.from("pulsen_milestones").select("id", { count: "exact", head: true }).eq("shown_in_house", true).gt("occurred_at", since),
+        supabase.from("pulsen_milestones").select("id", { count: "exact", head: true }).eq("shown_in_house", true).neq("milestone_type", "first_sale").gt("occurred_at", since),
       ]);
       if (posts.error) throw posts.error;
       if (ms.error) throw ms.error;
