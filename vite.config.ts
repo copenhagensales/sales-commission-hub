@@ -91,22 +91,12 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        // Funktionsform: kun selve pakken lægges i chunken (ikke dens fælles afhængigheder),
-        // så tunge biblioteker ikke trækkes ind i første indlæsning som modulepreload.
+        // Kun biblioteker, der hentes sent, får egne navngivne chunks. Biblioteker må aldrig lægges i en
+        // manuel chunk sammen med fælles hjælpere, da det får første indlæsning til at forudindlæse dem.
         manualChunks(id: string) {
-          if (!id.includes("node_modules")) return undefined;
-          const groups: Record<string, string[]> = {
-            "vendor-twilio": ["/@twilio/"],
-            "vendor-recharts": ["/recharts/", "/d3-", "/victory-vendor/", "/recharts-scale/"],
-            "vendor-tiptap": ["/@tiptap/", "/prosemirror-"],
-            "vendor-xlsx": ["/exceljs/"],
-            "vendor-dnd": ["/@dnd-kit/"],
-            "vendor-embla": ["/embla-carousel"],
-            "vendor-jspdf": ["/jspdf", "/html2canvas/"],
-          };
-          for (const [chunk, needles] of Object.entries(groups)) {
-            if (needles.some((n) => id.includes(`/node_modules${n}`) || id.includes(`node_modules${n}`))) return chunk;
-          }
+          if (!id.includes("/node_modules/")) return undefined;
+          if (id.includes("/node_modules/@twilio/")) return "vendor-twilio";
+          if (id.includes("/node_modules/exceljs/")) return "vendor-xlsx";
           return undefined;
         },
       },
