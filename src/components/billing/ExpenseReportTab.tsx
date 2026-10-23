@@ -1,3 +1,4 @@
+import { ResponsiveTable, useIsPhone } from "@/components/mobile";
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -75,6 +76,7 @@ function countBookedDays(booking: any): number {
 }
 
 export function ExpenseReportTab() {
+  const isPhone = useIsPhone();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [rows, setRows] = useState<ExpenseRow[]>([]);
@@ -416,6 +418,25 @@ export function ExpenseReportTab() {
       </div>
 
       {/* Table */}
+      {isPhone ? (
+        <ResponsiveTable
+          rows={EXPENSE_CATEGORIES.map((cat, idx) => ({ cat, idx }))}
+          rowKey={(r) => r.cat.key}
+          columns={[
+            { key: "label", header: "Udgiftspost", isTitle: true, cell: ({ cat }) => (
+              <>{cat.label}{AUTO_CATEGORIES.has(cat.key) && <span className="ml-2 text-[14px] font-normal text-muted-foreground">(auto)</span>}{RECURRING_CATEGORIES.has(cat.key) && <span className="ml-2 text-[14px] font-normal text-muted-foreground">(fast)</span>}</>
+            ) },
+            { key: "amount", header: "Beløb (kr)", isKey: true, cell: ({ idx, cat }) => (
+              <Input type="number" inputMode="numeric" min={0} step="1" placeholder="0" value={rows[idx]?.amount || ""}
+                onChange={(e) => updateRow(idx, "amount", e.target.value)} className="w-32" disabled={AUTO_CATEGORIES.has(cat.key)} aria-label={`Beløb for ${cat.label}`} />
+            ) },
+            { key: "note", header: "Note", isKey: true, cell: ({ idx, cat }) => (
+              <Input type="text" placeholder={cat.key === "ipads" ? "Eesy betaler 50%" : "Evt. bemærkning"} value={rows[idx]?.note || ""}
+                onChange={(e) => updateRow(idx, "note", e.target.value)} className="w-40" disabled={AUTO_CATEGORIES.has(cat.key)} aria-label={`Note for ${cat.label}`} />
+            ) },
+          ]}
+        />
+      ) : (
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -477,6 +498,7 @@ export function ExpenseReportTab() {
           </Table>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

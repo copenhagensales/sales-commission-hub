@@ -1,3 +1,4 @@
+import { ResponsiveTable, useIsPhone } from "@/components/mobile";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +34,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
 };
 
 export function HotelExpensesTab() {
+  const isPhone = useIsPhone();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [periodType, setPeriodType] = useState<"month" | "payroll">("month");
@@ -189,6 +191,26 @@ export function HotelExpensesTab() {
         </Card>
       </div>
 
+      {isPhone ? (
+        isLoading ? <p className="py-8 text-center text-muted-foreground">Indlæser...</p> : (
+          <ResponsiveTable
+            rows={hotelBookings ?? []}
+            rowKey={(bh) => bh.id}
+            empty={<p className="py-8 text-center text-muted-foreground">Ingen hotelovernatninger i denne periode</p>}
+            columns={[
+              { key: "loc", header: "Booking (lokation)", isTitle: true, cell: (bh) => <>{duplicateIds.has(bh.id) ? "⚠ " : ""}{bh.booking?.location?.name || "—"}</> },
+              { key: "hotel", header: "Hotel", isKey: true, cell: (bh) => bh.hotel?.name || "—" },
+              { key: "dates", header: "Periode", isKey: true, cell: (bh) => `${format(new Date(bh.check_in), "dd/MM")} – ${format(new Date(bh.check_out), "dd/MM/yyyy")}` },
+              { key: "total", header: "Total", isKey: true, cell: (bh) => (bh.total_price || 0) > 0 ? `${(bh.total_price || 0).toLocaleString("da-DK")} kr` : "—" },
+              { key: "status", header: "Status", isKey: true, cell: (bh) => { const si = STATUS_LABELS[bh.status] || { label: bh.status, variant: "outline" as const }; return <Badge variant={si.variant}>{si.label}</Badge>; } },
+              { key: "city", header: "By", cell: (bh) => bh.booking?.location?.address_city || "—" },
+              { key: "rooms", header: "Værelser", cell: (bh) => bh.rooms || 1 },
+              { key: "nights", header: "Nætter", cell: (bh) => bh.booked_days?.length || Math.max(1, Math.round((new Date(bh.check_out).getTime() - new Date(bh.check_in).getTime()) / 86400000)) },
+              { key: "dup", header: "Mulig dublet", cell: (bh) => duplicateIds.has(bh.id) ? "Ja" : "Nej" },
+            ]}
+          />
+        )
+      ) : (
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -287,6 +309,7 @@ export function HotelExpensesTab() {
           </Table>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

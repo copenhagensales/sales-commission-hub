@@ -1,3 +1,4 @@
+import { BottomSheet, useIsPhone } from "@/components/mobile";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
@@ -95,6 +96,13 @@ export default function ShiftOverview() {
   const displayDays = showWeekend 
     ? eachDayOfInterval({ start: weekStart, end: weekEnd })
     : weekDays;
+  // Telefon: én dag ad gangen (kun præsentation).
+  const isPhone = useIsPhone();
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const allWeekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const [phoneDayIdx, setPhoneDayIdx] = useState(() => (new Date().getDay() + 6) % 7);
+  const phoneDay = allWeekDays[phoneDayIdx] ?? allWeekDays[0];
+  const gridDays = isPhone ? [phoneDay] : displayDays;
 
   const { data: shifts } = useShifts(
     format(weekStart, "yyyy-MM-dd"),
@@ -1287,21 +1295,47 @@ export default function ShiftOverview() {
           }}
         />
 
+        {/* Dagvælger (telefon) */}
+        {isPhone && (
+          <>
+            <Button variant="outline" className="min-h-11 w-full justify-between" onClick={() => setDayPickerOpen(true)}>
+              <span className="capitalize">{format(phoneDay, "EEEE d. MMMM", { locale: da })}</span>
+              <span className="text-muted-foreground">Uge {format(currentDate, "w", { locale: da })} · Skift dag</span>
+            </Button>
+            <BottomSheet open={dayPickerOpen} onOpenChange={setDayPickerOpen} title="Vælg dag">
+              <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                <Button variant="outline" className="min-h-11" aria-label="Forrige uge" onClick={() => setCurrentDate(subWeeks(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+                <span className="font-semibold">Uge {format(currentDate, "w", { locale: da })}</span>
+                <Button variant="outline" className="min-h-11" aria-label="Næste uge" onClick={() => setCurrentDate(addWeeks(currentDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
+              </div>
+              <div className="flex flex-col gap-1 px-2">
+                {allWeekDays.map((day, i) => (
+                  <button key={day.toISOString()} type="button" onClick={() => { setPhoneDayIdx(i); setDayPickerOpen(false); }}
+                    className={cn("flex min-h-11 items-center justify-between rounded-lg px-3 text-left text-base active:bg-accent", i === phoneDayIdx && "bg-accent font-semibold")}>
+                    <span className="capitalize">{format(day, "EEEE", { locale: da })}</span>
+                    <span className="text-muted-foreground">{format(day, "d/M")}</span>
+                  </button>
+                ))}
+              </div>
+            </BottomSheet>
+          </>
+        )}
+
         {/* Calendar Grid */}
         <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <div className="min-w-[800px]">
+            <div className={isPhone ? undefined : "min-w-[800px]"}>
               {/* Day Headers */}
               <div 
                 className={cn(
                   "grid border-b border-border/60 bg-muted/30",
-                  showWeekend ? "grid-cols-8" : "grid-cols-6"
+                  isPhone ? "grid-cols-2" : showWeekend ? "grid-cols-8" : "grid-cols-6"
                 )}
               >
                 <div className="p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Medarbejder
                 </div>
-                {displayDays.map((day) => {
+                {gridDays.map((day) => {
                   const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
                   return (
                     <div
@@ -1340,7 +1374,7 @@ export default function ShiftOverview() {
                   key={employee.id} 
                   className={cn(
                     "grid",
-                    showWeekend ? "grid-cols-8" : "grid-cols-6",
+                    isPhone ? "grid-cols-2" : showWeekend ? "grid-cols-8" : "grid-cols-6",
                     idx < (employees?.length || 0) - 1 && "border-b border-border/30"
                   )}
                 >
@@ -1360,7 +1394,7 @@ export default function ShiftOverview() {
                   </div>
 
                   {/* Day cells */}
-                  {displayDays.map((day) => {
+                  {gridDays.map((day) => {
                     const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
                     const dateKey = format(day, "yyyy-MM-dd");
                     const popoverKey = `${employee.id}-${dateKey}`;
