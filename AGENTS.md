@@ -12,6 +12,23 @@ Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Ind
 6. Databasen afviser efterhånden ændringer, der bryder punkt 1–4. Får du sådan en afvisning, så stop, forsøg ikke at omgå den, og beskriv ændringen, så den kan tages gennem ændringsproceduren.
 7. Databasen håndhæver nu punkt 1–3: nye tabeller får RLS automatisk (du skal stadig lave reglerne), visninger skal oprettes med `WITH (security_invoker = true)`, nye SECURITY DEFINER-funktioner og ny adgang for anon afvises, og regler, der lader alle indloggede læse CPR, bank, adresse, telefon eller løn, afvises. Brug almindelige funktioner (SECURITY INVOKER) med RLS.
 
+## Mobilstandard (mobilplanen, go 23/10-2026)
+
+Dette afsnit er fast og må ikke fjernes eller omskrives af agenten. Alle sider i Stork gøres mobilvenlige én gang for alle efter denne standard. Når en bestilling siger »efter mobilstandarden«, gælder alle punkter.
+
+1. Én kolonne på telefon (under 768 px): intet vandret sideskrul på 360 px. En tabel må kun skrulle inden i sin egen ramme. Ingen faste pixelbredder over 320 px. Tabeller vises som kort eller lister på telefon med alle felter og handlinger tilgængelige og en »vis som tabel«-knap.
+2. Navigation: fem faste destinationer i bunden (Hjem, Tal, Vagter, Beskeder, Mig), resten under »Mere« i Mig. Undersider har titel og tilbage-pil øverst. Tilbage (pil, Android-knap, iOS-gestus) bevarer listeposition, filtre og kladde.
+3. Tommelfinger: alle knapper og links mindst 44 × 44 px med 8 px luft, trykfeedback inden 100 ms. Den primære handling står fast nederst og dækkes aldrig af tastatur eller hjemmebjælke (safe areas).
+4. Hurtig: første JavaScript højst 300 KB gzip; tunge biblioteker (recharts m.fl.) hentes først, når siden bruger dem, aldrig som preload. Skelet (ikke spinner) inden 200 ms ved skift mellem sider. Mål i felten: LCP ≤ 2,5 s, INP ≤ 200 ms, CLS ≤ 0,1.
+5. App-følelse: træk-ned for at opdatere på lister, uendelig rulning i feed uden dubletter, optimistisk opdatering af like/kommentar/afkrydsning med tilbagerulning ved fejl, billeder med reserveret plads og forhåndsvisning højst 200 KB.
+6. Opdateringer og offline: en ny version genindlæser aldrig midt i en indtastning; kladder bevares; 0 dobbeltregistreringer ved versionsskift, baggrund/forgrund og netudfald. Uden net vises »ikke sendt« med genforsøg, aldrig et falsk »gemt«.
+7. Push og installation loves kun, som platformen holder: på iPhone kræver push hjemmeskærm (iOS 16.4+) og tilladelse; Android giver ikke altid en installationsprompt. Appen forklarer det og virker fuldt uden.
+8. Formularer: rigtigt tastatur pr. felt (inputmode/type for tal, telefon, e-mail), skrift mindst 16 px i felter, fejl ved feltet, lange flows som ét trin pr. skærm, gem-knap altid synlig.
+9. Tal og tavler: KPI-kort stablet, grafer med tryk-tooltip og tallene som liste under grafen, dato- og filtervalg som skuffe fra bunden. TV-tavlerne (/tv-*) er undtaget.
+10. Tilgængelighed: brødtekst 16–17 px, sekundær tekst mindst 14 px, holder ved 200 % tekstforstørrelse, reflow ved 320 px, stående og liggende, kontrast WCAG AA i lys og mørk tilstand, reduceret bevægelse respekteres, fokus lander rigtigt efter skuffer, ingen blokerende fejl i VoiceOver/TalkBack.
+
+Byggeklodserne ligger i `src/components/mobile/` (sideskal med bundnavigation, responsiv tabel, bundskuffe, fast handlingsknap, formularfelter, skeletter, KPI-kort, grafindpakning, kladde-sikring). Brug dem; lav ikke nye varianter pr. side. Mobilændringer rører aldrig datakald, login, rettigheds-hooks (useAuth, useUnifiedPermissions, usePositionPermissions), routes eller migrationer. App-skallen ligger bag en kontakt pr. bruger med den gamle visning som standard, indtil ejeren slår den til for alle.
+
 ## Øvrige regler
 
 - EU/EØS-adgang håndhæves ved login af edge-funktionen geo-login-guard mod eea_ip_ranges og non_eea_ip_ranges (DB-IP Lite); kun IP'er der beviseligt er uden for EU/EØS afvises (session tilbagekaldes server-side), ukendt land/fejl lukkes ind. Why: login-hooks får ikke request-headers, og backend leverer kun IP, ikke land.
