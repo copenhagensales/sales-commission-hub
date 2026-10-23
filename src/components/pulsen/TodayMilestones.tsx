@@ -140,7 +140,7 @@ export function TodayMilestonesCard({ isHouse, teamId, teamName, enabled, layout
         </div>
         <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
           {items.slice(0, 10).map((m) => (
-            <div key={m.id} className="w-[220px] flex-none snap-start rounded-[20px] bg-card px-3">
+            <div key={m.id} className={cn("flex-none snap-start rounded-[20px] bg-card px-3", items.length === 1 ? "w-full" : "w-[min(85%,300px)]")}>
               <MilestoneRow m={m} fr={fr} interactive={isHouse} isNew={fresh.has(m.id)} />
             </div>
           ))}

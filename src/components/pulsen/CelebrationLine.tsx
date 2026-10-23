@@ -40,20 +40,22 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
   const what = c.type === "birthday" ? "har fødselsdag 🇩🇰" : `${c.years} års jubilæum`;
   return (
     <div className={cn(variant === "line" ? "rounded-[20px] bg-card px-4 py-2" : "rounded-[16px] border border-dashed border-border px-3 py-1")}>
-      <div className="flex items-center gap-3">
-        {variant === "line" && <span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">I dag</span>}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+        {variant === "line" && <span className="hidden whitespace-nowrap text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground sm:inline">I dag</span>}
         <PulsenAvatar employeeId={c.employeeId} name={c.name} size={32} />
         <p className="min-w-0 flex-1 truncate text-[14px]">
           <b className="font-extrabold">{short(c.name)}</b> {what}
           {greetings > 0 && <span className="text-muted-foreground"> · {greetings} {greetings === 1 ? "hilsen" : "hilsner"}</span>}
         </p>
-        {summary.total > 0 && <ReactionBubbles summary={summary} size={22} />}
-        <ReactButton compact summary={summary} disabled={!fr.canInteract} className="flex-none"
-          onSet={(reaction) => fr.setReaction.mutate({ targetType: c.type, targetKey: key, reaction })} />
-        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}
-          className="min-h-[44px] flex-none rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[13px] font-extrabold text-foreground">
-          Sig tillykke
-        </button>
+        <div className="ml-auto flex flex-none items-center gap-2">
+          {summary.total > 0 && <ReactionBubbles summary={summary} size={22} />}
+          <ReactButton compact summary={summary} disabled={!fr.canInteract} className="flex-none"
+            onSet={(reaction) => fr.setReaction.mutate({ targetType: c.type, targetKey: key, reaction })} />
+          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+            className="min-h-[44px] flex-none whitespace-nowrap rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[13px] font-extrabold text-foreground">
+            Sig tillykke
+          </button>
+        </div>
       </div>
       {open && (
         <div className="pb-2 pt-1">
