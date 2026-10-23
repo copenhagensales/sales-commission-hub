@@ -7,7 +7,7 @@ import { useActiveColleagues, type NewPulsenPost } from "@/hooks/usePulsen";
 import { PULSEN_IMAGE_MAX_BYTES, PULSEN_MAX_CHARS, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
 
-type Mode = "post" | "praise" | "question" | "image";
+export type Mode = "post" | "praise" | "question" | "image";
 
 interface Props {
   myEmployeeId: string;
@@ -18,6 +18,9 @@ interface Props {
   team: { id: string; name: string } | null;
   onSubmit: (input: NewPulsenPost, localPreviewUrl: string | null) => Promise<unknown>;
   onOpenEvent: () => void;
+  /** Åbner composeren i en bestemt tilstand (fx fra forsiden: ?compose=praise). */
+  initialMode?: Mode | null;
+  initialBody?: string;
 }
 
 const MODES: { key: Mode; label: string; icon: typeof PenLine }[] = [
@@ -27,10 +30,10 @@ const MODES: { key: Mode; label: string; icon: typeof PenLine }[] = [
   { key: "image", label: "Billede", icon: ImagePlus },
 ];
 
-export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, defaultAudience, team, onSubmit, onOpenEvent }: Props) {
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("post");
-  const [body, setBody] = useState("");
+export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, defaultAudience, team, onSubmit, onOpenEvent, initialMode, initialBody }: Props) {
+  const [open, setOpen] = useState(!!initialMode);
+  const [mode, setMode] = useState<Mode>(initialMode ?? "post");
+  const [body, setBody] = useState(initialBody ?? "");
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
   const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -38,6 +41,9 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (initialMode === "image") fileRef.current?.click();
+  }, [initialMode]);
   const colleagues = useActiveColleagues(open && mode === "praise");
 
   const audiences: { key: "house" | "team"; label: string }[] = [
