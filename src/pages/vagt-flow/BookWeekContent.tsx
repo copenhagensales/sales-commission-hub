@@ -46,6 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
 import { SupplierDiscountPanel } from "@/components/vagt-flow/SupplierDiscountPanel";
+import { useOutsideAgreementLocations, outsideAgreementKey } from "@/hooks/useSupplierDiscountStatus";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -94,6 +95,16 @@ export default function BookWeekContent() {
   
   // New state for market total price
   const [marketTotalPrice, setMarketTotalPrice] = useState<string>("");
+
+  // "Spørg om pris"-lokationer: aftalt pris pr. booking (DB håndhæver kravet)
+  const { data: outsideAgreement } = useOutsideAgreementLocations();
+  const [quotedPrice, setQuotedPrice] = useState<string>("");
+  const [quotedDate, setQuotedDate] = useState<string>("");
+  const [quotedRef, setQuotedRef] = useState<string>("");
+  const [quotedDiscount, setQuotedDiscount] = useState<string>("0");
+  const isQuotedLocation = (loc: any) =>
+    !!loc && !!outsideAgreement?.has(outsideAgreementKey(loc.type, loc.name));
+  const isQuoted = isQuotedLocation(selectedLocation);
   
   // Helper to detect if location is a market/fair
   const MARKET_TYPES = ["Markeder", "Messer"];
