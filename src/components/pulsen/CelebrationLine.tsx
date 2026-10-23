@@ -37,7 +37,7 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
   const summary = fr.getReactions(key);
   const comments = fr.getComments(key);
   const greetings = summary.total + comments.length;
-  const what = c.type === "birthday" ? `fylder ${c.years}` : `${c.years} års jubilæum`;
+  const what = c.type === "birthday" ? "har fødselsdag 🇩🇰" : `${c.years} års jubilæum`;
   return (
     <div className={cn(variant === "line" ? "rounded-[20px] bg-card px-4 py-2" : "rounded-[16px] border border-dashed border-border px-3 py-1")}>
       <div className="flex items-center gap-3">
