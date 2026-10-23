@@ -589,6 +589,43 @@ export function SupplierReportTab() {
   const effectiveDiscountPercent = totalAmountAll > 0 ? (totalDiscountAmount / totalAmountAll) * 100 : 0;
   const anyMissingLocked = locationDiscounts.some((l: any) => l.missingLocked);
 
+  // Kun visning: fordeler lokationens bookinger pr. ISO-uge (inden for perioden).
+  // Samme bruttoformel (bookingGross) og samme rabatsats som lokationsrækken.
+  // Merpris fordeles ikke pr. uge.
+  const getWeekRows = (loc: any) => {
+    const weeks = new Map<string, { week: number; start: Date; end: Date; days: Set<number>; dayCount: number; gross: number; discount: number }>();
+    for (const b of loc.bookings as any[]) {
+      const bStart = maxDate([new Date(b.start_date), periodStart]);
+      const bEnd = minDate([new Date(b.end_date), periodEnd]);
+      const lockedPct = b.discount_percent_locked == null ? null : Number(b.discount_percent_locked);
+      const seen = new Set<string>();
+      for (let d = new Date(bStart); d <= bEnd; d.setDate(d.getDate() + 1)) {
+        const ws = startOfWeek(d, { weekStartsOn: 1 });
+        const key = format(ws, "yyyy-MM-dd");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const we = new Date(ws);
+        we.setDate(we.getDate() + 6);
+        const clipS = maxDate([ws, bStart]);
+        const clipE = minDate([we, bEnd]);
+        const g = calcBookingTotal(b, clipS, clipE);
+        if (g.days === 0) continue;
+        const pct = loc.isExcluded ? 0 : isAnnualRevenue ? (lockedPct ?? 0) : (loc.discount ?? 0);
+        if (!weeks.has(key)) {
+          weeks.set(key, { week: getISOWeek(ws), start: ws, end: we, days: new Set(), dayCount: 0, gross: 0, discount: 0 });
+        }
+        const w = weeks.get(key)!;
+        getBookedWeekdays(b, clipS, clipE).forEach((s) => s.forEach((x) => w.days.add(x)));
+        w.dayCount += g.days;
+        w.gross += g.total;
+        w.discount += g.total * (pct / 100);
+      }
+    }
+    return [...weeks.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+  };
+  const showDiscountCols = !!discountRules && discountRules.length > 0;
+  const fmtKr = (n: number) => `${n.toLocaleString("da-DK", { maximumFractionDigits: 2 })} kr`;
+
 
   // Approve mutation
   const approveMutation = useMutation({
