@@ -349,7 +349,7 @@ export default function BookingFlow() {
     <MainLayout>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Booking Flow</h1>
             <p className="text-sm text-muted-foreground mt-1">
