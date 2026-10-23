@@ -14,6 +14,8 @@ import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfDay, end
 import { da } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
+import { useIsPhone } from "@/components/mobile/useIsPhone";
 
 type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
 
@@ -40,6 +42,8 @@ export function DBPeriodSelector({
 }: DBPeriodSelectorProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const isPhone = useIsPhone();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: periodStart,
     to: periodEnd,
@@ -176,12 +180,13 @@ export function DBPeriodSelector({
         size="icon"
         onClick={handlePrevious}
         disabled={mode === "custom"}
+        aria-label="Forrige periode"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
       {/* Period display */}
-      <div className="min-w-[200px] text-center">
+      <div className="min-w-[200px] text-center max-md:min-w-0 max-md:flex-1">
         <span className="font-medium capitalize">{formatPeriodDisplay()}</span>
         <span className="ml-2 text-xs text-muted-foreground">({getModeLabel()})</span>
       </div>
@@ -191,10 +196,47 @@ export function DBPeriodSelector({
         size="icon"
         onClick={handleNext}
         disabled={mode === "custom"}
+        aria-label="Næste periode"
       >
         <ChevronRight className="h-4 w-4" />
       </Button>
 
+      {isPhone ? (
+        /* Telefon: valg og kalender i skuffe fra bunden med 44 px rækker (mobilstandard pkt. 9). */
+        <>
+          <Button variant="outline" size="icon" onClick={() => setSheetOpen(true)} aria-haspopup="dialog" aria-label={`Vælg periode: ${getButtonLabel()}`}>
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+          <BottomSheet open={sheetOpen} onOpenChange={setSheetOpen} title="Vælg periode">
+            <div className="flex flex-col gap-1">
+              {presets.map((preset) => (
+                <button key={preset.label} type="button" aria-pressed={selectedPresetLabel === preset.label}
+                  onClick={() => { handlePresetSelect(preset); setSheetOpen(false); }}
+                  className={cn("min-h-11 w-full rounded-lg px-3 text-left text-base active:bg-accent",
+                    selectedPresetLabel === preset.label && "bg-accent font-semibold")}>
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 border-t pt-3">
+              <p className="px-3 pb-2 text-sm text-muted-foreground">Brugerdefineret</p>
+              <div className="flex justify-center">
+                <Calendar mode="range" defaultMonth={periodStart} selected={dateRange}
+                  onSelect={(range) => {
+                    setDateRange(range);
+                    if (range?.from && range?.to) {
+                      onModeChange("custom");
+                      onPresetLabelChange?.("Brugerdefineret");
+                      onChange(range.from, range.to);
+                      setSheetOpen(false);
+                    }
+                  }}
+                  numberOfMonths={1} locale={da} className="pointer-events-auto p-0" />
+              </div>
+            </div>
+          </BottomSheet>
+        </>
+      ) : (<>
       {/* Preset dropdown */}
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
@@ -256,6 +298,7 @@ export function DBPeriodSelector({
           </div>
         </PopoverContent>
       </Popover>
+      </>)}
     </div>
   );
 }
