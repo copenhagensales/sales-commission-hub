@@ -790,14 +790,9 @@ export function SupplierReportTab() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Lokation</TableHead>
-                    <TableHead>ID</TableHead>
-                    <TableHead>By</TableHead>
-                    <TableHead>Kunde</TableHead>
-                    <TableHead>Uger & Dage</TableHead>
-                     <TableHead className="text-right">Bookinger</TableHead>
-                     <TableHead className="text-right">Dage</TableHead>
-                     <TableHead className="text-right">Dagspris</TableHead>
+                    <TableHead>Lokation / uge</TableHead>
+                    <TableHead className="text-right">Dage</TableHead>
+                    <TableHead className="text-right">Dagspris</TableHead>
                     {hasSurcharge && (
                       <>
                         <TableHead className="text-right">Grundbeløb</TableHead>
@@ -805,7 +800,7 @@ export function SupplierReportTab() {
                       </>
                     )}
                     <TableHead className="text-right">Beløb</TableHead>
-                    {discountRules && discountRules.length > 0 && (
+                    {showDiscountCols && (
                       <>
                         <TableHead className="text-right">Rabat</TableHead>
                         <TableHead className="text-right">Efter rabat</TableHead>
@@ -813,114 +808,123 @@ export function SupplierReportTab() {
                     )}
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {locationDiscounts.map((loc: any) => (
-                    <TableRow key={loc.location?.id} className={loc.isExcluded ? "opacity-60" : ""}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {loc.location?.name}
-                          {loc.isExcluded && (
-                            <Badge variant="destructive" className="text-xs">Udelukket</Badge>
-                          )}
-                          {loc.maxDiscount != null && !loc.isExcluded && (
-                            <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
-                          )}
-                          {loc.missingLocked && (
-                            <Badge variant="destructive" className="text-xs">Ingen låst sats</Badge>
-                          )}
-                          {loc.missingRate && (
-                            <Badge variant="destructive" className="text-xs">Mangler dagspris</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{loc.location?.external_id || "-"}</TableCell>
-                      <TableCell>{loc.location?.address_city || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{loc.client?.name || "Ukendt"}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {[...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
-                            .sort(([a], [b]) => a - b)
-                            .map(([week, daysSet]) => {
-                              const sorted = [...daysSet].sort((a, b) => a - b);
-                              const isFullWeek = [0, 1, 2, 3, 4].every(d => daysSet.has(d));
-                              return (
-                                <div key={week} className="flex items-center gap-1 flex-wrap">
-                                  <span className="text-xs font-medium text-muted-foreground w-10 shrink-0">Uge {week}</span>
-                                  {isFullWeek ? (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Man–Fre</Badge>
-                                  ) : (
-                                    sorted.map(d => (
-                                      <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">{WEEKDAY_NAMES[d]}</Badge>
-                                    ))
+                {locationDiscounts.map((loc: any) => {
+                  const weekRows = getWeekRows(loc);
+                  return (
+                    <TableBody key={loc.location?.id} className={`border-b-4 border-background ${loc.isExcluded ? "opacity-60" : ""}`}>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableCell>
+                          <div className="flex items-center gap-2 flex-wrap font-semibold">
+                            {loc.location?.name}
+                            <Badge variant="outline" className="text-xs font-normal">{loc.client?.name || "Ukendt"}</Badge>
+                            {loc.isExcluded && <Badge variant="destructive" className="text-xs">Udelukket</Badge>}
+                            {loc.maxDiscount != null && !loc.isExcluded && (
+                              <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
+                            )}
+                            {loc.missingLocked && <Badge variant="destructive" className="text-xs">Ingen låst sats</Badge>}
+                            {loc.missingRate && <Badge variant="destructive" className="text-xs">Mangler dagspris</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {loc.location?.address_city || "-"}
+                            {loc.location?.external_id ? ` · ID ${loc.location.external_id}` : ""}
+                            {` · ${loc.bookings.length} booking${loc.bookings.length === 1 ? "" : "er"}`}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">{loc.totalDays}</TableCell>
+                        <TableCell className="text-right text-muted-foreground tabular-nums">
+                          {loc.usesTotalPrice ? <span className="italic">samlet</span> : fmtKr(loc.dailyRate)}
+                        </TableCell>
+                        {hasSurcharge && (
+                          <>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">{fmtKr(loc.baseAmount ?? 0)}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {loc.surchargeAmount > 0 ? (
+                                <div className="flex flex-col items-end">
+                                  <span>{fmtKr(loc.surchargeAmount)}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {loc.surchargeDays} dg × {loc.surchargePerDay.toLocaleString("da-DK")} kr
+                                    {loc.surchargeRefundable ? " · refusion" : ""}
+                                  </span>
+                                </div>
+                              ) : "-"}
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell className="text-right font-semibold tabular-nums">{fmtKr(loc.totalAmount)}</TableCell>
+                        {showDiscountCols && (
+                          <>
+                            <TableCell className="text-right">
+                              {loc.isExcluded ? (
+                                <span className="text-xs text-muted-foreground italic">Separat</span>
+                              ) : (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-green-600 tabular-nums">
+                                    -{loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
+                                  </span>
+                                  {loc.isMixedDiscount && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      blandet ({loc.lockedPercents.join(" / ")}%)
+                                    </span>
                                   )}
                                 </div>
-                              );
-                            })}
-                        </div>
-                      </TableCell>
-                       <TableCell className="text-right">{loc.bookings.length}</TableCell>
-                       <TableCell className="text-right">{loc.totalDays}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {loc.usesTotalPrice ? (
-                          <span className="italic">samlet</span>
-                        ) : (
-                          `${loc.dailyRate.toLocaleString("da-DK")} kr`
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold tabular-nums">
+                              {loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}
+                            </TableCell>
+                          </>
                         )}
-                      </TableCell>
-                      {hasSurcharge && (
-                        <>
-                          <TableCell className="text-right tabular-nums text-muted-foreground">
-                            {(loc.baseAmount ?? 0).toLocaleString("da-DK")} kr
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {loc.surchargeAmount > 0 ? (
-                              <div className="flex flex-col items-end">
-                                <span>{loc.surchargeAmount.toLocaleString("da-DK")} kr</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {loc.surchargeDays} dg × {loc.surchargePerDay.toLocaleString("da-DK")} kr
-                                  {loc.surchargeRefundable ? " · refusion" : ""}
+                      </TableRow>
+                      {weekRows.map((w) => {
+                        const sorted = [...w.days].sort((a, b) => a - b);
+                        const isFullWeek = sorted.length === 5 && [0, 1, 2, 3, 4].every((d) => w.days.has(d));
+                        return (
+                          <TableRow key={w.start.toISOString()} className="text-sm">
+                            <TableCell className="pl-8">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium w-14 shrink-0">Uge {w.week}</span>
+                                <span className="text-xs text-muted-foreground w-24 shrink-0 tabular-nums">
+                                  {format(w.start, "d/M")}–{format(w.end, "d/M")}
                                 </span>
-                              </div>
-                            ) : (
-                              "-"
-                            )}
-                          </TableCell>
-                        </>
-                      )}
-                      <TableCell className="text-right font-semibold">
-                        {loc.totalAmount.toLocaleString("da-DK")} kr
-                      </TableCell>
-                      {discountRules && discountRules.length > 0 && (
-                        <>
-                          <TableCell className="text-right">
-                            {loc.isExcluded ? (
-                              <span className="text-xs text-muted-foreground italic">Separat</span>
-                            ) : (
-                              <div className="flex flex-col items-end">
-                                <span className="text-green-600 tabular-nums">
-                                  -{loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
-                                </span>
-                                {loc.isMixedDiscount && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    blandet ({loc.lockedPercents.join(" / ")}%)
-                                  </span>
+                                {isFullWeek ? (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Man–Fre</Badge>
+                                ) : (
+                                  sorted.map((d) => (
+                                    <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">{WEEKDAY_NAMES[d]}</Badge>
+                                  ))
                                 )}
                               </div>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">{w.dayCount}</TableCell>
+                            <TableCell className="text-right text-muted-foreground tabular-nums">
+                              {w.dayCount > 0 ? fmtKr(w.gross / w.dayCount) : "-"}
+                            </TableCell>
+                            {hasSurcharge && (
+                              <>
+                                <TableCell className="text-right tabular-nums text-muted-foreground">{fmtKr(w.gross)}</TableCell>
+                                <TableCell />
+                              </>
                             )}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {loc.isExcluded ? "-" : `${loc.finalAmount.toLocaleString("da-DK")} kr`}
-                          </TableCell>
-                        </>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
+                            <TableCell className="text-right tabular-nums">{fmtKr(w.gross)}</TableCell>
+                            {showDiscountCols && (
+                              <>
+                                <TableCell className="text-right tabular-nums text-green-600">
+                                  {loc.isExcluded ? "-" : `-${fmtKr(w.discount)}`}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {loc.isExcluded ? "-" : fmtKr(w.gross - w.discount)}
+                                </TableCell>
+                              </>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  );
+                })}
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={8} className="font-semibold">
+                    <TableCell colSpan={3} className="font-semibold">
                       Subtotal
                     </TableCell>
                     {hasSurcharge && (
