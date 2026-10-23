@@ -87,12 +87,14 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
       {canPost && (
         <form onSubmit={(e) => { e.preventDefault(); share(); }}
           className={`mt-5 flex flex-wrap items-center gap-2 rounded-[28px] bg-[hsl(var(--cph-light-blue))] p-2 ${count === 0 ? "md:p-3" : ""}`}>
-          <PulsenAvatar employeeId={employeeId} name={shortName(self.data?.first_name, self.data?.last_name)} size={36} />
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={PULSEN_MAX_CHARS}
-            aria-label="Del noget med huset"
-            placeholder={`Del noget med huset, ${firstName.trim()} – ros, et spørgsmål, et billede …`}
-            className="min-h-[44px] min-w-0 flex-1 bg-transparent px-2 text-[15px] outline-none placeholder:text-muted-foreground" />
-          <div className="flex gap-2">
+          <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-0 sm:flex-1">
+            <PulsenAvatar employeeId={employeeId} name={shortName(self.data?.first_name, self.data?.last_name)} size={36} />
+            <input value={text} onChange={(e) => setText(e.target.value)} maxLength={PULSEN_MAX_CHARS}
+              aria-label="Del noget med huset"
+              placeholder={`Del noget med huset, ${firstName.trim()} …`}
+              className="min-h-[44px] min-w-0 flex-1 bg-transparent px-2 text-[16px] outline-none placeholder:text-muted-foreground" />
+          </div>
+          <div className="ml-auto flex gap-2">
             <button type="button" aria-label="Del et billede" onClick={() => navigate("/storkbook?compose=image")}
               className="flex h-11 w-11 items-center justify-center rounded-full text-foreground hover:bg-card">
               <ImagePlus className="h-5 w-5" aria-hidden="true" />
