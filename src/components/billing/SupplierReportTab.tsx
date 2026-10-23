@@ -651,6 +651,7 @@ export function SupplierReportTab() {
         discountAmount: loc.discountAmount,
         finalAmount: loc.finalAmount,
         isExcluded: loc.isExcluded,
+        isOutsideAgreement: !!loc.isOutsideAgreement,
         minDate: loc.minDate,
         maxDate: loc.maxDate,
         // Revisionsspor for de låste satser (annual_revenue)
