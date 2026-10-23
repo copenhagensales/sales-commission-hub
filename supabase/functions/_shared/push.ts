@@ -77,26 +77,34 @@ export async function sendPush(
           continue;
         }
         let ok = false;
+        let lastCode: number | null = null;
+        let lastError: string | null = null;
         for (const s of subs) {
           try {
-            await webpush.sendNotification(
+            const res: any = await webpush.sendNotification(
               { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
               JSON.stringify({ title: msg.title, body: msg.body, url: opts.url ?? msg.url, tag: type }),
-              { TTL: 60 * 60 * 24 },
+              { TTL: 60 * 60 * 24, urgency: "high" },
             );
             ok = true;
+            lastCode = typeof res?.statusCode === "number" ? res.statusCode : lastCode;
             await svc.from("push_subscriptions").update({ last_success_at: new Date().toISOString() }).eq("id", s.id);
           } catch (e: any) {
-            const code = e?.statusCode;
+            const code = typeof e?.statusCode === "number" ? e.statusCode : null;
+            lastCode = code;
+            lastError = String(e?.body || e?.message || "unknown").slice(0, 200);
             if (code === 404 || code === 410) {
               await svc.from("push_subscriptions").update({ is_active: false, deactivated_at: new Date().toISOString() }).eq("id", s.id);
-              await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated" });
+              await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: code, error_text: lastError });
             } else {
               console.error("push send failed", code ?? "unknown");
             }
           }
         }
-        await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: ok ? "sent" : "failed" });
+        await svc.from("push_log").insert({
+          user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null,
+          status: ok ? "sent" : "failed", status_code: lastCode, error_text: ok ? null : lastError,
+        });
         if (ok) sent++;
       } catch (e) {
         console.error("push user failed", e instanceof Error ? e.message : "unknown");

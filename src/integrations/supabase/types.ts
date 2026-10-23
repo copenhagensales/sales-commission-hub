@@ -14062,25 +14062,31 @@ export type Database = {
         Row: {
           created_at: string
           dedupe_key: string | null
+          error_text: string | null
           id: string
           push_type: string
           status: string
+          status_code: number | null
           user_id: string
         }
         Insert: {
           created_at?: string
           dedupe_key?: string | null
+          error_text?: string | null
           id?: string
           push_type: string
           status: string
+          status_code?: number | null
           user_id: string
         }
         Update: {
           created_at?: string
           dedupe_key?: string | null
+          error_text?: string | null
           id?: string
           push_type?: string
           status?: string
+          status_code?: number | null
           user_id?: string
         }
         Relationships: []
