@@ -25,6 +25,8 @@ import {
 import {
   AlertCircle,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   Clock,
   FileText,
@@ -840,11 +842,25 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle className="text-base">Automatisk udsendelse</CardTitle>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-2 text-left"
+          aria-expanded={expanded}
+        >
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <CardTitle className="text-base">Automatisk udsendelse</CardTitle>
+          {!expanded && (
+            <span className="text-sm text-muted-foreground">
+              {relevantSubscriptions.length} abonnement(er)
+            </span>
+          )}
+        </button>
         <Button size="sm" onClick={() => setCreating(true)}>
           <Plus className="mr-2 h-4 w-4" /> Nyt abonnement
         </Button>
       </CardHeader>
+      {expanded && (
       <CardContent className="space-y-8">
         {ownerGroups.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -891,6 +907,7 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
           ))
         )}
       </CardContent>
+      )}
       {editing && (
         <SubscriptionDialog
           subscription={editing}
