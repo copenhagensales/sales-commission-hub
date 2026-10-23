@@ -765,6 +765,7 @@ export function SupplierDispatchPanel({ locationType }: { locationType?: string 
   const { data: clients } = useReportClients();
   const [editing, setEditing] = useState<SupplierReportSubscription | null>(null);
   const [creating, setCreating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   // Uden valgt lokationstype vises alle abonnementer, så man ser hele billedet.
   // Kundevendte rapporter hænger ikke på lokationstype og vises altid.
