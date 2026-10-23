@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const BUCKET = "tryg-report-exports";
@@ -28,3 +28,18 @@ export function useDownloadTrygReportExport() {
   });
 }
 
+/** Kører Hjerteforeningen-udtrækket (hele året). campaignIds tom = alle fundne kampagner. */
+export function useRunHjerteforeningenExport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (campaignIds: number[] = []) => {
+      const { data, error } = await supabase.functions.invoke("hjerteforeningen-leads-export", {
+        body: { mode: "export", campaignIds },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { fileName: string; signedUrl: string | null; rows: number };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tryg-report-exports"] }),
+  });
+}
