@@ -273,6 +273,10 @@ export default function BookWeekContent() {
       setMarketStartDate(undefined);
       setMarketEndDate(undefined);
       setMarketTotalPrice("");
+      setQuotedPrice("");
+      setQuotedDate("");
+      setQuotedRef("");
+      setQuotedDiscount("0");
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
@@ -915,6 +919,10 @@ export default function BookWeekContent() {
                 }
                 if (!selectedClientId) {
                   toast({ title: "Fejl", description: "Ingen kunde valgt", variant: "destructive" });
+                  return;
+                }
+                if (isQuoted && !(parseFloat(quotedPrice) > 0)) {
+                  toast({ title: "Fejl", description: "Lokationen er 'spørg om pris' – indtast den aftalte pris", variant: "destructive" });
                   return;
                 }
                 // Validate based on type
