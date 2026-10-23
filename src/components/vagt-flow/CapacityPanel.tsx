@@ -229,7 +229,7 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
       <CardContent className="pt-4 pb-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between text-left"
+          className="w-full flex items-center justify-between text-left max-md:min-h-11"
         >
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-primary" />
