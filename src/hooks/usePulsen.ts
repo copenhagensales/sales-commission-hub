@@ -60,6 +60,24 @@ export const scopeKey = (s: PulsenScope) => (s.kind === "house" ? "house" : `tea
 const feedKey = (s: PulsenScope) => ["pulsen-feed", scopeKey(s)];
 export const postTargetKey = (id: string) => `pulsen_post:${id}`;
 
+/** Den indloggedes eget navn/rolle til optimistiske indlæg. */
+export function usePulsenSelf(employeeId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pulsen-self", employeeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, job_title")
+        .eq("id", employeeId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data as PersonRef | null;
+    },
+    enabled: !!employeeId,
+    staleTime: 600000,
+  });
+}
+
 export function usePulsenMe() {
   const { data: employeeId, isLoading } = useCurrentEmployeeId();
   const { isOwner, canEdit } = usePermissions();
@@ -94,7 +112,8 @@ export function usePulsenMe() {
     enabled: !!employeeId,
     staleTime: 300000,
   });
-  const self = useQuery({
+  const self = usePulsenSelf(employeeId);
+  const _unused = {
     queryKey: ["pulsen-self", employeeId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -105,9 +124,8 @@ export function usePulsenMe() {
       if (error) throw error;
       return data as PersonRef | null;
     },
-    enabled: !!employeeId,
-    staleTime: 600000,
-  });
+  };
+  void _unused;
   const led = ledTeams.data ?? [];
   return {
     employeeId: employeeId ?? null,
