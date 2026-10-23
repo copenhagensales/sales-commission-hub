@@ -29,6 +29,8 @@ import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { TimeSelect } from "@/components/ui/time-select";
 import { BookingEconomySummary } from "@/components/vagt-flow/BookingEconomySummary";
+import { useBookingDiscount } from "@/hooks/useBookingDiscount";
+import { Badge } from "@/components/ui/badge";
 
 interface Employee {
   id: string;
@@ -281,6 +283,7 @@ export function EditBookingDialog({
   onAddVehicleAssignment,
 }: EditBookingDialogProps) {
   const queryClient = useQueryClient();
+  const { data: bookingEconomy } = useBookingDiscount(booking?.id);
   const { canView } = usePermissions();
   const showTrainingTab = canView("tab_fm_training");
   
