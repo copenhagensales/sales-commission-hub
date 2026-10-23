@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { StickyOnPhone } from "@/components/mobile/StickyAction";
 import { Input } from "@/components/ui/input";
 
 import { Label } from "@/components/ui/label";
@@ -498,6 +499,8 @@ const SalesRegistration = () => {
                       </span>
                       <Input
                         type={requiresBasketNumber(selection.productId) ? "text" : "tel"}
+                        inputMode={requiresBasketNumber(selection.productId) ? "text" : "tel"}
+                        autoComplete="off"
                         placeholder={requiresBasketNumber(selection.productId) ? "Kurvnummer *" : "Telefonnummer *"}
                         value={phone}
                         onChange={(e) =>
@@ -612,7 +615,8 @@ const SalesRegistration = () => {
         </Card>
 
 
-        {/* Submit button */}
+        {/* Submit button — fast nederst på telefon */}
+        <StickyOnPhone>
         <Button
           onClick={handleSubmit}
           className="w-full"
@@ -622,15 +626,16 @@ const SalesRegistration = () => {
           <Save className="h-5 w-5 mr-2" />
           {isSubmitting ? "Gemmer..." : "Registrer salg"}
         </Button>
+        </StickyOnPhone>
       </div>
     </div>
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/vagt-flow")}>
+      <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-3">
+        <div className="flex items-center gap-4 min-w-0">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/vagt-flow")} aria-label="Tilbage">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

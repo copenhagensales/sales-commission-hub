@@ -4,6 +4,7 @@ import { da } from "date-fns/locale";
 import { Clock, Play, Square, Timer, Briefcase, Calendar, CheckCircle2, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { StickyOnPhone } from "@/components/mobile/StickyAction";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -235,6 +236,7 @@ export default function MyTimeClock() {
               rows={2}
             />
 
+            <StickyOnPhone>
             {!isClockedIn ? (
               <Button
                 size="lg"
@@ -257,6 +259,7 @@ export default function MyTimeClock() {
                 Afslut arbejdsdag
               </Button>
             )}
+            </StickyOnPhone>
           </CardContent>
         </Card>
 

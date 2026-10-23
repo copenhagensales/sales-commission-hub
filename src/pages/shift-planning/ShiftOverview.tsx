@@ -1152,7 +1152,7 @@ export default function ShiftOverview() {
             </div>
             
             {/* Actions */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 max-md:flex-wrap">
               {canEditShiftOverview && (
                 <Button
                   size="sm"

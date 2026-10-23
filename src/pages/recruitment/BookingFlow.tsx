@@ -349,14 +349,14 @@ export default function BookingFlow() {
     <MainLayout>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Booking Flow</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Automatiseret outreach med manuel godkendelse
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             <Button asChild variant="outline" className="gap-2">
               <Link to="/recruitment/booking-flow/engagement">
                 <BarChart3 className="h-4 w-4" />
@@ -460,8 +460,8 @@ export default function BookingFlow() {
                   const candidate = enrollment.candidates;
 
                   return (
-                    <div key={enrollment.id} className="flex items-center justify-between py-3 px-1">
-                      <div className="flex items-center gap-4">
+                    <div key={enrollment.id} className="flex items-center justify-between py-3 px-1 max-md:flex-col max-md:items-stretch max-md:gap-3">
+                      <div className="flex items-center gap-4 min-w-0">
                         <div className="w-2 h-2 rounded-full bg-amber-500" />
                         <div>
                           <p className="font-medium text-sm">
@@ -477,7 +477,7 @@ export default function BookingFlow() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 max-md:flex-wrap">
                         <Button
                           size="sm"
                           variant="outline"

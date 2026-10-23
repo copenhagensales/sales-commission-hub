@@ -280,12 +280,12 @@ export default function VagtLocations() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Lokationer</h1>
             <p className="text-muted-foreground">Administrer butikker og steder</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             {canEditLocation && (
               <>
                 <input

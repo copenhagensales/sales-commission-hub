@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { BOTTOM_NAV_HEIGHT } from "./BottomNav";
 import { cn } from "@/lib/utils";
+import { useIsPhone } from "./useIsPhone";
 
 /** Afstand fra bunden, når tastaturet er åbent (0 når lukket). Bruger visualViewport. */
 function useKeyboardInset(): number {
@@ -37,5 +38,20 @@ export function StickyAction({ children, withBottomNav = true, className }: { ch
       style={{ bottom }}>
       {children}
     </div>
+  );
+}
+
+/**
+ * Primær handling: på telefon fast nederst (StickyAction) med pladsreservation i indholdet;
+ * på computer vises children uændret på stedet.
+ */
+export function StickyOnPhone({ children }: { children: ReactNode }) {
+  const isPhone = useIsPhone();
+  if (!isPhone) return <>{children}</>;
+  return (
+    <>
+      <div aria-hidden="true" className="h-20" />
+      <StickyAction>{children}</StickyAction>
+    </>
   );
 }

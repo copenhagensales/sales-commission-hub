@@ -136,7 +136,7 @@ export function MonthlyVoiceGoalBoard({
                 <Trophy className="h-7 w-7 text-yellow-400" />
                 <span className="text-xl md:text-2xl font-semibold text-slate-200">Fælles mål</span>
               </div>
-              <div className="flex items-end gap-6 md:gap-10">
+              <div className="flex items-end gap-6 md:gap-10 max-md:flex-wrap max-md:gap-3">
                 {(data?.teamGoal ?? 0) > 0 && (
                   <>
                     <div className="text-right">
@@ -208,7 +208,7 @@ export function MonthlyVoiceGoalBoard({
 
             {/* Dagsbokse: én pr. dag i måneden med dagens salg */}
             {(data?.days.length ?? 0) > 0 && (
-              <div className="mt-3 flex gap-1 md:gap-1.5">
+              <div className="mt-3 flex gap-1 md:gap-1.5 max-md:grid max-md:grid-cols-7">
                 {data!.days.map((d) => (
                   <div
                     key={d.date}
