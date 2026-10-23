@@ -7,7 +7,7 @@ import { ViewAsBanner } from "./ViewAsBanner";
 import { CompleteProfileBanner } from "./CompleteProfileBanner";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { LeagueAnnouncementPopup } from "@/components/league/LeagueAnnouncementPopup";
@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { cn } from "@/lib/utils";
 import { PageShell, DraftGuardNavigationListener, useBottomTabs, useIsPhone } from "@/components/mobile";
-import { useLocation } from "react-router-dom";
 
 // Context for sidebar state
 interface SidebarContextType {

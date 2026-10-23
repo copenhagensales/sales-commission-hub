@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { requestSafeReload } from "@/components/mobile/DraftGuard";
 
 const ENTRY_RE = /\/assets\/index-[^"'\s]+\.js/;
 const CHECK_MS = 60_000;
@@ -16,7 +17,8 @@ export function useNyVersion() {
 
     let notified = false;
     let reloadTimer: ReturnType<typeof setTimeout> | undefined;
-    const reload = () => window.location.reload();
+    // Genindlæs aldrig midt i en uafsendt indtastning (DraftGuard udskyder til næste sideskift).
+    const reload = () => requestSafeReload(() => window.location.reload());
 
     const check = async () => {
       if (notified) return;

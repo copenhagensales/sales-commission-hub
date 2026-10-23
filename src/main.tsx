@@ -3,8 +3,10 @@ import App from "./App.tsx";
 import "./index.css";
 import "./i18n";
 import { registerServiceWorker } from "./lib/pwa/registerServiceWorker";
+import { reportWebVitals } from "./lib/perf/reportVitals";
 
 registerServiceWorker();
+reportWebVitals();
 
 const rootElement = document.getElementById("root");
 

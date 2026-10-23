@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { hasUnsentDrafts, requestSafeReload } from "@/components/mobile/DraftGuard";
 
 /**
  * Eneste sted, Storks service worker registreres.
@@ -43,11 +44,12 @@ export function registerServiceWorker() {
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Første installation: ingen genindlæsning. Ny version: diskret besked og reload.
+    // Første installation: ingen genindlæsning. Ny version: diskret besked og reload,
+    // men aldrig midt i en uafsendt indtastning (så udskydes den til næste sideskift).
     if (!hadController || reloading) return;
     reloading = true;
-    toast("Ny version af Stork er klar – opdaterer…");
-    window.setTimeout(() => window.location.reload(), 1500);
+    if (!hasUnsentDrafts()) toast("Ny version af Stork er klar – opdaterer…");
+    requestSafeReload(() => window.location.reload(), 1500);
   });
 
   window.addEventListener("load", () => {

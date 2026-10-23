@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         scope: "/",
         display: "standalone",
-        orientation: "portrait-primary",
+        orientation: "any",
         theme_color: "#2e3136",
         background_color: "#e6f0f1",
         lang: "da",
@@ -91,22 +91,23 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-twilio': ['@twilio/voice-sdk'],
-          'vendor-recharts': ['recharts'],
-          'vendor-tiptap': [
-            '@tiptap/react',
-            '@tiptap/starter-kit',
-            '@tiptap/extension-placeholder',
-            '@tiptap/extension-table',
-            '@tiptap/extension-table-cell',
-            '@tiptap/extension-table-header',
-            '@tiptap/extension-table-row',
-            '@tiptap/extension-text-align',
-            '@tiptap/extension-underline',
-          ],
-          'vendor-xlsx': ['exceljs'],
-          'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+        // Funktionsform: kun selve pakken lægges i chunken (ikke dens fælles afhængigheder),
+        // så tunge biblioteker ikke trækkes ind i første indlæsning som modulepreload.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          const groups: Record<string, string[]> = {
+            "vendor-twilio": ["/@twilio/"],
+            "vendor-recharts": ["/recharts/", "/d3-", "/victory-vendor/", "/recharts-scale/"],
+            "vendor-tiptap": ["/@tiptap/", "/prosemirror-"],
+            "vendor-xlsx": ["/exceljs/"],
+            "vendor-dnd": ["/@dnd-kit/"],
+            "vendor-embla": ["/embla-carousel"],
+            "vendor-jspdf": ["/jspdf", "/html2canvas/"],
+          };
+          for (const [chunk, needles] of Object.entries(groups)) {
+            if (needles.some((n) => id.includes(`/node_modules${n}`) || id.includes(`node_modules${n}`))) return chunk;
+          }
+          return undefined;
         },
       },
     },

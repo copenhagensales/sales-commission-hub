@@ -4,7 +4,7 @@ import { LockOverlays } from "./LockOverlays";
 import { RolePreviewBanner } from "./RolePreviewBanner";
 import { ViewAsBanner } from "./ViewAsBanner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { isTvMode } from "@/utils/tvMode";
 import { PageShell, DraftGuardNavigationListener, useBottomTabs, useIsPhone } from "@/components/mobile";
-import { useLocation } from "react-router-dom";
 
 interface DashboardLayoutProps {
   children: ReactNode;
