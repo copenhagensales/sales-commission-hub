@@ -1,3 +1,4 @@
+import { ResponsiveTable, useIsPhone } from "@/components/mobile";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -76,7 +77,30 @@ export default function VagtTimeOffRequests() {
     Andet: "Andet",
   };
 
-  const RequestTable = ({ requests, showActions = false }: { requests: TimeOffRequest[] | undefined; showActions?: boolean }) => (
+  const isPhone = useIsPhone();
+
+  const RequestTable = ({ requests, showActions = false }: { requests: TimeOffRequest[] | undefined; showActions?: boolean }) => isPhone ? (
+    <ResponsiveTable
+      rows={requests ?? []}
+      rowKey={(r) => r.id}
+      empty={<p className="py-8 text-center text-muted-foreground">Ingen anmodninger</p>}
+      columns={[
+        { key: "emp", header: "Medarbejder", isTitle: true, cell: (r) => r.employee?.full_name },
+        { key: "period", header: "Periode", isKey: true, cell: (r) => (
+          <>{format(new Date(r.start_date), "d/M/yyyy", { locale: da })}{r.start_date !== r.end_date && <> - {format(new Date(r.end_date), "d/M/yyyy", { locale: da })}</>}</>
+        ) },
+        { key: "reason", header: "Årsag", isKey: true, cell: (r) => reasonLabels[r.reason] || r.reason },
+        { key: "status", header: "Status", isKey: true, cell: (r) => <Badge className={`${statusColors[r.status]} text-white`}>{statusLabels[r.status]}</Badge> },
+        { key: "team", header: "Team", cell: (r) => r.employee?.team ?? "-" },
+      ]}
+      actions={showActions ? (r) => (
+        <>
+          <Button variant="outline" onClick={() => handleApprove(r)}><CheckCircle className="h-4 w-4 mr-1 text-green-600" />Godkend</Button>
+          <Button variant="outline" onClick={() => { setSelectedRequest(r); setShowRejectDialog(true); }}><XCircle className="h-4 w-4 mr-1 text-red-600" />Afvis</Button>
+        </>
+      ) : undefined}
+    />
+  ) : (
     <Table>
       <TableHeader>
         <TableRow>
