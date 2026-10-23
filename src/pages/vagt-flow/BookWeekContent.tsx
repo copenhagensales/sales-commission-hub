@@ -46,6 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
 import { SupplierDiscountPanel } from "@/components/vagt-flow/SupplierDiscountPanel";
+import { useOutsideAgreementLocations, outsideAgreementKey } from "@/hooks/useSupplierDiscountStatus";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -94,6 +95,16 @@ export default function BookWeekContent() {
   
   // New state for market total price
   const [marketTotalPrice, setMarketTotalPrice] = useState<string>("");
+
+  // "Spørg om pris"-lokationer: aftalt pris pr. booking (DB håndhæver kravet)
+  const { data: outsideAgreement } = useOutsideAgreementLocations();
+  const [quotedPrice, setQuotedPrice] = useState<string>("");
+  const [quotedDate, setQuotedDate] = useState<string>("");
+  const [quotedRef, setQuotedRef] = useState<string>("");
+  const [quotedDiscount, setQuotedDiscount] = useState<string>("0");
+  const isQuotedLocation = (loc: any) =>
+    !!loc && !!outsideAgreement?.has(outsideAgreementKey(loc.type, loc.name));
+  const isQuoted = isQuotedLocation(selectedLocation);
   
   // Helper to detect if location is a market/fair
   const MARKET_TYPES = ["Markeder", "Messer"];
@@ -237,9 +248,16 @@ export default function BookWeekContent() {
         year: isMarket && marketStartDate ? getWeekYear(marketStartDate) : selectedYear,
         expected_staff_count: expectedStaffCount,
         booked_days: bookedDays,
-        total_price: parsedTotalPrice,
+        total_price: isQuoted ? parseFloat(quotedPrice) : parsedTotalPrice,
         placement_id: selectedPlacement?.id || null,
-        daily_rate_override: selectedPlacement?.daily_rate || null,
+        daily_rate_override: isQuoted ? null : selectedPlacement?.daily_rate || null,
+        ...(isQuoted
+          ? {
+              quoted_price_date: quotedDate || null,
+              quoted_price_ref: quotedRef.trim() || null,
+              discount_percent_locked: parseFloat(quotedDiscount) || 0,
+            }
+          : {}),
         status: 'draft',
       } as any);
 
@@ -255,6 +273,10 @@ export default function BookWeekContent() {
       setMarketStartDate(undefined);
       setMarketEndDate(undefined);
       setMarketTotalPrice("");
+      setQuotedPrice("");
+      setQuotedDate("");
+      setQuotedRef("");
+      setQuotedDiscount("0");
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
@@ -609,6 +631,7 @@ export default function BookWeekContent() {
                         <div className="flex items-center gap-2">
                           {loc.is_favorite && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
                           {loc.name}
+                          {isQuotedLocation(loc) && <Badge variant="secondary" className="text-xs">Spørg om pris</Badge>}
                         </div>
                       </TableCell>
                       <TableCell>{loc.type || "-"}</TableCell>
@@ -722,8 +745,35 @@ export default function BookWeekContent() {
               </div>
             )}
 
-            {/* Leverandørrabat - kun ved annual_revenue-leverandører */}
-            <SupplierDiscountPanel locationType={selectedLocation?.type} />
+            {/* Leverandørrabat - kun ved annual_revenue-leverandører (ikke ved "Spørg om pris") */}
+            {isQuoted ? (
+              <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">Spørg om pris</Badge>
+                  <span className="text-xs text-muted-foreground">Uden for aftale – prisen aftales pr. booking</span>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase text-muted-foreground">Aftalt pris med Ocean (ekskl. moms) *</label>
+                  <Input type="number" min={0} value={quotedPrice} onChange={(e) => setQuotedPrice(e.target.value)} placeholder="fx 14375" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium uppercase text-muted-foreground">Tilbudsdato</label>
+                    <Input type="date" value={quotedDate} onChange={(e) => setQuotedDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium uppercase text-muted-foreground">Rabat %</label>
+                    <Input type="number" min={0} max={100} value={quotedDiscount} onChange={(e) => setQuotedDiscount(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase text-muted-foreground">Reference</label>
+                  <Input value={quotedRef} onChange={(e) => setQuotedRef(e.target.value)} placeholder="Mail, tilbudsnr. eller hvem der aftalte prisen" />
+                </div>
+              </div>
+            ) : (
+              <SupplierDiscountPanel locationType={selectedLocation?.type} />
+            )}
 
             {/* Date range picker for markets */}
             {isMarketLocation ? (
@@ -869,6 +919,10 @@ export default function BookWeekContent() {
                 }
                 if (!selectedClientId) {
                   toast({ title: "Fejl", description: "Ingen kunde valgt", variant: "destructive" });
+                  return;
+                }
+                if (isQuoted && !(parseFloat(quotedPrice) > 0)) {
+                  toast({ title: "Fejl", description: "Lokationen er 'spørg om pris' – indtast den aftalte pris", variant: "destructive" });
                   return;
                 }
                 // Validate based on type

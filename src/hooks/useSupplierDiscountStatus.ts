@@ -58,3 +58,27 @@ export function useHasAnnualRevenueRules(locationType?: string | null) {
     enabled: !!locationType,
   });
 }
+
+/**
+ * Lokationer med undtagelsen "uden for aftale" ("Spørg om pris").
+ * Nøgle: `${location_type}|${location_name}` i små bogstaver.
+ * Databasen håndhæver reglen (trigger booking_enforce_quoted_price); dette er kun til visning.
+ */
+export function useOutsideAgreementLocations() {
+  return useQuery({
+    queryKey: ["supplier-outside-agreement-locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_location_exceptions")
+        .select("location_type, location_name")
+        .eq("exception_type", "outside_agreement")
+        .eq("is_active", true);
+      if (error) throw error;
+      return new Set((data ?? []).map((e) => `${e.location_type}|${e.location_name}`.toLowerCase()));
+    },
+  });
+}
+
+export function outsideAgreementKey(type?: string | null, name?: string | null) {
+  return `${type ?? ""}|${name ?? ""}`.toLowerCase();
+}

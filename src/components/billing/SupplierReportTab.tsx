@@ -821,7 +821,7 @@ export function SupplierReportTab() {
                             {loc.location?.name}
                             <Badge variant="outline" className="text-xs font-normal">{loc.client?.name || "Ukendt"}</Badge>
                             {loc.isExcluded && <Badge variant="destructive" className="text-xs">Udelukket</Badge>}
-                            {loc.isOutsideAgreement && <Badge variant="secondary" className="text-xs">Uden for aftale</Badge>}
+                            {loc.isOutsideAgreement && <Badge variant="secondary" className="text-xs">Spørg om pris</Badge>}
                             {loc.maxDiscount != null && !loc.isExcluded && (
                               <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
                             )}

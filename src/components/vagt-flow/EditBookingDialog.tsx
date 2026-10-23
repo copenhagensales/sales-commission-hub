@@ -29,6 +29,8 @@ import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { TimeSelect } from "@/components/ui/time-select";
 import { BookingEconomySummary } from "@/components/vagt-flow/BookingEconomySummary";
+import { useBookingDiscount } from "@/hooks/useBookingDiscount";
+import { Badge } from "@/components/ui/badge";
 
 interface Employee {
   id: string;
@@ -281,6 +283,7 @@ export function EditBookingDialog({
   onAddVehicleAssignment,
 }: EditBookingDialogProps) {
   const queryClient = useQueryClient();
+  const { data: bookingEconomy } = useBookingDiscount(booking?.id);
   const { canView } = usePermissions();
   const showTrainingTab = canView("tab_fm_training");
   
@@ -1396,7 +1399,23 @@ export function EditBookingDialog({
               </div>
             )}
 
-            {/* Daily Rate Section */}
+            {/* Daily Rate Section ("Spørg om pris"-bookinger har aftalt pris i stedet for dagspris) */}
+            {bookingEconomy?.priceModel === "quoted" ? (
+              <div className="space-y-2 pt-3 border-t">
+                <Label className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Aftalt pris med Ocean (ekskl. moms)
+                  <Badge variant="secondary" className="text-xs">Spørg om pris</Badge>
+                </Label>
+                <p className="text-sm font-semibold tabular-nums">{Math.round(bookingEconomy.gross).toLocaleString("da-DK")} kr</p>
+                <p className="text-xs text-muted-foreground">
+                  Tilbudsdato: {bookingEconomy.quotedPriceDate ?? "–"} · Reference: {bookingEconomy.quotedPriceRef ?? "–"}
+                </p>
+                {bookingEconomy.priceReviewNeeded && (
+                  <Badge variant="destructive" className="text-xs">Periode ændret – bekræft pris med Ocean</Badge>
+                )}
+              </div>
+            ) : (
             <div className="space-y-3 pt-3 border-t">
               <Label className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
@@ -1503,6 +1522,7 @@ export function EditBookingDialog({
                 )}
               </div>
             </div>
+            )}
 
             {/* Brutto, låst rabatsats og netto */}
             <div className="pt-3 border-t">

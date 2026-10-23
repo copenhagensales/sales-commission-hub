@@ -15,6 +15,11 @@ export interface BookingDiscountInfo {
   /** Har leverandøren aktive annual_revenue-regler? */
   isAnnualRevenue: boolean;
   locationType: string | null;
+  /** 'quoted' = "Spørg om pris": aftalt pris pr. booking */
+  priceModel: string | null;
+  quotedPriceDate: string | null;
+  quotedPriceRef: string | null;
+  priceReviewNeeded: boolean;
 }
 
 /**
@@ -33,6 +38,7 @@ export function useBookingDiscount(bookingId?: string | null) {
         .select(`
           id, start_date, end_date, booked_days, total_price, daily_rate_override,
           discount_percent_locked, discount_basis, discount_locked_at,
+          price_model, quoted_price_date, quoted_price_ref, price_review_needed,
           location(type, daily_rate),
           location_placements(daily_rate)
         `)
@@ -74,6 +80,10 @@ export function useBookingDiscount(bookingId?: string | null) {
         lockedAt: booking.discount_locked_at ?? null,
         isAnnualRevenue,
         locationType,
+        priceModel: booking.price_model ?? null,
+        quotedPriceDate: booking.quoted_price_date ?? null,
+        quotedPriceRef: booking.quoted_price_ref ?? null,
+        priceReviewNeeded: !!booking.price_review_needed,
       };
     },
     enabled: !!bookingId,

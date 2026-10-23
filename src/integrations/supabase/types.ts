@@ -1451,6 +1451,9 @@ export type Database = {
           placement_id: string | null
           price_model: string | null
           price_note: string | null
+          price_review_needed: boolean
+          quoted_price_date: string | null
+          quoted_price_ref: string | null
           start_date: string
           status: string
           total_price: number | null
@@ -1477,6 +1480,9 @@ export type Database = {
           placement_id?: string | null
           price_model?: string | null
           price_note?: string | null
+          price_review_needed?: boolean
+          quoted_price_date?: string | null
+          quoted_price_ref?: string | null
           start_date: string
           status?: string
           total_price?: number | null
@@ -1503,6 +1509,9 @@ export type Database = {
           placement_id?: string | null
           price_model?: string | null
           price_note?: string | null
+          price_review_needed?: boolean
+          quoted_price_date?: string | null
+          quoted_price_ref?: string | null
           start_date?: string
           status?: string
           total_price?: number | null
@@ -20122,6 +20131,10 @@ export type Database = {
       }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_manager_position: { Args: { _user_id: string }; Returns: boolean }
+      is_outside_agreement_location: {
+        Args: { p_location_id: string }
+        Returns: boolean
+      }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_only: { Args: { _user_id: string }; Returns: boolean }
       is_protected_salary_employee: {
