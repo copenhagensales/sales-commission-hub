@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
+import { useIsPhone } from "@/components/mobile/useIsPhone";
 
 export type PeriodType = 
   | "today" 
@@ -109,6 +111,7 @@ export function DashboardPeriodSelector({
   disabled = false,
 }: DashboardPeriodSelectorProps) {
   const [open, setOpen] = useState(false);
+  const isPhone = useIsPhone();
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
     from: selectedPeriod.from,
     to: selectedPeriod.to,
@@ -164,6 +167,36 @@ export function DashboardPeriodSelector({
 
   if (disabled) {
     return null;
+  }
+
+  if (isPhone) {
+    // Telefon: samme valg som skuffe fra bunden med 44 px rækker (mobilstandard pkt. 9).
+    return (
+      <div className={cn("flex items-center gap-2", className)}>
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)} aria-haspopup="dialog"
+          className="gap-2 min-w-[140px] justify-start bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
+          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-foreground">{displayLabel}</span>
+        </Button>
+        <BottomSheet open={open} onOpenChange={setOpen} title="Vælg periode">
+          <div className="flex flex-col gap-1">
+            {PERIOD_PRESETS.map((preset) => (
+              <button key={preset.type} type="button" onClick={() => handlePresetSelect(preset.type)}
+                aria-pressed={selectedPeriod.type === preset.type}
+                className={cn("min-h-11 w-full rounded-lg px-3 text-left text-base active:bg-accent",
+                  selectedPeriod.type === preset.type && "bg-accent font-semibold")}>
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex justify-center border-t pt-3">
+            <Calendar mode="range" defaultMonth={dateRange.from}
+              selected={dateRange.from ? { from: dateRange.from, to: dateRange.to } : undefined}
+              onSelect={handleDateRangeSelect} numberOfMonths={1} locale={da} className="pointer-events-auto p-0" />
+          </div>
+        </BottomSheet>
+      </div>
+    );
   }
 
   return (

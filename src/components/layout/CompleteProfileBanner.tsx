@@ -50,14 +50,14 @@ export function CompleteProfileBanner() {
 
   return (
     <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
-      <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 max-w-7xl mx-auto">
         <div className="flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
           <p className="text-sm text-amber-800 dark:text-amber-200">
             <strong>Velkommen!</strong> Udfyld venligst dine personlige oplysninger for at færdiggøre din profil.
           </p>
         </div>
-        <Button asChild variant="outline" size="sm" className="shrink-0 border-amber-500/30 text-amber-800 dark:text-amber-200 hover:bg-amber-500/10">
+        <Button asChild variant="outline" size="sm" className="shrink-0 max-md:w-full max-md:min-h-11 border-amber-500/30 text-amber-800 dark:text-amber-200 hover:bg-amber-500/10">
           <Link to="/my-profile">
             Udfyld nu <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
