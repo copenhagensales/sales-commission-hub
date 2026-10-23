@@ -1,3 +1,4 @@
+import { YearSelect } from "@/components/mobile/YearSelect";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,14 +88,8 @@ export default function EconomicPosteringer() {
               className="pl-9"
             />
           </div>
-          <Select value={String(year)} onValueChange={(v) => { setYear(Number(v)); setPage(0); }}>
-            <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <YearSelect value={year} onChange={(y) => { setYear(y); setPage(0); }} triggerClassName="w-[100px]"
+            years={[currentYear, currentYear - 1, currentYear - 2]} />
           <Select value={kategoriFilter} onValueChange={(v) => { setKategoriFilter(v); setPage(0); }}>
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="Kategori" /></SelectTrigger>
             <SelectContent>

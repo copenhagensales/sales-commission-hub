@@ -430,7 +430,7 @@ export default function CandidateDetail() {
   return <MainLayout>
       <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto px-0">
         {/* Back button */}
-        <Button variant="ghost" onClick={() => navigate("/recruitment/candidates")} className="w-fit -ml-2">
+        <Button variant="ghost" onClick={() => navigate("/recruitment/candidates")} className="w-fit -ml-2 max-md:hidden">
           <ArrowLeft className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Tilbage til kandidater</span>
           <span className="sm:hidden">Tilbage</span>

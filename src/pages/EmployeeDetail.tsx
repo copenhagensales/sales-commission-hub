@@ -564,7 +564,7 @@ export default function EmployeeDetail() {
     return (
       <MainLayout>
         <div className="space-y-4">
-          <Button variant="ghost" onClick={() => navigate("/employees")}>
+          <Button variant="ghost" onClick={() => navigate("/employees")} className="max-md:hidden">
             <ArrowLeft className="mr-2 h-4 w-4" /> Tilbage til oversigt
           </Button>
           <Card>

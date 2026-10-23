@@ -1,3 +1,4 @@
+import { YearSelect } from "@/components/mobile/YearSelect";
 import { useState } from "react";
 import { useForecastSettingsList } from "@/hooks/useForecastSettings";
 import { ForecastCard } from "@/components/forecast/ForecastCard";
@@ -34,16 +35,8 @@ export default function ClientForecast() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={String(year)} onValueChange={v => setYear(Number(v))}>
-            <SelectTrigger className="w-[100px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <YearSelect value={year} onChange={setYear} triggerClassName="w-[100px]"
+            years={[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]} />
           <CreateForecastDialog month={month} year={year} existingTeamIds={forecasts?.map(f => f.team_id) || []} />
         </div>
       </div>

@@ -50,11 +50,11 @@ const DialogContent = React.forwardRef<
         <DialogPrimitive.Close asChild>
           <button
             type="button"
-            className="absolute right-4 top-4 z-[100] rounded-md bg-background/80 backdrop-blur-sm opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-2 cursor-pointer"
+            className="absolute right-4 top-4 z-[100] rounded-md bg-background/80 backdrop-blur-sm opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-2 cursor-pointer max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center"
             style={{ pointerEvents: 'auto' }}
           >
             <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">Luk</span>
           </button>
         </DialogPrimitive.Close>
       )}
