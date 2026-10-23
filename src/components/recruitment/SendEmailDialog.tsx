@@ -161,6 +161,10 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
       toast.error("Kandidaten har ingen email-adresse");
       return;
     }
+    if (sendOption === "scheduled" && scheduledDate && (getScheduledDateTime()?.getTime() ?? 0) <= Date.now()) {
+      toast.error("Tidspunktet er allerede passeret – vælg et senere tidspunkt");
+      return;
+    }
     if (sendOption === "scheduled" && !scheduledDate) {
       toast.error("Vælg venligst en dato for planlagt afsendelse");
       return;
@@ -262,7 +266,7 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
                         mode="single"
                         selected={scheduledDate}
                         onSelect={setScheduledDate}
-                        disabled={(date) => date < new Date()}
+                        disabled={(date) => { const today = new Date(); today.setHours(0, 0, 0, 0); return date < today; }}
                         initialFocus
                         className={cn("p-3 pointer-events-auto")}
                       />
