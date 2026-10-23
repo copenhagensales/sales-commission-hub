@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { StickyOnPhone } from "@/components/mobile/StickyAction";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -189,6 +190,7 @@ export default function TimeStamp() {
               rows={2}
             />
 
+            <StickyOnPhone>
             {!isClockedIn ? (
               <Button 
                 size="lg" 
@@ -211,6 +213,7 @@ export default function TimeStamp() {
                 Afslut arbejdsdag
               </Button>
             )}
+            </StickyOnPhone>
           </CardContent>
         </Card>
 

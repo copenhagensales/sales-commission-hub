@@ -12,3 +12,4 @@ export { InstallHint } from "./InstallHint";
 export { useIsPhone } from "./useIsPhone";
 export { useMoreAction, type MoreAction } from "./MoreActions";
 export { YearSelect } from "./YearSelect";
+export { StickyOnPhone } from "./StickyAction";
