@@ -464,14 +464,14 @@ export default function VagtBookings() {
           <CardContent className="pt-6 space-y-4">
             <div>
               <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Vælg uge</label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 max-md:flex-wrap">
                 <Button 
                   variant="outline" 
                   onClick={() => setSelectedWeek((w) => w - 1)}
                 >
                   ← Forrige uge
                 </Button>
-                <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-md bg-background">
+                <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-md bg-background max-md:order-first max-md:basis-full">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Uge {selectedWeek}, {selectedYear}</span>
                 </div>
@@ -586,9 +586,9 @@ export default function VagtBookings() {
             return (
               <Collapsible key={clientId} open={isExpanded} onOpenChange={() => toggleWeek(weekKey)}>
                 <Card>
-                  <CardContent className="pt-4 pb-4 flex items-center justify-between">
+                  <CardContent className="pt-4 pb-4 flex items-center justify-between max-md:flex-wrap max-md:gap-3">
                     <CollapsibleTrigger asChild>
-                      <div className="flex items-center gap-3 cursor-pointer flex-1">
+                      <div className="flex items-center gap-3 cursor-pointer flex-1 max-md:flex-wrap max-md:min-h-11">
                         <span className="font-bold text-lg">Uge {selectedWeek}, {selectedYear}</span>
                         <Badge variant="outline">
                           {data.client?.name || "Ukendt kunde"}
