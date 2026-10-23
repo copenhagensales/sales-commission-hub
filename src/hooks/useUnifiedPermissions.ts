@@ -55,9 +55,11 @@ export function useRoleDefinitions() {
 
 // Fetch all page permissions
 // OPTIMIZED: Extended staleTime to 15 minutes - permissions rarely change during session
-export function usePagePermissions() {
+/** @param enabled sæt false, når ingen er logget ind (offentlige sider): anon skal ikke hente rettighederne. */
+export function usePagePermissions(enabled = true) {
   return useQuery({
     queryKey: ['page-permissions'],
+    enabled,
     queryFn: async () => {
       // Paginated fetch to ensure ALL permissions are retrieved (Supabase default limit is 1000)
       const allPermissions = await fetchAllRows<PagePermission>(
@@ -156,7 +158,9 @@ function useCurrentUserRole() {
 export function useUnifiedPermissions() {
   const { user } = useAuth();
   const { data: currentRole, isLoading: roleLoading, isFetched: roleFetched } = useCurrentUserRole();
-  const { data: pagePermissions, isLoading: permissionsLoading, isFetched: permissionsFetched } = usePagePermissions();
+  // Kun når nogen er logget ind (samme betingelse som useCurrentUserRole). Offentlige sider (dialeren) hentede ellers
+  // alle rettighedsrækker som anon ved hver genindlæsning: 40 mio. kald og mætning 23/10.
+  const { data: pagePermissions, isLoading: permissionsLoading, isFetched: permissionsFetched } = usePagePermissions(!!user?.id);
   
   // isLoading: Still fetching initial data
   const isLoading = roleLoading || permissionsLoading;
