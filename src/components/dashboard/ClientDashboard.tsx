@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardHeader, TvLinkButton } from "@/components/dashboard/DashboardHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboards, type LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
@@ -412,11 +412,14 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
           subtitle={cphSubtitle}
           tvMode={tvMode}
           rightContent={
-            <DashboardPeriodSelector
-              selectedPeriod={selectedPeriod}
-              onPeriodChange={setSelectedPeriod}
-              disabled={tvMode}
-            />
+            <div className="flex items-center gap-2">
+              <DashboardPeriodSelector
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={setSelectedPeriod}
+                disabled={tvMode}
+              />
+              {!tvMode && <TvLinkButton />}
+            </div>
           }
           primaryKpis={
             useCached

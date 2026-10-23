@@ -37,14 +37,6 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   
   // Use team-based dashboard permissions instead of role-based permissions
   const { data: accessibleDashboards = [] } = useAccessibleDashboards();
-  const { isOwner, isTeamleder, canEdit } = useUnifiedPermissions();
-  const canCreateTvLink = isOwner || isTeamleder || canEdit("action_tv_link_manage");
-
-
-  const currentDashboardSlug = useMemo(() => {
-    const dashboard = DASHBOARD_LIST.find(d => d.path === location.pathname);
-    return dashboard?.slug || null;
-  }, [location.pathname]);
 
   const handleFullscreenChange = useCallback(() => {
     const isCurrentlyFullscreen = !!document.fullscreenElement;
@@ -152,9 +144,7 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
 
             {/* TV Link Generator */}
             {/* TV Link Generator - only for leadership */}
-            {currentDashboardSlug && canCreateTvLink && (
-              <TvBoardQuickGenerator dashboardSlug={currentDashboardSlug} />
-            )}
+            <TvLinkButton />
 
             {/* Fullscreen button */}
             <Button
@@ -180,4 +170,13 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
       </div>
     </div>
   );
+}
+
+/** TV-link-knap for det aktuelle board. Samme regel overalt: ejer, teamleder eller action_tv_link_manage. */
+export function TvLinkButton() {
+  const location = useLocation();
+  const { isOwner, isTeamleder, canEdit } = useUnifiedPermissions();
+  const slug = DASHBOARD_LIST.find((d) => d.path === location.pathname)?.slug;
+  if (!slug || !(isOwner || isTeamleder || canEdit("action_tv_link_manage"))) return null;
+  return <TvBoardQuickGenerator dashboardSlug={slug} />;
 }
