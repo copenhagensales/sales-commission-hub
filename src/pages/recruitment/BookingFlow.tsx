@@ -460,8 +460,8 @@ export default function BookingFlow() {
                   const candidate = enrollment.candidates;
 
                   return (
-                    <div key={enrollment.id} className="flex items-center justify-between py-3 px-1">
-                      <div className="flex items-center gap-4">
+                    <div key={enrollment.id} className="flex items-center justify-between py-3 px-1 max-md:flex-col max-md:items-stretch max-md:gap-3">
+                      <div className="flex items-center gap-4 min-w-0">
                         <div className="w-2 h-2 rounded-full bg-amber-500" />
                         <div>
                           <p className="font-medium text-sm">
@@ -477,7 +477,7 @@ export default function BookingFlow() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 max-md:flex-wrap">
                         <Button
                           size="sm"
                           variant="outline"
