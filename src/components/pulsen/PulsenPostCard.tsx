@@ -98,7 +98,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
         {showMenu && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" aria-label="Flere handlinger" className="-mr-2 -mt-2 flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+              <button type="button" aria-label="Flere handlinger" className="-mr-2 -mt-2 flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
                 <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
               </button>
             </DropdownMenuTrigger>
@@ -134,8 +134,8 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
           <Textarea value={draft} maxLength={PULSEN_MAX_CHARS} onChange={(e) => setDraft(e.target.value)} className="min-h-[120px] rounded-2xl text-[17px]" aria-label="Redigér indlæg" />
           <div className="mt-2 flex items-center justify-end gap-2">
             {showCharCounter(draft.length) && <span className="mr-auto text-[13px] tabular-nums text-muted-foreground">{draft.length}/{PULSEN_MAX_CHARS}</span>}
-            <button type="button" onClick={() => setEditing(false)} className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">Annullér</button>
-            <button type="button" onClick={saveEdit} disabled={!draft.trim()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Gem</button>
+            <button type="button" onClick={() => setEditing(false)} className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">Annullér</button>
+            <button type="button" onClick={saveEdit} disabled={!draft.trim()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50 active:opacity-70">Gem</button>
           </div>
         </div>
       ) : (
@@ -225,12 +225,12 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
                 <p className="break-words text-[15px] text-foreground">{c.body}</p>
               </div>
               {canPickBest && (
-                <button type="button" aria-label="Markér som bedste svar" onClick={() => onBestAnswer(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+                <button type="button" aria-label="Markér som bedste svar" onClick={() => onBestAnswer(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
                   <Star className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
               {c.isMine && (
-                <button type="button" aria-label="Slet din kommentar" onClick={() => interactions.onDeleteComment(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+                <button type="button" aria-label="Slet din kommentar" onClick={() => interactions.onDeleteComment(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
                   <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
@@ -259,7 +259,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
             aria-label="Din kommentar, højst 200 tegn"
             className="h-11 min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-4 text-[15px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
-          <button type="button" onClick={() => void submit()} disabled={saving || !value.trim()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send</button>
+          <button type="button" onClick={() => void submit()} disabled={saving || !value.trim()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50 active:opacity-70">Send</button>
         </div>
       )}
     </div>
