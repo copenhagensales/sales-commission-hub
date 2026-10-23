@@ -128,12 +128,12 @@ export default function ReferAFriend() {
                   <Input 
                     value={referralLink} 
                     readOnly 
-                    className="font-mono text-sm"
+                    className="font-mono text-base md:text-sm"
                   />
                   <Button 
                     onClick={handleCopy}
                     variant={copied ? "default" : "outline"}
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 max-md:min-h-11"
                   >
                     {copied ? (
                       <>
