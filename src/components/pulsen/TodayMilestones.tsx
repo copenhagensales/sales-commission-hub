@@ -155,7 +155,7 @@ export function TodayMilestonesCard({ isHouse, teamId, teamName, enabled, layout
       <div className="flex items-center gap-2">
         <LiveDot flash={flash} />
         <h2 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted-foreground">Dagens milepæle</h2>
-        <span className="ml-auto text-[12px] font-extrabold tabular-nums">{count} i dag</span>
+        <span className="ml-auto whitespace-nowrap text-[12px] font-extrabold tabular-nums">{count} i dag</span>
       </div>
       {q.isLoading ? (
         <p className="mt-3 text-[14px] text-muted-foreground">Henter …</p>
@@ -214,7 +214,7 @@ export function TodayMilestonesMini({ enabled }: { enabled: boolean }) {
       <div className="flex items-center gap-2">
         <LiveDot />
         <h3 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[hsl(var(--cph-emerald))]">Dagens milepæle</h3>
-        <span className="ml-auto text-[12px] font-extrabold tabular-nums">{count} i dag</span>
+        <span className="ml-auto whitespace-nowrap text-[12px] font-extrabold tabular-nums">{count} i dag</span>
       </div>
       {q.isLoading ? (
         <div className="mt-3 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-xl bg-[hsl(var(--cph-light-blue)/0.12)]" />)}</div>

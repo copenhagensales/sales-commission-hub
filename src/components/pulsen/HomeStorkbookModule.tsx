@@ -90,7 +90,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
           <PulsenAvatar employeeId={employeeId} name={shortName(self.data?.first_name, self.data?.last_name)} size={36} />
           <input value={text} onChange={(e) => setText(e.target.value)} maxLength={PULSEN_MAX_CHARS}
             aria-label="Del noget med huset"
-            placeholder={`Del noget med huset, ${firstName} – ros, et spørgsmål, et billede …`}
+            placeholder={`Del noget med huset, ${firstName.trim()} – ros, et spørgsmål, et billede …`}
             className="min-h-[44px] min-w-0 flex-1 bg-transparent px-2 text-[15px] outline-none placeholder:text-muted-foreground" />
           <div className="flex gap-2">
             <button type="button" aria-label="Del et billede" onClick={() => navigate("/storkbook?compose=image")}
