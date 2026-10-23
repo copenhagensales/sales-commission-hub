@@ -200,7 +200,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
           type="button"
           onClick={() => setComposing(true)}
           disabled={!interactions.canInteract}
-          className="min-h-[44px] rounded-xl px-3 text-[14px] font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+          className="min-h-[44px] rounded-xl px-3 text-[14px] font-semibold text-muted-foreground hover:bg-muted active:bg-muted disabled:opacity-50"
         >
           Kommentér · <span className="tabular-nums">{comments.length}</span>
         </button>
