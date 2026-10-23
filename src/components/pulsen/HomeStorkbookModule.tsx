@@ -116,7 +116,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
           Storkbook kunne ikke hentes. <button type="button" onClick={() => posts.refetch()} className="min-h-[44px] font-extrabold text-foreground underline">Prøv igen</button>
         </p>
       ) : (
-        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)] [&>*]:min-w-0 lg:[&>*:last-child]:col-span-2 xl:[&>*:last-child]:col-span-1">
+        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)] [&>*]:min-w-0 lg:[&>*:last-child]:col-span-2 2xl:[&>*:last-child]:col-span-1">
           {/* 1. Seneste indlæg i stort */}
           {posts.isLoading ? <Skel h={260} /> : first ? (
             <article className="rounded-[24px] bg-[hsl(var(--cph-light-blue))] p-5">
