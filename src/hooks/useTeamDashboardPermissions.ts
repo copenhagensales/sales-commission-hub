@@ -167,7 +167,7 @@ export function useAccessibleDashboards() {
   const { user } = useAuth();
   const { isOwner, isReady, role } = useUnifiedPermissions();
   const { data: assistantRelations } = useTeamAssistantLeaders();
-  const { data: rolePermissions } = usePagePermissions();
+  const { data: rolePermissions } = usePagePermissions(!!user?.id);   // ikke som anon (offentlige sider)
   
   return useQuery({
     queryKey: ["accessible-dashboards", user?.id, isOwner, role, rolePermissions?.length ?? 0],
