@@ -10,3 +10,5 @@ export { KpiCard, KpiGrid, ChartFrame } from "./KpiCard";
 export { useDraftGuard, hasUnsentDrafts, requestSafeReload, DraftGuardNavigationListener } from "./DraftGuard";
 export { InstallHint } from "./InstallHint";
 export { useIsPhone } from "./useIsPhone";
+export { useMoreAction, type MoreAction } from "./MoreActions";
+export { YearSelect } from "./YearSelect";

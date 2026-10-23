@@ -1,10 +1,11 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Menu } from "lucide-react";
 import { useIsPhone } from "./useIsPhone";
 import { BottomNav, BOTTOM_NAV_HEIGHT, tabRootFor, useBottomTabs } from "./BottomNav";
 import { BottomSheet } from "./BottomSheet";
 import { cn } from "@/lib/utils";
+import { MoreActionsContext, type MoreAction } from "./MoreActions";
 
 interface TopBarProps {
   title: ReactNode;
@@ -59,12 +60,20 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
   const [moreOpen, setMoreOpen] = useState(false);
   const { pathname } = useLocation();
   const tabs = useBottomTabs();
+  const [actions, setActions] = useState<Array<[string, MoreAction]>>([]);
+  const register = useCallback((id: string, action: MoreAction) => {
+    setActions((prev) => [...prev.filter(([k]) => k !== id), [id, action]]);
+    return () => setActions((prev) => prev.filter(([k]) => k !== id));
+  }, []);
+  const ctx = useMemo(() => ({ register }), [register]);
   if (!isMobile) return <>{children}</>;
 
   // Mobilstandard pkt. 2: »Mere« ligger nederst i fanen »Mig«. Har brugeren ikke adgang til »Mig«,
   // bliver »Mere« i topbjælken, så den gamle menu stadig kan nås.
   const meTab = tabs.find((t) => t.to === "/my-profile" && t.visible);
-  const moreInTopBar = !!moreMenu && !meTab;
+  const hasActions = actions.length > 0;
+  // Sidehandlinger (TV-link, fuldskærm m.fl.) gør »Mere« tilgængelig i topbjælken på siden.
+  const moreInTopBar = (!!moreMenu && !meTab) || hasActions;
   const showMoreRow = !!moreMenu && !!meTab && pathname === meTab.to;
 
   const moreButton = moreInTopBar ? (
@@ -79,10 +88,10 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
     <>
       <TopBar title={title ?? "Stork"} showBack={showBack} right={<>{right}{moreButton}</>} />
       <div
-        className={cn("min-w-0")}
+        className={cn("min-w-0 max-w-full overflow-x-hidden")}
         style={{ paddingBottom: `calc(${BOTTOM_NAV_HEIGHT + stickyActionSpace}px + env(safe-area-inset-bottom, 0px) + 16px)` }}
       >
-        {children}
+        <MoreActionsContext.Provider value={ctx}>{children}</MoreActionsContext.Provider>
         {showMoreRow && (
           <div className="px-4 pt-2">
             <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog"
@@ -95,9 +104,24 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
         )}
       </div>
       <BottomNav />
-      {moreMenu && (
+      {(moreMenu || hasActions) && (
         <BottomSheet open={moreOpen} onOpenChange={setMoreOpen} title="Mere">
-          {moreMenu(() => setMoreOpen(false))}
+          {hasActions && (
+            <div className={cn("flex flex-col gap-1", moreMenu && "mb-2 border-b border-border pb-2")}>
+              {actions.map(([id, a]) => {
+                const Icon = a.icon;
+                return (
+                  <button key={id} type="button"
+                    onClick={() => { setMoreOpen(false); a.onSelect(); }}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-base active:bg-accent">
+                    {Icon && <Icon className="h-5 w-5 text-muted-foreground" />}
+                    <span>{a.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {moreMenu?.(() => setMoreOpen(false))}
         </BottomSheet>
       )}
     </>

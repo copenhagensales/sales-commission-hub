@@ -4,6 +4,7 @@ import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { getTvBoardUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
+import { useMoreAction } from "@/components/mobile/MoreActions";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,8 @@ function getStaleInfo(code: { last_accessed_at?: string | null; created_at?: str
 
 export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorProps) {
   const [open, setOpen] = useState(false);
+  // Telefon: »TV Link« ligger i »Mere«-skuffen i stedet for som knap på siden.
+  const inMoreMenu = useMoreAction({ label: "TV Link", icon: Monitor, onSelect: () => setOpen(true) });
   const [newCodeName, setNewCodeName] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const queryClient = useQueryClient();
@@ -217,12 +220,14 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Monitor className="h-4 w-4" />
-          <span className="hidden md:inline">TV Link</span>
-        </Button>
-      </DialogTrigger>
+      {!inMoreMenu && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2" aria-label="TV Link">
+            <Monitor className="h-4 w-4" />
+            <span className="hidden md:inline">TV Link</span>
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

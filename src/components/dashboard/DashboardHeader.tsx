@@ -18,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMoreAction } from "@/components/mobile/MoreActions";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 
 interface DashboardHeaderProps {
@@ -83,6 +84,13 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
     }
   };
 
+  // Telefon: »Fuldskærm« ligger i »Mere«-skuffen i stedet for i sidehovedet.
+  const fullscreenInMore = useMoreAction(isTvBoardMode ? null : {
+    label: isFullscreen ? "Afslut fuldskærm" : "Fuldskærm",
+    icon: isFullscreen ? Minimize2 : Maximize2,
+    onSelect: toggleFullscreen,
+  });
+
   const handleGoToMenu = () => {
     navigate("/home");
   };
@@ -124,7 +132,7 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
             {/* Dashboard selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2" aria-label="Dashboards">
                   <LayoutGrid className="h-4 w-4" />
                   <span className="hidden md:inline">Dashboards</span>
                 </Button>
@@ -147,7 +155,8 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
             <TvLinkButton />
 
             {/* Fullscreen button */}
-            <Button
+            {!fullscreenInMore && <Button
+              aria-label={isFullscreen ? "Afslut fuldskærm" : "Fuldskærm"}
               variant="outline"
               size="sm"
               onClick={toggleFullscreen}
@@ -164,7 +173,7 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
                   <span className="hidden md:inline">Fuldskærm</span>
                 </>
               )}
-            </Button>
+            </Button>}
           </>
         )}
       </div>
