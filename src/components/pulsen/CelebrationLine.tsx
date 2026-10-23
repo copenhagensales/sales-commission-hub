@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Celebration } from "@/components/home/CelebrationStrip";
-import { ReactButton } from "@/components/home/FeedReactionRow";
+import { ReactButton, ReactionBubbles } from "@/components/home/FeedReactionRow";
 import { FeedCommentList } from "@/components/home/FeedCommentList";
 import { PulsenAvatar } from "@/components/pulsen/PulsenAvatar";
 import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
@@ -47,6 +47,9 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
           <b className="font-extrabold">{short(c.name)}</b> {what}
           {greetings > 0 && <span className="text-muted-foreground"> · {greetings} {greetings === 1 ? "hilsen" : "hilsner"}</span>}
         </p>
+        {summary.total > 0 && <ReactionBubbles summary={summary} size={22} />}
+        <ReactButton compact summary={summary} disabled={!fr.canInteract} className="flex-none"
+          onSet={(reaction) => fr.setReaction.mutate({ targetType: c.type, targetKey: key, reaction })} />
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}
           className="min-h-[44px] flex-none rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[13px] font-extrabold text-foreground">
           Sig tillykke
@@ -55,8 +58,6 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
       {open && (
         <div className="pb-2 pt-1">
           <div className="flex items-center gap-1 border-y border-border py-0.5">
-            <ReactButton summary={summary} disabled={!fr.canInteract}
-              onSet={(reaction) => fr.setReaction.mutate({ targetType: c.type, targetKey: key, reaction })} />
             <button type="button" disabled={!fr.canInteract} onClick={() => setComposing(true)}
               className="min-h-[44px] rounded-xl px-3 text-[14px] font-semibold text-muted-foreground hover:bg-muted">Skriv besked</button>
           </div>
