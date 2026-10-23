@@ -1124,3 +1124,13 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-pulsen-in, .animate-pulsen-blink { animation: none; }
 }
+
+/* Mobilstandard pkt. 3: elementer der fungerer som knapper/faner/menupunkter er mindst 44 px høje på telefon. */
+@media (max-width: 767.98px) {
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"] {
+    min-height: 44px;
+  }
+}
