@@ -76,6 +76,7 @@ function countBookedDays(booking: any): number {
 }
 
 export function ExpenseReportTab() {
+  const isPhone = useIsPhone();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [rows, setRows] = useState<ExpenseRow[]>([]);
