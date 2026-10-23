@@ -329,7 +329,7 @@ export default function BookingFlowEngagement() {
               </p>
             </div>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 max-md:flex-wrap">
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Fra</label>
               <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

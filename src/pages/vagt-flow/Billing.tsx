@@ -325,7 +325,7 @@ function BillingOverviewTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 max-md:flex-wrap">
         <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
           <SelectTrigger className="w-[180px]">
             <SelectValue />

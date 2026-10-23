@@ -285,7 +285,7 @@ export default function VagtLocations() {
             <h1 className="text-3xl font-bold tracking-tight">Lokationer</h1>
             <p className="text-muted-foreground">Administrer butikker og steder</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             {canEditLocation && (
               <>
                 <input

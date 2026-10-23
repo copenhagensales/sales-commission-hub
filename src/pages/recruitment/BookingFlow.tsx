@@ -356,7 +356,7 @@ export default function BookingFlow() {
               Automatiseret outreach med manuel godkendelse
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             <Button asChild variant="outline" className="gap-2">
               <Link to="/recruitment/booking-flow/engagement">
                 <BarChart3 className="h-4 w-4" />
