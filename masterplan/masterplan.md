@@ -13,7 +13,7 @@ Masterplanen beskriver, hvordan strukturen fra dokumentet *Storks struktur* før
 - **Hvert skridt har et bevis**, før det næste tages. Mens ét område bevises, bygges det næste, og det, der kan bygges samtidig, bygges samtidig.
 - **Alt er afgjort i planen.** Du bruger kun dine hænder ved de handlinger og godkendelser, der står i »Hvad du skal gøre«.
 
-**Status:** godkendt 19/10-2026. Samme dag tilføjet efter din afgørelse: 2.0's sikkerhedsregler på hele databasen fra fase 0, log på alle tabeller i fase 1 og egen backup uden for Lovable (trin 0.3, 0.5, 1.1 og 1.2). Efter din godkendelse samme dag er også mangelanalysens punkter fra 2.0's fundament, forretningsforståelsen og dine afgørelser skrevet ind i trinene, og der er udpeget en GDPR- og AI-ansvarlig. Tilføjelserne giver tilsammen ca. fire uger mere. Planen har 55 konkrete trin i fase 0–5. Hvert trin siger, hvad der er færdigt bagefter, hvad der er afgjort, og hvordan det bevises. Planen har været gennem tre uafhængige angrebsrunder. Den første fandt, at overgangen manglede. Den anden fandt 23 huller mellem trinene, flest i lønnens overgang. Den tredje kontrollerede rettelserne: 16 var lukket, 7 delvist, og der var 10 nye rester. De er rettet i trinene. Planen er derefter gjort mere ambitiøs: genafspilning i stedet for at vente på lønperioder, fase 3 og 4 bygget samtidig med ét lønskift og moduler flyttet undervejs. Målet er ca. 6 måneder fra go (se Tidsplan). Repoet er offentligt, så åbne sikkerhedshuller beskrives her kun generelt, indtil de er lukket. Den eksisterende masterplan for 2.0 (`docs/strategi/stork-2-0-master-plan.md`) røres ikke.
+**Status:** godkendt 19/10-2026. Samme dag tilføjet efter din afgørelse: 2.0's sikkerhedsregler på hele databasen fra fase 0, log på alle tabeller i fase 1 og egen backup uden for Lovable (trin 0.3, 0.5, 1.1 og 1.2). Efter din godkendelse samme dag er også mangelanalysens punkter fra 2.0's fundament, forretningsforståelsen og dine afgørelser skrevet ind i trinene, og Kasper Mikkelsen er GDPR- og AI-ansvarlig. Tilføjelserne giver tilsammen ca. fem uger mere, heraf én uge til at trække beskyttelsen af CPR, bank og privat e-mail frem (20/10). Planen har 55 konkrete trin i fase 0–5. Hvert trin siger, hvad der er færdigt bagefter, hvad der er afgjort, og hvordan det bevises. Planen har været gennem tre uafhængige angrebsrunder. Den første fandt, at overgangen manglede. Den anden fandt 23 huller mellem trinene, flest i lønnens overgang. Den tredje kontrollerede rettelserne: 16 var lukket, 7 delvist, og der var 10 nye rester. De er rettet i trinene. Planen er derefter gjort mere ambitiøs: genafspilning i stedet for at vente på lønperioder, fase 3 og 4 bygget samtidig med ét lønskift og moduler flyttet undervejs. Målet er ca. 6 måneder fra go (se Tidsplan). Masterplanen ligger i mappen masterplan/ i 1.0-repoet. Repoet er offentligt, så de fire huller i 0.5 og andre åbne sikkerhedshuller beskrives der kun generelt, indtil de er lukket. Den eksisterende masterplan for 2.0 (`docs/strategi/stork-2-0-master-plan.md`) røres ikke.
 
 ## Udgangspunkt: hvad der flyttes
 
@@ -138,7 +138,7 @@ Lovable gemmer migrationer i `drizzle/migrations/` siden 7/10. Databasen kan ikk
 Tre ting gælder uanset vej:
 
 - **Adskilte adgange.** Adgangen til at ændre strukturen bruges kun til godkendte, prøvede scripts. Almindelige dataændringer går altid gennem strukturens handlinger. Hvert script logges med indhold, tidspunkt og resultat.
-- **Edge functions** leveres ikke af Git. Lovable deployer dem, når du beder om det i chatten. Fase 0 beviser den vej med én ændret funktion.
+- **Edge functions** leveres ikke af Git. Lovable deployer dem, når du beder om det i chatten. Fase 0 beviser den vej med én ændret funktion. UI-ændringer og dokumenter leveres også gennem Lovable, ikke ved direkte push til hovedgrenen. En direkte push, mens nogen arbejder i Lovable, får Lovable til at parkere sit arbejde på grenen lovable-sync og miste det i projektet. Det skete 19/10.
 - **Rækkefølgen ved en ændring** er altid databasen først, derefter edge functions og til sidst UI. En ændring skal tåle, at brugere har en ældre fane åben.
 
 ### Trinene i fase 0
@@ -148,8 +148,8 @@ Tre ting gælder uanset vej:
 **Færdigt bagefter:** vi kan lægge en databaseændring, en ændret edge function og en UI-ændring ind i 1.0 ad en afprøvet vej og altid se, hvad der blev kørt, af hvem og hvornår.
 
 - **Bygges:** D prøves i fire skridt: læs, skriv et prøveskema, aflæs ændringen og ryd op. Derefter oprettes en læsende databasebruger, som prøves gennem Supabases forbindelsespulje. Første rigtige levering er et udvidet skemaudtræk (`introspect_schema_v2`) med indeks, versionsnummer og rettigheder for alle roller, også servicerollen.
-- **Afgjort:** D er hovedvejen, når prøven er bestået, og A er reserve. B bygges kun som læsende databasebruger til backup og kontrol (0.3 og 0.5). C bygges kun, hvis den læsende adgang ikke kan bevises. Så flyttes 1.0 til eget Supabase før fase 1. I 1.0-repoet slås hemmelighedsscanning med push-blokering, scanning af historikken, Dependabot og CodeQL til, og der må være 0 høje eller kritiske fund før hvert skift (2.0-masterplanen, cutover-krav 8–10). D bruges kun til scripts, der står i ændringsloggen, aldrig til direkte dataændringer. UI-kontrakten ligger i `public` med præfikset `stork_`.
-- **Bevis:** alle fire skridt lykkes ad D og A. Det nye udtræk er identisk med det gamle for de fælles dele. Et kald uden token afvises. Den læsende bruger når databasen gennem puljen, læser alle rækker i alle tabeller trods RLS og kan intet skrive, heller ikke gennem funktioner.
+- **Afgjort:** D er hovedvejen, når prøven er bestået, og A er reserve. D er bevist i drift 20/10. Reserven er prøvet samme dag gennem Lovable-chatten, som oprettede, aflæste og slettede et prøveskema som migrationer uden at røre andet. B bygges kun som læsende databasebruger til backup og kontrol (0.3 og 0.5). C bygges kun, hvis den læsende adgang ikke kan bevises. Så flyttes 1.0 til eget Supabase før fase 1. I 1.0-repoet slås hemmelighedsscanning med push-blokering, scanning af historikken, Dependabot og CodeQL til, og der må være 0 høje eller kritiske fund før hvert skift (2.0-masterplanen, cutover-krav 8–10). D bruges kun til scripts, der står i ændringsloggen, aldrig til direkte dataændringer. UI-ændringer sendes til Lovable-chatten via MCP som en færdig, godkendt ændring, og Lovables diff sammenlignes med den, før leveringen regnes som gennemført. Der pushes ikke direkte til hovedgrenen (din afgørelse 19/10). UI-kontrakten ligger i `public` med præfikset `stork_`.
+- **Bevis:** alle fire skridt lykkes ad D og A. Det nye udtræk er identisk med det gamle for de fælles dele. Et kald uden token afvises. Den læsende bruger når databasen gennem puljen, læser alle rækker i Storks tabeller trods RLS og kan ikke skrive i Storks tabeller eller gennem Storks funktioner. Platformens fælles skriveveje, som kun en superbruger kan lukke (pg\_net-køen, large objects og midlertidige tabeller), er listet, og kontrolpunkterne giver alarm ved brug. Adgangskoden findes kun hos backup-jobbet. En UI-ændring leveret gennem Lovable lander på hovedgrenen med præcis den godkendte diff og uden en lovable-sync-gren.
 
 #### Trin 0.2 Testkopi af 1.0 · M
 
@@ -164,8 +164,8 @@ Tre ting gælder uanset vej:
 **Færdigt bagefter:** ingen databaseændring sker uden at blive registreret, heller ikke fra Lovable-chatten. Før hvert skift tages en kopi af det, der ændres, og der er en øvet vej tilbage. Stork har sin egen backup uden for Lovable, så en fejl kan rettes uden at miste resten af dagens data.
 
 - **Bygges:** strukturens schemas (`core_identity`, `core_compliance`, `app_portal`, `overgang`), genbrugt fra 2.0 med standardrettigheder. En ændringslog med scriptets kontrolsum og skemaets fingeraftryk før og efter. En UI-version, der får gamle åbne faner til at genindlæse. Egen backup: de vigtigste tabeller (salg, salgslinjer, medarbejdere, vagter, fravær og rettigheder) tages hver time og resten hver nat. Et planlagt job uden for Lovable tager den med den læsende databasebruger fra 0.1. Den gemmes krypteret i jeres egen Supabase-konto i EU i 30 dage og kan gendanne én tabel uden at røre resten. Kun navngivne superadmins har adgang til den, og den står i fortegnelsen over behandlinger. I strukturens schemas har anon og authenticated ingen direkte skriverettighed, og servicerollen har ingen direkte adgang til data, så edge functions går gennem strukturens handlinger ligesom UI'et. Hver AI-ændring af databasen logges med aktør, tidspunkt og ændring. For mine scripts logges også instruktion og godkender. En ændring fra Lovable kobles til den chatbesked, der udløste den, og til den, der sendte beskeden, og de berørte rækker tages fra loggen. Den AI-ansvarlige ejer loggen (din afgørelse 19/10).
-- **Afgjort:** Lovables Cloud-tilladelse sættes til »Ask each time« for både skema- og dataændringer. Hovedgrenen beskyttes ikke; ændringsloggen og fingeraftrykket er værnet. Lovables daglige backup er reserve. Kan den læsende adgang ikke bevises i 0.1, flyttes 1.0 til eget Supabase med gendannelse til et vilkårligt tidspunkt før fase 1, fordi datasikkerhed er noget af det vigtigste i systemet (din afgørelse 19/10).
-- **Bevis:** en ændring uden om proceduren opdages. Lovable-chatten beder om lov ved en dataændring. En gammel fane genindlæses inden for 5 minutter. Gendannelse øves på testkopien med en backup af testkopien selv: én tabel gendannes, afstemmes mod de tabeller, der peger på den, og de øvrige tabeller er urørte. I drift prøves backuppen kun ved læsning: antal rækker og kontrolsummer pr. tabel afstemmes mod driften hver nat.
+- **Afgjort:** Lovables Cloud-tilladelse sættes til »Ask each time« for både skema- og dataændringer. Tilladelsen er personlig pr. Lovable-konto, så den sættes på alle konti, der bygger i 1.0. Begge nuværende konti står på »Ask each time« (20/10). Prøvet 20/10: Lovable spurgte før en sletning i skemaet, men ikke før en dataændring. Dataændringer fra chatten på organisationstabellerne fanges af loggen fra 0.6, på de øvrige tabeller først fra 1.2. Indtil da er dataændringer fra chatten på de øvrige tabeller en kendt rest. Hovedgrenen beskyttes ikke; ændringsloggen og fingeraftrykket er værnet. Lovables daglige backup er reserve. Kan den læsende adgang ikke bevises i 0.1, flyttes 1.0 til eget Supabase med gendannelse til et vilkårligt tidspunkt før fase 1, fordi datasikkerhed er noget af det vigtigste i systemet (din afgørelse 19/10).
+- **Bevis:** en ændring uden om proceduren opdages. Lovable-chatten beder om lov ved en skemaændring, og en dataændring fra chatten på en organisationstabel står i loggen (0.6). En gammel fane genindlæses inden for 5 minutter. Gendannelse øves på testkopien med en backup af testkopien selv: én tabel gendannes, afstemmes mod de tabeller, der peger på den, og de øvrige tabeller er urørte. I drift prøves backuppen kun ved læsning: antal rækker og kontrolsummer pr. tabel afstemmes mod driften hver nat.
 
 #### Trin 0.4 Skriveregistret · L
 
@@ -254,12 +254,12 @@ Målet er, at Stork er i mål ca. 6 måneder efter go. Arbejdet kører uden paus
 | Uge efter go | Færdigt |
 | --- | --- |
 | 1 | De fire midlertidige værn er på, leveringsvejen virker, og kontrolpunkterne kører |
-| 5 | Fase 0 er færdig, og prøveflytningen har målt, hvad en flytning koster |
-| 10 | Fase 1: personer, organisation, rettigheder, log og GDPR er i strukturen |
-| 14 | Fase 2: salg og pris skifter ved en periodegrænse |
-| 14–23 | Fase 3 og 4 bygges side om side og genafspilles. Kommunikation, rekruttering, kontrakter, AMO og IT flyttes undervejs |
-| 23 | Lønskiftet: løn, tid og FM skifter samlet ved en periodegrænse |
-| 26 | Fase 5: tal, tavler, rapporter og de sidste moduler er flyttet, og slutkontrollen er bestået |
+| 6 | Fase 0 er færdig, og prøveflytningen har målt, hvad en flytning koster |
+| 11 | Fase 1: personer, organisation, rettigheder, log og GDPR er i strukturen |
+| 15 | Fase 2: salg og pris skifter ved en periodegrænse |
+| 15–24 | Fase 3 og 4 bygges side om side og genafspilles. Kommunikation, rekruttering, kontrakter, AMO og IT flyttes undervejs |
+| 24 | Lønskiftet: løn, tid og FM skifter samlet ved en periodegrænse |
+| 27 | Fase 5: tal, tavler, rapporter og de sidste moduler er flyttet, og slutkontrollen er bestået |
 
 ## Fase 1: fundamentet
 
@@ -289,7 +289,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 **Færdigt bagefter:** hver medarbejder findes én gang som person, og hver ansættelse er sin egen periode. En genansat får en ny periode på samme person, og anciennitet regnes af perioderne. Kun de, der har ret til det, ser CPR, bank og privatadresse, og hvert opslag logges.
 
 - **Bygges:**
-  - Personer genbrugt fra 2.0 med 1.0's medarbejder-id, så 1.0's 115 fremmednøgler virker uden ændring. Ansættelsesperioder. Kolonnerettigheder på de følsomme felter. Handlinger til at oprette, rette og afslutte ansættelse.
+  - Personer genbrugt fra 2.0 med 1.0's medarbejder-id, så 1.0's 115 fremmednøgler virker uden ændring. Ansættelsesperioder. Kolonnerettigheder på de følsomme felter. Beskyttelsen af CPR, bank, privatadresse og privat e-mail trækkes frem og bygges lige efter 0.6, fordi alle aktive medarbejdere i dag kan læse kollegers CPR, bank og private e-mail gennem API'et (din afgørelse 20/10). Handlinger til at oprette, rette og afslutte ansættelse.
   - Filkontrakten: upload, signerede links, adgang efter rettighed, klassifikation og anonymisering af filer. Den bygges her, fordi medarbejderens profilbillede er den første fil, der flyttes, og den genbruges af FM, kontrakter og galleri.
 - **1.0 i dag:**
   - 160 UI-filer afhænger af medarbejdertabellen. 22 omlægges her: 11 skrivende og 11 læsende.
@@ -400,6 +400,7 @@ Fase 2 flytter klienter, kataloget, prisberegningen, indgangene og salget som en
   - Ved overlap får den regel forrang, som 1.0 faktisk har brugt.
   - Sammenlægning af produkter er økonomisk neutral. Linjenavnet kan sættes pr. produkt, klient og kampagne og fryses på linjen.
   - Prisvinduet er de perioder, der ikke er låst. En periode, der er låst før fristen, kan ikke længere omprises. Lønperioderne fra 3.1 bygges derfor før dette trin.
+  - En prisregel kan give flere pengevirkninger med hver sin modtager, fx provision til lukkeren og lead-provision til leadgiveren, og dele omsætningen mellem deres teams efter en andel. Motoren bogfører én postering pr. modtager og konto (3.3), så delesalg kan trækkes ud direkte. Godkendt 23/10.
 - **Bevis:** 1.0's genberegning som tørkørsel før og efter skiftet giver nul ændrede linjer.
 
 #### Trin 2.4 Én prismotor · L
@@ -440,6 +441,7 @@ Fase 2 flytter klienter, kataloget, prisberegningen, indgangene og salget som en
   - Tilladte overgange er afventer → godkendt, annulleret eller afvist og godkendt → annulleret. Begge kan tilbageføres. En berigelse eller en ny version fra kilden genprissættes af motoren, forskellen bogføres i en åben periode, og den oprindelige linje bevares. Straksbetaling er et felt på salget, som indgår i prisen (forretningsforståelsen §4).
   - Ældre salg får teamet fra organisationstræets daterede historik, hvor den findes (fra trin 0.6). Før det genskabes klientens team fra sælgernes teamhistorik. De steder, hvor data er uenige eller mangler, fremlægges for dig som rapport pr. klient og periode, og du bekræfter, retter eller markerer »ukendt« (din afgørelse 16/5). »Ukendt« bruges kun, hvor du har markeret det.
   - De 2.641 gamle FM-rækker afstemmes én gang her med én matchregel: sælger, tidspunkt og telefon. Rækker med et tilsvarende salg kobles. Rækker uden bevares som markeret historik, og et salg oprettes kun gennem en kontrolleret handling med afklaret beløb.
+  - Et salg kan have en leadgiver ud over sælgeren, fx en Relatel-sælger, der overdrager et fiber-lead til en TDC-lukker (i dag udtrykt som VOK's lead-provision). Leadgiveren registreres via sin identitet, og begge personers team fryses på salgsdatoen. Kundens ejerskab ændres ikke af det. Indtil lønskiftet (3.9) kopieres et salg med leadgiver til 1.0 som to linjer, lead-produkt på leadgiveren og lukke-produkt på lukkeren, som 1.0's VOK-model i dag, så løn og team-DB er rigtige, før posteringerne (3.3) findes. Godkendt 23/10.
 - **Bevis:**
   - To genafspillede lønperioder og en uge live, hvor hvert salg og hver linje sammenlignes.
   - 1.0's lønberegninger giver samme tal på kopi og original.
@@ -493,6 +495,7 @@ I fase 3 skifter lønnen. Det sker ved en periodegrænse, efter at to genafspill
   - Et sent salg i en låst periode bogføres i den ældste åbne periode.
   - Omsætning bogføres ved salget. Provision venter synligt, til sælgeren er matchet.
   - Prisen genberegnes kun, mens linjens periode er åben. Er perioden låst, ændres originalen ikke: en berigelse eller en ny version fra kilden giver en korrektion, og forskellen bogføres i en åben periode. Et underskud står i perioden for alle løngrupper og føres ikke automatisk videre. Det afskrives ikke ved fratræden, og inddrivelse er en manuel handling med årsag. Modposter på en fratrådt sælgers salg bogføres på sælgeren, og DB for et team uden leder vises i fælles oversigt.
+  - Et salg med leadgiver giver posteringer til begge modtagere, hver med sit team på salgsdatoen: provision til lukkeren, lead-provision til leadgiveren og omsætning pr. team efter andelen. Annullering og rettelser giver modposter til begge efter samme ene regel. Godkendt 23/10.
 - **Bevis:** alle ti forløb fra angrebet giver de forventede posteringer, også en ændring på 0 kr. og et modtagerskift. Samtidige ændringer og gentagne kald giver aldrig en dobbelt postering.
 
 #### Trin 3.4 Åbningsgrundlag for gamle salg · L
@@ -1052,6 +1055,7 @@ Den største risiko er en fejl i lønnen ved et skift. Den næststørste er, at 
 | Persondata i test | Rigtige persondata i en testkopi | Kun syntetiske data |
 | Datatab ved en fejl | Lovable kan kun gendanne hele databasen til en daglig backup, og alt siden går tabt | Egen backup hver time af de vigtigste tabeller og gendannelse af én tabel ad gangen (0.3) |
 | Svækket adgang | Lovable ændrer RLS-regler og funktioner, der går uden om RLS, løbende og uden gennemgang | 2.0's sikkerhedsregler afviser svækkelser, og en daglig rettighedstest pr. rolle finder resten (0.5) |
+| Push uden om Lovable | Lovable parkerer sit arbejde på lovable-sync og mister det i projektet (sket 19/10) | Ingen direkte push til hovedgrenen. UI og dokumenter leveres gennem Lovable, og der tjekkes for en lovable-sync-gren efter hver levering |
 
 ## Hvad du skal gøre
 
@@ -1060,9 +1064,9 @@ Planen har ingen åbne spørgsmål. Hvert valg er afgjort i sit trin med kilde. 
 | Hvornår | Handling |
 | --- | --- |
 | Nu | Godkendt 19/10-2026 og lagt i denne mappe |
-| Før fase 0 | Ejeren af arbejdsområdet gør dig til admin i Lovable-arbejdsområdet, hvor 1.0 ligger (Workspace settings → People) |
+| Før fase 0 | Gjort 20/10: du er admin i Lovable-arbejdsområdet, hvor 1.0 ligger |
 | Trin 0.1 | Forbinde Lovables MCP-server til Claude. Det er én godkendelse på din konto |
-| Trin 0.3 | Sætte Lovable Cloud-tilladelsen »Execute backward incompatible database migrations« til »Ask each time« |
+| Trin 0.3 | Sætte Lovable Cloud-tilladelsen »Execute backward incompatible database migrations« til »Ask each time«. Gjort 20/10 for begge nuværende konti. En ny Lovable-bruger skal sætte det samme (Account settings → Preferences → Agent permissions → Cloud) |
 | Trin 1.1 | Den GDPR-ansvarlige bekræfter klassifikationen af ca. 330 persondatafelter |
 | Trin 2.6 | Gennemgå rapporten over klienternes team-historik: bekræft, ret eller markér »ukendt« pr. linje |
 | Hvert skift med lønvirkning (2.6 og 3.9) | Godkende listen over afvigelser med kronebeløb pr. medarbejder, før der skiftes |
@@ -1108,10 +1112,23 @@ De tekniske valg er mine. Hvert valg er afgjort og bevises i det trin, der bruge
 | Valg | Afgjort | Bevis |
 | --- | --- | --- |
 | Leveringsvej for databasen | D med A som reserve. B (egen databasebruger) bygges kun som læsende bruger til backup og kontrol. C (eget projekt) bygges kun, hvis B ikke kan bevises | Fire skridt i 0.1: læs, skriv, aflæs og ryd op |
-| Edge functions | Leveres gennem Lovable-chatten | Én ændret funktion i 0.1, hvor versionen svarer til Git |
+| Edge functions | Leveres gennem Lovable-chatten | Én ændret funktion i 0.1, hvor versionen svarer til Git. UI-ændringer og dokumenter går også gennem Lovable, aldrig ved direkte push til hovedgrenen |
 | Testmiljø | En lokal kopi bygget direkte fra driftens skemaudtræk, med kun syntetiske data og uden job. Sammenligninger med rigtige data køres som læsende, samlede forespørgsler i drift | Skemaet er identisk med driftens i 0.2 |
 | Skriveregister | Alle skrivere i kode, skema og job findes og får en afgørelse, før deres enhed skifter | 0.4 og hvert trins skriverliste |
 | Genbrug fra 2.0 | Trin 1–10 lægges ind som samlet sluttilstand, aldrig ved at afspille 2.0's historik | 0.6 og fase 1 |
 | Beregningsmotoren | Kører i databasen, så pris og bogføring sker i samme transaktion | 2.4's genafspilning af to lønperioder |
 | UI-kontraktens første domænefunktioner | Bygges i prøveflytningen og til brugerens kontekst. Mønsteret bruges først bredt, når det er bevist | 0.7 og 1.5 |
 | Sikkerhedsreglerne | Afvisningerne sker med databasens egne udløsere ved skemaændringer, mens ændringen laves. Kan de ikke bruges i Lovable Cloud, et tjek hver time med alarm | 0.5: hvert forsøg afvises eller giver alarm inden for en time |
+| Bevis og kontrol | Codex skriver beviset for hvert trin som kode, uafhængigt af mig, og angriber hvert databasescript én gang, før det køres i drift. Codex læser kun repoet og arbejder på testkopien, aldrig mod driften | Hvert trins bevis er skrevet af Codex og kører grønt på testkopien, før scriptet køres i drift |
+
+### Arbejdsregler i drift (godkendt 23/10)
+
+Reglerne er dem, fase 0 er kørt efter. De gælder for alle senere trin.
+
+1. Databaseændringer i drift sker kun som registrerede scripts (`stork_script_start`/`stork_script_slut` med filens sha256), prøvet på testkopien først, med tilbagerulningsscript klar og øvet. Rettighedsbaselinen godkendes i samme ombæring.
+2. Én driftsændring ad gangen. Den næste starter først, når kontrollerne (puls, timekontrol, vagt) har været grønne efter den forrige.
+3. Codex angriber hvert script én runde før drift. Anden runde kun ved behov, derefter egne rettelser. Codex har kun læseadgang og kører aldrig mod drift.
+4. UI leveres gennem Lovable-chatten eller som gren → pull request → din godkendelse. Edge functions leveres kun gennem Lovable-chatten, fordi Git ikke deployer dem. Alt gennemgås som diff, før det publiceres, og du publicerer. Fælles login- og rettigheds-hooks ændres kun efter særskilt aftale.
+5. Alt dokumenteres: hver driftsændring står i ændringsloggen med bevis, og reglernes alarmer (ændrede SECURITY DEFINER-funktioner, rettighedsafvigelser) kvitteres efter gennemgang og slås aldrig fra.
+
+**Ændringsvindue:** tunge forespørgsler og ændringer, der kan påvirke svartiden, køres uden for 08–17 på hverdage. Brugersynlige ændringer (publicering, låsning af en gammel vej) kan køres i arbejdstiden, når tilbagevejen er øvet og kan gennemføres på få minutter, og du har fået besked først. Lønnen rører vi kun ved periodegrænser (grundreglen).
