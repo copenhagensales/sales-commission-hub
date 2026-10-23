@@ -64,13 +64,17 @@ export function usePagePermissions() {
         "role_page_permissions",
         "*",
         undefined,
-        { orderBy: "permission_key", ascending: true }
+        { pageSize: 1000, orderBy: "permission_key", ascending: true }
       );
-      console.log(`[usePagePermissions] Fetched ${allPermissions.length} permissions via pagination`);
       return allPermissions;
     },
-    staleTime: 15 * 60 * 1000, // 15 minutes - rarely changes during session
-    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
+    // Hentes én gang pr. session: rettighederne ændrer sig ikke, mens man er logget ind. Editorerne (PermissionMap m.fl.)
+    // invaliderer nøglen, når de gemmer. Før: 15 min + genhentning ved fokus/mount gav ~12 kald/s i drift (23/10, mætning).
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 }
 
