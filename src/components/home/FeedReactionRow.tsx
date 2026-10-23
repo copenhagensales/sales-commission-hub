@@ -53,7 +53,7 @@ export function ReactButton({ summary, onSet, disabled, className, compact = fal
             type="button"
             disabled={disabled}
             aria-label="Vælg reaktion"
-            className="flex min-h-[44px] min-w-[32px] items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            className="flex min-h-[44px] min-w-[32px] items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted active:bg-muted disabled:opacity-50"
           >
             <ChevronDown className="h-4 w-4" aria-hidden="true" />
           </button>
