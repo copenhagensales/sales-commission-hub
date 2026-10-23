@@ -422,7 +422,7 @@ export function usePositionPermissions() {
     staleTime: 15 * 60 * 1000, // 15 minutes - permissions rarely change during session
     gcTime: 30 * 60 * 1000, // 30 minutes cache
     refetchOnWindowFocus: false, // Don't refetch on window focus - too expensive
-    refetchOnMount: 'always', // Only refetch if stale
+    refetchOnMount: true, // Kun hvis cachen er forældet (staleTime 15 min). 'always' hentede role_page_permissions ved hvert mount: ~100 kald/s, 74 % af databasens tid (Stork-dagsrapport 21/10)
     refetchOnReconnect: false, // Don't refetch on reconnect - keep cached value
     retry: 2, // Reduced from 3 - faster feedback on persistent failures
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 3000), // Max 3s delay (was 5s)
