@@ -39,6 +39,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     description: "Telemarketing overblik for Eesy",
     permissionKey: "menu_dashboard_eesy_tm" 
   },
+  {
+    slug: "hiper",
+    name: "Hiper",
+    path: "/dashboards/hiper",
+    description: "Hiper-teamets overblik – salg og top performers",
+    permissionKey: "menu_dashboard_eesy_tm"
+  },
   { 
     slug: "tdc-erhverv", 
     name: "TDC Erhverv", 
