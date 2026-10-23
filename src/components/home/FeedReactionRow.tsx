@@ -120,16 +120,16 @@ export function ReactionSummaryLine({ summary }: { summary: FeedReactionSummary 
   const [open, setOpen] = useState(false);
   if (summary.total === 0) return null;
   return (
-    <div>
+    <div className="min-w-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${summary.total} reaktioner. Vis fordeling`}
-        className="flex min-h-[44px] items-center gap-2 text-[13px] text-muted-foreground hover:underline"
+        className="flex min-h-[44px] w-full min-w-0 max-w-full items-center gap-2 text-left text-[13px] text-muted-foreground hover:underline"
       >
-        <ReactionBubbles summary={summary} />
-        <span className="truncate">{summaryText(summary)}</span>
+        <span className="shrink-0"><ReactionBubbles summary={summary} /></span>
+        <span className="min-w-0 flex-1 truncate">{summaryText(summary)}</span>
       </button>
       {open && (
         <div className="flex flex-wrap gap-1.5 pb-2">
