@@ -1,3 +1,5 @@
+import { BottomSheet, useIsPhone } from "@/components/mobile";
+import { SlidersHorizontal } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -442,6 +444,9 @@ export default function VagtBookings() {
     return assignments < expected;
   };
 
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -484,6 +489,13 @@ export default function VagtBookings() {
               </div>
             </div>
 
+            {isPhone ? (
+              <>
+                <Button variant="outline" className="min-h-11 w-full" onClick={() => setFiltersOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />Filtre{clientFilter !== "all" ? " (1)" : ""}
+                </Button>
+                <BottomSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Filtre">
+                  <div className="px-2 [&_button[role=combobox]]:min-h-11">
             <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
@@ -502,6 +514,29 @@ export default function VagtBookings() {
                 </Select>
               </div>
             </div>
+                  </div>
+                </BottomSheet>
+              </>
+            ) : (
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Alle kunder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle kunder</SelectItem>
+                    {fieldmarketingClients?.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            )}
           </CardContent>
         </Card>
 
