@@ -73,7 +73,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
       <header className="flex items-start gap-3">
         <PulsenAvatar employeeId={post.author_employee_id} name={authorName} />
         <div className="min-w-0 flex-1">
-          <p className="text-[16px] leading-snug text-foreground">
+          <p className="line-clamp-2 text-[16px] leading-snug text-foreground">
             <span className="font-extrabold">{authorName}</span>
             {post.post_type === "praise" && praisedName && (
               <>
