@@ -495,6 +495,7 @@ I fase 3 skifter lønnen. Det sker ved en periodegrænse, efter at to genafspill
   - Et sent salg i en låst periode bogføres i den ældste åbne periode.
   - Omsætning bogføres ved salget. Provision venter synligt, til sælgeren er matchet.
   - Prisen genberegnes kun, mens linjens periode er åben. Er perioden låst, ændres originalen ikke: en berigelse eller en ny version fra kilden giver en korrektion, og forskellen bogføres i en åben periode. Et underskud står i perioden for alle løngrupper og føres ikke automatisk videre. Det afskrives ikke ved fratræden, og inddrivelse er en manuel handling med årsag. Modposter på en fratrådt sælgers salg bogføres på sælgeren, og DB for et team uden leder vises i fælles oversigt.
+  - Et salg med leadgiver giver posteringer til begge modtagere, hver med sit team på salgsdatoen: provision til lukkeren, lead-provision til leadgiveren og omsætning pr. team efter andelen. Annullering og rettelser giver modposter til begge efter samme ene regel. Godkendt 23/10.
 - **Bevis:** alle ti forløb fra angrebet giver de forventede posteringer, også en ændring på 0 kr. og et modtagerskift. Samtidige ændringer og gentagne kald giver aldrig en dobbelt postering.
 
 #### Trin 3.4 Åbningsgrundlag for gamle salg · L
