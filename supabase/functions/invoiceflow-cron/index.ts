@@ -64,9 +64,9 @@ async function credentialUseCheck(svc: SupabaseClient) {
   const { count } = await svc.from("invoiceflow_credential_use_log").select("id", { count: "exact", head: true })
     .is("run_id", null).gte("used_at", since);
   await svc.rpc("compliance_raise", {
-    _key: "invoiceflow_decrypt_without_run", _severity: "KRITISK",
-    _title: "InvoiceFlow-login dekrypteret uden kørsel", _value: count ?? 0, _threshold: 0,
-    _details: { timer: 26 },
+    p_key: "invoiceflow_decrypt_without_run", p_sev: "KRITISK",
+    p_title: "InvoiceFlow-login dekrypteret uden kørsel", p_val: count ?? 0, p_thr: 0,
+    p_detail: { timer: 26 },
   }).then(() => {}, () => {});
   return count ?? 0;
 }
