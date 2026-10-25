@@ -24,7 +24,7 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
         <span className="font-extrabold" style={{ color: "#1b1f1d" }}>
           Krav · salg pr. kalenderuge
         </span>
-        <span className="flex flex-wrap gap-x-1 font-semibold tabular-nums" style={{ color: "#3c4743" }}>
+        <span className="flex flex-wrap gap-x-1 font-semibold tabular-nums max-md:order-last max-md:w-full" style={{ color: "#3c4743" }}>
           {shown.map((s, i) => (
             <span key={s.l} className="whitespace-nowrap">
               {i > 0 && " · "}

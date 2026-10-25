@@ -140,9 +140,9 @@ export function RevenuePerEmployeeChart() {
           Månedlig omsætning (ekskl. Field Marketing i omsætningskilden) delt med antal ansatte (ekskl. Stab) pr. månedsslut.
           {!isLoading && chartData.length > 1 && (
             <>
-              {" "}Nu: <span className="font-medium text-foreground">{fmtKr(latest)}</span>
+              {" "}Nu: <span className="whitespace-nowrap font-medium text-foreground">{fmtKr(latest)}</span>
               {" · "}
-              Ændring: <span className={`font-medium ${delta > 0 ? "text-green-500" : delta < 0 ? "text-red-500" : "text-foreground"}`}>
+              Ændring: <span className={`whitespace-nowrap font-medium ${delta > 0 ? "text-green-500" : delta < 0 ? "text-red-500" : "text-foreground"}`}>
                 {delta > 0 ? "+" : ""}{fmtKr(delta)} ({deltaPct > 0 ? "+" : ""}{deltaPct.toFixed(1)}%)
               </span>
             </>
