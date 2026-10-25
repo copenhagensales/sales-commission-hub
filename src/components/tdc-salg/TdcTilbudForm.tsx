@@ -50,7 +50,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
   const hwGroups = groupBy(HARDWARE);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px] max-md:[&>*]:min-w-0 max-md:[&_.text-2xl]:text-xl">
+    <div className="grid gap-6 lg:grid-cols-[1fr_380px] max-md:[&>*]:min-w-0 max-md:[&_.text-2xl]:text-xl max-md:[&_label]:min-h-11 max-md:[&_label]:inline-flex max-md:[&_label]:items-center max-md:[&_button:not([role=checkbox]):not([role=radio]):not([role=switch])]:min-h-11 max-md:[&_input]:min-h-11">
       <div className="space-y-6">
         <Card>
           <CardHeader><CardTitle>Løsninger</CardTitle></CardHeader>

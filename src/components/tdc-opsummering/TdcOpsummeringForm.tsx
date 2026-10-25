@@ -201,7 +201,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:[&>*]:min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:[&>*]:min-w-0 max-md:[&_label]:min-h-11 max-md:[&_label]:inline-flex max-md:[&_label]:items-center max-md:[&_button:not([role=checkbox]):not([role=radio]):not([role=switch])]:min-h-11 max-md:[&_input]:min-h-11">
         {/* Left column - Input form */}
         <div className="space-y-6">
           {/* Summary variant toggle */}
