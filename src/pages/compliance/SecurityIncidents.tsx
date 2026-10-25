@@ -103,8 +103,8 @@ export default function SecurityIncidents() {
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto space-y-6 p-6">
-        <div className="flex items-center justify-between">
+      <div className="max-w-5xl mx-auto space-y-6 p-6 max-md:p-0">
+        <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate("/compliance")}>
               <ArrowLeft className="h-5 w-5" />
@@ -117,7 +117,7 @@ export default function SecurityIncidents() {
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Registrer hændelse</Button>
+              <Button className="max-md:min-h-11 max-md:w-full"><Plus className="h-4 w-4 mr-2" /> Registrer hændelse</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>

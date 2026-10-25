@@ -130,8 +130,8 @@ export default function AmoAnnualDiscussion() {
 
   return (
     <MainLayout>
-    <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-background p-4 md:p-8 max-md:p-0 space-y-6">
+      <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3 max-md:[&>button]:min-h-11">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-emerald-500/20">
             <Shield className="h-6 w-6 text-emerald-400" />

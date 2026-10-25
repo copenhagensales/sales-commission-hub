@@ -115,7 +115,7 @@ export function IntegrationLogs() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-4 mb-4">
+        <div className="flex gap-4 mb-4 max-md:flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Type:</span>
             <Select value={typeFilter} onValueChange={setTypeFilter}>

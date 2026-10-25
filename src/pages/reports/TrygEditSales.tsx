@@ -698,7 +698,7 @@ export default function TrygEditSales() {
               </div>
               )}
               {view !== "kanvas" && (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 max-md:w-full max-md:[&>div]:w-full">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -720,7 +720,7 @@ export default function TrygEditSales() {
                     )}
                   </div>
                   {view === "united" && (
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm max-md:min-h-11 max-md:w-full">
                       <Checkbox
                         checked={hideNoPhone}
                         onCheckedChange={(c) => setHideNoPhone(c === true)}

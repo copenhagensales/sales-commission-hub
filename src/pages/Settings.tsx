@@ -631,7 +631,7 @@ export default function Settings() {
                           className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 cursor-pointer"
                           onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 max-md:flex-wrap max-md:min-w-0">
                             <Switch
                               checked={integration.is_active}
                               onCheckedChange={() => handleToggleIntegrationActive(integration)}
@@ -894,7 +894,7 @@ export default function Settings() {
                           className="flex items-center justify-between max-md:flex-wrap max-md:gap-2 cursor-pointer"
                           onClick={() => setExpandedWebhookId(expandedWebhookId === webhook.id ? null : webhook.id)}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 max-md:flex-wrap max-md:min-w-0">
                             <h3 className="font-semibold">{webhook.name}</h3>
                             <Badge variant="outline" className="text-xs font-mono">
                               {webhook.type}
