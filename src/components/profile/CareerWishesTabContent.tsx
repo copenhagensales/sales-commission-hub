@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useIsPhone, StickyOnPhone, useDraftGuard } from "@/components/mobile";
 import { Loader2, CheckCircle, Sparkles, Users, Crown, ArrowRight } from "lucide-react";
 
 type LeadershipInterest = "yes" | "maybe" | "no";
@@ -34,6 +35,12 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
   const [isSubmitted, setIsSubmitted] = useState(false);
   // Én anmodnings-id pr. udfyldt formular; genbruges ved genforsøg.
   const [requestId] = useState(() => crypto.randomUUID());
+
+  const isPhone = useIsPhone();
+  // Kladden bevares ved versionsskift: genindlæsning udskydes, mens formularen er udfyldt.
+  useDraftGuard(!!formPurpose && !isSubmitted);
+  const [step, setStep] = useState(0);
+  const [stepError, setStepError] = useState<string | null>(null);
 
   const showTeamChangeSection = formPurpose === "team_change" || formPurpose === "both";
   const showLeadershipSection = formPurpose === "leadership" || formPurpose === "both";
@@ -94,42 +101,42 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
     },
   });
 
+  const validate = (scope: "purpose" | "details" | "all"): string | null => {
+    if (!formPurpose) return "Vælg hvad din henvendelse handler om.";
+    if (scope === "purpose") return null;
+    if (showTeamChangeSection) {
+      if (!desiredTeam) return "Vælg hvilket team du ønsker.";
+      if (!teamChangeMotivation.trim()) return "Beskriv din motivation for teamskifte.";
+    }
+    if (showLeadershipSection) {
+      if (!leadershipInterest) return "Angiv din interesse for ledelse.";
+      const withLeader = leadershipInterest === "yes" || leadershipInterest === "maybe";
+      if (withLeader && !leadershipRoleType) return "Vælg hvilken type ledelsesrolle.";
+      if (withLeader && !leadershipMotivation.trim()) return "Beskriv din motivation for ledelse.";
+    }
+    return null;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formPurpose) {
-      toast({ title: "Udfyld venligst", description: "Vælg hvad din henvendelse handler om.", variant: "destructive" });
+    const err = validate("all");
+    if (err) {
+      setStepError(err);
+      toast({ title: "Udfyld venligst", description: err, variant: "destructive" });
       return;
     }
-
-    if (showTeamChangeSection) {
-      if (!desiredTeam) {
-        toast({ title: "Udfyld venligst", description: "Vælg hvilket team du ønsker.", variant: "destructive" });
-        return;
-      }
-      if (!teamChangeMotivation.trim()) {
-        toast({ title: "Udfyld venligst", description: "Beskriv din motivation for teamskifte.", variant: "destructive" });
-        return;
-      }
-    }
-
-    if (showLeadershipSection) {
-      if (!leadershipInterest) {
-        toast({ title: "Udfyld venligst", description: "Angiv din interesse for ledelse.", variant: "destructive" });
-        return;
-      }
-      if ((leadershipInterest === "yes" || leadershipInterest === "maybe") && !leadershipRoleType) {
-        toast({ title: "Udfyld venligst", description: "Vælg hvilken type ledelsesrolle.", variant: "destructive" });
-        return;
-      }
-      if ((leadershipInterest === "yes" || leadershipInterest === "maybe") && !leadershipMotivation.trim()) {
-        toast({ title: "Udfyld venligst", description: "Beskriv din motivation for ledelse.", variant: "destructive" });
-        return;
-      }
-    }
-
+    setStepError(null);
     submitMutation.mutate();
   };
+
+  const goNext = () => {
+    const err = validate(step === 0 ? "purpose" : "details");
+    setStepError(err);
+    if (!err) setStep((v) => Math.min(2, v + 1));
+  };
+  const showPurpose = !isPhone || step === 0;
+  const showDetails = !isPhone || step === 1;
+  const STEPS = ["Ønske", "Begrundelse", "Send"];
 
   if (isSubmitted) {
     return (
@@ -161,10 +168,25 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
+          {isPhone && (
+            <div aria-label={`Trin ${step + 1} af 3`}>
+              <div className="mb-2 flex justify-between text-[14px] text-muted-foreground">
+                {STEPS.map((l, i) => (
+                  <span key={l} className={i === step ? "font-semibold text-foreground" : undefined}>{i + 1}. {l}</span>
+                ))}
+              </div>
+              <div className="flex gap-1" aria-hidden="true">
+                {STEPS.map((l, i) => <div key={l} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-primary" : "bg-muted"}`} />)}
+              </div>
+            </div>
+          )}
+          {stepError && isPhone && <p role="alert" className="text-[14px] text-destructive">{stepError}</p>}
+
+          {showPurpose && (<>
           {/* Employee Info (read-only) */}
           <div className="bg-muted/50 p-4 rounded-lg space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wide">Medarbejderinfo</Label>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2 md:gap-4">
               <div>
                 <span className="text-muted-foreground">Navn:</span>
                 <span className="ml-2 font-medium">{employeeName}</span>
@@ -239,8 +261,10 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
             </div>
           </div>
 
+          </>)}
+
           {/* Team Change Section */}
-          {showTeamChangeSection && (
+          {showDetails && showTeamChangeSection && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
               <div className="flex items-center gap-2 mb-2">
                 <Users className="h-5 w-5 text-primary" />
@@ -278,7 +302,7 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
           )}
 
           {/* Leadership Interest Section */}
-          {showLeadershipSection && (
+          {showDetails && showLeadershipSection && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
               <div className="flex items-center gap-2 mb-2">
                 <Crown className="h-5 w-5 text-primary" />
@@ -334,8 +358,33 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
             </div>
           )}
 
+          {isPhone && step === 2 && (
+            <div className="space-y-2 rounded-lg bg-muted/40 p-4 text-[15px]">
+              <p className="font-semibold">Klar til at sende</p>
+              {showTeamChangeSection && <p>Teamskifte: {desiredTeam === "open_for_suggestions" ? "Åben for forslag" : desiredTeam}</p>}
+              {showLeadershipSection && <p>Ledelse: {leadershipInterest === "yes" ? "Meget interesseret" : "Måske på sigt"}</p>}
+              <p className="text-muted-foreground">Din henvendelse behandles fortroligt af HR/ledelsen.</p>
+            </div>
+          )}
+
+          {isPhone && (
+            <StickyOnPhone>
+              {step > 0 && (
+                <Button type="button" variant="outline" onClick={() => { setStepError(null); setStep(step - 1); }}>Tilbage</Button>
+              )}
+              {step < 2 ? (
+                <Button type="button" onClick={goNext}>Næste</Button>
+              ) : (
+                <Button type="submit" disabled={submitMutation.isPending}>
+                  {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send
+                </Button>
+              )}
+            </StickyOnPhone>
+          )}
+
           {/* Submit Button */}
-          {formPurpose && (
+          {!isPhone && formPurpose && (
             <Button 
               type="submit" 
               className="w-full" 
