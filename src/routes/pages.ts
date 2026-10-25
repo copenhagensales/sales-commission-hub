@@ -62,6 +62,7 @@ export const MyGoals = lazyPage(() => import("@/pages/MyGoals"));
 export const TeamGoals = lazyPage(() => import("@/pages/TeamGoals"));
 export const CareerWishes = lazyPage(() => import("@/pages/CareerWishes"));
 export const CareerWishesOverview = lazyPage(() => import("@/pages/CareerWishesOverview"));
+export const InvoiceFlow = lazyPage(() => import("@/pages/InvoiceFlow"));
 export const CarQuiz = lazyPage(() => import("@/pages/CarQuiz"));
 export const CarQuizAdmin = lazyPage(() => import("@/pages/CarQuizAdmin"));
 export const CodeOfConduct = lazyPage(() => import("@/pages/CodeOfConduct"));

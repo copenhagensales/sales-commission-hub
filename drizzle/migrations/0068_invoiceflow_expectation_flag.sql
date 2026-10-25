@@ -1,0 +1,1 @@
+ALTER TABLE public.invoiceflow_suppliers ADD COLUMN missing_period text, ADD COLUMN missing_checked_at timestamptz;
