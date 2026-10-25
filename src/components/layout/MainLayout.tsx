@@ -63,7 +63,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <RolePreviewBanner />
           
           {/* Complete profile banner for new employees */}
-          {!isPreviewMode && <CompleteProfileBanner />}
+          {!isPreviewMode && !isPhone && <CompleteProfileBanner />}
           
           <DraftGuardNavigationListener />
           {isPhone ? (
@@ -74,7 +74,10 @@ export function MainLayout({ children }: MainLayoutProps) {
               right={<EnvironmentSwitcher compact />}
               moreMenu={(close) => <SidebarComponent isMobile onNavigate={close} />}
             >
-              <main className="min-w-0 p-4">{children}</main>
+              <main className="min-w-0 p-4">
+                {!isPreviewMode && <div className="mb-4 empty:hidden"><CompleteProfileBanner /></div>}
+                {children}
+              </main>
             </PageShell>
           ) : (
             <>

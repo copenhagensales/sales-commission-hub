@@ -25,16 +25,16 @@ export function TopBar({ title, showBack, right }: TopBarProps) {
     else navigate(tabRootFor(pathname, tabs) ?? "/home");
   };
   return (
-    <header className="sticky top-0 z-40 border-b border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top,0px)] text-sidebar-foreground">
-      <div className="flex h-[88px] items-center gap-2 px-6">
+    <header className="sticky top-0 z-40 border-b border-sidebar-foreground/10 bg-sidebar pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] text-sidebar-foreground shadow-[0_8px_24px_-12px_hsl(var(--cph-onyx)/0.5)]">
+      <div className="flex h-[88px] items-center gap-3 px-4 min-[380px]:px-6">
         {showBack ? (
           <button type="button" onClick={goBack} aria-label="Tilbage"
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-full active:bg-sidebar-accent">
+            className="-ml-2 flex h-11 w-11 flex-none items-center justify-center rounded-full transition-colors active:bg-sidebar-accent">
             <ArrowLeft className="h-6 w-6" />
           </button>
         ) : <span className="w-2" />}
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{title}</div>
-        {right}
+        {right && <div className="flex flex-none items-center">{right}</div>}
       </div>
     </header>
   );
