@@ -42,6 +42,7 @@ import { useQualityAccess } from "@/hooks/useQualityControl";
 import { ViewAsSelector } from "./ViewAsSelector";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
+import { useInvoiceflowAccess } from "@/hooks/useInvoiceflow";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
@@ -112,6 +113,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
+  const { hasAccess: invoiceflowAccess } = useInvoiceflowAccess();
   const [ledelseOpen, setLedelseOpen] = useState(
     ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client", "/customer-inquiries", "/client-forecast"].some(path => location.pathname.startsWith(path))
   );
@@ -1000,7 +1002,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             <Collapsible open={ledelseOpen} onOpenChange={setLedelseOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].some(path => location.pathname.startsWith(path)) 
+                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/invoiceflow"].some(path => location.pathname.startsWith(path)) 
                   ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
@@ -1011,6 +1013,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {ledelseOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {invoiceflowAccess && (
+                  <NavLink to="/invoiceflow" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/invoiceflow" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Receipt className="h-4 w-4" />
+                    InvoiceFlow
+                  </NavLink>
+                )}
                 {p.canViewContracts && (
                   <NavLink to="/company-overview" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",

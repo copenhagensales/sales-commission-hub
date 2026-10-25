@@ -48,6 +48,7 @@ import {
   MyGoals,
   CareerWishes,
   CareerWishesOverview,
+  InvoiceFlow,
   CarQuiz,
   CarQuizAdmin,
   CodeOfConduct,
@@ -320,6 +321,8 @@ export const routes: RouteConfig[] = [
     access: "role",
     positionPermission: "menu_career_wishes_overview",
   },
+  // Adgang håndhæves af invoiceflow_access (RLS); siden viser selv afvisning.
+  { path: "/invoiceflow", component: InvoiceFlow, access: "protected" },
   { path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" },
   
   // Client Forecast
