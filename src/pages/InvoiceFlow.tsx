@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import {
   useInvoiceflowAccess, useIfSuppliers, useIfSources, useIfCredentialMeta, useIfJobs, useIfInvoices,
   useIfSettings, useIfPortalRequests, useCreateSupplierWithSource, useUpdateSource, useUpdateIfSettings,
-  useAddPortalRequest, useInvoiceflowAdmin, useIfPortalCatalog, useSaveCredential,
+  useAddPortalRequest, useInvoiceflowAdmin, useIfPortalCatalog, useSaveCredential, useIfLiveView,
 } from "@/hooks/useInvoiceflow";
 
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleString("da-DK", { dateStyle: "short", timeStyle: "short" }) : "–");
@@ -164,6 +164,37 @@ function PortalLoginForm({ sourceId, slug, hasLogin }: { sourceId: string; slug?
   );
 }
 
+/** Engangskode: koden tastes KUN i Browserbases Live View-ramme. Stork har intet kodefelt. */
+function CodeWaitBox({ jobId, supplier, expiresAt }: { jobId: string; supplier: string; expiresAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const left = Math.max(0, new Date(expiresAt).getTime() - now);
+  const live = useIfLiveView(jobId, left > 0);
+  const admin = useInvoiceflowAdmin();
+  const { toast } = useToast();
+  const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
+  return (
+    <div className="space-y-3 border-b p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">{supplier}: portalen beder om en kode</p>
+        <Badge variant={left < 120000 ? "destructive" : "secondary"}>{left ? `${mm}:${String(ss).padStart(2, "0")} tilbage` : "Udløbet"}</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">Tast koden direkte i portalens side herunder. Kørslen fortsætter selv, når login er gennemført.</p>
+      {live.isLoading && <div className="h-[60vh] w-full animate-pulse rounded-lg bg-muted" />}
+      {live.isError && <p className="text-sm text-destructive">Live View kunne ikke hentes. Kun den, der har gemt loginnet, kan åbne den.</p>}
+      {live.data?.url && left > 0 && (
+        <iframe title="Portal (Live View)" src={live.data.url} className="h-[60vh] min-h-[420px] w-full rounded-lg border bg-background"
+          sandbox="allow-same-origin allow-scripts allow-forms" allow="clipboard-read; clipboard-write" referrerPolicy="no-referrer" />
+      )}
+      <Button className="min-h-11 w-full md:w-auto" disabled={admin.isPending || !left}
+        onClick={() => admin.mutate({ action: "check_code", job_id: jobId }, {
+          onSuccess: (r) => toast({ title: r.ok ? "Login gennemført – kørslen fortsætter" : "Portalen venter stadig på koden" }),
+          onError: () => toast({ title: "Tjek fejlede", variant: "destructive" }),
+        })}>Jeg har tastet koden</Button>
+    </div>
+  );
+}
+
 function NewSupplierForm() {
   const create = useCreateSupplierWithSource();
   const save = useSaveCredential();
@@ -265,7 +296,9 @@ function RunsTab() {
       {jobs.map((j) => {
         const last = [...(j.runs ?? [])].sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
         return (
-          <Card key={j.id}><CardContent className="flex flex-col gap-2 p-3 md:flex-row md:items-center md:justify-between">
+          <Card key={j.id}>
+          {j.status === "afventer_kode" && last?.live_view_expires_at && <CodeWaitBox jobId={j.id} supplier={nameFor(j.source_id)} expiresAt={last.live_view_expires_at} />}
+          <CardContent className="flex flex-col gap-2 p-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0 space-y-1 text-sm">
               <div className="flex flex-wrap items-center gap-2 font-medium">
                 {nameFor(j.source_id)} <Badge variant={j.status === "fejlet" || j.status === "pauset" ? "destructive" : "secondary"}>{JOB_STATUS[j.status]}</Badge>
@@ -273,8 +306,13 @@ function RunsTab() {
               </div>
               {last && <p className="text-muted-foreground break-words">Seneste: {fmtDate(last.started_at)} · {last.result ?? "–"} · {last.invoices_found} fakturaer{last.error_message ? ` · ${last.error_code}: ${last.error_message}` : ""}</p>}
               {j.next_attempt_at && <p className="text-muted-foreground">Næste forsøg {fmtDate(j.next_attempt_at)}</p>}
+              {last?.browserbase_session_id && (
+                <a className="inline-flex min-h-11 items-center text-primary underline" href={`https://www.browserbase.com/sessions/${last.browserbase_session_id}`} target="_blank" rel="noreferrer noopener">
+                  Se optagelse (kræver Browserbase-login)
+                </a>
+              )}
             </div>
-            <Button size="sm" variant="outline" className="min-h-11" disabled={admin.isPending || j.status === "koerer"}
+            <Button size="sm" variant="outline" className="min-h-11" disabled={admin.isPending || j.status === "koerer" || j.status === "afventer_kode"}
               onClick={() => admin.mutate({ action: "rerun", job_id: j.id }, { onError: () => toast({ title: "Kunne ikke genkøre", variant: "destructive" }) })}>Genkør</Button>
           </CardContent></Card>
         );
