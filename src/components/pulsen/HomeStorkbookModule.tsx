@@ -94,17 +94,19 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
               placeholder={`Del noget med huset, ${firstName.trim()} …`}
               className="min-h-[44px] min-w-0 flex-1 bg-transparent px-2 text-[16px] outline-none placeholder:text-muted-foreground" />
           </div>
-          <div className="ml-auto flex gap-2">
+          {/* Telefon: iOS-stil handlingslinje under feltet med tynd skillelinje og tre lige brede knapper. */}
+          <div className="flex basis-full items-center gap-1 border-t border-foreground/10 pt-2 sm:ml-auto sm:basis-auto sm:gap-2 sm:border-0 sm:pt-0">
             <button type="button" aria-label="Del et billede" onClick={() => navigate("/storkbook?compose=image")}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-foreground hover:bg-card">
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold text-foreground/80 transition active:scale-95 active:bg-card hover:bg-card sm:h-11 sm:w-11 sm:flex-none">
               <ImagePlus className="h-5 w-5" aria-hidden="true" />
+              <span className="sm:hidden">Billede</span>
             </button>
             <button type="button" onClick={() => navigate("/storkbook?compose=praise")}
-              className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-card px-4 text-[14px] font-extrabold text-foreground">
-              <HandHeart className="h-4 w-4" aria-hidden="true" /> Giv ros
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold text-foreground/80 transition active:scale-95 active:bg-card sm:flex-none sm:bg-card sm:px-4 sm:font-extrabold sm:text-foreground">
+              <HandHeart className="h-5 w-5 sm:h-4 sm:w-4" aria-hidden="true" /> Giv ros
             </button>
             <button type="submit" disabled={!text.trim() || !self.data}
-              className="min-h-[44px] rounded-full bg-[hsl(var(--cph-emerald))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-onyx))] disabled:opacity-50">
+              className="min-h-[44px] flex-1 rounded-full bg-[hsl(var(--cph-emerald))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-onyx))] shadow-sm transition active:scale-95 disabled:bg-foreground/10 disabled:text-foreground/40 disabled:shadow-none sm:flex-none">
               Del
             </button>
           </div>
