@@ -1301,7 +1301,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                       setMatchComment(challenge.comment || "");
                       setMatchStarted(true);
                     }}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                    className={`flex min-h-[44px] md:min-h-0 items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
                       isSelected 
                         ? "bg-amber-500/20 border-amber-500/50 text-amber-400" 
                         : "bg-slate-700/50 border-slate-600/50 text-slate-300 hover:border-slate-500"
