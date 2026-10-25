@@ -1,3 +1,4 @@
+import { useIsPhone } from "@/components/mobile";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -135,7 +136,7 @@ export function CompactLeagueView() {
                           <ReactButton
                             summary={summary}
                             disabled={!canInteract}
-                            compact
+                            compact={isPhone}
                             className="-ml-1 [&_button]:text-[13px]"
                             onSet={(reaction) =>
                               setReaction.mutate({ targetType: "league_round", targetKey: key, reaction })
