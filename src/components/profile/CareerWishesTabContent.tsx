@@ -37,6 +37,8 @@ export function CareerWishesTabContent({ employeeId, employeeName, department }:
   const [requestId] = useState(() => crypto.randomUUID());
 
   const isPhone = useIsPhone();
+  // Kladden bevares ved versionsskift: genindlæsning udskydes, mens formularen er udfyldt.
+  useDraftGuard(!!formPurpose && !isSubmitted);
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
 

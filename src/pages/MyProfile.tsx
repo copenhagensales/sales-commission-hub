@@ -7,6 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchSalaryDetails } from "@/lib/salary/salaryDetails";
 import { EMPLOYEE_SAFE_COLUMNS, attachSensitiveFields } from "@/lib/employees/safeColumns";
+import { RouteSkeleton } from "@/components/mobile";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,17 +100,18 @@ function EditableSensitiveField({
       <div className="flex items-center gap-1">
         <Input
           type="text"
+          inputMode="numeric"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="h-9 flex-1"
+          className="h-9 flex-1 max-md:h-11 max-md:text-base"
           placeholder={placeholder}
           autoFocus
         />
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+        <Button variant="ghost" size="icon" aria-label="Gem" className="h-8 w-8 shrink-0 max-md:h-11 max-md:w-11" onClick={handleSave}>
           <Check className="h-4 w-4 text-green-600" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+        <Button variant="ghost" size="icon" aria-label="Annullér" className="h-8 w-8 shrink-0 max-md:h-11 max-md:w-11" onClick={handleCancel}>
           <X className="h-4 w-4 text-destructive" />
         </Button>
       </div>
@@ -120,7 +122,7 @@ function EditableSensitiveField({
 
   return (
     <div 
-      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px] max-md:min-h-11 active:bg-muted/60"
       onClick={handleStartEdit}
     >
       <span className="font-medium">{displayValue}</span>
@@ -134,12 +136,14 @@ function EditableContactField({
   value, 
   onSave, 
   type = "text",
-  placeholder 
+  placeholder,
+  inputMode
 }: { 
   value: string | null; 
   onSave: (value: string | null) => void;
   type?: "text" | "tel" | "email";
   placeholder?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value || "");
@@ -164,17 +168,18 @@ function EditableContactField({
       <div className="flex items-center gap-1">
         <Input
           type={type}
+          inputMode={type === "tel" ? "tel" : type === "email" ? "email" : inputMode}
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="h-9 flex-1"
+          className="h-9 flex-1 max-md:h-11 max-md:text-base"
           placeholder={placeholder}
           autoFocus
         />
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+        <Button variant="ghost" size="icon" aria-label="Gem" className="h-8 w-8 shrink-0 max-md:h-11 max-md:w-11" onClick={handleSave}>
           <Check className="h-4 w-4 text-green-600" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+        <Button variant="ghost" size="icon" aria-label="Annullér" className="h-8 w-8 shrink-0 max-md:h-11 max-md:w-11" onClick={handleCancel}>
           <X className="h-4 w-4 text-destructive" />
         </Button>
       </div>
@@ -185,7 +190,7 @@ function EditableContactField({
 
   return (
     <div 
-      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px] max-md:min-h-11 active:bg-muted/60"
       onClick={() => setIsEditing(true)}
     >
       <div className="flex items-center gap-2">
@@ -1087,9 +1092,7 @@ export default function MyProfile() {
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Indlæser...</p>
-        </div>
+        <RouteSkeleton />
       </MainLayout>
     );
   }
@@ -1112,8 +1115,8 @@ export default function MyProfile() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <div className="relative group">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="relative group flex-none">
             <Avatar className="h-20 w-20 border-2 border-border">
               <AvatarImage src={employee.avatar_url || undefined} alt="Profilbillede" />
               <AvatarFallback className="bg-muted text-muted-foreground text-lg">
@@ -1160,16 +1163,16 @@ export default function MyProfile() {
               </>
             )}
           </div>
-          <div>
-            <h1 className="text-3xl font-bold">Min profil</h1>
-            <p className="text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold md:text-3xl">Min profil</h1>
+            <p className="text-muted-foreground break-words">
               {employee.first_name} {employee.last_name} {employee.job_title && `· ${employee.job_title}`}
             </p>
             {!isPreviewMode && employee.avatar_url && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="mt-1 h-7 px-2 text-xs text-muted-foreground"
+                className="mt-1 h-7 px-2 text-xs text-muted-foreground max-md:h-11 max-md:text-[14px]"
                 disabled={removeMyAvatar.isPending}
                 onClick={() =>
                   removeMyAvatar.mutate(employee.id, {
@@ -1185,7 +1188,7 @@ export default function MyProfile() {
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="h-auto flex-wrap">
+          <TabsList className="h-auto flex-wrap max-md:flex max-md:w-full max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:[scrollbar-width:none] max-md:[&>button]:min-h-11 max-md:[&>button]:flex-none">
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
             <TabsTrigger value="kalender">
               <Calendar className="h-4 w-4 mr-2" />
@@ -1242,7 +1245,7 @@ export default function MyProfile() {
                     <div className="space-y-4">
                       <div className="space-y-3">
                         <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Identitet</h4>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
                             <label className="text-xs text-muted-foreground">Fornavn(e)</label>
                             <DisplayField value={employee.first_name} />
@@ -1302,6 +1305,7 @@ export default function MyProfile() {
                           <EditableContactField 
                             value={employee.address_postal_code} 
                             placeholder="Postnummer"
+                            inputMode="numeric"
                             onSave={(v) => handleSaveContact("address_postal_code", v)} 
                           />
                         </div>
@@ -1476,17 +1480,17 @@ export default function MyProfile() {
                 {contracts.length > 0 ? (
                   <div className="space-y-3">
                     {contracts.map((contract: any) => (
-                      <div key={contract.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div>
-                          <p className="font-medium">{contract.title}</p>
+                      <div key={contract.id} className="flex flex-col gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors md:flex-row md:items-center md:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium break-words">{contract.title}</p>
                           <p className="text-sm text-muted-foreground">
                             {formatDate(contract.created_at)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between gap-3 md:justify-start">
                           {getContractStatusBadge(contract.status || "draft")}
                           {contract.status === "pending_employee" ? (
-                            <Button size="sm" onClick={() => navigate(`/contract/${contract.id}`)}>
+                            <Button size="sm" className="max-md:min-h-11" onClick={() => navigate(`/contract/${contract.id}`)}>
                               Læs og underskriv
                             </Button>
                           ) : (
@@ -1494,6 +1498,8 @@ export default function MyProfile() {
                               variant="ghost" 
                               size="icon"
                               title="Download som PDF"
+                              aria-label="Åbn kontrakt som PDF"
+                              className="max-md:h-11 max-md:w-auto max-md:gap-2 max-md:px-4"
                               onClick={() => downloadContractAsPdf({
                                 id: contract.id,
                                 title: contract.title,
@@ -1504,6 +1510,7 @@ export default function MyProfile() {
                               })}
                             >
                               <Download className="h-4 w-4" />
+                              <span className="md:hidden">Åbn</span>
                             </Button>
                           )}
                         </div>
