@@ -152,7 +152,7 @@ export function CompactLeagueView() {
                       {formatPoints(standing.total_points || 0)}
                     </p>
                     {gapText(index) && (
-                      <p className="mt-1 whitespace-nowrap text-[12px] text-muted-foreground">{gapText(index)}</p>
+                      <p className="mt-1 hidden whitespace-nowrap text-[12px] text-muted-foreground min-[380px]:block">{gapText(index)}</p>
                     )}
                   </div>
                 </div>
