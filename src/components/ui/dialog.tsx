@@ -40,17 +40,31 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-4 z-50 grid w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto -translate-x-1/2 gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        "fixed left-1/2 top-4 z-50 grid w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto -translate-x-1/2 gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-md:top-[max(1rem,env(safe-area-inset-top))] max-md:max-h-[calc(100dvh_-_max(1rem,env(safe-area-inset-top))_-_1rem)]",
         className,
       )}
       {...props}
     >
+      {!hideCloseButton && (
+        // Telefon: X i en klæbende, højdeløs række øverst, så den bliver stående når indholdet skrulles.
+        <div className="md:hidden sticky top-0 z-[100] -mr-4 -mt-4 ml-auto h-0 w-11 self-start">
+          <DialogPrimitive.Close asChild>
+            <button
+              type="button"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-border backdrop-blur-sm active:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <X className="h-5 w-5" />
+              <span className="sr-only">Luk</span>
+            </button>
+          </DialogPrimitive.Close>
+        </div>
+      )}
       {children}
       {!hideCloseButton && (
         <DialogPrimitive.Close asChild>
           <button
             type="button"
-            className="absolute right-4 top-4 z-[100] rounded-md bg-background/80 backdrop-blur-sm opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-2 cursor-pointer max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center"
+            className="max-md:hidden absolute right-4 top-4 z-[100] rounded-md bg-background/80 backdrop-blur-sm opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-2 cursor-pointer"
             style={{ pointerEvents: 'auto' }}
           >
             <X className="h-5 w-5" />
