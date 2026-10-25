@@ -60,7 +60,6 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
   const isMobile = useIsPhone();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
-  const tabs = useBottomTabs();
   const [actions, setActions] = useState<Array<[string, MoreAction]>>([]);
   const register = useCallback((id: string, action: MoreAction) => {
     setActions((prev) => [...prev.filter(([k]) => k !== id), [id, action]]);
