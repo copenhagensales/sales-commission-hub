@@ -344,7 +344,7 @@ export default function CodeOfConductAdmin() {
   return (
     <MainLayout>
       <div className="container mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 max-md:flex-col max-md:items-stretch max-md:gap-3 max-md:[&>button]:min-h-11 max-md:[&>button]:w-full max-md:[&>button]:whitespace-normal">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Shield className="h-6 w-6 text-primary" />

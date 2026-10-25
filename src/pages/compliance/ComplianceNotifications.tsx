@@ -134,7 +134,7 @@ export default function ComplianceNotifications() {
         </Button>
 
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Bell className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">
               Notifikationsmodtagere

@@ -18,9 +18,12 @@ CHECK_JS = r"""
   const label = (e) => (e.getAttribute('aria-label') || e.innerText || e.tagName).trim().replace(/\s+/g,' ').slice(0,40);
   const visible = (e) => { const s = getComputedStyle(e); const r = e.getBoundingClientRect();
     return s.visibility !== 'hidden' && s.display !== 'none' && +s.opacity > 0 && r.width > 0 && r.height > 0; };
-  const inHScroll = (e) => { for (let p = e.parentElement; p; p = p.parentElement) {
+  // PageShell's indholdsramme kan selv skrulle; den tæller som siden, ikke som en tilladt indre ramme.
+  const shell = document.querySelector('[data-mobil-indhold]');
+  const inHScroll = (e) => { for (let p = e.parentElement; p && p !== shell; p = p.parentElement) {
     const s = getComputedStyle(p); if (/(auto|scroll)/.test(s.overflowX) && p.scrollWidth > p.clientWidth) return true; } return false; };
   if (document.documentElement.scrollWidth > W + 1) issues.push({type:'sideskrul', detail: document.documentElement.scrollWidth + 'px'});
+  if (shell && shell.scrollWidth > shell.clientWidth + 1) issues.push({type:'sideskrul', detail: 'indholdsramme +' + (shell.scrollWidth - shell.clientWidth) + 'px'});
   const main = document.querySelector('main') || document.body;
   // Tekst der går ud over skærmkanten
   main.querySelectorAll('*').forEach(e => { if (!visible(e) || inHScroll(e)) return; const r = e.getBoundingClientRect();

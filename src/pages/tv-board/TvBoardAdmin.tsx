@@ -332,7 +332,7 @@ export default function TvBoardAdmin() {
             </ol>
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm font-medium">TV Link format:</p>
-              <code className="text-primary">{getPublicUrl()}/tv/[dashboard-slug]</code>
+              <code className="text-primary break-all">{getPublicUrl()}/tv/[dashboard-slug]</code>
             </div>
           </CardContent>
         </Card>

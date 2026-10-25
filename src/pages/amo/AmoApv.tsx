@@ -193,7 +193,7 @@ export default function AmoApv() {
   return (
     <MainLayout>
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3 max-md:[&>button]:min-h-11">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-emerald-500/20">
             <Shield className="h-6 w-6 text-emerald-400" />
@@ -261,8 +261,8 @@ export default function AmoApv() {
           return (
             <Card key={a.id} className="cursor-pointer hover:border-muted-foreground/30 transition-colors" onClick={() => setDetailApv(a)}>
               <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-2">
+                  <div className="flex items-center gap-2 min-w-0 max-md:flex-wrap">
                     <CardTitle className="text-base">{a.title}</CardTitle>
                     <Badge variant="outline" className="text-xs">{reasonLabels[a.reason] || a.reason}</Badge>
                   </div>
@@ -271,7 +271,7 @@ export default function AmoApv() {
                       "h-3 w-3 rounded-full",
                       status === "green" ? "bg-emerald-500" : status === "yellow" ? "bg-yellow-500" : "bg-red-500"
                     )} />
-                    <Button variant="outline" size="sm" className="h-8 gap-1 px-2" onClick={() => openCopy(a)}>
+                    <Button variant="outline" size="sm" className="h-8 gap-1 px-2 max-md:h-11" onClick={() => openCopy(a)}>
                       <Copy className="h-3.5 w-3.5" />
                       <span>Kopiér</span>
                     </Button>

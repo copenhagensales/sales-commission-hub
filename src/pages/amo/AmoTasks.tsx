@@ -204,8 +204,8 @@ export default function AmoTasks() {
 
   return (
     <MainLayout>
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-6 max-md:p-0 space-y-6">
+      <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <ListTodo className="h-6 w-6 text-primary" />
@@ -213,7 +213,7 @@ export default function AmoTasks() {
           </h1>
           <p className="text-muted-foreground text-sm">Administrer compliance-opgaver på tværs af AMO-moduler</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 max-md:flex-wrap max-md:[&>button]:min-h-11 max-md:[&>button]:flex-1">
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4 mr-1" /> Eksportér CSV
           </Button>
