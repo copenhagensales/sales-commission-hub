@@ -20,7 +20,7 @@ export default function TdcMonthlyGoalBoard() {
 
 
   const content = (
-    <div className="cph-board min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
+    <div className="cph-board min-h-screen w-full bg-slate-950 text-white p-6 md:p-10 max-md:p-4">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">TDC Månedsmål</h1>
@@ -42,13 +42,13 @@ export default function TdcMonthlyGoalBoard() {
       ) : (
         <>
           {/* Fælles mål */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 md:p-8 mb-8">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 md:p-8 mb-8 max-md:p-4 max-md:mb-4">
             <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <Trophy className="h-7 w-7 text-yellow-400" />
                 <span className="text-xl md:text-2xl font-semibold text-slate-200">Fælles mål</span>
               </div>
-              <div className="flex items-end gap-6 md:gap-10">
+              <div className="flex items-end gap-6 md:gap-10 max-md:flex-wrap max-md:gap-4">
                 {(data?.teamGoal ?? 0) > 0 && (
                   <>
                     <div className="text-right">
@@ -123,7 +123,7 @@ export default function TdcMonthlyGoalBoard() {
 
             {/* Dagsbokse: én pr. dag i måneden med dagens salg */}
             {(data?.days.length ?? 0) > 0 && (
-              <div className="mt-3 flex gap-1 md:gap-1.5">
+              <div className="mt-3 flex gap-1 md:gap-1.5 max-md:grid max-md:grid-cols-8">
                 {data!.days.map((d) => (
                   <div
                     key={d.date}
@@ -154,7 +154,7 @@ export default function TdcMonthlyGoalBoard() {
           </div>
 
           {/* Individuelle mål */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 md:p-8">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 md:p-8 max-md:p-4">
             <h2 className="text-xl md:text-2xl font-semibold text-slate-200 mb-5">Individuelle mål</h2>
             {(data?.sellers.length ?? 0) === 0 ? (
               <p className="text-slate-400">Ingen aktive sælgere på TDC Erhverv-teamet.</p>
