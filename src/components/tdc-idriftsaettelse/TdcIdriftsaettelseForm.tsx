@@ -258,7 +258,7 @@ export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } 
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2 max-md:[&>*]:min-w-0 max-md:[&_label]:min-h-11 max-md:[&_label]:inline-flex max-md:[&_label]:items-center max-md:[&_button:not([role=checkbox]):not([role=radio]):not([role=switch])]:min-h-11 max-md:[&_input]:min-h-11">
+    <div className="grid gap-6 lg:grid-cols-2 max-md:pb-24 max-md:[&>*]:min-w-0 max-md:[&_label]:min-h-11 max-md:[&_label]:inline-flex max-md:[&_label]:items-center max-md:[&_button:not([role=checkbox]):not([role=radio]):not([role=switch])]:min-h-11 max-md:[&_input]:min-h-11">
       <Card>
         <CardHeader><CardTitle>Oplysninger</CardTitle></CardHeader>
         <CardContent className="space-y-6">
