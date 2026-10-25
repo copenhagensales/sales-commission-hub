@@ -402,11 +402,11 @@ export default function CommissionLeague() {
                   {/* === LEFT COLUMN === */}
                   <div className="order-2 md:order-1 flex flex-col gap-1.5">
                     {/* Visnings-toggle: Individuel / Hold */}
-                    <div className="flex items-center gap-1 self-center md:self-start rounded-lg bg-slate-900/60 p-1 ring-1 ring-indigo-500/25 mb-1">
+                    <div className="flex w-full max-w-xs md:w-auto items-center gap-1 self-center md:self-start rounded-lg bg-slate-900/60 p-1 ring-1 ring-indigo-500/25 mb-1">
                       <button
                         type="button"
                         onClick={() => setLeagueView("individual")}
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                        className={`min-h-[44px] flex-1 md:min-h-0 md:flex-none rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
                           leagueView === "individual"
                             ? "bg-indigo-500/25 text-indigo-100 ring-1 ring-indigo-400/50"
                             : "text-muted-foreground hover:text-foreground"
@@ -417,7 +417,7 @@ export default function CommissionLeague() {
                       <button
                         type="button"
                         onClick={() => setLeagueView("team")}
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                        className={`min-h-[44px] flex-1 md:min-h-0 md:flex-none rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
                           leagueView === "team"
                             ? "bg-indigo-500/25 text-indigo-100 ring-1 ring-indigo-400/50"
                             : "text-muted-foreground hover:text-foreground"
@@ -764,9 +764,9 @@ export default function CommissionLeague() {
                 </CardHeader>
                 <CardContent className="px-2 sm:px-6">
                   <Tabs defaultValue="all">
-                    <TabsList className="mb-2 sm:mb-3 w-full sm:w-auto">
-                      <TabsTrigger value="all" className="text-xs sm:text-sm flex-1 sm:flex-none">Alle Divisioner</TabsTrigger>
-                      {!isFan && <TabsTrigger value="my" className="text-xs sm:text-sm flex-1 sm:flex-none">Min Division</TabsTrigger>}
+                    <TabsList className="mb-2 sm:mb-3 w-full sm:w-auto max-md:h-auto">
+                      <TabsTrigger value="all" className="min-h-[40px] md:min-h-0 text-xs sm:text-sm flex-1 sm:flex-none">Alle Divisioner</TabsTrigger>
+                      {!isFan && <TabsTrigger value="my" className="min-h-[40px] md:min-h-0 text-xs sm:text-sm flex-1 sm:flex-none">Min Division</TabsTrigger>}
                     </TabsList>
 
                     <TabsContent value="all">
@@ -842,11 +842,11 @@ export default function CommissionLeague() {
                 </CardHeader>
                 <CardContent>
                   {/* Round navigation – chips */}
-                  <div className="flex flex-wrap items-center gap-1.5 mb-4 overflow-x-auto pb-1">
+                  <div className="flex flex-nowrap md:flex-wrap items-center gap-1.5 mb-4 overflow-x-auto overscroll-x-contain pb-1">
                     <Button
                       variant={effectiveIndex === -1 ? "default" : "outline"}
                       size="sm"
-                      className="text-xs h-7 px-2.5 shrink-0"
+                      className="text-xs h-11 min-w-[44px] md:h-7 md:min-w-0 px-2.5 shrink-0"
                       onClick={() => setSelectedRoundIndex(-1)}
                     >
                       Kval
@@ -856,7 +856,7 @@ export default function CommissionLeague() {
                         key={r.id}
                         variant={effectiveIndex === idx ? "default" : "outline"}
                         size="sm"
-                        className="text-xs h-7 px-2.5 shrink-0"
+                        className="text-xs h-11 min-w-[44px] md:h-7 md:min-w-0 px-2.5 shrink-0"
                         onClick={() => setSelectedRoundIndex(idx)}
                       >
                         R{r.round_number}
