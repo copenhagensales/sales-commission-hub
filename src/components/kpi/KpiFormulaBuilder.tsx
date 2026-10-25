@@ -475,7 +475,7 @@ export function KpiFormulaBuilder() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[700px] max-h-[90dvh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingFormula ? "Rediger formel" : "Opret ny formel"}</DialogTitle>
             <DialogDescription>

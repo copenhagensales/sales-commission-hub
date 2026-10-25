@@ -326,7 +326,7 @@ export function EmployeeExcelImport() {
           <Upload className="mr-2 h-4 w-4" /> Importer fra Excel
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[80dvh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {step === "upload" && "Vælg Excel-fil"}

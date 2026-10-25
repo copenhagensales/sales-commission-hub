@@ -108,7 +108,7 @@ export function EesyMobilePerk() {
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{isNew ? "Skift til Eesy Mobil med 50 % rabat" : "Eksisterende Eesy-kunde: 50 % rabat"}</DialogTitle>
             <DialogDescription>

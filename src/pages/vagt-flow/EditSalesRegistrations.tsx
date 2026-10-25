@@ -1082,7 +1082,7 @@ export default function EditSalesRegistrations() {
 
       {/* Group Edit Dialog */}
       <Dialog open={groupEditDialog.open} onOpenChange={(open) => setGroupEditDialog({ open, group: open ? groupEditDialog.group : null })}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Rediger hele salgsgruppen</DialogTitle>
           </DialogHeader>

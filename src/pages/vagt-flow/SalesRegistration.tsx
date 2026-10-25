@@ -635,7 +635,7 @@ const SalesRegistration = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-3">
         <div className="flex items-center gap-4 min-w-0">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/vagt-flow")} aria-label="Tilbage">
+          <Button variant="ghost" size="icon" onClick={() => ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0 ? navigate(-1) : navigate("/vagt-flow")} aria-label="Tilbage">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

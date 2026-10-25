@@ -130,7 +130,7 @@ export function CandidateDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh]">
+      <DialogContent className="bg-card border-border max-w-2xl max-h-[90dvh]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-foreground text-xl">

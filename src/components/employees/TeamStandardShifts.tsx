@@ -998,7 +998,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingShift ? "Rediger vagt" : "Tilføj standard vagt"}</DialogTitle>
           </DialogHeader>

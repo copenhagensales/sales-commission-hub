@@ -543,7 +543,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
       {/* Condition builder dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-auto">
           <DialogHeader>
             <DialogTitle>
               Betingelser for "{selectedProduct?.name}"

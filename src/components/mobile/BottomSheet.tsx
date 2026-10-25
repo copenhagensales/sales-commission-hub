@@ -28,42 +28,49 @@ export function useSheetNavigate() {
  */
 export function BottomSheet({ open, onOpenChange, title, description, children, className }: BottomSheetProps) {
   const navigate = useNavigate();
+  // Refs, så effekten kun afhænger af `open` (nye callbacks ved gen-render må ikke lægge nye history-poster).
+  const navigateRef = useRef(navigate);
+  const onOpenChangeRef = useRef(onOpenChange);
+  navigateRef.current = navigate;
+  onOpenChangeRef.current = onOpenChange;
   const pushedRef = useRef(false);
   const pendingRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      // Lukket via UI: fjern vores history-post igen.
-      if (pushedRef.current) {
-        pushedRef.current = false;
-        if ((window.history.state as { bottomSheet?: boolean } | null)?.bottomSheet) window.history.back();
-      }
-      return;
-    }
+    if (!open) return;
+    const isSheetState = () => !!(window.history.state as { bottomSheet?: boolean } | null)?.bottomSheet;
     const prev = (window.history.state ?? {}) as { idx?: number };
-    // Posten tæller som et skridt, så sider der alligevel lægges oven på den, ved at der er historik.
+    // Én post pr. åbning. Posten tæller som et skridt, så sider oven på den ved, at der er historik.
     window.history.pushState({ ...prev, idx: (prev.idx ?? 0) + 1, bottomSheet: true }, "");
     pushedRef.current = true;
     const onPop = () => {
+      window.removeEventListener("popstate", onPop);
       pushedRef.current = false;
-      onOpenChange(false);
       const to = pendingRef.current;
       pendingRef.current = null;
-      if (to) setTimeout(() => navigate(to), 0);
+      onOpenChangeRef.current(false);
+      if (to) setTimeout(() => navigateRef.current(to), 0);
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [open, onOpenChange, navigate]);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // Lukket via UI (ikke via tilbage): fjern vores post igen.
+      if (pushedRef.current) {
+        pushedRef.current = false;
+        if (isSheetState()) window.history.back();
+      }
+    };
+  }, [open]);
 
   const sheetNavigate = useCallback((to: string) => {
     if (pushedRef.current && (window.history.state as { bottomSheet?: boolean } | null)?.bottomSheet) {
       pendingRef.current = to;
       window.history.back();
     } else {
-      onOpenChange(false);
-      navigate(to);
+      onOpenChangeRef.current(false);
+      navigateRef.current(to);
     }
-  }, [navigate, onOpenChange]);
+  }, []);
 
   const onClickCapture = (e: MouseEvent<HTMLDivElement>) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

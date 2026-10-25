@@ -832,7 +832,7 @@ const DashboardSettings = () => {
 
         {/* Create/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingKpi ? "Rediger KPI" : "Opret ny KPI"}
@@ -1102,7 +1102,7 @@ const DashboardSettings = () => {
           if (!open && showCelebration) return;
           setIsDesignDialogOpen(open);
         }}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => {
+          <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto" onInteractOutside={(e) => {
             // Prevent closing when clicking on celebration overlay
             if (showCelebration) {
               e.preventDefault();

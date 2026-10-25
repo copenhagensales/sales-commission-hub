@@ -376,7 +376,7 @@ export function AIDashboardWizard({ open, onOpenChange, onGenerate, teams, clien
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent className="sm:max-w-[700px] max-h-[85dvh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />

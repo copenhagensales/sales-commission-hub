@@ -119,7 +119,7 @@ export default function SecurityIncidents() {
             <DialogTrigger asChild>
               <Button className="max-md:min-h-11 max-md:w-full"><Plus className="h-4 w-4 mr-2" /> Registrer hændelse</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Registrer sikkerhedshændelse</DialogTitle>
               </DialogHeader>

@@ -380,7 +380,7 @@ export default function CareerWishesOverview() {
         </Card>
 
         <Dialog open={!!selectedWish} onOpenChange={(open) => !open && setSelectedWishId(null)}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto">
             {selectedWish && (
               <>
                 <DialogHeader>

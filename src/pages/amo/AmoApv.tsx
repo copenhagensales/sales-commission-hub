@@ -305,7 +305,7 @@ export default function AmoApv() {
 
       {/* Detail dialog */}
       <Dialog open={!!detailApv} onOpenChange={() => setDetailApv(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{detailApv?.title}</DialogTitle>
           </DialogHeader>
@@ -329,7 +329,7 @@ export default function AmoApv() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Rediger APV" : "Ny APV"}</DialogTitle>
           </DialogHeader>

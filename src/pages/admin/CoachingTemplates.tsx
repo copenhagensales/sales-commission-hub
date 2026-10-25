@@ -287,7 +287,7 @@ export default function CoachingTemplates() {
 
         {/* Edit/Create Dialog */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{isCreating ? "Opret Skabelon" : "Rediger Skabelon"}</DialogTitle>
             </DialogHeader>

@@ -190,7 +190,7 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
           {t("batchMigration.batchSync")}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+      <DialogContent className="max-w-2xl max-h-[90dvh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5" />

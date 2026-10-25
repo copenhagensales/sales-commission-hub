@@ -463,7 +463,7 @@ export function ProductPricingRulesDialog({
   if (isCreating || editingRule) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingRule ? "Rediger prissætningsregel" : "Opret prissætningsregel"}
@@ -490,7 +490,7 @@ export function ProductPricingRulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             ⚙️ Prissætningsregler for "{productName}"

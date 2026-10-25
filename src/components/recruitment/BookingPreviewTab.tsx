@@ -285,7 +285,7 @@ export function BookingPreviewTab() {
 
       {/* Edit Dialog */}
       <Dialog open={editing} onOpenChange={(open) => !open && setEditing(false)}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Rediger booking-side tekster</DialogTitle>
           </DialogHeader>

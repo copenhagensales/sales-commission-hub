@@ -264,7 +264,7 @@ export default function AmoDocuments() {
       </Card>
 
       <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Rediger dokument" : "Nyt dokument"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div><Label>Titel *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>

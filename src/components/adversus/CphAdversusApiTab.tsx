@@ -416,7 +416,7 @@ export function CphAdversusApiTab() {
 
       {/* Event detail dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogContent className="max-w-3xl max-h-[80dvh]">
           <DialogHeader>
             <DialogTitle>Event detaljer</DialogTitle>
           </DialogHeader>

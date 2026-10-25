@@ -71,7 +71,7 @@ export function EmployeeProfileDialog({ open, onOpenChange, employeeId }: Employ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-8 w-48" />
