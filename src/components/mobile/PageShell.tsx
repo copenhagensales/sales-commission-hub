@@ -26,7 +26,7 @@ export function TopBar({ title, showBack, right }: TopBarProps) {
   };
   return (
     <header className="sticky top-0 z-40 border-b border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top,0px)] text-sidebar-foreground">
-      <div className="flex h-[88px] items-center gap-2 px-3">
+      <div className="flex h-[88px] items-center gap-2 px-6">
         {showBack ? (
           <button type="button" onClick={goBack} aria-label="Tilbage"
             className="flex h-11 w-11 flex-none items-center justify-center rounded-full active:bg-sidebar-accent">
