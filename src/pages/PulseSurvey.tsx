@@ -275,6 +275,7 @@ export default function PulseSurvey() {
     );
   }
 
+  const npsQm = SCALE_QUESTIONS[0];
   const scaleOnly = SCALE_QUESTIONS.slice(1);
   const totalSteps = 3 + scaleOnly.length; // baggrund, anbefaling, skalaer, forslag
   const lastStep = totalSteps - 1;
@@ -345,9 +346,9 @@ export default function PulseSurvey() {
             {step === 1 && (
               <>
                 <p className="text-[14px] font-semibold text-muted-foreground">⭐ Anbefaling</p>
-                <Label className="block text-[17px] font-semibold leading-snug">{npsQ.question}</Label>
-                {npsQ.extraHelpText && <p className="text-[14px] text-muted-foreground italic">{npsQ.extraHelpText}</p>}
-                <ScaleSelector value={formData.nps_score} isNps onChange={(v) => handleScaleChange('nps_score', v)} lowLabel={npsQ.lowLabel} highLabel={npsQ.highLabel} />
+                <Label className="block text-[17px] font-semibold leading-snug">{npsQm.question}</Label>
+                {npsQm.extraHelpText && <p className="text-[14px] text-muted-foreground italic">{npsQm.extraHelpText}</p>}
+                <ScaleSelector value={formData.nps_score} isNps onChange={(v) => handleScaleChange('nps_score', v)} lowLabel={npsQm.lowLabel} highLabel={npsQm.highLabel} />
                 <div className="space-y-2">
                   <Label className="text-[16px] font-medium">Vil du kort uddybe? <span className="text-muted-foreground font-normal">(valgfrit)</span></Label>
                   <Textarea value={npsComment} onChange={(e) => setNpsComment(e.target.value)} placeholder="Hvad fungerer godt – og hvad kunne være bedre?" rows={3} className="text-[16px]" />
