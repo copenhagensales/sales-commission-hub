@@ -130,8 +130,8 @@ export function CompactLeagueView() {
                           {summary.total > 0 && (
                             <span className="flex flex-none items-center gap-1 text-[12px] text-muted-foreground">
                               <ReactionBubbles summary={summary} size={20} />
-                              <span className="tabular-nums">{summary.total}</span>
-                              <span aria-hidden="true">·</span>
+                              <span className="hidden tabular-nums min-[380px]:inline">{summary.total}</span>
+                              <span aria-hidden="true" className="hidden min-[380px]:inline">·</span>
                             </span>
                           )}
                           <ReactButton
@@ -148,7 +148,7 @@ export function CompactLeagueView() {
                     })()}
                   </div>
                   <div className="flex-none pl-1 text-right">
-                    <p className="whitespace-nowrap text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+                    <p className="whitespace-nowrap text-[18px] min-[380px]:text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
                       {formatPoints(standing.total_points || 0)}
                     </p>
                     {gapText(index) && (
