@@ -135,7 +135,8 @@ export function CompactLeagueView() {
                           <ReactButton
                             summary={summary}
                             disabled={!canInteract}
-                            className="-ml-3 [&_button]:text-[13px]"
+                            compact
+                            className="-ml-1 [&_button]:text-[13px]"
                             onSet={(reaction) =>
                               setReaction.mutate({ targetType: "league_round", targetKey: key, reaction })
                             }
@@ -162,7 +163,7 @@ export function CompactLeagueView() {
         <div className="mt-4 flex justify-end">
           <Link
             to="/commission-league"
-            className="flex items-center gap-1.5 text-[14px] font-extrabold text-foreground hover:opacity-70"
+            className="flex min-h-[44px] items-center gap-1.5 text-[14px] font-extrabold text-foreground hover:opacity-70"
           >
             Se fuld liga
             <ArrowRight className="h-3.5 w-3.5" />

@@ -168,7 +168,7 @@ export function EventRsvpCard({
               disabled={disabled}
               onClick={() => onRespond(o.status)}
               className={cn(
-                "flex items-center justify-center gap-1 rounded-full px-2 py-2 text-[13px] font-extrabold transition-colors",
+                "flex min-h-[44px] items-center justify-center gap-1 rounded-full px-2 py-2 text-[13px] font-extrabold transition-colors",
                 active
                   ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]"
                   : featured
