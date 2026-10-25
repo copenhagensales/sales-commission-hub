@@ -1,6 +1,6 @@
 import type React from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Calendar, Newspaper, User, Menu, type LucideIcon } from "lucide-react";
+import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, type LucideIcon } from "lucide-react";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -23,10 +23,19 @@ export const PROFILE_PATH = "/my-profile";
 /** Destinationerne med samme rettighedstjek som AppSidebar. Profilen nås via »Menu«. */
 export function useBottomTabs(): BottomTab[] {
   const p = usePermissions();
+  // »Vagter« peger på det første mål, brugeren har ret til (oversigt → egen FM-plan → egen TM-plan).
+  const shiftsTo = p.canViewFmOverview
+    ? "/vagt-flow"
+    : p.canViewFmMySchedule
+      ? "/vagt-flow/my-schedule"
+      : p.canViewMySchedule
+        ? "/shift-planning/my-schedule"
+        : null;
   return [
     { to: "/home", label: "Hjem", icon: Home, visible: !!p.canViewHome },
     { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals },
-    { to: "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!p.canViewFmOverview },
+    { to: shiftsTo ?? "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!shiftsTo },
+    { to: "/commission-league", label: "Liga", icon: Trophy, visible: !!p.canViewCommissionLeague },
     { to: "/storkbook", label: "Storkbook", icon: Newspaper, visible: !!p.canViewPulsen },
     { to: PROFILE_PATH, label: "Mig", icon: User, visible: !!p.canViewMyProfile },
   ];
@@ -44,12 +53,12 @@ interface BottomNavProps {
   menuOpen?: boolean;
 }
 
-const itemClass = "group flex h-full min-h-[44px] w-full flex-col items-center justify-center gap-1 text-[11px] font-medium tracking-[0.01em] transition-colors duration-200 active:scale-95 motion-reduce:transform-none";
+const itemClass = "group flex h-full min-h-[44px] w-full min-w-0 flex-col items-center justify-center gap-1 whitespace-nowrap text-[11px] font-medium tracking-[0.01em] transition-colors duration-200 active:scale-95 motion-reduce:transform-none";
 
 /** Ikon med blød pille bag den aktive fane (iOS/Material-stil). */
 function TabIcon({ icon: Icon, active, children }: { icon: LucideIcon; active: boolean; children?: React.ReactNode }) {
   return (
-    <span className={cn("relative flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200",
+    <span className={cn("relative flex h-8 w-12 max-w-full items-center justify-center rounded-full transition-colors duration-200",
       active ? "bg-[hsl(var(--cph-emerald)/0.16)]" : "bg-transparent")}>
       <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.8} aria-hidden />
       {children}
@@ -83,10 +92,11 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
     >
       <ul className="flex" style={{ height: BOTTOM_NAV_HEIGHT }}>
         {tabs.map((t) => {
-          const active = pathname === t.to || pathname.startsWith(`${t.to}/`);
+          const root = t.label === "Vagter" ? t.to.split("/").slice(0, 2).join("/") : t.to;
+          const active = pathname === root || pathname.startsWith(`${root}/`);
           const Icon = t.icon;
           return (
-            <li key={t.to} className="flex-1">
+            <li key={t.to} className="min-w-0 flex-1">
               <NavLink
                 to={t.to}
                 aria-current={active ? "page" : undefined}
@@ -101,7 +111,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
           );
         })}
         {onMenu && (
-          <li className="flex-1">
+          <li className="min-w-0 flex-1">
             <button
               type="button"
               onClick={onMenu}
