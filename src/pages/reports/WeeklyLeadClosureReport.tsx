@@ -568,6 +568,7 @@ export default function WeeklyLeadClosureReport() {
               onValueChange={(value) => value && setPeriod(value as PeriodMode)}
               variant="outline"
               size="sm"
+              className="max-md:grid max-md:w-full max-md:grid-cols-3 max-md:[&>button]:min-h-11"
             >
               <ToggleGroupItem value="week">Uge</ToggleGroupItem>
               <ToggleGroupItem value="month">Måned</ToggleGroupItem>
@@ -575,7 +576,7 @@ export default function WeeklyLeadClosureReport() {
             </ToggleGroup>
             {availableWeeks.length > 0 && (
               <Select value={activeWeek} onValueChange={setSelectedWeek}>
-                <SelectTrigger className="w-[190px]">
+                <SelectTrigger className="w-[190px] max-md:min-h-11 max-md:w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

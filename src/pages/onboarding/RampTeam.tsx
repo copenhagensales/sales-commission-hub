@@ -659,7 +659,7 @@ export default function RampTeam() {
   const aboutButton = (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className="rounded-full px-3 py-1 text-[12px] font-bold" style={{ background: "#f1f4f3", color: "#1b1f1d" }}>
+        <button type="button" className="rounded-full px-3 py-1 text-[12px] font-bold max-md:min-h-11 max-md:px-4 max-md:text-[14px]" style={{ background: "#f1f4f3", color: "#1b1f1d" }}>
           Om modellen
         </button>
       </PopoverTrigger>
@@ -735,8 +735,8 @@ export default function RampTeam() {
                 {programStartLabel && !programActive ? ` · ugens 1-1 registreres fra ${programStartLabel}` : ""}.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 max-md:w-full">
+              <div className="relative max-md:w-full">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "#57635e" }} />
                 <input
                   type="search"
@@ -744,7 +744,7 @@ export default function RampTeam() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Søg sælger"
                   aria-label="Søg sælger"
-                  className="w-48 rounded-full bg-white py-2.5 pl-9 pr-4 text-[14px] font-semibold outline-none"
+                  className="w-48 rounded-full bg-white py-2.5 pl-9 pr-4 text-[14px] font-semibold outline-none max-md:min-h-11 max-md:w-full max-md:text-base"
                   style={{ color: "#1b1f1d", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}
                 />
               </div>
@@ -752,7 +752,7 @@ export default function RampTeam() {
                 type="button"
                 aria-pressed={discreet}
                 onClick={toggleDiscreet}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-2 text-[12px] font-bold"
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-2 text-[12px] font-bold max-md:min-h-11 max-md:px-4 max-md:text-[14px]"
                 style={{
                   background: discreet ? "#1b1f1d" : "#ffffff",
                   color: discreet ? "#ffffff" : "#1b1f1d",
@@ -785,7 +785,7 @@ export default function RampTeam() {
                       type="button"
                       onClick={toggleChart}
                       aria-expanded={chartOpen}
-                      className="rounded-full px-3 py-1 text-[12px] font-bold"
+                      className="rounded-full px-3 py-1 text-[12px] font-bold max-md:min-h-11 max-md:px-4 max-md:text-[14px]"
                       style={{ background: "#f1f4f3", color: "#1b1f1d" }}
                     >
                       {chartOpen ? "Skjul" : "Vis"}
@@ -856,7 +856,7 @@ export default function RampTeam() {
                   type="button"
                   onClick={() => setPausedOpen((v) => !v)}
                   aria-expanded={pausedOpen || !!searchTerm}
-                  className="rounded-full px-3 py-1 text-[12px] font-bold"
+                  className="rounded-full px-3 py-1 text-[12px] font-bold max-md:min-h-11 max-md:px-4 max-md:text-[14px]"
                   style={{ background: "#ffffff", color: "#1b1f1d" }}
                 >
                   {pausedOpen || searchTerm ? "Skjul" : "Vis"}

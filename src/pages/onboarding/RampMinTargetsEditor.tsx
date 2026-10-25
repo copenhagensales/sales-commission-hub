@@ -24,9 +24,9 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
         <span className="font-extrabold" style={{ color: "#1b1f1d" }}>
           Krav · salg pr. kalenderuge
         </span>
-        <span className="font-semibold tabular-nums" style={{ color: "#3c4743" }}>
+        <span className="flex flex-wrap gap-x-1 font-semibold tabular-nums" style={{ color: "#3c4743" }}>
           {shown.map((s, i) => (
-            <span key={s.l}>
+            <span key={s.l} className="whitespace-nowrap">
               {i > 0 && " · "}
               {s.l} <strong>{s.v}</strong>
             </span>
@@ -37,7 +37,7 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
-            className="ml-auto rounded-full px-3 py-1 text-[12px] font-bold"
+            className="ml-auto rounded-full px-3 py-1 text-[12px] font-bold max-md:min-h-11 max-md:px-4 max-md:text-[14px]"
             style={{ background: "#ffffff", color: "#1b1f1d" }}
           >
             {open ? "Luk" : "Ret"}
@@ -55,7 +55,7 @@ export function RampMinTargetsEditor({ targets }: { targets: number[] }) {
                 step={1}
                 value={values[i] ?? ""}
                 onChange={(e) => setValues((v) => v.map((x, j) => (j === i ? e.target.value : x)))}
-                className="w-24 rounded-md border px-2 py-1.5 text-[14px] font-bold"
+                className="w-24 rounded-md border px-2 py-1.5 text-[14px] font-bold max-md:min-h-11 max-md:text-base"
                 style={{ color: "#1b1f1d", borderColor: "#d7e0dc" }}
               />
             </label>
