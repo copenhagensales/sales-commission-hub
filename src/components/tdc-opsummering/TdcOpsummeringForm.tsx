@@ -637,7 +637,8 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg">Genereret opsummering</CardTitle>
-              <Button onClick={copyToClipboard} size="sm" variant={copied ? "secondary" : "default"}>
+              <div className="max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-40 max-md:min-h-[44px] max-md:rounded-none max-md:border-t max-md:bg-background/95 max-md:p-3 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] max-md:backdrop-blur [body:has(nav[aria-label='Hovednavigation'])_&]:max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))] [body:has(nav[aria-label='Hovednavigation'])_&]:max-md:pb-3 md:static">
+              <Button className="max-md:h-11 max-md:w-full" onClick={copyToClipboard} size="sm" variant={copied ? "secondary" : "default"}>
                 {copied ? (
                   <>
                     <Check className="h-4 w-4 mr-1" />
@@ -650,6 +651,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
                   </>
                 )}
               </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="relative">
