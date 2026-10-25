@@ -36,7 +36,7 @@ export function StickyPerformanceBar({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-background/98 to-background/95 backdrop-blur-md border-b border-border/50 shadow-lg animate-in slide-in-from-top-2 duration-300 md:hidden">
+    <div className="fixed left-0 right-0 top-[calc(88px+env(safe-area-inset-top,0px))] z-30 bg-gradient-to-b from-background/98 to-background/95 backdrop-blur-md border-b border-border/50 shadow-lg animate-in slide-in-from-top-2 duration-300 md:hidden">
       <div className="flex items-center justify-center gap-6 py-2.5 px-4 max-w-lg mx-auto">
         {/* Progress */}
         <div className="flex items-center gap-2">
