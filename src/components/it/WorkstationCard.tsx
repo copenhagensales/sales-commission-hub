@@ -103,7 +103,7 @@ export function WorkstationCard({
           }}
           onKeyDown={(event) => event.stopPropagation()}
           className={cn(
-            "w-fit rounded-full border px-2 py-0.5 max-md:inline-flex max-md:min-h-11 max-md:items-center max-md:px-4 max-md:text-xs text-[10px] font-semibold uppercase tracking-wide transition-colors",
+            "w-fit rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             isFree
               ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
@@ -164,7 +164,7 @@ export function WorkstationCard({
                 onToggleEquipment?.(ws, item.kind, next);
               }}
               onKeyDown={(event) => event.stopPropagation()}
-              className="rounded p-0.5 max-md:inline-flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {icon}
             </button>
@@ -204,7 +204,7 @@ export function WorkstationCard({
                 onToggleChair(ws, !chairBroken);
               }}
               onKeyDown={(event) => event.stopPropagation()}
-              className="rounded p-0.5 max-md:inline-flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {chairIcon}
             </button>
