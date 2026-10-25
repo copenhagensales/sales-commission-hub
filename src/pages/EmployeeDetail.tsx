@@ -579,14 +579,14 @@ export default function EmployeeDetail() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate("/employees")}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Tilbage
+      <div className="space-y-6 max-md:min-w-0 max-md:max-w-full">
+        <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
+          <div className="flex items-center gap-4 max-md:min-w-0 max-md:gap-2">
+            <Button variant="ghost" className="max-md:min-h-11 max-md:min-w-11 max-md:px-2" aria-label="Tilbage" onClick={() => navigate("/employees")}>
+              <ArrowLeft className="mr-2 h-4 w-4 max-md:mr-0" /> <span className="max-md:sr-only">Tilbage</span>
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold tracking-tight max-md:text-2xl max-md:break-words">
                 {employee.first_name} {employee.last_name}
               </h1>
               <div className="flex items-center gap-2 mt-1">
@@ -594,7 +594,7 @@ export default function EmployeeDetail() {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 max-md:[&_button]:min-h-11">
             {employee.private_phone && (
               <>
                 <Button 
@@ -674,7 +674,7 @@ export default function EmployeeDetail() {
               <RotateCcw className="h-4 w-4 mr-2" />
               Nulstil login
             </Button>
-            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+            <div className="flex items-center gap-2 border-l pl-4 ml-2 max-md:min-h-11 max-md:border-l-0 max-md:pl-0 max-md:ml-0">
               <Switch 
                 checked={employee.is_active} 
                 onCheckedChange={(checked) => handleSave("is_active", checked)} 
@@ -686,8 +686,8 @@ export default function EmployeeDetail() {
           </div>
         </div>
 
-        <Tabs defaultValue="stamdata" className="w-full">
-          <TabsList>
+        <Tabs defaultValue="stamdata" className="w-full min-w-0">
+          <TabsList className="max-md:flex max-md:h-auto max-md:w-full max-md:justify-start max-md:overflow-x-auto max-md:[&>button]:min-h-11 max-md:[&>button]:shrink-0">
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
             <TabsTrigger value="kontrakter">
               <FileText className="h-4 w-4 mr-2" />
@@ -712,7 +712,7 @@ export default function EmployeeDetail() {
           </TabsContent>
 
           <TabsContent value="stamdata" className="mt-6">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 max-md:[&>*]:min-w-0">
               {/* Left column */}
               <div className="space-y-4">
                 <TableSection title="Identitet">

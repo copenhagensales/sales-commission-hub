@@ -242,7 +242,7 @@ export function RampEstablishedSection({
           <button
             type="button"
             onClick={() => setShowAll((v) => !v)}
-            className="rounded-full px-3 py-1 text-[12px] font-bold"
+            className="rounded-full px-3 py-1 text-[12px] font-bold max-md:min-h-11 max-md:px-4 max-md:text-[14px]"
             style={{ background: "#f1f4f3", color: DARK }}
           >
             {showAll ? "Vis færre" : `Vis alle ${visible.length} etablerede`}

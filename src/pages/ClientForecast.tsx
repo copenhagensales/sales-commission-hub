@@ -18,13 +18,13 @@ export default function ClientForecast() {
   const { data: forecasts, isLoading } = useForecastSettingsList(month, year);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Kundeforecast</h1>
           <p className="text-muted-foreground text-sm">Overblik over alle teams med aktive forecasts</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 max-md:w-full max-md:[&_button]:min-h-11">
           <Select value={String(month)} onValueChange={v => setMonth(Number(v))}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />

@@ -32,6 +32,7 @@ export function TrygReportExports() {
             placeholder="Kampagne-id'er, kommasepareret (tom = alle fundne Hjerteforeningen-kampagner)"
           />
           <Button
+            className="max-w-full max-md:min-h-11 max-md:w-full"
             size="sm"
             disabled={run.isPending}
             onClick={() => {
@@ -46,7 +47,7 @@ export function TrygReportExports() {
             }}
           >
             {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
-            Hjerteforeningen – lukkede leads (hele året)
+            <span className="truncate">Hjerteforeningen – lukkede leads (hele året)</span>
           </Button>
           {link && (
             <a className="block text-sm underline" href={link.url}>
