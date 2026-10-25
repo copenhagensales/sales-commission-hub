@@ -11165,34 +11165,40 @@ export type Database = {
       }
       invoiceflow_runs: {
         Row: {
+          browserbase_session_id: string | null
           error_code: string | null
           error_message: string | null
           finished_at: string | null
           id: string
           invoices_found: number
           job_id: string
+          live_view_expires_at: string | null
           result: string | null
           screenshot_path: string | null
           started_at: string
         }
         Insert: {
+          browserbase_session_id?: string | null
           error_code?: string | null
           error_message?: string | null
           finished_at?: string | null
           id?: string
           invoices_found?: number
           job_id: string
+          live_view_expires_at?: string | null
           result?: string | null
           screenshot_path?: string | null
           started_at?: string
         }
         Update: {
+          browserbase_session_id?: string | null
           error_code?: string | null
           error_message?: string | null
           finished_at?: string | null
           id?: string
           invoices_found?: number
           job_id?: string
+          live_view_expires_at?: string | null
           result?: string | null
           screenshot_path?: string | null
           started_at?: string

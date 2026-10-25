@@ -45,7 +45,7 @@ export const PORTAL_MODULES = ["hiper"] as const;
 export type PortalSlug = (typeof PORTAL_MODULES)[number];
 
 export class PortalError extends Error {
-  constructor(public code: "PORTAL_LAYOUT" | "PORTAL_REQUIRES_CODE" | "PORTAL_LOGIN_FAILED" | "PORTAL_NOT_SUPPORTED" | "BROWSERBASE" | "CREDENTIAL_MISSING", message: string, public retryable = false) {
+  constructor(public code: "PORTAL_LAYOUT" | "PORTAL_REQUIRES_CODE" | "PORTAL_CODE_TIMEOUT" | "PORTAL_LOGIN_FAILED" | "PORTAL_NOT_SUPPORTED" | "BROWSERBASE" | "CREDENTIAL_MISSING", message: string, public retryable = false) {
     super(message);
   }
 }

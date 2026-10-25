@@ -83,7 +83,7 @@ const rows: DpaRow[] = [
     purpose: "InvoiceFlow: cloud-browser til hentning af leverandørfakturaer fra portaler (Hiper)",
     link: { href: "https://www.browserbase.com/legal/dpa", label: "Browserbase DPA" },
     linkNote:
-      "Browsere køres i region eu-central-1 (Frankfurt). Browserbase er en amerikansk virksomhed: overførsel/adgang fra USA (support, metadata, kontodata) er ikke afklaret – åbent punkt. Sessionsoptagelse er slået fra.",
+      "Browsere køres i region eu-central-1 (Frankfurt). Browserbase er en amerikansk virksomhed: overførsel/adgang fra USA (support, metadata, kontodata) er ikke afklaret – åbent punkt. FØLSOMT: sessionsoptagelser (replay) er slået til og viser portalernes login-sider og ejerens Live View-indtastning af engangskoder; de opbevares hos Browserbase, og deres opbevaringstid er ikke bekræftet (afhænger af Browserbase-plan/aftale) – skal aflæses og noteres.",
     archive: "PDF",
     status: "Mangler underskrift/arkivering",
   },

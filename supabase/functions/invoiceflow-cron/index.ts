@@ -1,6 +1,6 @@
 // Dagligt cron-kald + worker. Opretter jobs på kørselsdage, kører køen og laver kontroller.
 import { cors, json, isCron, serviceClient, notifyOwner } from "../_shared/invoiceflow.ts";
-import { claimDueJobs, previousPeriod, runJob } from "../_shared/invoiceflowWorker.ts";
+import { claimDueJobs, previousPeriod, runJob, resumeCodeJob, kickCodeWait } from "../_shared/invoiceflowWorker.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // deno-lint-ignore no-explicit-any
@@ -86,6 +86,16 @@ async function credentialUseCheck(svc: SupabaseClient) {
   return count ?? 0;
 }
 
+/** Kode-opfølgning: ~100 sek. pr. kørsel (under edge-grænsen); kæder sig selv kun mens der ventes. */
+const CODE_BUDGET_MS = 100_000;
+async function codeWait(svc: SupabaseClient) {
+  const { data } = await svc.from("invoiceflow_jobs").select("id").eq("status", "afventer_kode").limit(3);
+  const res = await Promise.all((data ?? []).map((j) => resumeCodeJob(svc, j.id, CODE_BUDGET_MS)));
+  const waiting = res.filter((r) => r.status === "waiting").length;
+  if (waiting) kickCodeWait();
+  return { tjekket: res.length, venter: waiting };
+}
+
 async function work(svc: SupabaseClient) {
   const ids = await claimDueJobs(svc);
   const results = await Promise.all(ids.map((id) => runJob(svc, id)));
@@ -99,6 +109,7 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const now = new Date();
   const out: Record<string, unknown> = {};
+  if (body.task === "code_wait") return json(200, { kode: await codeWait(svc) });
 
   // Kaldes hver time; daglige opgaver kun i timen kl. 06 dansk tid.
   const cphHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", hour: "2-digit", hour12: false }).format(now));
@@ -115,5 +126,8 @@ Deno.serve(async (req) => {
     out.dekryptering_uden_koersel = await credentialUseCheck(svc);
   }
   out.work = await work(svc);
+  // Sikkerhedsnet: genstart kæden, hvis den er brudt, så timeouts altid lukkes
+  const { count: waitingJobs } = await svc.from("invoiceflow_jobs").select("id", { count: "exact", head: true }).eq("status", "afventer_kode");
+  if (waitingJobs) kickCodeWait();
   return json(200, out);
 });

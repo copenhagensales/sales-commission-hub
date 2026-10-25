@@ -55,7 +55,7 @@ export function useIfCredentialMeta() {
 export function useIfJobs() {
   return useQuery({ queryKey: KEYS.jobs, queryFn: async () => {
     const { data, error } = await supabase.from("invoiceflow_jobs")
-      .select("id, kind, period, status, attempt, scheduled_at, next_attempt_at, source_id, runs:invoiceflow_runs(id, started_at, finished_at, result, error_code, error_message, invoices_found)")
+      .select("id, kind, period, status, attempt, scheduled_at, next_attempt_at, source_id, runs:invoiceflow_runs(id, started_at, finished_at, result, error_code, error_message, invoices_found, browserbase_session_id, live_view_expires_at)")
       .order("created_at", { ascending: false }).limit(100);
     if (error) throw error; return data;
   }});
@@ -160,7 +160,20 @@ type AdminAction =
   | { action: "run_now"; source_id: string }
   | { action: "approve_send"; invoice_id: string }
   | { action: "signed_url"; invoice_id: string }
-  | { action: "test"; source_id: string };
+  | { action: "test"; source_id: string }
+  | { action: "check_code"; job_id: string };
+
+/** Live View-URL hentes frisk fra serveren ved hvert kald (kun ejeren af loginnet); caches ikke. */
+export function useIfLiveView(jobId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["invoiceflow-live-view", jobId], enabled, staleTime: 0, gcTime: 0, retry: 1, refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("invoiceflow-admin", { body: { action: "live_view", job_id: jobId } });
+      if (error) throw error;
+      return data as { url: string; expires_at: string };
+    },
+  });
+}
 
 export function useInvoiceflowAdmin() {
   const inv = useInvalidate();
@@ -168,7 +181,7 @@ export function useInvoiceflowAdmin() {
     mutationFn: async (body: AdminAction) => {
       const { data, error } = await supabase.functions.invoke("invoiceflow-admin", { body });
       if (error) throw error;
-      return data as { ok?: boolean; code?: string; message?: string; url?: string; reason?: string; error?: string };
+      return data as { ok?: boolean; status?: string; job_id?: string; code?: string; message?: string; url?: string; reason?: string; error?: string };
     },
     onSuccess: inv,
   });

@@ -162,6 +162,10 @@ export default function ProcessingRegistry() {
               virksomhedens portal-login (krypteret i Stork, kun dekrypteret i
               kørslen) og fakturaer. Region: eu-central-1 (Frankfurt, EU).
               Åbent: mulig overførsel/adgang fra USA (amerikansk leverandør).
+              Følsomt: Browserbase gemmer sessionsoptagelser (replay), der viser
+              login-sider og Live View, hvor ejeren selv taster engangskoder.
+              Opbevaringstiden hos Browserbase er ikke bekræftet og skal noteres.
+              Live View-links gemmes ikke i Stork og udløber med sessionen.
               Se DPA-oversigten; status: mangler underskrift/arkivering.
             </li>
             <li>

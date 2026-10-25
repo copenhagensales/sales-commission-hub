@@ -1,8 +1,9 @@
 // Hiper (Mit Hiper) – flow_version 1. Deterministiske selectors, ingen AI-navigation.
-// Login-selectors er aflæst fra den offentlige loginside 25/10-2026. Fakturasidens layout er IKKE
-// verificeret med et rigtigt login: alt uventet giver PORTAL_LAYOUT.
+// Login-selectors er aflæst fra den offentlige loginside 25/10-2026. Siden efter login og
+// fakturasidens layout er IKKE verificeret med et rigtigt login: alt uventet giver PORTAL_LAYOUT.
 // deno-lint-ignore-file no-explicit-any
 import { PortalError, parsePortalAmount, parsePortalDate, periodOf } from "../invoiceflowPortalPeriods.ts";
+import { INVOICE_REACH_MS, LoginProbe } from "../invoiceflowCodeWait.ts";
 
 export const HIPER = {
   loginUrl: "https://www.hiper.dk/mit-hiper/login",
@@ -10,6 +11,7 @@ export const HIPER = {
   email: "#selfcare-login__email",
   password: "#selfcare-login__password",
   rememberMe: 'input[name="remember_me"]',
+  rememberDevice: 'label:has-text("Husk denne enhed"), button:has-text("Husk denne enhed"), input[name*="remember" i]',
   submit: 'form:has(#selfcare-login__password) [type="submit"]',
   loginError: ".selfcare-login__error, [role=alert]",
   codeHints: /engangskode|bekræftelseskode|verifikationskode|sms-kode|indtast koden/i,
@@ -20,6 +22,7 @@ export const HIPER = {
 
 export type PortalInvoice = { bytes: Uint8Array; invoiceNumber: string | null; invoiceDate: string | null; amountInclVat: number | null };
 export type Shot = (name: string) => Promise<void>;
+export type PortalMode = "test" | "keepalive" | "fetch";
 
 async function codeRequested(page: any) {
   const txt: string = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
@@ -27,24 +30,31 @@ async function codeRequested(page: any) {
   return otp > 0 || HIPER.codeHints.test(txt);
 }
 
-async function login(page: any, creds: Record<string, string>, shot: Shot) {
+/** Bruges af ventemodellen: er vi forbi login (fakturalink synligt og ingen kode-side)? */
+export async function probeHiper(page: any): Promise<LoginProbe> {
+  if (await codeRequested(page)) return "code";
+  if (page.url().includes("/login")) return "code";
+  return (await page.locator(HIPER.invoiceLink).count().catch(() => 0)) ? "logged_in" : "code";
+}
+
+/** Login. Returnerer "code", hvis portalen beder om engangskode eller fakturasiden ikke nås inden 20 sek. */
+export async function loginHiper(page: any, creds: Record<string, string>, shot: Shot): Promise<LoginProbe> {
   await page.goto(HIPER.loginUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.locator(HIPER.cookieDecline).click({ timeout: 4000 }).catch(() => {});
-  // Persistent context kan allerede være logget ind
-  if (!page.url().includes("/login")) return;
+  if (!page.url().includes("/login")) return probeHiper(page); // persistent context allerede logget ind
   const email = page.locator(HIPER.email);
   if (!(await email.count())) { await shot("login-layout"); throw new PortalError("PORTAL_LAYOUT", "Hiper-loginsiden har uventet layout"); }
   await email.fill(creds.email);
   await page.locator(HIPER.password).fill(creds.password);
   await page.locator(HIPER.rememberMe).check({ timeout: 2000 }).catch(() => {});
   await page.locator(HIPER.submit).first().click();
-  await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
-  if (await codeRequested(page)) throw new PortalError("PORTAL_REQUIRES_CODE", "Hiper kræver engangskode – ikke understøttet endnu");
-  if (page.url().includes("/login")) {
-    if (await page.locator(HIPER.loginError).count()) throw new PortalError("PORTAL_LOGIN_FAILED", "Hiper afviste loginnet");
-    await shot("after-login");
-    throw new PortalError("PORTAL_LAYOUT", "Uventet side efter login");
+  await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+  if (page.url().includes("/login") && !(await codeRequested(page)) && (await page.locator(HIPER.loginError).count())) {
+    throw new PortalError("PORTAL_LOGIN_FAILED", "Hiper afviste loginnet");
   }
+  const reached = await page.locator(HIPER.invoiceLink).first().waitFor({ state: "visible", timeout: INVOICE_REACH_MS }).then(() => true, () => false);
+  if (reached && !(await codeRequested(page))) return "logged_in";
+  return "code";
 }
 
 async function openInvoices(page: any, shot: Shot) {
@@ -59,10 +69,10 @@ async function logout(page: any) {
   await page.locator(HIPER.logout).first().click({ timeout: 5000 }).catch(() => {});
 }
 
-/** mode "test"/"keepalive": login → (fakturaside ved test) → logout. "fetch": hent PDF'er for perioderne. */
-export async function runHiper(page: any, creds: Record<string, string>, mode: "test" | "keepalive" | "fetch", periods: string[], shot: Shot): Promise<PortalInvoice[]> {
-  await login(page, creds, shot);
+/** Efter gennemført login: (husk enhed) → fakturaside → evt. download → log ud. */
+export async function afterLoginHiper(page: any, mode: PortalMode, periods: string[], shot: Shot, afterCode = false): Promise<PortalInvoice[]> {
   try {
+    if (afterCode) await page.locator(HIPER.rememberDevice).first().click({ timeout: 2000 }).catch(() => {});
     if (mode === "keepalive") return [];
     await openInvoices(page, shot);
     if (mode === "test") return [];
@@ -84,7 +94,7 @@ export async function runHiper(page: any, creds: Record<string, string>, mode: "
       let o = 0; for (const c of chunks) { bytes.set(c, o); o += c.length; }
       if (!(bytes[0] === 0x25 && bytes[1] === 0x50)) throw new PortalError("PORTAL_LAYOUT", "Download var ikke en PDF");
       const invoiceNumber = cells.map((c) => c.trim()).find((c) => /^\d{5,}$/.test(c)) ?? null;
-      const amountInclVat = cells.map(parsePortalAmount).find((a) => a !== null && /kr|,/.test(cells.join(" "))) ?? null;
+      const amountInclVat = cells.map(parsePortalAmount).find((a) => a !== null) ?? null;
       out.push({ bytes, invoiceNumber, invoiceDate, amountInclVat });
     }
     return out;
@@ -92,3 +102,5 @@ export async function runHiper(page: any, creds: Record<string, string>, mode: "
     await logout(page);
   }
 }
+
+export const hiperModule = { login: loginHiper, probe: probeHiper, afterLogin: afterLoginHiper };

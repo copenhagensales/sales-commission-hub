@@ -31,6 +31,8 @@ export async function requireInvoiceflowOwner(req: Request) {
 
 /** Cron-kald: x-cron-secret valideret via eksisterende verify_internal_cron_secret. */
 export async function isCron(req: Request) {
+  const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (srk && req.headers.get("Authorization") === `Bearer ${srk}`) return true; // intern kæde (kode-opfølgning)
   const s = req.headers.get("x-cron-secret");
   if (!s) return false;
   const { data } = await serviceClient().rpc("verify_internal_cron_secret", { _token: s });

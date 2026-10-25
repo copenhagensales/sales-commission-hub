@@ -1,8 +1,8 @@
 // Ejer-handlinger: genkør, godkend og send, signeret PDF-link, test nu.
 import { z } from "npm:zod@3.23.8";
 import { cors, json, requireInvoiceflowOwner, deliverInvoice } from "../_shared/invoiceflow.ts";
-import { runJob, previousPeriod } from "../_shared/invoiceflowWorker.ts";
-import { runPortal } from "../_shared/invoiceflowPortal.ts";
+import { runJob, previousPeriod, resumeCodeJob } from "../_shared/invoiceflowWorker.ts";
+import { liveViewUrl } from "../_shared/browserbase.ts";
 import { PortalError } from "../_shared/invoiceflowPortalPeriods.ts";
 import { findMailInvoices, MailRule, MailRuleError } from "../_shared/invoiceflowMailRule.ts";
 
@@ -12,6 +12,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve_send"), invoice_id: z.string().uuid() }),
   z.object({ action: z.literal("signed_url"), invoice_id: z.string().uuid() }),
   z.object({ action: z.literal("test"), source_id: z.string().uuid() }),
+  z.object({ action: z.literal("live_view"), job_id: z.string().uuid() }),
+  z.object({ action: z.literal("check_code"), job_id: z.string().uuid() }),
 ]);
 
 Deno.serve(async (req) => {
@@ -23,7 +25,35 @@ Deno.serve(async (req) => {
   const b = parsed.data;
   const { svc } = ctx;
 
+  /** Live View kun for den bruger, der ejer loginnet på kilden, og kun mens jobbet venter på kode. */
+  async function codeJobForOwner(jobId: string) {
+    const { data: job } = await svc.from("invoiceflow_jobs").select("id, status, source_id").eq("id", jobId).maybeSingle();
+    if (!job || job.status !== "afventer_kode") return null;
+    const { data: cred } = await svc.from("invoiceflow_credentials").select("owner_user_id").eq("source_id", job.source_id).maybeSingle();
+    if (!cred || cred.owner_user_id !== ctx!.userId) return null;
+    const { data: run } = await svc.from("invoiceflow_runs").select("browserbase_session_id, live_view_expires_at")
+      .eq("job_id", jobId).not("browserbase_session_id", "is", null).order("started_at", { ascending: false }).limit(1).maybeSingle();
+    if (!run?.browserbase_session_id || !run.live_view_expires_at || new Date(run.live_view_expires_at) <= new Date()) return null;
+    return run;
+  }
+
   switch (b.action) {
+    case "live_view": {
+      const run = await codeJobForOwner(b.job_id);
+      if (!run) return json(403, { error: "Live View er ikke tilgængelig" });
+      try {
+        const url = await liveViewUrl(run.browserbase_session_id!);
+        return new Response(JSON.stringify({ url, expires_at: run.live_view_expires_at }), { status: 200, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      } catch {
+        return json(502, { error: "Live View kunne ikke hentes" });
+      }
+    }
+    case "check_code": {
+      const run = await codeJobForOwner(b.job_id);
+      if (!run) return json(403, { error: "Jobbet venter ikke på kode" });
+      const r = await resumeCodeJob(svc, b.job_id, 8_000);
+      return json(200, { ok: r.status === "done", status: r.status });
+    }
     case "rerun": {
       const { data } = await svc.from("invoiceflow_jobs").update({ status: "koerer", next_attempt_at: null, attempt: 0 })
         .eq("id", b.job_id).neq("status", "koerer").select("id");
@@ -51,24 +81,14 @@ Deno.serve(async (req) => {
       const { data: src } = await svc.from("invoiceflow_sources").select("type, config").eq("id", b.source_id).maybeSingle();
       if (!src) return json(404, { error: "Kilde findes ikke" });
       if (src.type === "portal") {
-        // Testen logges som kørsel, så dekrypteringen altid har et run_id
-        const { data: tj } = await svc.from("invoiceflow_jobs").insert({ source_id: b.source_id, kind: "manual", period: "test", status: "koerer" }).select("id").single();
-        const { data: tr } = await svc.from("invoiceflow_runs").insert({ job_id: tj!.id }).select("id").single();
-        const done = (status: string, patch: Record<string, unknown>) => Promise.all([
-          svc.from("invoiceflow_jobs").update({ status, updated_at: new Date().toISOString() }).eq("id", tj!.id),
-          svc.from("invoiceflow_runs").update({ finished_at: new Date().toISOString(), result: status, ...patch }).eq("id", tr!.id),
-        ]);
-        try {
-          const r = await runPortal(svc, { id: b.source_id, config: src.config }, tr!.id, "test", []);
-          await done("ok", { invoices_found: 0 });
-          return json(200, { ok: true, message: `Login ok – fakturasiden kunne nås (Browserbase-region ${r.region})` });
-        } catch (e) {
-          const code = e instanceof PortalError ? e.code : "UNKNOWN";
-          const msg = e instanceof PortalError ? e.message : "Uventet fejl";
-          // deno-lint-ignore no-explicit-any
-          await done(code === "PORTAL_REQUIRES_CODE" ? "afventer_kode" : "fejlet", { error_code: code, error_message: msg, screenshot_path: (e as any)?.screenshotPath ?? null });
-          return json(200, { ok: false, code, message: `${msg} (${code})` });
-        }
+        // Test = login → fakturaside → log ud. Køres som job (period "test"), så dekryptering altid har et run_id,
+        // og en engangskode håndteres via Live View som ved almindelige kørsler.
+        const { data: tj, error } = await svc.from("invoiceflow_jobs").insert({ source_id: b.source_id, kind: "manual", period: "test", status: "koerer" }).select("id").single();
+        if (error) return json(500, { error: "Test kunne ikke startes" });
+        const r = await runJob(svc, tj.id);
+        if (r.ok) return json(200, { ok: true, message: "Login ok – fakturasiden kunne nås" });
+        if (r.error === "AWAITING_CODE") return json(200, { ok: false, code: "AWAITING_CODE", job_id: tj.id, message: "Portalen beder om en engangskode – åbn kørslen under Kørsler" });
+        return json(200, { ok: false, code: r.error, message: `Test fejlede (${r.error})` });
       }
       if (src.type !== "email") return json(200, { ok: false, message: "Kildetypen kan ikke testes" });
       try {
