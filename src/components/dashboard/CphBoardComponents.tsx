@@ -539,7 +539,7 @@ export function CphBoardFrame({
       </header>
 
       <section
-        className={tvMode ? "relative grid gap-4" : "relative grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5 [&>*:first-child]:col-span-2 md:[&>*:first-child]:col-span-1"}
+        className={tvMode ? "relative grid gap-4" : "relative grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5"}
         style={tvMode ? { gridTemplateColumns: kpiCols } : undefined}
       >
         {primaryKpis.map((kpi, i) => (

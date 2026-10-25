@@ -888,7 +888,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       <div className="group relative">
         <div className="flex items-center justify-between gap-2">
           {/* Left value */}
-          <div className={`min-w-[100px] flex items-center justify-end gap-1.5 transition-all duration-500 ${
+          <div className={`min-w-0 flex-1 md:flex-none md:min-w-[100px] flex items-center justify-end gap-1.5 transition-all duration-500 ${
             winner === 'left' ? 'scale-[1.02]' : ''
           }`}>
             {winner === 'left' && (
@@ -909,7 +909,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
           
           {/* Center label with icon */}
-          <div className={`shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-xl min-w-[110px] transition-all duration-300 ${
+          <div className={`shrink-0 flex items-center justify-center gap-2 px-2 md:px-3 py-2 rounded-xl min-w-[96px] md:min-w-[110px] transition-all duration-300 ${
             winner === 'left' ? 'bg-emerald-500/10 border border-emerald-500/30' :
             winner === 'right' ? 'bg-rose-500/10 border border-rose-500/30' :
             winner === 'tie' ? 'bg-amber-500/10 border border-amber-500/30' :
@@ -925,7 +925,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
           
           {/* Right value */}
-          <div className={`min-w-[100px] flex items-center gap-1.5 transition-all duration-500 ${
+          <div className={`min-w-0 flex-1 md:flex-none md:min-w-[100px] flex items-center gap-1.5 transition-all duration-500 ${
             winner === 'right' ? 'scale-[1.02]' : ''
           }`}>
             <span className={`font-bold text-sm tabular-nums whitespace-nowrap transition-colors duration-300 ${
@@ -1125,22 +1125,22 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       </div>
       
       <CardHeader className="relative pb-2 z-10">
-        <CardTitle className="flex items-center gap-3 text-lg font-bold text-white">
-          <div className="relative">
+        <CardTitle className="flex flex-wrap md:flex-nowrap items-center gap-3 text-lg font-bold text-white">
+          <div className="relative shrink-0">
             <Swords className="w-6 h-6 text-amber-400" />
             <div className="absolute inset-0 text-amber-400 blur-sm opacity-50">
               <Swords className="w-6 h-6" />
             </div>
           </div>
-          <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+          <span className="min-w-0 flex-1 md:flex-none truncate whitespace-nowrap bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
             Head to Head
           </span>
           
           {/* Mode toggle - more prominent (disabled during match) */}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="contents md:ml-auto md:flex md:items-center md:gap-2">
             {/* Active battles count */}
             {activeChallenges.length > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+              <div className="flex shrink-0 items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 whitespace-nowrap">
                 <span className="text-[10px] font-medium text-emerald-400">{activeChallenges.length} aktiv{activeChallenges.length > 1 ? 'e' : ''}</span>
               </div>
             )}
@@ -1156,7 +1156,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                     forfeitMutation.mutate(activeChallengeId);
                   }
                 }}
-                className="h-9 bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/40 text-rose-400"
+                className="order-last md:order-none w-full md:w-auto h-11 md:h-9 bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/40 text-rose-400"
               >
                 <XCircle className="w-4 h-4 mr-1" />
                 Træk dig
@@ -1167,13 +1167,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
             <Button
               size="sm"
               onClick={() => setShowSetupDialog(true)}
-              className="h-9 bg-gradient-to-r from-amber-500/80 to-orange-500/80 hover:from-amber-500 hover:to-orange-500 text-white"
+              className="w-full md:w-auto h-11 md:h-9 bg-gradient-to-r from-amber-500/80 to-orange-500/80 hover:from-amber-500 hover:to-orange-500 text-white"
             >
               <Plus className="w-4 h-4 mr-1" />
               Ny duel
             </Button>
             
-            <div className={`flex bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg ${isMatchOngoing ? 'opacity-50' : ''}`}>
+            <div className={`grid w-full grid-cols-2 md:flex md:w-auto bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg ${isMatchOngoing ? 'opacity-50' : ''}`}>
               <button
                 onClick={() => {
                   if (isMatchOngoing) return;
@@ -1182,7 +1182,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   setOpponentTeam(opponentTeam.slice(0, 1));
                 }}
                 disabled={isMatchOngoing}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                className={`flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   battleMode === "1v1" 
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
                     : "text-slate-400 hover:text-white hover:bg-slate-700/50"
@@ -1197,7 +1197,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   setBattleMode("team");
                 }}
                 disabled={isMatchOngoing}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                className={`flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   battleMode === "team" 
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
                     : "text-slate-400 hover:text-white hover:bg-slate-700/50"
@@ -1301,7 +1301,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                       setMatchComment(challenge.comment || "");
                       setMatchStarted(true);
                     }}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                    className={`flex min-h-[44px] md:min-h-0 items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
                       isSelected 
                         ? "bg-amber-500/20 border-amber-500/50 text-amber-400" 
                         : "bg-slate-700/50 border-slate-600/50 text-slate-300 hover:border-slate-500"
@@ -1610,7 +1610,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                 setMatchStartTime(null);
                 setActiveChallengeId(null);
               }}
-              className="text-xs text-slate-500 hover:text-rose-400 transition-colors py-1"
+              className="min-h-[44px] w-full md:w-auto md:min-h-0 rounded-lg border border-slate-700 md:border-0 text-sm md:text-xs text-slate-400 md:text-slate-500 hover:text-rose-400 transition-colors py-1"
             >
               Afslut kamp
             </button>

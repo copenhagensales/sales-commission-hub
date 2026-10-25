@@ -19,7 +19,7 @@ export function LeagueRulesSheet({
     <Dialog>
       <DialogTrigger asChild>
         {compact ? (
-          <button className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 hover:bg-primary/20 hover:border-primary/30 hover:text-primary transition-colors cursor-pointer">
+          <button className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-primary/10 border border-primary/20 rounded-md px-3 py-0.5 min-h-[44px] md:min-h-0 hover:bg-primary/20 hover:border-primary/30 hover:text-primary transition-colors cursor-pointer">
             <Info className="h-3 w-3" />
             <span>Turneringsregler</span>
           </button>

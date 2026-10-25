@@ -318,9 +318,9 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         <LeaguePlayerAvatar employeeId={standing.employee_id} name={playerName} />
 
         {/* Name + movement – fixed width for sparkline alignment */}
-        <div className="w-[180px] sm:w-[220px] shrink-0">
+        <div className="min-w-0 flex-1 sm:w-[220px] sm:flex-none sm:shrink-0">
 
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex min-w-0 items-center gap-1.5 sm:flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
               <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -336,7 +336,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               division={standing.current_division}
             >
               <span className={cn(
-                "font-medium text-sm sm:text-[15px] truncate max-w-[140px] sm:max-w-none cursor-default",
+                "block min-w-0 font-medium text-sm sm:text-[15px] truncate max-w-full sm:max-w-none cursor-default",
                 isCurrentUser && "text-primary font-semibold"
               )}>
                 {playerName}
@@ -345,12 +345,12 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
             {isCurrentUser && <span className="text-[10px] text-muted-foreground">(dig)</span>}
             
             {promoted && (
-              <Badge className="bg-green-500/20 text-green-500 border-green-500/30 text-[10px] px-1 py-0">
+              <Badge className="hidden sm:inline-flex bg-green-500/20 text-green-500 border-green-500/30 text-[10px] px-1 py-0">
                 <ArrowUp className="h-3 w-3 mr-0.5" />Oprykket
               </Badge>
             )}
             {relegated && (
-              <Badge className="bg-red-500/20 text-red-500 border-red-500/30 text-[10px] px-1 py-0">
+              <Badge className="hidden sm:inline-flex bg-red-500/20 text-red-500 border-red-500/30 text-[10px] px-1 py-0">
                 <ArrowDown className="h-3 w-3 mr-0.5" />Nedrykket
               </Badge>
             )}
@@ -375,7 +375,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
 
         {/* Points + provision */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="text-right">
+          <div className="text-right tabular-nums">
             <div className="flex items-center gap-1.5 justify-end">
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {roundProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
@@ -415,7 +415,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
             </div>
           )}
 
-          <div className="w-16 sm:w-20 text-right">
+          <div className="hidden sm:block w-16 sm:w-20 text-right">
             {isPromoZone && (
               <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>
             )}
