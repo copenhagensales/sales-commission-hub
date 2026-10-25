@@ -339,7 +339,7 @@ export default function SystemFeedback() {
                     <button
                       key={p.value}
                       onClick={() => setPriority(p.value)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 max-md:min-h-11 rounded-md border text-sm font-medium transition-all ${
                         priority === p.value ? p.bgClass + " ring-1 ring-offset-1 ring-offset-background" : "border-border text-muted-foreground hover:bg-muted/50"
                       }`}
                     >

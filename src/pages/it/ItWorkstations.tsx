@@ -524,7 +524,7 @@ export default function ItWorkstations() {
                   setStatusFilter("campaign_pending");
                   setProblemsOnly(false);
                 }}
-                className="mt-2 text-xs font-medium text-primary underline-offset-2 hover:underline"
+                className="mt-2 text-xs font-medium text-primary underline-offset-2 hover:underline max-md:flex max-md:min-h-11 max-md:items-center max-md:text-sm"
               >
                 Vis de {activeCampaign.pending + activeCampaign.failed} der mangler →
               </button>
@@ -554,7 +554,7 @@ export default function ItWorkstations() {
                   setStatusFilter("missing_equipment");
                   setProblemsOnly(false);
                 }}
-                className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                className="text-xs font-medium text-primary underline-offset-2 hover:underline max-md:flex max-md:min-h-11 max-md:items-center max-md:text-sm"
               >
                 Vis berørte borde →
               </button>

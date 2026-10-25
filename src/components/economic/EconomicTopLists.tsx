@@ -53,7 +53,7 @@ export function EconomicTopLists({ byKategori, posteringer }: Props) {
   }, [posteringer]);
   
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
       {/* Top 10 Kategorier */}
       <Card>
         <CardHeader>
