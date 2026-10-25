@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { SkeletonList } from "@/components/mobile";
 import { useConversations, useOnlineStatus, useDeleteConversation, Conversation } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -32,15 +33,31 @@ interface ConversationListProps {
   onSelect: (id: string | null) => void;
 }
 
+/** Listens rulleposition overlever, mens en samtale er åben (telefon skjuler listen). */
+let savedScrollTop = 0;
+
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
   const { data: conversations, isLoading } = useConversations();
   const onlineUsers = useOnlineStatus();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const viewport = () => rootRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]") ?? null;
+
+  useEffect(() => {
+    if (selectedId === null) {
+      const v = viewport();
+      if (v) v.scrollTop = savedScrollTop;
+    }
+  }, [selectedId, isLoading]);
+
+  const select = (id: string) => {
+    savedScrollTop = viewport()?.scrollTop ?? 0;
+    onSelect(id);
+  };
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        Indlæser...
+      <div className="p-2">
+        <SkeletonList count={5} />
       </div>
     );
   }
@@ -56,14 +73,14 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-2 space-y-1">
+    <ScrollArea className="h-full" ref={rootRef}>
+      <div className="p-2 space-y-1 max-md:space-y-2">
         {conversations.map((conversation) => (
           <ConversationItem
             key={conversation.id}
             conversation={conversation}
             isSelected={selectedId === conversation.id}
-            onClick={() => onSelect(conversation.id)}
+            onClick={() => select(conversation.id)}
             onDelete={() => {
               if (selectedId === conversation.id) {
                 onSelect(null);
@@ -123,8 +140,12 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
   return (
     <>
       <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+        aria-label={`${displayName}${unreadCount > 0 ? `, ${unreadCount} ulæste` : ""}`}
         className={cn(
-          "group relative flex items-center gap-3 p-3 md:p-3 rounded-xl cursor-pointer transition-all duration-200 active:scale-[0.98] touch-manipulation",
+          "group relative flex min-h-[64px] items-center gap-3 p-3 md:min-h-0 md:p-3 rounded-xl max-md:border max-md:border-border max-md:bg-card cursor-pointer transition-all duration-200 active:scale-[0.98] touch-manipulation",
           isSelected 
             ? "bg-primary text-primary-foreground shadow-md" 
             : "hover:bg-accent/60 active:bg-accent/80"
@@ -152,7 +173,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className={cn(
-              "font-medium truncate",
+              "font-medium truncate max-md:text-[16px]",
               unreadCount > 0 && !isSelected && "font-bold"
             )}>
               {displayName}
@@ -170,7 +191,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
           </div>
           
           <div className={cn(
-            "flex items-center gap-2 text-sm mt-0.5",
+            "flex items-center gap-2 text-sm mt-0.5 max-md:text-[14px]",
             isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
           )}>
             <span className="truncate">
@@ -198,10 +219,11 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
               variant="ghost"
               size="icon"
               className={cn(
-                "h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0",
+                "h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 max-md:h-11 max-md:w-11 max-md:opacity-100",
                 isSelected ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent"
               )}
               onClick={(e) => e.stopPropagation()}
+              aria-label="Flere handlinger"
             >
               <MoreVertical className="h-4 w-4" />
             </Button>

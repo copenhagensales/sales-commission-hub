@@ -14,6 +14,16 @@ import { TypingIndicator } from "./TypingIndicator";
 import { MentionInput } from "./MentionInput";
 import { useUploadAttachment } from "@/hooks/useChat";
 import { toast } from "sonner";
+import { SkeletonList } from "@/components/mobile";
+
+/** Besked, der er vist straks i tråden, men endnu ikke bekræftet af serveren. */
+interface PendingMessage {
+  key: string;
+  content: string;
+  replyToId?: string;
+  attachment: { url: string; type: string; name: string } | null;
+  status: "sending" | "failed";
+}
 
 interface ChatViewProps {
   conversationId: string;
@@ -42,6 +52,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [attachment, setAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [pending, setPending] = useState<PendingMessage[]>([]);
+  const inFlight = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -65,11 +78,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
     }
   }, [conversationId]);
 
+  // Rul til nyeste besked ved åbning, ved ny besked og ved afsendelse.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, pending.length, conversationId, isLoading]);
+
+  useEffect(() => {
+    setPending([]);
+  }, [conversationId]);
 
   // Handle typing indicator
   const handleTyping = () => {
@@ -86,25 +102,47 @@ export function ChatView({ conversationId }: ChatViewProps) {
     }
   };
 
-  const handleSend = async () => {
+  const deliver = async (p: PendingMessage) => {
+    if (inFlight.current.has(p.key)) return; // ingen dobbelt-afsendelse ved gentryk
+    inFlight.current.add(p.key);
+    setPending((prev) => prev.map((x) => (x.key === p.key ? { ...x, status: "sending" } : x)));
+    try {
+      await sendMessage.mutateAsync({
+        conversationId,
+        content: p.content,
+        replyToId: p.replyToId,
+        attachmentUrl: p.attachment?.url,
+        attachmentType: p.attachment?.type,
+        attachmentName: p.attachment?.name,
+      });
+      setPending((prev) => prev.filter((x) => x.key !== p.key));
+    } catch {
+      setPending((prev) => prev.map((x) => (x.key === p.key ? { ...x, status: "failed" } : x)));
+    } finally {
+      inFlight.current.delete(p.key);
+    }
+  };
+
+  const handleSend = () => {
     if (!message.trim() && !attachment) return;
-    
+
     // Stop typing indicator
     if (currentEmployee) {
       setTyping(false, currentEmployee.id, currentEmployee.full_name);
     }
-    
-    await sendMessage.mutateAsync({
-      conversationId,
+
+    const p: PendingMessage = {
+      key: crypto.randomUUID(),
       content: message.trim(),
       replyToId: replyTo?.id,
-      attachmentUrl: attachment?.url,
-      attachmentType: attachment?.type,
-      attachmentName: attachment?.name,
-    });
+      attachment,
+      status: "sending",
+    };
+    setPending((prev) => [...prev, p]);
     setMessage("");
     setReplyTo(null);
     setAttachment(null);
+    void deliver(p);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -143,8 +181,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin" />
+      <div className="h-full p-3">
+        <SkeletonList count={4} />
       </div>
     );
   }
@@ -157,7 +195,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
           variant="ghost"
           size="sm"
           onClick={() => setShowSearch(!showSearch)}
-          className="h-8 px-2 md:px-3"
+          className="h-8 px-2 md:px-3 max-md:h-11 max-md:w-11"
+          aria-label="Søg i beskeder"
         >
           <Search className="h-4 w-4 md:mr-1" />
           <span className="hidden md:inline">Søg</span>
@@ -185,7 +224,24 @@ export function ChatView({ conversationId }: ChatViewProps) {
               onReply={handleReply}
             />
           ))}
-          {messages?.length === 0 && (
+          {pending.map((p) => (
+            <div key={p.key} className="flex justify-end" aria-live="polite">
+              <div className="max-w-[80%] min-w-0">
+                <div className={cn("rounded-2xl px-3 py-2 text-[15px] break-words", p.status === "failed" ? "bg-destructive/10 text-foreground border border-destructive/40" : "bg-primary/70 text-primary-foreground")}>
+                  {p.content || p.attachment?.name}
+                </div>
+                {p.status === "sending" ? (
+                  <p className="mt-1 text-right text-[14px] text-muted-foreground">Sender …</p>
+                ) : (
+                  <button type="button" onClick={() => void deliver(p)}
+                    className="mt-1 ml-auto flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70">
+                    Ikke sendt – prøv igen
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {messages?.length === 0 && pending.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
               Ingen beskeder endnu. Start samtalen!
             </div>
@@ -193,6 +249,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         </div>
         
         <TypingIndicator users={otherTypingUsers} />
+        <div ref={bottomRef} aria-hidden="true" />
       </ScrollArea>
 
       {/* Reply preview - more compact on mobile */}
@@ -203,7 +260,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             <span className="font-medium">{replyTo.sender?.full_name}</span>
             <p className="text-muted-foreground truncate">{replyTo.content}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)} className="flex-shrink-0 h-8 w-8 p-0">
+          <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)} className="flex-shrink-0 h-8 w-8 p-0 max-md:h-11 max-md:w-11" aria-label="Fjern svar">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -232,7 +289,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="h-10 w-10 flex-shrink-0"
+            className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11"
+            aria-label="Vedhæft fil"
           >
             {isUploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -251,15 +309,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
           </div>
           <Button
             onClick={handleSend}
-            disabled={(!message.trim() && !attachment) || sendMessage.isPending}
+            disabled={!message.trim() && !attachment}
             size="icon"
-            className="h-10 w-10 flex-shrink-0"
+            className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11"
+            aria-label="Send"
           >
-            {sendMessage.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </div>

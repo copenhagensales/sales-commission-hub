@@ -22,7 +22,7 @@ export default function Messages() {
   if (canSendEmployeeSms) {
     return (
       <MainLayout>
-        <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-6rem)]">
+        <div className="flex flex-col h-[calc(100dvh-88px-64px-16px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] md:h-[calc(100vh-6rem)]">
           <Tabs defaultValue="chat" className="flex flex-col h-full">
             {/* Header with tabs */}
             <div className="flex items-center justify-between mb-2 md:mb-4 px-2 md:px-0">
@@ -34,11 +34,11 @@ export default function Messages() {
               </div>
               <div className="flex items-center gap-2">
                 <TabsList>
-                  <TabsTrigger value="chat" className="gap-2">
+                  <TabsTrigger value="chat" className="gap-2 max-md:min-h-11" aria-label="Chat">
                     <MessageSquare className="h-4 w-4" />
                     <span className="hidden sm:inline">Chat</span>
                   </TabsTrigger>
-                  <TabsTrigger value="sms" className="gap-2">
+                  <TabsTrigger value="sms" className="gap-2 max-md:min-h-11" aria-label="SMS">
                     <Phone className="h-4 w-4" />
                     <span className="hidden sm:inline">SMS</span>
                     {smsUnreadCount > 0 && (
@@ -85,7 +85,7 @@ export default function Messages() {
   // Original layout for users without SMS permission
   return (
     <MainLayout>
-      <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-6rem)]">
+      <div className="flex flex-col h-[calc(100dvh-88px-64px-16px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] md:h-[calc(100vh-6rem)]">
         {/* Header - simplified on mobile */}
         <div className={cn(
           "flex items-center justify-between mb-2 md:mb-4 px-2 md:px-0",
@@ -100,7 +100,8 @@ export default function Messages() {
           <Button 
             onClick={() => setShowNewDialog(true)} 
             size="sm"
-            className="gap-2"
+            className="gap-2 max-md:min-h-11"
+            aria-label="Ny samtale"
           >
             <PenSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Ny samtale</span>
@@ -138,7 +139,7 @@ export default function Messages() {
                     variant="ghost" 
                     size="sm"
                     onClick={() => setSelectedConversationId(null)}
-                    className="gap-2"
+                    className="gap-2 min-h-11"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Tilbage
@@ -210,7 +211,8 @@ function ChatTabContent({
             onClick={() => setShowNewDialog(true)} 
             size="sm"
             variant="ghost"
-            className="gap-2"
+            className="gap-2 max-md:h-11 max-md:w-11"
+            aria-label="Ny samtale"
           >
             <PenSquare className="h-4 w-4" />
           </Button>
@@ -235,7 +237,7 @@ function ChatTabContent({
                 variant="ghost" 
                 size="sm"
                 onClick={() => setSelectedConversationId(null)}
-                className="gap-2"
+                className="gap-2 min-h-11"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Tilbage
