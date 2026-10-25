@@ -464,13 +464,18 @@ const Home = () => {
         {/* ZONE 4: Fødselsdage & jubilæer */}
         {upcomingCelebrations.length > 0 && (
           <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6 md:px-8">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-              <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold text-foreground">
-                <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
-                Fødselsdage &amp; jubilæer
-                <span className="font-normal text-foreground/70">· næste 14 dage</span>
-              </h2>
-              <span className="text-[13px] text-foreground/70">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 gap-2.5">
+                <span className="mt-[3px] inline-block h-3.5 w-[3px] flex-none rounded-sm bg-[hsl(var(--cph-onyx))]" />
+                <div className="min-w-0">
+                  <h2 className="text-[15px] font-extrabold leading-tight text-foreground">
+                    Fødselsdage &amp; jubilæer
+                    <span className="hidden font-normal text-foreground/70 sm:inline"> · næste 14 dage</span>
+                  </h2>
+                  <p className="mt-0.5 text-[14px] text-foreground/70 sm:hidden">Næste 14 dage</p>
+                </div>
+              </div>
+              <span className="flex-none whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-[13px] font-semibold text-foreground/70">
                 {upcomingCelebrations.length} kollegaer
               </span>
             </div>
