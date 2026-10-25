@@ -2,7 +2,7 @@ import { ReactNode, useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight, User } from "lucide-react";
 import { useIsPhone } from "./useIsPhone";
-import { BottomNav, BOTTOM_NAV_HEIGHT, PROFILE_PATH, tabRootFor, useBottomTabs } from "./BottomNav";
+import { BottomNav, BOTTOM_NAV_HEIGHT, tabRootFor, useBottomTabs } from "./BottomNav";
 import { BottomSheet } from "./BottomSheet";
 import { cn } from "@/lib/utils";
 import { MoreActionsContext, type MoreAction } from "./MoreActions";
@@ -60,7 +60,6 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
   const isMobile = useIsPhone();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
-  const tabs = useBottomTabs();
   const [actions, setActions] = useState<Array<[string, MoreAction]>>([]);
   const register = useCallback((id: string, action: MoreAction) => {
     setActions((prev) => [...prev.filter(([k]) => k !== id), [id, action]]);
@@ -69,9 +68,8 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
   const ctx = useMemo(() => ({ register }), [register]);
   if (!isMobile) return <>{children}</>;
 
-  const profileTab = tabs.find((t) => t.to === PROFILE_PATH && t.visible);
   const hasActions = actions.length > 0;
-  const hasMenu = !!moreMenu || hasActions || !!profileTab;
+  const hasMenu = !!moreMenu || hasActions;
 
   return (
     <>
@@ -86,17 +84,6 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
       <BottomNav onMenu={hasMenu ? () => setMoreOpen(true) : undefined} menuOpen={moreOpen} />
       {hasMenu && (
         <BottomSheet open={moreOpen} onOpenChange={setMoreOpen} title="Menu">
-          {profileTab && (
-            <div className="mb-2 border-b border-border pb-2">
-              <button type="button"
-                onClick={() => { setMoreOpen(false); navigate(PROFILE_PATH); }}
-                className="flex min-h-[52px] w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 text-[16px] font-semibold text-foreground active:bg-muted">
-                <User className="h-5 w-5" aria-hidden="true" />
-                <span className="flex-1 text-left">Min profil</span>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-              </button>
-            </div>
-          )}
           {hasActions && (
             <div className={cn("flex flex-col gap-1", moreMenu && "mb-2 border-b border-border pb-2")}>
               {actions.map(([id, a]) => {
