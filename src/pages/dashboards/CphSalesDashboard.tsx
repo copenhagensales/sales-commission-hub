@@ -1199,7 +1199,7 @@ export default function CphSalesDashboard() {
             {displayTopSellers.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
-              <div className="space-y-1.5 overflow-y-auto max-h-[400px]">
+              <div className="space-y-1.5 md:overflow-y-auto md:max-h-[400px]">
                 {displayTopSellers.map((seller) => (
                   <div 
                     key={seller.name} 
@@ -1209,11 +1209,11 @@ export default function CphSalesDashboard() {
                         : 'bg-muted/30'
                     } p-3`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex flex-1 items-center gap-2 min-w-0">
                       <div className="flex items-center justify-center w-8 shrink-0">
                         {getRankDisplay(seller.rank)}
                       </div>
-                      <span className="font-medium break-words md:truncate text-sm min-w-0">
+                      <span className="font-medium truncate text-sm min-w-0">
                         {seller.name}
                       </span>
                     </div>
@@ -1242,7 +1242,7 @@ export default function CphSalesDashboard() {
             {displaySales.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
-              <div className="space-y-1.5 overflow-y-auto max-h-[400px]">
+              <div className="space-y-1.5 md:overflow-y-auto md:max-h-[400px]">
                 {displaySales.slice(0, 15).map((sale: RecentSale) => (
                   <div 
                     key={sale.id} 
@@ -1250,7 +1250,7 @@ export default function CphSalesDashboard() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium break-words md:truncate text-sm min-w-0">{sale.agent_name}</p>
+                        <p className="font-medium truncate text-sm min-w-0">{sale.agent_name}</p>
                         <Badge 
                           variant={sale.status === "confirmed" ? "default" : "secondary"}
                           className={`shrink-0 ${sale.status === "confirmed" ? "bg-emerald-500" : ""} text-[10px] px-1.5`}
