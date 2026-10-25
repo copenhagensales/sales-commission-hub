@@ -40,7 +40,7 @@ export default function HeadToHead() {
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="container mx-auto p-6 max-w-4xl">
+        <div className="container mx-auto p-3 md:p-6 max-w-4xl">
           <Skeleton className="h-48 w-full rounded-xl mb-6" />
           <Skeleton className="h-[600px] w-full rounded-xl" />
         </div>
@@ -50,7 +50,7 @@ export default function HeadToHead() {
 
   return (
     <MainLayout>
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="container mx-auto p-3 md:p-6 max-w-4xl">
         <H2HPerformanceDashboard employeeId={currentEmployee?.id} />
         <HeadToHeadComparison
           currentEmployeeId={currentEmployee?.id}
