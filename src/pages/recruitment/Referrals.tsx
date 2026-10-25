@@ -338,7 +338,7 @@ export default function Referrals() {
                 ))}
               </div>
             ) : filteredReferrals && filteredReferrals.length > 0 ? (
-              <Table>
+              <Table className="max-md:block max-md:[&_tbody]:block max-md:[&_thead]:hidden">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Kandidat</TableHead>
@@ -357,7 +357,7 @@ export default function Referrals() {
                       : 'Ukendt';
                     
                     return (
-                      <TableRow key={referral.id}>
+                      <TableRow key={referral.id} className="max-md:flex max-md:flex-col max-md:gap-2 max-md:px-0 max-md:py-4 max-md:[&>td]:p-0 max-md:[&>td]:min-w-0">
                         <TableCell>
                           <div>
                             <div className="flex items-center gap-2">
@@ -380,8 +380,8 @@ export default function Referrals() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div>
+                        <TableCell data-label="Henvist af:" className={"max-md:before:mr-2 max-md:before:text-sm max-md:before:text-muted-foreground max-md:before:content-[attr(data-label)]"}>
+                          <div className="max-md:inline-block max-md:align-top">
                             <p className="font-medium">{referrerName}</p>
                             <p className="text-sm text-muted-foreground">
                               Kandidat angav: {referral.referrer_name_provided}
@@ -393,7 +393,7 @@ export default function Referrals() {
                             value={referral.status}
                             onValueChange={(value) => handleStatusChange(referral, value)}
                           >
-                            <SelectTrigger className="w-[160px]">
+                            <SelectTrigger className="w-[160px] max-md:min-h-11 max-md:w-full">
                               <SelectValue>
                                 <Badge variant={statusInfo.variant} className="flex items-center gap-1">
                                   {statusInfo.icon}
@@ -413,10 +413,10 @@ export default function Referrals() {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell data-label="Modtaget:" className={"text-muted-foreground max-md:before:mr-2 max-md:before:text-sm max-md:before:text-muted-foreground max-md:before:content-[attr(data-label)]"}>
                           {format(new Date(referral.created_at), "d. MMM yyyy", { locale: da })}
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Bonus:" className={"max-md:flex max-md:items-center max-md:before:mr-2 max-md:before:text-sm max-md:before:text-muted-foreground max-md:before:content-[attr(data-label)]"}>
                           {getBonusStatus(referral)}
                         </TableCell>
                         <TableCell>
