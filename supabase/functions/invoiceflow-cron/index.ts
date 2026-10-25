@@ -85,7 +85,9 @@ Deno.serve(async (req) => {
   const now = new Date();
   const out: Record<string, unknown> = {};
 
-  if (body.task !== "work") {
+  // Kaldes hver time; daglige opgaver kun i timen kl. 06 dansk tid.
+  const cphHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", hour: "2-digit", hour12: false }).format(now));
+  if (body.task === "daily" || (body.task !== "work" && cphHour === 6)) {
     const { data: st } = await svc.from("invoiceflow_settings").select("run_day, catchup_day, expectation_day").eq("id", true).single();
     const day = now.getUTCDate();
     const period = previousPeriod(now);
