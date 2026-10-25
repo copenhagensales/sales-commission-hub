@@ -62,7 +62,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
                   {items.some((p) => p.nonCampaignCommission) && (
                     <label className="flex items-center gap-2 text-sm font-medium max-md:min-h-11 max-md:text-base">
                       Kampagne {campaign ? "ja" : "nej"}
-                      <Switch checked={campaign} onCheckedChange={onCampaign} aria-label="Kampagne" />
+                      <Switch checked={campaign} onCheckedChange={onCampaign} aria-label="Kampagne" className="max-md:h-7 max-md:w-12" />
                     </label>
                   )}
                 </div>
