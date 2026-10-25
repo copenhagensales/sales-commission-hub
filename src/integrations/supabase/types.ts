@@ -11256,6 +11256,8 @@ export type Database = {
           expected_day: number | null
           id: string
           is_active: boolean
+          missing_checked_at: string | null
+          missing_period: string | null
           name: string
           updated_at: string
         }
@@ -11266,6 +11268,8 @@ export type Database = {
           expected_day?: number | null
           id?: string
           is_active?: boolean
+          missing_checked_at?: string | null
+          missing_period?: string | null
           name: string
           updated_at?: string
         }
@@ -11276,6 +11280,8 @@ export type Database = {
           expected_day?: number | null
           id?: string
           is_active?: boolean
+          missing_checked_at?: string | null
+          missing_period?: string | null
           name?: string
           updated_at?: string
         }
