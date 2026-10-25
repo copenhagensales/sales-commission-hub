@@ -59,7 +59,6 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
         {children}
         <SheetPrimitive.Close className="absolute right-4 top-4 z-[100] rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center max-md:right-2 max-md:top-[max(0.5rem,env(safe-area-inset-top))] max-md:opacity-100">
           <X className="h-5 w-5 md:h-4 md:w-4" />
-          <X className="h-4 w-4" />
           <span className="sr-only">Luk</span>
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
