@@ -79,7 +79,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   return (
     <nav
       aria-label="Hovednavigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-foreground/10 bg-sidebar/85 shadow-[0_-8px_24px_-12px_hsl(var(--cph-onyx)/0.5)] backdrop-blur-xl backdrop-saturate-150 pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-foreground/10 bg-sidebar/[0.97] shadow-[0_-8px_24px_-12px_hsl(var(--cph-onyx)/0.5)] backdrop-blur-xl backdrop-saturate-150 pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
     >
       <ul className="flex" style={{ height: BOTTOM_NAV_HEIGHT }}>
         {tabs.map((t) => {
@@ -90,7 +90,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
               <NavLink
                 to={t.to}
                 aria-current={active ? "page" : undefined}
-                className={cn(itemClass, active ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/60")}
+                className={cn(itemClass, active ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
               >
                 <TabIcon icon={Icon} active={active}>
                   {t.to === "/storkbook" && <StorkbookBadge />}
@@ -107,7 +107,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
               onClick={onMenu}
               aria-haspopup="dialog"
               aria-expanded={!!menuOpen}
-              className={cn(itemClass, menuOpen || onProfile ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/60")}
+              className={cn(itemClass, menuOpen || onProfile ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
             >
               <TabIcon icon={Menu} active={!!menuOpen || onProfile} />
               Menu

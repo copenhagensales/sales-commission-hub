@@ -310,11 +310,11 @@ const Home = () => {
         periodCommission={personalStats?.periodCommission || 0}
       />
 
-      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-10 md:pt-8">
-        <div className="flex flex-col gap-8">
+      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-10 md:pt-8 max-md:min-h-0 max-md:px-0 max-md:pb-4 max-md:pt-1">
+        <div className="flex flex-col gap-8 max-md:gap-5">
           {/* Topbar */}
-          <div className="flex items-end justify-between gap-4 border-b-2 border-[hsl(var(--cph-onyx))] pb-6">
-            <div className="flex flex-col gap-3">
+          <div className="flex items-end justify-between gap-4 border-b-2 border-[hsl(var(--cph-onyx))] pb-6 max-md:pb-4">
+            <div className="flex min-w-0 flex-col gap-3">
               <div className="flex items-center gap-2.5">
                 <span className="h-2 w-2 rounded-full bg-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-onyx))]" />
                 <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-foreground/70">
@@ -398,7 +398,7 @@ const Home = () => {
 
         <Card className="h-full border-0 bg-card rounded-3xl">
 
-          <CardHeader className="px-6 pb-2 pt-6">
+          <CardHeader className="px-6 pb-2 pt-6 max-md:px-5 max-md:pt-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
                 <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
@@ -409,14 +409,14 @@ const Home = () => {
                 open={addEventOpen}
                 onOpenChange={setAddEventOpen}
                 trigger={
-                  <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0" aria-label="Tilføj begivenhed">
+                  <Button variant="ghost" size="sm" className="h-11 w-11 -mr-2 md:mr-0 md:h-7 md:w-7 p-0" aria-label="Tilføj begivenhed">
                     <Plus className="w-4 h-4" />
                   </Button>
                 }
               />
             </div>
           </CardHeader>
-          <CardContent className="flex flex-col px-6 pb-6">
+          <CardContent className="flex flex-col px-6 pb-6 max-md:px-5 max-md:pb-5">
             {companyEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <CalendarX className="mb-2 h-8 w-8 opacity-50" />

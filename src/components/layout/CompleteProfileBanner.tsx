@@ -49,11 +49,11 @@ export function CompleteProfileBanner() {
   }
 
   return (
-    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
+    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 max-md:rounded-2xl max-md:border max-md:p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3 md:items-center">
           <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800 dark:text-amber-200">
+          <p className="text-sm max-md:text-[15px] text-amber-800 dark:text-amber-200">
             <strong>Velkommen!</strong> Udfyld venligst dine personlige oplysninger for at færdiggøre din profil.
           </p>
         </div>
