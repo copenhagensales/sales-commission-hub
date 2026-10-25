@@ -73,12 +73,12 @@ function PhotoSlot({
           className="h-full w-full object-cover"
         />
         {(photo.title || photo.event_date) && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[hsl(var(--cph-onyx)/0.72)] px-3 py-2 text-[12px] font-extrabold text-[hsl(var(--cph-light-blue))]">
-            {photo.title}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[hsl(var(--cph-onyx)/0.92)] via-[hsl(var(--cph-onyx)/0.6)] to-transparent px-3 pb-2.5 pt-8 text-[hsl(var(--cph-light-blue))] md:bg-[hsl(var(--cph-onyx)/0.72)] md:bg-none md:py-2">
+            <div className="line-clamp-2 text-[15px] font-extrabold leading-snug md:text-[12px]">{photo.title}</div>
             {photo.event_date && (
-              <span className="ml-1 font-normal opacity-75">
-                · {format(parseISO(photo.event_date), "d. MMM", { locale: da })}
-              </span>
+              <div className="mt-0.5 text-[13px] opacity-75 md:text-[12px]">
+                {format(parseISO(photo.event_date), "d. MMM", { locale: da })}
+              </div>
             )}
           </div>
         )}
@@ -285,14 +285,14 @@ export function EventGallery() {
         }}
       />
 
-      <div className="relative mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-[14px] font-extrabold">
+      <div className="relative mb-4 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold md:text-[14px]">
           <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-emerald))]" />
           Seneste event
         </h2>
         <div className="flex items-center gap-2">
           {photos.length > SLOT_PLACEHOLDERS.length && (
-            <div className="flex items-center gap-1.5">
+            <div className="hidden items-center gap-1.5 md:flex">
               <button
                 type="button"
                 onClick={() => scrollByCards(-1)}
@@ -314,10 +314,11 @@ export function EventGallery() {
           {canManage && (
             <Button
               onClick={openDialog}
-              className="h-auto gap-2 rounded-xl bg-[hsl(var(--cph-light-blue))] px-3.5 py-2 text-[13px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
+              aria-label="Læg billeder op"
+              className="h-11 w-11 gap-2 rounded-full bg-[hsl(var(--cph-light-blue))] p-0 text-[13px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white active:scale-95 md:h-auto md:w-auto md:rounded-xl md:px-3.5 md:py-2"
             >
-              <ImagePlus className="h-4 w-4" />
-              Læg billeder op
+              <ImagePlus className="h-5 w-5 md:h-4 md:w-4" />
+              <span className="hidden md:inline">Læg billeder op</span>
             </Button>
           )}
         </div>
@@ -325,12 +326,12 @@ export function EventGallery() {
 
       <div
         ref={scrollRef}
-        className="relative flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 [scrollbar-width:thin]"
+        className="relative -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:mx-0 md:scroll-px-0 md:gap-2.5 md:px-0 md:[scrollbar-width:thin]"
       >
         {slots.map((slot, index) => (
           <div
             key={slot.photo?.id ?? `slot-${index}`}
-            className="aspect-[4/3] w-[calc(50%-5px)] shrink-0 snap-start md:w-[calc(25%-8px)]"
+            className="aspect-[4/3] w-[82%] shrink-0 snap-start md:w-[calc(25%-8px)]"
           >
             <PhotoSlot
               photo={slot.photo}
