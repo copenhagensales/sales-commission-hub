@@ -53,6 +53,7 @@ export function PlayerProfileHoverCard({
 }: PlayerProfileHoverCardProps) {
   const { data } = useEmployeeProfileStats();
   const hasHover = useHasHover();
+  const isPhone = useIsPhone();
   const person = employeeId ? data?.byId.get(employeeId) : undefined;
 
   if (!person) return <>{children}</>;
