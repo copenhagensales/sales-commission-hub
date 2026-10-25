@@ -1182,7 +1182,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   setOpponentTeam(opponentTeam.slice(0, 1));
                 }}
                 disabled={isMatchOngoing}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 max-md:min-h-11 max-md:min-w-11 max-md:justify-center ${
                   battleMode === "1v1" 
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
                     : "text-slate-400 hover:text-white hover:bg-slate-700/50"
@@ -1197,7 +1197,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   setBattleMode("team");
                 }}
                 disabled={isMatchOngoing}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 max-md:min-h-11 max-md:min-w-11 max-md:justify-center ${
                   battleMode === "team" 
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
                     : "text-slate-400 hover:text-white hover:bg-slate-700/50"
