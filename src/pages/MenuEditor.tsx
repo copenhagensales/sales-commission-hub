@@ -489,7 +489,7 @@ export default function MenuEditor() {
 
   return (
     <div className="container max-w-4xl mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
         <div>
           <h1 className="text-2xl font-bold">Menu Editor</h1>
           <p className="text-muted-foreground text-sm">
