@@ -158,7 +158,7 @@ function Body() {
       )}
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{viewing?.title}</DialogTitle></DialogHeader>
           {viewing && (
             <div className="space-y-3 text-sm">
@@ -186,7 +186,7 @@ function Body() {
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? "Redigér vurdering" : "Ny vurdering"}</DialogTitle></DialogHeader>
           {f && (
             <div className="space-y-4">

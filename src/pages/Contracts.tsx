@@ -595,7 +595,7 @@ export default function Contracts() {
 
         {/* Template Dialog */}
         <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTemplate ? "Rediger skabelon" : "Ny skabelon"}
@@ -671,7 +671,7 @@ export default function Contracts() {
 
         {/* Preview Contract Dialog */}
         <Dialog open={!!previewContract} onOpenChange={() => setPreviewContract(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{previewContract?.title}</DialogTitle>
             </DialogHeader>

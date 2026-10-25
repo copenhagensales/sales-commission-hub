@@ -634,7 +634,7 @@ export default function DesignDashboard() {
 
       {/* Widget Configuration Dialog */}
       <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[550px] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingWidget ? "Rediger Widget" : "Tilføj Widget"}</DialogTitle>
             <DialogDescription>Konfigurer din widget</DialogDescription>

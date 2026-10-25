@@ -155,7 +155,7 @@ export function SendEmployeeSmsDialog({ open, onOpenChange, employee }: SendEmpl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border max-w-md sm:max-w-lg h-[80vh] max-h-[700px] flex flex-col p-0">
+      <DialogContent className="bg-card border-border max-w-md sm:max-w-lg h-[80dvh] max-h-[700px] flex flex-col p-0">
         <DialogHeader className="p-4 pb-2 border-b border-border shrink-0">
           <DialogTitle className="text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />

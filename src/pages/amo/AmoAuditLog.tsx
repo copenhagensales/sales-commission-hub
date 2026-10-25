@@ -209,7 +209,7 @@ export default function AmoAuditLog() {
 
       {/* Detail Dialog */}
       <Dialog open={!!selectedEntry} onOpenChange={() => setSelectedEntry(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Audit Log Detaljer</DialogTitle>
           </DialogHeader>

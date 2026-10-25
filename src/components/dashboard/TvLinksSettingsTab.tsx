@@ -391,7 +391,7 @@ export function TvLinksSettingsTab() {
               Opret nyt TV-link
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogContent className="sm:max-w-lg max-h-[90dvh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Opret nyt TV-link</DialogTitle>
               <DialogDescription>

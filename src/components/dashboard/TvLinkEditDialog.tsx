@@ -254,7 +254,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[90dvh] flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Rediger TV-link</DialogTitle>
             <DialogDescription>

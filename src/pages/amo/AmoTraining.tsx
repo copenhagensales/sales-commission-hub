@@ -300,7 +300,7 @@ export default function AmoTraining() {
       </Card>
 
       <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Rediger kursus" : "Nyt kursuskrav"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>

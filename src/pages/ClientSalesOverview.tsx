@@ -275,7 +275,7 @@ export default function ClientSalesOverview() {
 
       {/* Sales Detail Dialog */}
       <Dialog open={!!selectedVendor} onOpenChange={(open) => !open && setSelectedVendor(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[80dvh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Salg for: {selectedVendor?.vendor || "Ukendt leverandør"}

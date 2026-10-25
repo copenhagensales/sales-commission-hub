@@ -3469,7 +3469,7 @@ export default function MgTest() {
 
       {/* Field Inspector Dialog */}
       <Dialog open={!!inspectingCampaign} onOpenChange={(open) => !open && setInspectingCampaign(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
@@ -3580,7 +3580,7 @@ export default function MgTest() {
 
       {/* Create Product Dialog */}
       <Dialog open={createProductDialog} onOpenChange={setCreateProductDialog}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Opret nyt produkt</DialogTitle>
             <DialogDescription>

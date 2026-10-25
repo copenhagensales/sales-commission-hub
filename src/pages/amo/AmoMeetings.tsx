@@ -308,7 +308,7 @@ export default function AmoMeetings() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Rediger møde" : "Nyt AMO-møde"}</DialogTitle>
           </DialogHeader>

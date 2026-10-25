@@ -616,7 +616,7 @@ function UseCaseDialog({ open, data, onClose, onSave }: { open: boolean; data?: 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); else handleOpen(); }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{data?.id ? "Rediger use case" : "Ny AI use case"}</DialogTitle>
         </DialogHeader>
