@@ -99,7 +99,21 @@ export function PageShell({ children, title, showBack, right, moreMenu, stickyAc
               })}
             </div>
           )}
-          {moreMenu?.(() => setMoreOpen(false))}
+          {moreMenu && (
+            // Telefon-stil til den genbrugte sidemenu (kun CSS, computerens sidemenu er uændret).
+            <div
+              data-menu-skuffe
+              className={cn(
+                "min-w-0 max-w-full overflow-x-hidden",
+                "[&_a]:flex [&_a]:min-h-11 [&_a]:min-w-0 [&_a]:items-center [&_a]:text-base [&_a]:active:bg-muted",
+                "[&_a>span]:truncate [&_a]:overflow-hidden",
+                "[&_button]:min-h-11 [&_button]:text-base [&_button]:font-bold [&_button]:active:bg-muted",
+                "[&_a_svg]:h-5 [&_a_svg]:w-5 [&_a_svg]:shrink-0 [&_button_svg]:h-5 [&_button_svg]:w-5 [&_button_svg]:shrink-0",
+              )}
+            >
+              {moreMenu(() => setMoreOpen(false))}
+            </div>
+          )}
         </BottomSheet>
       )}
     </>
