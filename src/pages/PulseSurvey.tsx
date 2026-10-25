@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle, HeartHandshake, Save, FlaskConical, Shield, Clock, BarChart3 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SkeletonCard, SkeletonList, StickyOnPhone, useDraftGuard, useIsPhone } from "@/components/mobile";
 
 const TENURE_OPTIONS = [
   { value: 'under_1_month', label: 'Under 1 måned' },
@@ -65,13 +66,14 @@ function ScaleSelector({ value, onChange, isNps = false, lowLabel, highLabel }: 
   
   return (
     <div className="space-y-1">
-      <div className="flex flex-wrap gap-2">
+      <div className={`grid ${isNps ? 'grid-cols-6' : 'grid-cols-5'} gap-2 md:flex md:flex-wrap`}>
         {scale.map((num) => (
           <button
             key={num}
             type="button"
+            aria-pressed={value === num}
             onClick={() => onChange(num)}
-            className={`w-10 h-10 rounded-lg font-medium transition-all ${
+            className={`h-11 w-full text-[16px] md:text-base md:w-10 md:h-10 rounded-lg font-medium transition-all active:scale-95 touch-manipulation max-md:ring-offset-2 ${value === num ? 'max-md:ring-2 max-md:ring-foreground' : ''} ${
               value === num
                 ? isNps ? `${getNpsColor(num)} shadow-lg scale-110` : 'bg-primary text-primary-foreground shadow-lg scale-110'
                 : 'bg-muted hover:bg-muted/80 text-foreground'
@@ -82,7 +84,7 @@ function ScaleSelector({ value, onChange, isNps = false, lowLabel, highLabel }: 
         ))}
       </div>
       {(lowLabel || highLabel) && (
-        <div className="flex justify-between text-xs text-muted-foreground pt-1">
+        <div className="flex justify-between gap-3 text-xs max-md:text-[14px] text-muted-foreground pt-1">
           <span>{lowLabel}</span>
           <span>{highLabel}</span>
         </div>
@@ -132,6 +134,13 @@ export default function PulseSurvey() {
       return (data || []).filter(t => !HIDDEN_PULSE_TEAMS.includes(t.name));
     }
   });
+
+  const isPhone = useIsPhone();
+  const [step, setStep] = useState(0);
+  const submittingRef = useRef(false);
+  const hasAnyAnswer = Object.keys(formData).length > 0 || !!npsComment || !!improvementSuggestions || !!campaignImprovementSuggestions || !!selectedTeamId;
+  // Kladden bevares ved versionsskift: ingen genindlæsning midt i besvarelsen.
+  useDraftGuard(hasAnyAnswer && !hasCompleted);
 
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const draftInitialized = useRef(false);
@@ -192,6 +201,12 @@ export default function PulseSurvey() {
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return; // ingen dobbelt-afsendelse ved gentryk
+    submittingRef.current = true;
+    try { await doSubmit(); } finally { submittingRef.current = false; }
+  };
+
+  const doSubmit = async () => {
     if (isTestMode) { toast.success('Test afsluttet – ingen data blev gemt'); navigate('/pulse-survey-results'); return; }
 
     const requiredScales = SCALE_QUESTIONS.map(q => q.key);
@@ -219,8 +234,9 @@ export default function PulseSurvey() {
   if (!isTestMode && (surveyLoading || completionLoading || draftLoading)) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+        <div className="max-w-3xl mx-auto space-y-4 py-4" aria-busy="true" aria-label="Indlæser pulsmåling">
+          <SkeletonCard />
+          <SkeletonList count={3} />
         </div>
       </MainLayout>
     );
@@ -254,6 +270,130 @@ export default function PulseSurvey() {
               <p className="text-muted-foreground text-center">Du har allerede udfyldt denne måneds pulsmåling.<br />Næste pulsmåling aktiveres den 15. i næste måned.</p>
             </CardContent>
           </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const npsQm = SCALE_QUESTIONS[0];
+  const scaleOnly = SCALE_QUESTIONS.slice(1);
+  const totalSteps = 3 + scaleOnly.length; // baggrund, anbefaling, skalaer, forslag
+  const lastStep = totalSteps - 1;
+  const stepValid = (i: number): boolean => {
+    if (i === 0) return !!selectedTeamId && !!formData.tenure;
+    if (i === 1) return formData.nps_score !== undefined;
+    if (i >= 2 && i < lastStep) return formData[scaleOnly[i - 2].key as keyof PulseSurveyResponse] !== undefined;
+    return true;
+  };
+  const goTo = (i: number) => { setStep(i); window.scrollTo({ top: 0 }); };
+
+  if (isPhone) {
+    const q = step >= 2 && step < lastStep ? scaleOnly[step - 2] : null;
+    const section = q ? SECTIONS.find((s) => s.id === q.section) : null;
+    return (
+      <MainLayout>
+        <div className="space-y-4">
+          <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm pb-3 pt-2 -mx-4 px-4">
+            <div className="flex items-center justify-between text-[14px] text-muted-foreground mb-1.5">
+              <span className="font-semibold text-foreground" aria-live="polite">{step + 1} af {totalSteps}</span>
+              {!isTestMode && draftStatus !== 'idle' && (
+                <span className="flex items-center gap-1"><Save className="h-3.5 w-3.5" />{draftStatus === 'saving' ? 'Gemmer kladde …' : 'Kladde gemt'}</span>
+              )}
+            </div>
+            <Progress value={Math.round(((step + 1) / totalSteps) * 100)} className="h-2" />
+          </div>
+
+          {isTestMode && step === 0 && (
+            <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+              <FlaskConical className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200">Du er i test-tilstand – svar gemmes ikke.</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="rounded-2xl border border-border bg-card p-4 space-y-5">
+            {step === 0 && (
+              <>
+                <div>
+                  <h1 className="text-2xl font-bold">{isTestMode ? 'Pulsmåling (Test)' : 'Pulsmåling'}</h1>
+                  <p className="text-[14px] text-muted-foreground">Anonym · 3–5 minutter{!isTestMode ? ' · gemmes automatisk' : ''}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[16px] font-semibold">Hvilket team arbejder du på? <span className="text-destructive">*</span></Label>
+                  <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                    <SelectTrigger className="min-h-11 text-[16px]"><SelectValue placeholder="Vælg team..." /></SelectTrigger>
+                    <SelectContent>
+                      {teams?.map((team) => (
+                        <SelectItem key={team.id} value={team.id} className="min-h-11 text-[16px]">{team.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[16px] font-semibold">Hvor længe har du arbejdet hos Copenhagen Sales? <span className="text-destructive">*</span></Label>
+                  <RadioGroup value={formData.tenure} onValueChange={(v) => setFormData(prev => ({ ...prev, tenure: v as PulseSurveyResponse['tenure'] }))} className="gap-2">
+                    {TENURE_OPTIONS.map((option) => (
+                      <Label key={option.value} htmlFor={`m-${option.value}`}
+                        className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-[16px] font-normal active:bg-muted ${formData.tenure === option.value ? 'border-primary bg-primary/10' : 'border-border'}`}>
+                        <RadioGroupItem value={option.value} id={`m-${option.value}`} />
+                        {option.label}
+                      </Label>
+                    ))}
+                  </RadioGroup>
+                </div>
+              </>
+            )}
+
+            {step === 1 && (
+              <>
+                <p className="text-[14px] font-semibold text-muted-foreground">⭐ Anbefaling</p>
+                <Label className="block text-[17px] font-semibold leading-snug">{npsQm.question}</Label>
+                {npsQm.extraHelpText && <p className="text-[14px] text-muted-foreground italic">{npsQm.extraHelpText}</p>}
+                <ScaleSelector value={formData.nps_score} isNps onChange={(v) => handleScaleChange('nps_score', v)} lowLabel={npsQm.lowLabel} highLabel={npsQm.highLabel} />
+                <div className="space-y-2">
+                  <Label className="text-[16px] font-medium">Vil du kort uddybe? <span className="text-muted-foreground font-normal">(valgfrit)</span></Label>
+                  <Textarea value={npsComment} onChange={(e) => setNpsComment(e.target.value)} placeholder="Hvad fungerer godt – og hvad kunne være bedre?" rows={3} className="text-[16px]" />
+                </div>
+              </>
+            )}
+
+            {q && (
+              <>
+                {section && <p className="text-[14px] font-semibold text-muted-foreground">{section.icon} {section.title}</p>}
+                <Label className="block text-[17px] font-semibold leading-snug">{q.question}</Label>
+                <ScaleSelector value={formData[q.key as keyof PulseSurveyResponse] as number} onChange={(v) => handleScaleChange(q.key, v)} lowLabel={q.lowLabel} highLabel={q.highLabel} />
+              </>
+            )}
+
+            {step === lastStep && (
+              <>
+                <p className="text-[14px] font-semibold text-muted-foreground">💬 Dine forslag</p>
+                <div className="space-y-2">
+                  <Label className="text-[16px] font-medium">Hvad bør kunden forbedre for at gøre kampagnen og produkterne lettere at sælge? <span className="text-muted-foreground font-normal">(valgfrit)</span></Label>
+                  <Textarea value={campaignImprovementSuggestions} onChange={(e) => setCampaignImprovementSuggestions(e.target.value)} placeholder="Skriv dine forslag her..." rows={3} className="text-[16px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[16px] font-medium">Har du idéer til, hvad vi kunne gøre bedre i Copenhagen Sales? <span className="text-muted-foreground font-normal">(valgfrit)</span></Label>
+                  <Textarea value={improvementSuggestions} onChange={(e) => setImprovementSuggestions(e.target.value)} placeholder="Skriv dine forslag her..." rows={3} className="text-[16px]" />
+                </div>
+                <p className="text-[14px] text-muted-foreground">
+                  {isTestMode ? 'Dette er en test – ingen data gemmes.' : 'Din besvarelse er anonym og kan ikke ændres efter indsendelse.'}
+                </p>
+              </>
+            )}
+          </div>
+
+          <StickyOnPhone>
+            <div className="flex gap-2">
+              <Button variant="outline" className="min-h-11 flex-1" disabled={step === 0} onClick={() => goTo(step - 1)}>Tilbage</Button>
+              {step < lastStep ? (
+                <Button className="min-h-11 flex-[2]" disabled={!stepValid(step)} onClick={() => goTo(step + 1)}>Næste</Button>
+              ) : (
+                <Button className="min-h-11 flex-[2]" onClick={handleSubmit} disabled={!isTestMode && (submitSurvey.isPending || !selectedTeamId)}>
+                  {isTestMode ? 'Afslut test' : submitSurvey.isPending ? 'Sender …' : 'Send'}
+                </Button>
+              )}
+            </div>
+          </StickyOnPhone>
         </div>
       </MainLayout>
     );
