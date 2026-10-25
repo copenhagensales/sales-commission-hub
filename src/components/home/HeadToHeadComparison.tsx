@@ -888,7 +888,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       <div className="group relative">
         <div className="flex items-center justify-between gap-2">
           {/* Left value */}
-          <div className={`min-w-[100px] flex items-center justify-end gap-1.5 transition-all duration-500 ${
+          <div className={`min-w-0 flex-1 md:flex-none md:min-w-[100px] flex items-center justify-end gap-1.5 transition-all duration-500 ${
             winner === 'left' ? 'scale-[1.02]' : ''
           }`}>
             {winner === 'left' && (
@@ -909,7 +909,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
           
           {/* Center label with icon */}
-          <div className={`shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-xl min-w-[110px] transition-all duration-300 ${
+          <div className={`shrink-0 flex items-center justify-center gap-2 px-2 md:px-3 py-2 rounded-xl min-w-[96px] md:min-w-[110px] transition-all duration-300 ${
             winner === 'left' ? 'bg-emerald-500/10 border border-emerald-500/30' :
             winner === 'right' ? 'bg-rose-500/10 border border-rose-500/30' :
             winner === 'tie' ? 'bg-amber-500/10 border border-amber-500/30' :
@@ -925,7 +925,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
           
           {/* Right value */}
-          <div className={`min-w-[100px] flex items-center gap-1.5 transition-all duration-500 ${
+          <div className={`min-w-0 flex-1 md:flex-none md:min-w-[100px] flex items-center gap-1.5 transition-all duration-500 ${
             winner === 'right' ? 'scale-[1.02]' : ''
           }`}>
             <span className={`font-bold text-sm tabular-nums whitespace-nowrap transition-colors duration-300 ${
