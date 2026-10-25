@@ -14,7 +14,9 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { X } from "lucide-react";
+import { useIsPhone } from "@/components/mobile/useIsPhone";
 import { useEmployeeProfileStats } from "@/hooks/useEmployeeProfileStats";
 import { PlayerProfileCard } from "./PlayerProfileCard";
 
@@ -51,6 +53,7 @@ export function PlayerProfileHoverCard({
 }: PlayerProfileHoverCardProps) {
   const { data } = useEmployeeProfileStats();
   const hasHover = useHasHover();
+  const isPhone = useIsPhone();
   const person = employeeId ? data?.byId.get(employeeId) : undefined;
 
   if (!person) return <>{children}</>;
@@ -62,15 +65,27 @@ export function PlayerProfileHoverCard({
     />
   );
 
-  if (!hasHover) {
+  // Telefon eller touch: åbnes ved tryk, lukkes med tydelig knap, tryk udenfor eller tilbage.
+  if (!hasHover || isPhone) {
     return (
       <Dialog>
         <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent
+          aria-describedby={undefined}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className="w-auto max-w-[calc(100vw-24px)] max-h-[88vh] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:text-white"
+          className="w-auto max-w-[calc(100vw-24px)] max-h-[calc(100dvh-48px)] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none"
+          hideCloseButton
         >
-          {card}
+          <DialogTitle className="sr-only">Spillerprofil for {person.fullName}</DialogTitle>
+          <div className="relative">
+            {card}
+            <DialogClose
+              aria-label="Luk profil"
+              className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[hsl(var(--cph-light-blue)/0.15)] text-[hsl(var(--cph-light-blue))] backdrop-blur active:scale-95"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </DialogClose>
+          </div>
         </DialogContent>
       </Dialog>
     );
