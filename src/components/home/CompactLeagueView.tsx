@@ -13,6 +13,7 @@ import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
 export function CompactLeagueView() {
+  const isPhone = useIsPhone();
   const { data: season } = useActiveSeason();
   const { data: currentEmployeeId } = useCurrentEmployeeId();
   const { data: seasonStandings = [] } = useSeasonStandings(season?.id);

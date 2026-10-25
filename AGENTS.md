@@ -50,3 +50,4 @@ Dette afsnit er fast og må ikke fjernes eller omskrives af agenten.
 10. Tilgængelighed: brødtekst 16–17 px, sekundær tekst mindst 14 px, holder ved 200 % tekstforstørrelse, reflow ved 320 px, stående og liggende, kontrast WCAG AA i lys og mørk tilstand, reduceret bevægelse respekteres, fokus lander rigtigt efter skuffer, ingen blokerende fejl i VoiceOver/TalkBack.
 
 Byggeklodserne ligger i `src/components/mobile/`; lav ikke nye varianter pr. side. Mobilændringer rører aldrig datakald, login, rettigheds-hooks, routes eller migrationer.
+- Mobilændringer er først færdige, når `python3 scripts/mobile-audit/audit.py <routes>` er kørt for de berørte sider ved 360/393/430 px uden nye reelle fejl, og skærmbillederne er set. Why: fejl skal findes systematisk, ikke af brugeren én ad gangen.
