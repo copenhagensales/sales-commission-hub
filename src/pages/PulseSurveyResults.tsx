@@ -18,6 +18,8 @@ import { TeamComparisonBarChart } from "@/components/pulse-survey/TeamComparison
 import { TeamRadarChart } from "@/components/pulse-survey/TeamRadarChart";
 import { TeamHeatmap } from "@/components/pulse-survey/TeamHeatmap";
 import { TeamComparisonLineChart } from "@/components/pulse-survey/TeamComparisonLineChart";
+import { BottomSheet, ChartFrame, KpiCard, KpiGrid, SkeletonCard, SkeletonKpi, useIsPhone } from "@/components/mobile";
+import { SlidersHorizontal } from "lucide-react";
 import { PulseSurveyEditor } from "@/components/quiz-admin/PulseSurveyEditor";
 import { useQuizTemplate, useUpdateQuizTemplate, PulseSurveyQuestion } from "@/hooks/useQuizTemplates";
 
@@ -79,8 +81,8 @@ function calculateAverages(responses: any[], questionData: Record<string, { labe
   return averages;
 }
 
-function AveragesChart({ averages, questionData, responses = [] }: { averages: Record<string, number> | null; questionData: Record<string, { label: string; fullQuestion: string }>; responses?: any[] }) {
-  if (!averages) return <p className="text-muted-foreground">Ingen data</p>;
+function AveragesChart({ averages, questionData, responses = [], phone = false }: { averages: Record<string, number> | null; questionData: Record<string, { label: string; fullQuestion: string }>; responses?: any[]; phone?: boolean }) {
+  if (!averages) return <p className="text-muted-foreground">Ingen besvarelser endnu</p>;
 
   const data = Object.entries(averages).map(([key, value]) => {
     const distribution: Record<number, number> = {};
@@ -100,14 +102,14 @@ function AveragesChart({ averages, questionData, responses = [] }: { averages: R
     };
   });
 
-  return (
-    <TooltipProvider>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} layout="vertical" margin={{ left: 80, right: 20 }}>
+  const chart = (
+      <ResponsiveContainer width="100%" height={phone ? "100%" : 300}>
+        <BarChart data={data} layout="vertical" margin={phone ? { left: 4, right: 8 } : { left: 80, right: 20 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis type="number" domain={[0, 10]} />
-          <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+          <YAxis type="category" dataKey="name" width={phone ? 96 : 80} tick={{ fontSize: phone ? 11 : 12 }} />
           <ChartTooltip 
+            trigger={phone ? "click" : "hover"}
             content={({ active, payload }) => {
               if (active && payload && payload.length) {
                 const data = payload[0].payload;
@@ -139,8 +141,18 @@ function AveragesChart({ averages, questionData, responses = [] }: { averages: R
           <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
-    </TooltipProvider>
   );
+
+  if (phone) {
+    return (
+      <ChartFrame title="Gennemsnit pr. spørgsmål" height={Math.max(300, data.length * 32)}
+        data={data.map((d) => ({ label: d.name, value: `${d.score} / 10` }))}>
+        {chart}
+      </ChartFrame>
+    );
+  }
+
+  return <TooltipProvider>{chart}</TooltipProvider>;
 }
 
 // Initial default questions used when no template exists - will be saved to DB on first load
@@ -171,6 +183,8 @@ export default function PulseSurveyResults() {
   const deactivateSurvey = useDeactivatePulseSurvey();
   const { data: activeSurvey } = useActivePulseSurvey();
   const [linkCopied, setLinkCopied] = useState(false);
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Template editing
   const { data: template, isLoading: templateLoading } = useQuizTemplate('pulse_survey');
@@ -320,15 +334,62 @@ export default function PulseSurveyResults() {
   const monthNames = ['januar', 'februar', 'marts', 'april', 'maj', 'juni', 
     'juli', 'august', 'september', 'oktober', 'november', 'december'];
 
+  const teamLabel = selectedTeamId === 'all' ? 'Alle teams' : teamsWithResponses.find(t => t.id === selectedTeamId)?.name;
+  const surveyLabel = (() => { const sv = surveys?.find(x => x.id === selectedSurveyId); return sv ? `${monthNames[sv.month - 1]} ${sv.year}` : 'Vælg måned'; })();
+  const filterSelects = (
+    <>
+          <div className="w-48 max-md:w-full">
+            <Select value={selectedSurveyId} onValueChange={setSelectedSurveyId}>
+              <SelectTrigger className="max-md:min-h-11 max-md:text-[16px]" aria-label="Måned">
+                <SelectValue placeholder="Vælg måned" />
+              </SelectTrigger>
+              <SelectContent>
+                {surveys?.map((survey) => (
+                  <SelectItem key={survey.id} value={survey.id} className="max-md:min-h-11">
+                    {monthNames[survey.month - 1]} {survey.year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="w-48 max-md:w-full">
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger className="max-md:min-h-11 max-md:text-[16px]" aria-label="Team">
+                <SelectValue placeholder="Vælg team" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="max-md:min-h-11">Alle teams (samlet)</SelectItem>
+                {teamsWithResponses.map((team) => (
+                  <SelectItem key={team.id} value={team.id} className="max-md:min-h-11">{team.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+    </>
+  );
+
+  if (surveysLoading) {
+    return (
+      <MainLayout>
+        <div className="space-y-4" aria-busy="true" aria-label="Indlæser resultater">
+          <SkeletonKpi />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Pulsmåling resultater</h1>
+            <h1 className="text-3xl max-md:text-2xl font-bold">Pulsmåling resultater</h1>
             <p className="text-muted-foreground">Anonymiseret oversigt over medarbejdertrivsel</p>
           </div>
-           <div className="flex gap-2">
+           <div className="flex flex-wrap gap-2 max-md:w-full max-md:[&>button]:min-h-11 max-md:[&>button]:flex-1">
             <Button variant="outline" onClick={() => navigate('/pulse-survey?test=true')}>
               <FlaskConical className="h-4 w-4 mr-2" />
               Test pulsmåling
@@ -365,11 +426,13 @@ export default function PulseSurveyResults() {
               <Input 
                 readOnly 
                 value={publicSurveyLink} 
-                className="font-mono text-base md:text-sm"
+                className="font-mono text-base md:text-sm min-w-0 max-md:min-h-11"
               />
               <Button
                 variant="outline"
                 size="icon"
+                className="shrink-0 max-md:h-11 max-md:w-11"
+                aria-label="Kopiér link"
                 onClick={() => {
                   navigator.clipboard.writeText(publicSurveyLink);
                   setLinkCopied(true);
@@ -384,52 +447,42 @@ export default function PulseSurveyResults() {
         </Card>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-4">
-          <div className="w-48">
-            <Select value={selectedSurveyId} onValueChange={setSelectedSurveyId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vælg måned" />
-              </SelectTrigger>
-              <SelectContent>
-                {surveys?.map((survey) => (
-                  <SelectItem key={survey.id} value={survey.id}>
-                    {monthNames[survey.month - 1]} {survey.year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="w-48">
-            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vælg team" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle teams (samlet)</SelectItem>
-                {teamsWithResponses.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {isPhone ? (
+          <>
+            <Button variant="outline" className="w-full min-h-11 justify-between" onClick={() => setFiltersOpen(true)}>
+              <span className="truncate">{surveyLabel} · {teamLabel}</span>
+              <SlidersHorizontal className="h-4 w-4 shrink-0" />
+            </Button>
+            <BottomSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Periode og team">
+              <div className="space-y-3 px-2 pb-2">
+                {filterSelects}
+                <Button className="w-full min-h-11" onClick={() => setFiltersOpen(false)}>Vis resultater</Button>
+              </div>
+            </BottomSheet>
+          </>
+        ) : (
+          <div className="flex flex-wrap gap-4">{filterSelects}</div>
+        )}
 
         {responsesLoading ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">Indlæser resultater...</p>
-            </CardContent>
-          </Card>
+          <div className="space-y-4" aria-busy="true"><SkeletonKpi /><SkeletonCard /></div>
         ) : !responses || responses.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">Ingen besvarelser for denne måned endnu.</p>
+              <p className="text-muted-foreground">Ingen besvarelser endnu</p>
             </CardContent>
           </Card>
         ) : (
           <>
             {/* KPI Cards */}
+            {isPhone ? (
+              <KpiGrid cols={4}>
+                <KpiCard label="Besvarelser" value={filteredResponses.length} sub={teamLabel} />
+                <KpiCard label="NPS Score" value={npsData?.nps ?? '-'} sub={npsData ? `${npsData.promoters}% promoters – ${npsData.detractors}% detractors` : undefined} />
+                <KpiCard label="Trivsel" value={averages?.wellbeing_score || '-'} sub="Gennemsnit" />
+                <KpiCard label="Teams" value={teamsWithResponses.length || 0} sub="Med besvarelser" />
+              </KpiGrid>
+            ) : (
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -481,9 +534,10 @@ export default function PulseSurveyResults() {
                 </CardContent>
               </Card>
             </div>
+            )}
 
             <Tabs defaultValue="overview" className="space-y-4">
-              <TabsList>
+              <TabsList className="max-md:flex max-md:w-full max-md:justify-start max-md:overflow-x-auto max-md:h-auto max-md:[&>button]:min-h-11 max-md:[&>button]:shrink-0">
                 <TabsTrigger value="overview">Oversigt</TabsTrigger>
                 <TabsTrigger value="team-comparison">Team sammenligning</TabsTrigger>
                 <TabsTrigger value="details">Detaljer</TabsTrigger>
@@ -495,6 +549,9 @@ export default function PulseSurveyResults() {
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
+                {isPhone ? (
+                  <AveragesChart averages={averages} questionData={questionData} responses={filteredResponses} phone />
+                ) : (
                 <Card>
                   <CardHeader>
                     <CardTitle>Gennemsnit pr. spørgsmål</CardTitle>
@@ -506,6 +563,7 @@ export default function PulseSurveyResults() {
                     <AveragesChart averages={averages} questionData={questionData} responses={filteredResponses} />
                   </CardContent>
                 </Card>
+                )}
 
                 <TeamHeatmap 
                   responses={normalizedResponses} 
