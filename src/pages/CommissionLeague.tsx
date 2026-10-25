@@ -368,6 +368,17 @@ export default function CommissionLeague() {
     return null;
   })();
 
+  // Telefon: afstand til placeringen over (kun fra allerede hentede stillinger)
+  const myGapToNext = (() => {
+    if (!stickyData || stickyData.rank <= 1) return null;
+    if (stickyData.isQualification) {
+      const above = (standings || []).find(s => s.overall_rank === stickyData.rank - 1);
+      return above ? { value: Number(above.current_provision) - Number(stickyData.provision ?? 0), unit: "kr" } : null;
+    }
+    const above = (seasonStandings || []).find(s => s.overall_rank === stickyData.rank - 1);
+    return above ? { value: Number(above.total_points) - Number(stickyData.points ?? 0), unit: "pt" } : null;
+  })();
+
   // Today provision for sticky bar
   const myTodayProvision = currentEmployeeId ? (todayProvisionMap?.[currentEmployeeId] ?? 0) : 0;
 
@@ -392,6 +403,31 @@ export default function CommissionLeague() {
         <div className="max-w-6xl mx-auto space-y-3 sm:space-y-6">
           {isCompletedPhase && (
             <div className="flex justify-end"><StartSeasonButton /></div>
+          )}
+          {stickyData && isEnrolled && leagueView === "individual" && (
+            <div className="md:hidden rounded-xl border border-indigo-500/30 bg-slate-800/80 p-4" aria-label="Din placering">
+              <p className="text-sm text-muted-foreground">Din placering</p>
+              <div className="mt-1 grid grid-cols-3 gap-2 text-center">
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold font-mono">#{stickyData.rank}</p>
+                  <p className="text-sm text-muted-foreground truncate">{stickyData.division === 1 ? "Superligaen" : `${stickyData.division - 1}. div`}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold font-mono truncate">
+                    {stickyData.isQualification
+                      ? Number(stickyData.provision ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })
+                      : Number(stickyData.points ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{stickyData.isQualification ? "kr. provision" : "point"}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold font-mono truncate">
+                    {stickyData.rank <= 1 ? "–" : myGapToNext ? Math.max(0, myGapToNext.value).toLocaleString("da-DK", { maximumFractionDigits: 0 }) : "…"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{stickyData.rank <= 1 ? "Du fører" : `${myGapToNext?.unit ?? ""} til #${stickyData.rank - 1}`}</p>
+                </div>
+              </div>
+            </div>
           )}
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>

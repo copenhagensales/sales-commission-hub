@@ -282,15 +282,15 @@ export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } 
           <div className="space-y-2">
             <Label>Numre i løsningen</Label>
             {solution === "omstilling" && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap max-md:[&>*]:min-w-[8rem] max-md:[&>*]:flex-1">
                 <Input placeholder="Hovednummer" value={mainNumber} className={mainBad ? "border-destructive" : ""} title={mainBad ? "Skal være 8 cifre" : undefined} onChange={(e) => setMainNumber(e.target.value)} />
                 <Input value="Hovednummer" disabled />
                 <Input placeholder="Intet simkort" disabled />
-                <div className="w-[5.5rem] shrink-0" />
+                <div className="w-[5.5rem] shrink-0 max-md:hidden" />
               </div>
             )}
             {rows.map((r, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="flex gap-2 max-md:flex-wrap max-md:[&>*]:min-w-[8rem] max-md:[&>*]:flex-1">
                 <Input placeholder="Nummer/Navn" value={r.name} className={rowBad(r.name) ? "border-destructive" : ""} title={rowBad(r.name) ? "Skal være 8 cifre" : undefined} onChange={(e) => updateRow(i, "name", e.target.value)} />
                 <Select value={r.subscription} onValueChange={(v) => updateRow(i, "subscription", v)}>
                   <SelectTrigger><SelectValue placeholder="Abonnement" /></SelectTrigger>

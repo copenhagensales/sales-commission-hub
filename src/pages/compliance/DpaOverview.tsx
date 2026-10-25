@@ -133,7 +133,7 @@ function ArchiveCell({
             <button
               type="button"
               onClick={() => openMut.mutate(doc.storage_path)}
-              className="flex items-start gap-1 text-left text-primary underline break-all"
+              className="flex items-start gap-1 max-md:min-h-11 max-md:items-center text-left text-primary underline break-all"
             >
               <FileText className="h-4 w-4 shrink-0" />
               <span>{doc.file_name}</span>
@@ -232,7 +232,7 @@ export default function DpaOverview() {
                           href={row.link.href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary underline break-all"
+                          className="text-primary underline break-all max-md:flex max-md:min-h-11 max-md:items-center"
                         >
                           {row.link.label}
                         </a>

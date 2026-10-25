@@ -52,7 +52,7 @@ export function BaselineFilter() {
               <div className="flex items-center gap-2">
                 <CardTitle className="text-base">Baseline-filter</CardTitle>
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger className="max-md:-m-3 max-md:inline-flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center">
                     <HelpCircle className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">

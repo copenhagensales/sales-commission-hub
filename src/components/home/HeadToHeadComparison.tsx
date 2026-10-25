@@ -1121,7 +1121,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       {/* Animated background effects */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-rose-500/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-1/2 -right-1/2 max-md:right-0 max-md:bottom-0 w-full h-full bg-gradient-to-tl from-rose-500/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
       
       <CardHeader className="relative pb-2 z-10">

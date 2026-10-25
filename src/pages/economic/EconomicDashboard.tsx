@@ -132,7 +132,7 @@ export default function EconomicDashboard() {
               <CardTitle className="text-sm font-medium flex items-center gap-1">
                 Baseline / md
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger className="max-md:-m-3 max-md:inline-flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center">
                     <HelpCircle className="h-3 w-3 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
@@ -157,7 +157,7 @@ export default function EconomicDashboard() {
               <CardTitle className="text-sm font-medium flex items-center gap-1">
                 Gns. netto / md
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger className="max-md:-m-3 max-md:inline-flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center">
                     <HelpCircle className="h-3 w-3 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
