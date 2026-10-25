@@ -68,7 +68,7 @@ export function ComplianceReviewPanel() {
                 <button
                   type="button"
                   onClick={() => navigate(area.href)}
-                  className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary"
+                  className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary max-md:min-h-11 max-md:w-full"
                 >
                   {area.title}
                   <ArrowRight className="h-3.5 w-3.5" />
