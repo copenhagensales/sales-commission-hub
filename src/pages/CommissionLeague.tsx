@@ -371,13 +371,15 @@ export default function CommissionLeague() {
   // Telefon: afstand til placeringen over (kun fra allerede hentede stillinger)
   const myGapToNext = (() => {
     if (!stickyData || stickyData.rank <= 1) return null;
-    if (stickyData.isQualification) {
-      const above = (standings || []).find(s => s.overall_rank === stickyData.rank - 1);
-      return above ? { value: Number(above.current_provision) - Number(stickyData.provision ?? 0), unit: "kr" } : null;
-    }
-    const above = (seasonStandings || []).find(s => s.overall_rank === stickyData.rank - 1);
-    return above ? { value: Number(above.total_points) - Number(stickyData.points ?? 0), unit: "pt" } : null;
+    const above = stickyData.isQualification
+      ? (standings || []).find(s => s.overall_rank === stickyData.rank - 1)?.current_provision
+      : (seasonStandings || []).find(s => s.overall_rank === stickyData.rank - 1)?.total_points;
+    const mine = stickyData.isQualification ? stickyData.provision : stickyData.points;
+    const value = Number(above) - Number(mine ?? 0);
+    // Manglende tal (undefined/null) må aldrig blive til »NaN«.
+    return above == null || !Number.isFinite(value) ? null : value;
   })();
+  const myGapUnit = stickyData?.isQualification ? "kr" : "pt";
 
   // Today provision for sticky bar
   const myTodayProvision = currentEmployeeId ? (todayProvisionMap?.[currentEmployeeId] ?? 0) : 0;
