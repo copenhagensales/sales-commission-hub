@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Calendar, MessageSquare, User, type LucideIcon } from "lucide-react";
+import { Home, Target, Calendar, MessageSquare, User, Menu, type LucideIcon } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,10 @@ export interface BottomTab {
 /** Højde på bundnavigationen uden safe area (px). Bruges af PageShell og StickyAction. */
 export const BOTTOM_NAV_HEIGHT = 64;
 
-/** Bundfanerne med samme rettighedstjek som AppSidebar (Hjem, Løn & Mål, Vagtplan-overblik, Beskeder, Min profil). */
+/** Sti til profilen, som ligger øverst i »Menu«-skuffen i stedet for som egen fane. */
+export const PROFILE_PATH = "/my-profile";
+
+/** Destinationerne med samme rettighedstjek som AppSidebar. Profilen nås via »Menu«. */
 export function useBottomTabs(): BottomTab[] {
   const p = usePermissions();
   return [
@@ -22,7 +25,7 @@ export function useBottomTabs(): BottomTab[] {
     { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals },
     { to: "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!p.canViewFmOverview },
     { to: "/messages", label: "Beskeder", icon: MessageSquare, visible: !!p.canViewMessagesPersonal },
-    { to: "/my-profile", label: "Mig", icon: User, visible: !!p.canViewMyProfile },
+    { to: PROFILE_PATH, label: "Mig", icon: User, visible: !!p.canViewMyProfile },
   ];
 }
 
@@ -32,11 +35,20 @@ export function tabRootFor(pathname: string, tabs: BottomTab[]): string | null {
   return hit ? hit.to : null;
 }
 
-/** Fem faste faner i bunden på telefon. Faner uden adgang vises ikke. */
-export function BottomNav() {
-  const tabs = useBottomTabs().filter((t) => t.visible);
+interface BottomNavProps {
+  /** Åbner »Menu«-skuffen. Udelades = ingen menu-fane. */
+  onMenu?: () => void;
+  menuOpen?: boolean;
+}
+
+const itemClass = "flex h-full min-h-[44px] w-full flex-col items-center justify-center gap-0.5 text-[12px] font-semibold transition-colors active:opacity-70";
+
+/** Fire faste faner + »Menu« yderst til højre på telefon. Faner uden adgang vises ikke. */
+export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
+  const tabs = useBottomTabs().filter((t) => t.visible && t.to !== PROFILE_PATH);
   const { pathname } = useLocation();
-  if (tabs.length === 0) return null;
+  if (tabs.length === 0 && !onMenu) return null;
+  const onProfile = pathname === PROFILE_PATH || pathname.startsWith(`${PROFILE_PATH}/`);
   return (
     <nav
       aria-label="Hovednavigation"
@@ -51,10 +63,7 @@ export function BottomNav() {
               <NavLink
                 to={t.to}
                 aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex h-full min-h-[44px] flex-col items-center justify-center gap-0.5 text-[12px] font-semibold transition-colors active:opacity-70",
-                  active ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70",
-                )}
+                className={cn(itemClass, active ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
               >
                 <Icon className="h-6 w-6" aria-hidden />
                 {t.label}
@@ -62,6 +71,20 @@ export function BottomNav() {
             </li>
           );
         })}
+        {onMenu && (
+          <li className="flex-1">
+            <button
+              type="button"
+              onClick={onMenu}
+              aria-haspopup="dialog"
+              aria-expanded={!!menuOpen}
+              className={cn(itemClass, menuOpen || onProfile ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
+            >
+              <Menu className="h-6 w-6" aria-hidden />
+              Menu
+            </button>
+          </li>
+        )}
       </ul>
     </nav>
   );
