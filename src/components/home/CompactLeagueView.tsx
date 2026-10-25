@@ -64,8 +64,8 @@ export function CompactLeagueView() {
   return (
     <Card className="h-full border-0 bg-card rounded-3xl">
       <CardHeader className="px-6 pb-2 pt-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <CardTitle className="flex items-center whitespace-nowrap gap-2.5 text-[15px] font-extrabold">
             <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
             Liga · samlet top 3
           </CardTitle>
@@ -124,9 +124,9 @@ export function CompactLeagueView() {
                       const key = leagueTargetKey(standing.employee_id);
                       const summary = getReactions(key);
                       return (
-                        <div className="mt-0.5 flex items-center gap-2">
+                        <div className="mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden">
                           {summary.total > 0 && (
-                            <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                            <span className="flex flex-none items-center gap-1 text-[12px] text-muted-foreground">
                               <ReactionBubbles summary={summary} size={20} />
                               <span className="tabular-nums">{summary.total}</span>
                               <span aria-hidden="true">·</span>
@@ -144,12 +144,12 @@ export function CompactLeagueView() {
                       );
                     })()}
                   </div>
-                  <div className="flex-none text-right">
-                    <p className="text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+                  <div className="flex-none pl-1 text-right">
+                    <p className="whitespace-nowrap text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
                       {formatPoints(standing.total_points || 0)}
                     </p>
                     {gapText(index) && (
-                      <p className="mt-1 text-[12px] text-muted-foreground">{gapText(index)}</p>
+                      <p className="mt-1 whitespace-nowrap text-[12px] text-muted-foreground">{gapText(index)}</p>
                     )}
                   </div>
                 </div>
