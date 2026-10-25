@@ -222,11 +222,11 @@ export function ContactRow({ label, value, field, type, onSave }: ContactRowProp
       <tr className="border-b border-border/50 last:border-0 group">
         <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
         <td className="py-2.5 text-sm font-medium">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between max-md:min-w-0 max-md:gap-1">
             {value ? (
               <PhoneLink 
                 phoneNumber={value} 
-                className="text-primary hover:underline"
+                className="text-primary hover:underline max-md:min-h-11 max-md:min-w-0"
                 iconClassName="h-3.5 w-3.5"
               />
             ) : (
@@ -235,7 +235,7 @@ export function ContactRow({ label, value, field, type, onSave }: ContactRowProp
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity max-md:h-11 max-md:w-11 max-md:shrink-0 max-md:opacity-100" 
               onClick={() => setIsEditing(true)}
             >
               <Pencil className="h-3 w-3" />
@@ -251,15 +251,15 @@ export function ContactRow({ label, value, field, type, onSave }: ContactRowProp
     <tr className="border-b border-border/50 last:border-0 group">
       <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
       <td className="py-2.5 text-sm font-medium">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:min-w-0 max-md:gap-1">
           {value ? (
             <a 
               href={`mailto:${value}`} 
-              className="text-primary hover:underline flex items-center gap-1.5"
+              className="text-primary hover:underline flex items-center gap-1.5 max-md:min-h-11 max-md:min-w-0"
               onClick={(e) => e.stopPropagation()}
             >
-              <Mail className="h-3.5 w-3.5" />
-              {value}
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+              <span className="max-md:truncate">{value}</span>
             </a>
           ) : (
             <span className="text-muted-foreground">-</span>
@@ -267,7 +267,7 @@ export function ContactRow({ label, value, field, type, onSave }: ContactRowProp
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity max-md:h-11 max-md:w-11 max-md:shrink-0 max-md:opacity-100" 
             onClick={() => setIsEditing(true)}
           >
             <Pencil className="h-3 w-3" />
@@ -364,7 +364,7 @@ export function TableSection({ title, children }: TableSectionProps) {
       <div className="px-4 py-2.5 border-b border-border bg-muted/30">
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      <table className="w-full">
+      <table className="w-full max-md:table-fixed">
         <tbody className="divide-y divide-border/50">
           {children}
         </tbody>
