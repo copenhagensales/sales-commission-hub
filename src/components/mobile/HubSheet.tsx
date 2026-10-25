@@ -38,7 +38,7 @@ export function HubSheet({ open, onOpenChange, title, tiles }: HubSheetProps) {
               key={t.to}
               type="button"
               onClick={() => go(t.to)}
-              className="flex min-h-[96px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-transform duration-100 active:scale-[0.98] active:bg-muted motion-reduce:transform-none"
+              className="flex min-h-[96px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border bg-card px-3.5 py-4 text-left shadow-sm transition-transform duration-100 active:scale-[0.98] active:bg-muted motion-reduce:transform-none"
             >
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--cph-emerald)/0.14)] text-[hsl(var(--cph-emerald))]">
                 <Icon className="h-7 w-7" aria-hidden />
