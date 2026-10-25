@@ -1,3 +1,4 @@
+import type React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Home, Target, Calendar, Newspaper, User, Menu, type LucideIcon } from "lucide-react";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
@@ -43,7 +44,18 @@ interface BottomNavProps {
   menuOpen?: boolean;
 }
 
-const itemClass = "flex h-full min-h-[44px] w-full flex-col items-center justify-center gap-0.5 text-[12px] font-semibold transition-colors active:opacity-70";
+const itemClass = "group flex h-full min-h-[44px] w-full flex-col items-center justify-center gap-1 text-[11px] font-medium tracking-[0.01em] transition-colors duration-200 active:scale-95 motion-reduce:transform-none";
+
+/** Ikon med blød pille bag den aktive fane (iOS/Material-stil). */
+function TabIcon({ icon: Icon, active, children }: { icon: LucideIcon; active: boolean; children?: React.ReactNode }) {
+  return (
+    <span className={cn("relative flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200",
+      active ? "bg-[hsl(var(--cph-emerald)/0.16)]" : "bg-transparent")}>
+      <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.8} aria-hidden />
+      {children}
+    </span>
+  );
+}
 
 /** Rødt tal på ikonet, når der er nyt i Storkbook (som notifikationer på Facebook). */
 function StorkbookBadge() {
@@ -52,7 +64,7 @@ function StorkbookBadge() {
   if (count <= 0) return null;
   return (
     <span aria-label={`${count} nye i Storkbook`}
-      className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-black leading-none tabular-nums text-destructive-foreground ring-2 ring-sidebar">
+      className="absolute right-2 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-black leading-none tabular-nums text-destructive-foreground ring-2 ring-sidebar">
       {formatUnread(count)}
     </span>
   );
@@ -67,7 +79,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   return (
     <nav
       aria-label="Hovednavigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-foreground/10 bg-sidebar/85 shadow-[0_-8px_24px_-12px_hsl(var(--cph-onyx)/0.5)] backdrop-blur-xl backdrop-saturate-150 pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
     >
       <ul className="flex" style={{ height: BOTTOM_NAV_HEIGHT }}>
         {tabs.map((t) => {
@@ -78,12 +90,11 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
               <NavLink
                 to={t.to}
                 aria-current={active ? "page" : undefined}
-                className={cn(itemClass, active ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
+                className={cn(itemClass, active ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/60")}
               >
-                <span className="relative">
-                  <Icon className="h-6 w-6" aria-hidden />
+                <TabIcon icon={Icon} active={active}>
                   {t.to === "/storkbook" && <StorkbookBadge />}
-                </span>
+                </TabIcon>
                 {t.label}
               </NavLink>
             </li>
@@ -96,9 +107,9 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
               onClick={onMenu}
               aria-haspopup="dialog"
               aria-expanded={!!menuOpen}
-              className={cn(itemClass, menuOpen || onProfile ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
+              className={cn(itemClass, menuOpen || onProfile ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/60")}
             >
-              <Menu className="h-6 w-6" aria-hidden />
+              <TabIcon icon={Menu} active={!!menuOpen || onProfile} />
               Menu
             </button>
           </li>
