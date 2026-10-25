@@ -536,8 +536,8 @@ export default function TrygEditSales() {
           </Card>
         ) : (
           <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <div className="space-y-2">
+            <CardHeader className="flex flex-row items-start justify-between gap-4 max-md:flex-col max-md:items-stretch">
+              <div className="space-y-2 min-w-0">
                 <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                   <Button
                     variant={view === "united" ? "default" : "outline"}
