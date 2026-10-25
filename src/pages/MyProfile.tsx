@@ -100,7 +100,6 @@ function EditableSensitiveField({
       <div className="flex items-center gap-1">
         <Input
           type="text"
-          inputMode="numeric"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
