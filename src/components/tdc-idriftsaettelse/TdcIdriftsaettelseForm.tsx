@@ -258,7 +258,7 @@ export function TdcIdriftsaettelseForm({ prefill }: { prefill?: IdriftPrefill } 
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-2 max-md:[&>*]:min-w-0">
       <Card>
         <CardHeader><CardTitle>Oplysninger</CardTitle></CardHeader>
         <CardContent className="space-y-6">

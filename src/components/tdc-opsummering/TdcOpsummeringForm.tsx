@@ -201,7 +201,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:[&>*]:min-w-0">
         {/* Left column - Input form */}
         <div className="space-y-6">
           {/* Summary variant toggle */}
@@ -220,7 +220,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
                     type="button"
                     onClick={() => setIsEnglish(opt.val)}
                     className={cn(
-                      "px-4 py-1.5 text-sm font-medium rounded-full transition-colors",
+                      "px-4 py-1.5 text-sm font-medium rounded-full transition-colors max-md:min-h-11 max-md:min-w-11",
                       isEnglish === opt.val
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground"
@@ -233,7 +233,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
             </CardHeader>
             {!onlyImplementering && (
             <CardContent>
-              <div className="inline-flex w-full bg-muted/30 rounded-lg p-1">
+              <div className="inline-flex w-full bg-muted/30 rounded-lg p-1 max-md:grid max-md:grid-cols-2 max-md:gap-1">
                 {(
                   [
                     { val: "standard", label: "Standard" },
@@ -247,7 +247,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
                     type="button"
                     onClick={() => setSummaryVariant(opt.val)}
                     className={cn(
-                      "flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                      "flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors max-md:min-h-11 max-md:px-2",
                       summaryVariant === opt.val
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground"
@@ -671,7 +671,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
                 )}
 
                 {/* Controls */}
-                <div className="flex items-center justify-between mb-3 p-2 bg-muted/50 rounded-md">
+                <div className="flex items-center justify-between mb-3 p-2 bg-muted/50 rounded-md max-md:flex-wrap max-md:gap-2">
                   <div className="flex items-center gap-2">
                     <Moon className="h-4 w-4 text-muted-foreground" />
                     <Switch checked={!isDarkTheme} onCheckedChange={(v) => setIsDarkTheme(!v)} />
@@ -686,7 +686,7 @@ export function TdcOpsummeringForm({ prefill, onMbbChange, onlyImplementering }:
                       min={12}
                       max={24}
                       step={1}
-                      className="w-32"
+                      className="w-32 max-md:w-24"
                     />
                     <span className="text-sm text-muted-foreground w-12">{fontSize}px</span>
                   </div>

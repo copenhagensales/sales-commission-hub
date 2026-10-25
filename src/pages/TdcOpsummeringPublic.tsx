@@ -4,7 +4,7 @@ import { TdcOpsummeringForm } from "@/components/tdc-opsummering/TdcOpsummeringF
 export default function TdcOpsummeringPublic() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="container mx-auto max-w-7xl space-y-6">
+      <div className="container mx-auto max-w-7xl space-y-6 max-md:px-0">
         <div className="flex items-center gap-3">
           <FileText className="h-8 w-8 text-primary" />
           <div>

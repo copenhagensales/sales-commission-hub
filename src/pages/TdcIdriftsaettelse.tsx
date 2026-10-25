@@ -5,7 +5,7 @@ import { TdcIdriftsaettelseForm } from "@/components/tdc-idriftsaettelse/TdcIdri
 export default function TdcIdriftsaettelse() {
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-6 max-w-7xl">
+      <div className="container mx-auto py-6 space-y-6 max-w-7xl max-md:px-0 max-md:py-2">
         <div className="flex items-center gap-3">
           <Mail className="h-8 w-8 text-primary" />
           <div>
