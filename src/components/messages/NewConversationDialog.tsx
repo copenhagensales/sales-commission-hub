@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { BottomSheet, useIsPhone } from "@/components/mobile";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -105,6 +106,7 @@ export function NewConversationDialog({
     }
   };
 
+  const isPhone = useIsPhone();
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
       setSelectedIds([]);
@@ -116,13 +118,7 @@ export function NewConversationDialog({
     onOpenChange(isOpen);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Ny samtale</DialogTitle>
-        </DialogHeader>
-
+  const body = (
         <div className="space-y-4">
           {isGroup && (
             <div>
@@ -154,12 +150,12 @@ export function NewConversationDialog({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={activeTab === "employees" ? "Søg efter medarbejdere..." : "Søg efter teams..."}
-                className="pl-9"
+                className="pl-9 max-md:min-h-11"
               />
             </div>
 
             <TabsContent value="employees" className="mt-2">
-              <ScrollArea className="h-[300px] border rounded-md">
+              <ScrollArea className="h-[300px] max-md:h-[40dvh] border rounded-md">
                 {employeesLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="h-6 w-6 animate-spin" />
@@ -169,7 +165,7 @@ export function NewConversationDialog({
                     {filteredEmployees?.map((employee) => (
                       <label
                         key={employee.id}
-                        className="flex items-center gap-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                        className="flex items-center gap-3 p-2 rounded-md hover:bg-accent cursor-pointer max-md:min-h-11 max-md:text-[16px] active:bg-accent"
                       >
                         <Checkbox
                           checked={selectedIds.includes(employee.id)}
@@ -189,7 +185,7 @@ export function NewConversationDialog({
             </TabsContent>
 
             <TabsContent value="teams" className="mt-2">
-              <ScrollArea className="h-[300px] border rounded-md">
+              <ScrollArea className="h-[300px] max-md:h-[40dvh] border rounded-md">
                 {teamsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="h-6 w-6 animate-spin" />
@@ -226,6 +222,7 @@ export function NewConversationDialog({
               {selectedTeamId ? `Team valgt (${selectedIds.length} medlemmer)` : `${selectedIds.length} valgt`}
             </span>
             <Button
+              className="max-md:min-h-11"
               onClick={handleCreate}
               disabled={selectedIds.length === 0 || createConversation.isPending}
             >
@@ -236,6 +233,23 @@ export function NewConversationDialog({
             </Button>
           </div>
         </div>
+  );
+
+  if (isPhone) {
+    return (
+      <BottomSheet open={open} onOpenChange={handleOpenChange} title="Ny samtale">
+        <div className="px-2">{body}</div>
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Ny samtale</DialogTitle>
+        </DialogHeader>
+        {body}
       </DialogContent>
     </Dialog>
   );
