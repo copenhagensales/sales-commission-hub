@@ -68,7 +68,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
   return (
     <section aria-label="Storkbook" className="rounded-[32px] bg-card p-5 md:p-7">
       <header className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <StorkbookMark variant="full" tone="light" size={38} />
           <h2 aria-label="Storkbook" className="font-['Figtree'] text-[26px] font-black lowercase leading-none tracking-[-0.045em]">
             <span aria-hidden="true" className="text-[hsl(var(--cph-onyx))]">stork</span>
@@ -79,8 +79,8 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
           <LiveDot />
           {storkLine(count)}
         </span>
-        <Link to="/storkbook" className="ml-auto flex min-h-[44px] items-center gap-1 rounded-full bg-[hsl(var(--cph-onyx))] px-4 sm:px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))]">
-          Åbn Storkbook <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        <Link to="/storkbook" aria-label="Åbn Storkbook" className="ml-auto flex h-11 w-11 flex-none items-center justify-center gap-1 rounded-full bg-[hsl(var(--cph-onyx))] text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] active:scale-95 sm:w-auto sm:px-5">
+          <span className="hidden sm:inline">Åbn Storkbook</span> <ArrowRight className="h-5 w-5 sm:h-4 sm:w-4" aria-hidden="true" />
         </Link>
       </header>
 
