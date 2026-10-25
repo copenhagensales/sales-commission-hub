@@ -833,18 +833,18 @@ export default function EmployeeMasterData() {
               <CardContent className="p-0">
                 {/* Filter header */}
                 <div className="flex items-center gap-3 flex-wrap mb-4">
-                  <div className="relative flex-1 min-w-[200px] max-w-md">
+                  <div className="relative flex-1 min-w-[200px] max-w-md max-md:min-w-0 max-md:w-full max-md:max-w-full max-md:basis-full">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
                       ref={searchInputRef}
                       placeholder={t("employees.filters.searchPlaceholder")} 
                       value={searchTerm} 
                       onChange={(e) => setSearchTerm(e.target.value)} 
-                      className="pl-9 h-9" 
+                      className="pl-9 h-9 max-md:h-11 max-md:text-base" 
                     />
                   </div>
                   <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "active" | "inactive" | "all")}>
-                    <SelectTrigger className="w-32 h-9">
+                    <SelectTrigger className="w-32 h-9 max-md:h-11 max-md:flex-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -854,7 +854,7 @@ export default function EmployeeMasterData() {
                     </SelectContent>
                   </Select>
                   <Select value={teamFilter} onValueChange={setTeamFilter}>
-                    <SelectTrigger className="w-36 h-9">
+                    <SelectTrigger className="w-36 h-9 max-md:h-11 max-md:flex-1">
                       <SelectValue placeholder="Alle teams" />
                     </SelectTrigger>
                     <SelectContent>
@@ -936,7 +936,7 @@ export default function EmployeeMasterData() {
                       </p>
                     </div>
                   ) : (
-                    <Table>
+                    <Table className="max-md:block max-md:[&_tbody]:block max-md:[&_thead]:hidden">
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-b border-border/50">
                           <TableHead className="text-xs font-medium text-muted-foreground cursor-pointer" onClick={() => handleSort("name")}>
@@ -957,9 +957,9 @@ export default function EmployeeMasterData() {
                       <TableBody>
                         {(() => {
                           const renderRow = (employee: EmployeeMasterDataRecord) => (
-                          <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/30 border-b border-border/30" onClick={() => navigate(`/employees/${employee.id}`)}>
-                            <TableCell className="font-medium py-3">
-                              <div className="flex items-center gap-2">
+                          <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/30 border-b border-border/30 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-3 max-md:gap-y-1 max-md:px-3 max-md:py-3 max-md:active:bg-muted max-md:[&>td]:p-0 max-md:[&>td]:border-0" onClick={() => navigate(`/employees/${employee.id}`)}>
+                            <TableCell className="font-medium py-3 max-md:w-full max-md:min-w-0 max-md:text-base">
+                              <div className="flex items-center gap-2 max-md:flex-wrap">
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div className="relative">
@@ -997,13 +997,13 @@ export default function EmployeeMasterData() {
                             </TableCell>
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
-                            <TableCell className="py-3 text-sm text-muted-foreground max-w-[260px] truncate">{employee.work_email || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                            <TableCell className="py-3 text-sm text-muted-foreground max-w-[260px] truncate max-md:w-full max-md:max-w-full">{employee.work_email || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3 text-sm whitespace-nowrap">{employee.employment_start_date ? new Date(employee.employment_start_date).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) : <span className="text-muted-foreground/50">-</span>}</TableCell>
-                            <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                            <TableCell className="py-3 max-md:flex max-md:min-h-11 max-md:items-center" onClick={(e) => e.stopPropagation()}>
                               <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { setActivatingEmployee(employee); }}} />
                             </TableCell>
-                            <TableCell className="py-3">
-                              <div className="flex items-center gap-0.5">
+                            <TableCell className="py-3 max-md:ml-auto">
+                              <div className="flex items-center gap-0.5 max-md:gap-1 max-md:[&_button]:h-11 max-md:[&_button]:w-11">
                                 <Tooltip><TooltipTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleSendInvitation(employee); }} disabled={!employee.private_email || sendingResetTo === employee.id || employee.invitation_status === "completed"}>
                                     {sendingResetTo === employee.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : employee.invitation_status === "completed" ? <UserCheck className="h-3.5 w-3.5 text-status-success" /> : employee.invitation_status === "pending" ? <Send className="h-3.5 w-3.5 text-status-warning" /> : <Mail className="h-3.5 w-3.5" />}
