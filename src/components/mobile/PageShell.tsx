@@ -2,7 +2,7 @@ import { ReactNode, useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight, User } from "lucide-react";
 import { useIsPhone } from "./useIsPhone";
-import { BottomNav, BOTTOM_NAV_HEIGHT, PROFILE_PATH, tabRootFor, useBottomTabs } from "./BottomNav";
+import { BottomNav, BOTTOM_NAV_HEIGHT, tabRootFor, useBottomTabs } from "./BottomNav";
 import { BottomSheet } from "./BottomSheet";
 import { cn } from "@/lib/utils";
 import { MoreActionsContext, type MoreAction } from "./MoreActions";
