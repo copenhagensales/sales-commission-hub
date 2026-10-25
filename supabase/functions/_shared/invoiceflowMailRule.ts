@@ -1,13 +1,8 @@
 // Mail-regel-motor: finder vedhæftede PDF'er i en M365-indbakke ud fra regler.
 // Genbruges i fase 2 til at læse engangskoder.
-export interface MailRule {
-  mailbox: string;
-  from_domain?: string;
-  subject_contains?: string;
-  attachment_contains?: string;
-  lookback_days?: number;
-}
-
+import { type MailRule } from "./invoiceflowMailMatch.ts";
+import { matchesRule, attachmentMatches } from "./invoiceflowMailMatch.ts";
+export type { MailRule };
 export interface MailMatch {
   messageId: string;
   receivedAt: string;
@@ -17,20 +12,6 @@ export interface MailMatch {
 
 export class MailRuleError extends Error {
   constructor(public code: string, msg: string, public retryable: boolean) { super(msg); }
-}
-
-export function matchesRule(rule: MailRule, msg: { from: string; subject: string }) {
-  const from = msg.from.toLowerCase();
-  if (rule.from_domain && !from.endsWith("@" + rule.from_domain.toLowerCase().replace(/^@/, "")) &&
-      !from.endsWith("." + rule.from_domain.toLowerCase().replace(/^@/, ""))) return false;
-  if (rule.subject_contains && !msg.subject.toLowerCase().includes(rule.subject_contains.toLowerCase())) return false;
-  return true;
-}
-
-export function attachmentMatches(rule: MailRule, name: string, contentType: string) {
-  const isPdf = contentType === "application/pdf" || name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) return false;
-  return !rule.attachment_contains || name.toLowerCase().includes(rule.attachment_contains.toLowerCase());
 }
 
 async function graphToken() {

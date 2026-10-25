@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchesRule, attachmentMatches } from "../../supabase/functions/_shared/invoiceflowMailRule";
+import { matchesRule, attachmentMatches } from "../../supabase/functions/_shared/invoiceflowMailMatch";
 
 describe("InvoiceFlow mail-regel", () => {
   const rule = { mailbox: "x@y.dk", from_domain: "leverandoer.dk", subject_contains: "faktura" };

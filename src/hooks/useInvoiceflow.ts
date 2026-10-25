@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 
 type T = Database["public"]["Tables"];
 export type IfSupplier = T["invoiceflow_suppliers"]["Row"];
@@ -95,7 +95,7 @@ export function useCreateSupplierWithSource() {
     }) => {
       const { data: s, error } = await supabase.from("invoiceflow_suppliers").insert(input.supplier).select("id").single();
       if (error) throw error;
-      const { error: e2 } = await supabase.from("invoiceflow_sources").insert({ ...input.source, supplier_id: s.id });
+      const { error: e2 } = await supabase.from("invoiceflow_sources").insert({ type: input.source.type, owner_employee_id: input.source.owner_employee_id, config: input.source.config as Json, supplier_id: s.id });
       if (e2) throw e2;
     },
     onSuccess: inv,
