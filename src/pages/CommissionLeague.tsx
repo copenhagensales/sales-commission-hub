@@ -424,9 +424,9 @@ export default function CommissionLeague() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-2xl font-bold font-mono truncate">
-                    {stickyData.rank <= 1 ? "–" : myGapToNext ? Math.max(0, myGapToNext.value).toLocaleString("da-DK", { maximumFractionDigits: 0 }) : "…"}
+                    {myGapToNext == null ? "–" : Math.max(0, myGapToNext).toLocaleString("da-DK", { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-sm text-muted-foreground">{stickyData.rank <= 1 ? "Du fører" : `${myGapToNext?.unit ?? ""} til #${stickyData.rank - 1}`}</p>
+                  <p className="text-sm text-muted-foreground">{stickyData.rank <= 1 ? "Du fører" : `${myGapUnit} til #${stickyData.rank - 1}`}</p>
                 </div>
               </div>
             </div>
@@ -529,7 +529,7 @@ export default function CommissionLeague() {
                         >
                           <SelectTrigger
                             aria-label="Vælg sæson"
-                            className="h-8 w-auto min-w-[180px] text-xs font-semibold bg-yellow-500/10 hover:bg-yellow-500/15 border-yellow-500/40 text-yellow-200 ring-1 ring-yellow-500/20"
+                            className="h-11 md:h-8 w-auto min-w-0 md:min-w-[180px] text-xs font-semibold bg-yellow-500/10 hover:bg-yellow-500/15 border-yellow-500/40 text-yellow-200 ring-1 ring-yellow-500/20"
                           >
                             <Calendar className="h-3.5 w-3.5 mr-1.5 text-yellow-400" />
                             <SelectValue />
