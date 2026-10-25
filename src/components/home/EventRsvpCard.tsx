@@ -189,7 +189,7 @@ export function EventRsvpCard({
             type="button"
             disabled={attendees.length === 0}
             className={cn(
-              "mt-3 flex items-center gap-2 rounded-full text-left text-[12px] hover:underline disabled:no-underline",
+              "mt-2 flex min-h-[44px] items-center gap-2 rounded-full text-left text-[12px] hover:underline disabled:no-underline",
               featured ? "opacity-90" : "text-foreground/60",
             )}
           >
