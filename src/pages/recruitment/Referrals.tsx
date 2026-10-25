@@ -226,7 +226,7 @@ export default function Referrals() {
     <MainLayout>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-xl">
               <Users className="h-8 w-8 text-primary" />
@@ -236,7 +236,7 @@ export default function Referrals() {
               <p className="text-muted-foreground">Administrer medarbejderhenvisninger</p>
             </div>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button className="max-md:min-h-11 max-md:w-full" onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Opret henvisning
           </Button>
@@ -306,18 +306,18 @@ export default function Referrals() {
                 <CardTitle>Alle henvisninger</CardTitle>
                 <CardDescription>Oversigt over alle medarbejderhenvisninger</CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-col">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Søg navn, email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 w-[250px]"
+                    className="pl-9 w-[250px] max-md:min-h-11 max-md:w-full max-md:text-base"
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[180px] max-md:min-h-11 max-md:w-full">
                     <SelectValue placeholder="Alle statusser" />
                   </SelectTrigger>
                   <SelectContent>

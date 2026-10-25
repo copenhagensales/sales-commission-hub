@@ -865,7 +865,7 @@ export default function EmployeeMasterData() {
                     </SelectContent>
                   </Select>
                   {canEditEmployees && (
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex items-center gap-2 ml-auto max-md:ml-0 max-md:w-full max-md:flex-wrap max-md:[&_button]:min-h-11">
                       <EmployeeExcelImport />
                       <Dialog open={createDialogOpen} onOpenChange={(open) => {
                         setCreateDialogOpen(open);

@@ -35,7 +35,7 @@ export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 max-md:flex-col">
         <div className="space-y-1.5">
           <CardTitle>Udvikling i {horizon}-dages churn</CardTitle>
           <CardDescription>
@@ -43,7 +43,7 @@ export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
             hvor alle startere har haft fulde {horizon} dage. Samme population som churn-nævneren (ekskl. stab).
           </CardDescription>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 gap-2 max-md:w-full max-md:flex-wrap max-md:[&>button]:min-h-11">
           <Select value={String(horizon)} onValueChange={(v) => setHorizon(Number(v) as Horizon)}>
             <SelectTrigger className="w-[130px]">
               <SelectValue />
