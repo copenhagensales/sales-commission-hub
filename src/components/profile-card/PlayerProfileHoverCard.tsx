@@ -82,7 +82,7 @@ export function PlayerProfileHoverCard({
             {card}
             <DialogClose
               aria-label="Luk profil"
-              className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[hsl(var(--cph-light-blue)/0.15)] text-[hsl(var(--cph-light-blue))] backdrop-blur active:scale-95"
+              className="absolute right-4 top-6 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[hsl(var(--cph-light-blue)/0.15)] text-[hsl(var(--cph-light-blue))] backdrop-blur active:scale-95"
             >
               <X className="h-5 w-5" aria-hidden="true" />
             </DialogClose>
