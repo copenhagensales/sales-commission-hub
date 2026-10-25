@@ -419,10 +419,10 @@ export default function Referrals() {
                         <TableCell data-label="Bonus:" className={"max-md:flex max-md:items-center max-md:before:mr-2 max-md:before:text-sm max-md:before:text-muted-foreground max-md:before:content-[attr(data-label)]"}>
                           {getBonusStatus(referral)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="max-md:self-end">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" aria-label="Flere handlinger" className="max-md:h-11 max-md:w-11">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
