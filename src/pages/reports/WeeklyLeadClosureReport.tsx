@@ -561,7 +561,7 @@ export default function WeeklyLeadClosureReport() {
               {periodLabel ? `${periodLabel} · ` : ""}Resultater pr. kampagne
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 max-md:w-full">
             <ToggleGroup
               type="single"
               value={period}
