@@ -10832,6 +10832,455 @@ export type Database = {
           },
         ]
       }
+      invoiceflow_access: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          id: string
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          scope: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          scope?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoiceflow_credential_use_log: {
+        Row: {
+          credential_id: string
+          id: string
+          result: string
+          run_id: string | null
+          used_at: string
+        }
+        Insert: {
+          credential_id: string
+          id?: string
+          result: string
+          run_id?: string | null
+          used_at?: string
+        }
+        Update: {
+          credential_id?: string
+          id?: string
+          result?: string
+          run_id?: string | null
+          used_at?: string
+        }
+        Relationships: []
+      }
+      invoiceflow_credentials: {
+        Row: {
+          ciphertext: string
+          created_at: string
+          field_names: string[]
+          id: string
+          iv: string
+          last_used_at: string | null
+          owner_user_id: string
+          source_id: string
+          updated_at: string
+        }
+        Insert: {
+          ciphertext: string
+          created_at?: string
+          field_names?: string[]
+          id?: string
+          iv: string
+          last_used_at?: string | null
+          owner_user_id: string
+          source_id: string
+          updated_at?: string
+        }
+        Update: {
+          ciphertext?: string
+          created_at?: string
+          field_names?: string[]
+          id?: string
+          iv?: string
+          last_used_at?: string | null
+          owner_user_id?: string
+          source_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoiceflow_credentials_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: true
+            referencedRelation: "invoiceflow_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoiceflow_deliveries: {
+        Row: {
+          attempt: number
+          created_at: string
+          error_message: string | null
+          id: string
+          invoice_id: string
+          provider_message_id: string | null
+          recipient_email: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invoice_id: string
+          provider_message_id?: string | null
+          recipient_email: string
+          sent_at?: string | null
+          status: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invoice_id?: string
+          provider_message_id?: string | null
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoiceflow_deliveries_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoiceflow_invoices: {
+        Row: {
+          amount_excl_vat: number | null
+          amount_incl_vat: number | null
+          created_at: string
+          currency: string
+          fetched_by: string | null
+          id: string
+          invoice_date: string | null
+          invoice_number: string | null
+          pdf_hash: string
+          pdf_path: string
+          period: string | null
+          retention_until: string | null
+          run_id: string | null
+          source_id: string | null
+          status: string
+          supplier_id: string
+        }
+        Insert: {
+          amount_excl_vat?: number | null
+          amount_incl_vat?: number | null
+          created_at?: string
+          currency?: string
+          fetched_by?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          pdf_hash: string
+          pdf_path: string
+          period?: string | null
+          retention_until?: string | null
+          run_id?: string | null
+          source_id?: string | null
+          status?: string
+          supplier_id: string
+        }
+        Update: {
+          amount_excl_vat?: number | null
+          amount_incl_vat?: number | null
+          created_at?: string
+          currency?: string
+          fetched_by?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          pdf_hash?: string
+          pdf_path?: string
+          period?: string | null
+          retention_until?: string | null
+          run_id?: string | null
+          source_id?: string | null
+          status?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoiceflow_invoices_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoiceflow_invoices_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoiceflow_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoiceflow_jobs: {
+        Row: {
+          attempt: number
+          created_at: string
+          id: string
+          kind: string
+          next_attempt_at: string | null
+          period: string | null
+          scheduled_at: string
+          source_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          next_attempt_at?: string | null
+          period?: string | null
+          scheduled_at?: string
+          source_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          next_attempt_at?: string | null
+          period?: string | null
+          scheduled_at?: string
+          source_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoiceflow_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoiceflow_portal_requests: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          portal_url: string | null
+          requested_by: string | null
+          status: string
+          supplier_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          portal_url?: string | null
+          requested_by?: string | null
+          status?: string
+          supplier_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          portal_url?: string | null
+          requested_by?: string | null
+          status?: string
+          supplier_name?: string
+        }
+        Relationships: []
+      }
+      invoiceflow_runs: {
+        Row: {
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          invoices_found: number
+          job_id: string
+          result: string | null
+          screenshot_path: string | null
+          started_at: string
+        }
+        Insert: {
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          invoices_found?: number
+          job_id: string
+          result?: string | null
+          screenshot_path?: string | null
+          started_at?: string
+        }
+        Update: {
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          invoices_found?: number
+          job_id?: string
+          result?: string | null
+          screenshot_path?: string | null
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoiceflow_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoiceflow_settings: {
+        Row: {
+          bookkeeping_email: string | null
+          catchup_day: number
+          expectation_day: number
+          id: boolean
+          retention_years: number
+          run_day: number
+          sender_email: string | null
+          updated_at: string
+        }
+        Insert: {
+          bookkeeping_email?: string | null
+          catchup_day?: number
+          expectation_day?: number
+          id?: boolean
+          retention_years?: number
+          run_day?: number
+          sender_email?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bookkeeping_email?: string | null
+          catchup_day?: number
+          expectation_day?: number
+          id?: boolean
+          retention_years?: number
+          run_day?: number
+          sender_email?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invoiceflow_sources: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          is_paused: boolean
+          owner_employee_id: string | null
+          pause_reason: string | null
+          requires_approval: boolean
+          supplier_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_paused?: boolean
+          owner_employee_id?: string | null
+          pause_reason?: string | null
+          requires_approval?: boolean
+          supplier_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_paused?: boolean
+          owner_employee_id?: string | null
+          pause_reason?: string | null
+          requires_approval?: boolean
+          supplier_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoiceflow_sources_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "invoiceflow_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoiceflow_suppliers: {
+        Row: {
+          cadence: string
+          created_at: string
+          cvr: string | null
+          expected_day: number | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cadence?: string
+          created_at?: string
+          cvr?: string | null
+          expected_day?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          cadence?: string
+          created_at?: string
+          cvr?: string | null
+          expected_day?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       it_activity_logs: {
         Row: {
           action: string
@@ -19256,6 +19705,7 @@ export type Database = {
         Args: { p_review_id: string; p_role: string }
         Returns: Json
       }
+      am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       assign_role_by_email: {
         Args: {
@@ -20107,6 +20557,7 @@ export type Database = {
       introspect_schema: { Args: never; Returns: Json }
       introspect_schema_v2: { Args: never; Returns: Json }
       introspect_usage: { Args: never; Returns: Json }
+      invoiceflow_has_access: { Args: { _scope?: string }; Returns: boolean }
       is_active_employee: { Args: { _uid: string }; Returns: boolean }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }
