@@ -152,7 +152,7 @@ export function CompactLeagueView() {
                     </p>
                     {gapText(index) && (
                       <p className="mt-1 whitespace-nowrap text-[12px] text-muted-foreground">
-                        {gapText(index).replace(/ efter nr\. \d+$/, " efter")}
+                        {isPhone ? gapText(index).replace(/ efter nr\. \d+$/, " efter") : gapText(index)}
                       </p>
                     )}
                   </div>
