@@ -1027,7 +1027,7 @@ export default function CphSalesDashboard() {
 
   // Skip layout wrapper in TV mode to avoid lock checks
   const content = (
-    <div className="cph-board space-y-6 rounded-[20px] p-6">
+    <div className="cph-board space-y-6 rounded-[20px] p-6 max-md:p-0 max-md:space-y-4">
       <DashboardHeader 
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
@@ -1038,7 +1038,7 @@ export default function CphSalesDashboard() {
 
       {/* Sales by Client - Cards with colors - MOVED TO TOP */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 max-md:flex-col max-md:items-stretch max-md:gap-2">
           <div className="flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
             <h3 className="font-semibold text-base">
@@ -1144,7 +1144,7 @@ export default function CphSalesDashboard() {
       )}
 
       {/* Top KPI Row - Compact */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1 max-md:gap-3">
         <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="font-medium text-muted-foreground text-sm">Salg i dag</CardTitle>
