@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Calendar, MessageSquare, User, Menu, type LucideIcon } from "lucide-react";
+import { Home, Target, Calendar, Newspaper, User, Menu, type LucideIcon } from "lucide-react";
+import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
+import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +26,7 @@ export function useBottomTabs(): BottomTab[] {
     { to: "/home", label: "Hjem", icon: Home, visible: !!p.canViewHome },
     { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals },
     { to: "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!p.canViewFmOverview },
-    { to: "/messages", label: "Beskeder", icon: MessageSquare, visible: !!p.canViewMessagesPersonal },
+    { to: "/storkbook", label: "Storkbook", icon: Newspaper, visible: !!p.canViewPulsen },
     { to: PROFILE_PATH, label: "Mig", icon: User, visible: !!p.canViewMyProfile },
   ];
 }
@@ -42,6 +44,19 @@ interface BottomNavProps {
 }
 
 const itemClass = "flex h-full min-h-[44px] w-full flex-col items-center justify-center gap-0.5 text-[12px] font-semibold transition-colors active:opacity-70";
+
+/** Rødt tal på ikonet, når der er nyt i Storkbook (som notifikationer på Facebook). */
+function StorkbookBadge() {
+  const { data: employeeId } = useCurrentEmployeeId();
+  const { data: count = 0 } = usePulsenUnread(employeeId);
+  if (count <= 0) return null;
+  return (
+    <span aria-label={`${count} nye i Storkbook`}
+      className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-black leading-none tabular-nums text-destructive-foreground ring-2 ring-sidebar">
+      {formatUnread(count)}
+    </span>
+  );
+}
 
 /** Fire faste faner + »Menu« yderst til højre på telefon. Faner uden adgang vises ikke. */
 export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
@@ -65,7 +80,10 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
                 aria-current={active ? "page" : undefined}
                 className={cn(itemClass, active ? "text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
               >
-                <Icon className="h-6 w-6" aria-hidden />
+                <span className="relative">
+                  <Icon className="h-6 w-6" aria-hidden />
+                  {t.to === "/storkbook" && <StorkbookBadge />}
+                </span>
                 {t.label}
               </NavLink>
             </li>
