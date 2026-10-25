@@ -491,6 +491,13 @@
       "when": 1792932701284,
       "tag": "0069_invoiceflow_credentials_column_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1792933250961,
+      "tag": "0070_invoiceflow_portal_catalog",
+      "breakpoints": true
     }
   ]
 }
