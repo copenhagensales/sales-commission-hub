@@ -226,6 +226,82 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
 
   const pendingAbsences = myAbsences?.filter(a => a.status === "pending") || [];
 
+  /** Visning af én dag (samme regler for telefonliste og computergitter). */
+  const getDayInfo = (day: Date) => {
+    const shift = getShiftForDay(day);
+    const holiday = isHoliday(day);
+    const holidayName = getHolidayName(day);
+    const approvedAbsence = getApprovedAbsenceForDay(day);
+    const lateness = getLatenessForDay(day);
+    const timeStamp = getTimeStampForDay(day);
+    const workTimes = getWorkTimesForDay(day);
+
+    let bgColor = "";
+    let icon: React.ReactNode = null;
+    let statusText = "";
+    let timeStampInfo: React.ReactNode = null;
+
+    if (holiday) {
+      bgColor = "bg-destructive/10";
+      icon = <CalendarPlus className="h-3 w-3 text-destructive" />;
+      statusText = holidayName || "Helligdag";
+    } else if (approvedAbsence) {
+      if (approvedAbsence.type === "vacation") {
+        bgColor = "bg-amber-500/20";
+        icon = <Palmtree className="h-3 w-3 text-amber-600" />;
+        statusText = "Ferie";
+      } else if (approvedAbsence.type === "sick") {
+        bgColor = "bg-red-500/20";
+        icon = <Thermometer className="h-3 w-3 text-red-500" />;
+        statusText = "Syg";
+      } else if (approvedAbsence.type === "day_off") {
+        bgColor = "bg-blue-500/20";
+        icon = <CalendarX2 className="h-3 w-3 text-blue-600" />;
+        statusText = "Fridag";
+      } else if (approvedAbsence.type === "no_show") {
+        bgColor = "bg-gray-500/20";
+        icon = <UserX className="h-3 w-3 text-gray-600" />;
+        statusText = "Udeblivelse";
+      }
+    } else if (lateness) {
+      bgColor = "bg-orange-500/15";
+      icon = <AlarmClock className="h-3 w-3 text-orange-600" />;
+      const newTime = lateness.new_start_time?.slice(0,5) || "";
+      const endTime = workTimes?.split('-')[1] || "";
+      statusText = newTime && endTime ? `${newTime}-${endTime}` : `+${lateness.minutes} min`;
+    } else if (shift) {
+      bgColor = "bg-green-500/15";
+      icon = <Briefcase className="h-3 w-3 text-green-600" />;
+      statusText = `${shift.start_time.slice(0, 5)}-${shift.end_time.slice(0, 5)}`;
+    } else if (workTimes) {
+      bgColor = "bg-green-500/15";
+      icon = <Briefcase className="h-3 w-3 text-green-600" />;
+      statusText = workTimes;
+    } else {
+      bgColor = "bg-muted/30";
+    }
+
+    if (timeStamp && !holiday && !approvedAbsence) {
+      const clockIn = format(new Date(timeStamp.clock_in), "HH:mm");
+      const clockOut = timeStamp.clock_out ? format(new Date(timeStamp.clock_out), "HH:mm") : "...";
+      const effectiveHours = timeStamp.effective_hours ?? null;
+      const isFixedSalary = salaryType === 'fixed';
+      const hourlyRate = salaryAmount || 0;
+      timeStampInfo = (
+        <div className="mt-1 text-[10px] text-blue-600 flex items-center gap-1 max-md:text-[14px]">
+          <Clock className="h-2.5 w-2.5" />
+          <span>{clockIn}-{clockOut}</span>
+          {effectiveHours !== null && isFixedSalary && hourlyRate > 0 && (
+            <span className="text-green-600 font-medium ml-1">
+              +{Math.round(effectiveHours * hourlyRate)} kr
+            </span>
+          )}
+        </div>
+      );
+    }
+    return { bgColor, icon, statusText, timeStampInfo };
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -236,7 +312,7 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
         </div>
         <Button 
           size="sm"
-          className="bg-amber-500 hover:bg-amber-600 text-white"
+          className="bg-amber-500 hover:bg-amber-600 text-white max-md:min-h-11 max-md:w-full"
           onClick={() => { setSelectedDate(new Date()); setAbsenceDialogOpen(true); }}
         >
           <Palmtree className="h-4 w-4 mr-2" />
@@ -247,14 +323,14 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
       <div className="space-y-4">
         {/* Month Navigation */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+          <Button variant="ghost" size="sm" className="max-md:min-h-11" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
             <ChevronLeft className="h-4 w-4 mr-1" />
             {format(subMonths(currentDate, 1), "MMM", { locale: da })}
           </Button>
           <h3 className="text-lg font-semibold">
             {format(currentDate, "MMMM yyyy", { locale: da })}
           </h3>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+          <Button variant="ghost" size="sm" className="max-md:min-h-11" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
             {format(addMonths(currentDate, 1), "MMM", { locale: da })}
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
@@ -284,8 +360,45 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
           </div>
         </div>
 
+        {/* Telefon: liste pr. dag, grupperet pr. uge */}
+        <div className="space-y-4 md:hidden">
+          {calendarWeeks.map((week, weekIndex) => {
+            const days = week.filter((d): d is Date => d !== null);
+            if (days.length === 0) return null;
+            return (
+              <section key={weekIndex} aria-label={`Uge ${format(days[0], "w")}`}>
+                <h4 className="mb-2 text-[14px] font-semibold text-muted-foreground">Uge {format(days[0], "w")}</h4>
+                <ul className="flex flex-col gap-2">
+                  {days.map((day) => {
+                    const info = getDayInfo(day);
+                    return (
+                      <li key={format(day, "yyyy-MM-dd")}>
+                        <button type="button" onClick={() => handleDayClick(day)}
+                          className={cn("flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left active:opacity-70",
+                            info.bgColor, isToday(day) && "ring-2 ring-primary ring-inset")}>
+                          <div className="w-20 flex-none">
+                            <div className={cn("text-[14px] font-semibold capitalize", isToday(day) && "text-primary")}>{format(day, "EEE d. MMM", { locale: da })}</div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-[15px]">
+                              {info.icon}
+                              <span className="truncate">{info.statusText || "Ingen vagt"}</span>
+                            </div>
+                            {info.timeStampInfo}
+                          </div>
+                          <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" aria-hidden="true" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+
         {/* Calendar Grid */}
-        <Card>
+        <Card className="hidden md:block">
           <CardContent className="pt-4 pb-2">
             {/* Day headers */}
             <div className="grid grid-cols-6 bg-muted/50 border-b rounded-t-lg">
@@ -297,7 +410,6 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
               ))}
             </div>
 
-            {/* Calendar weeks */}
             {calendarWeeks.map((week, weekIndex) => {
               const firstDay = week.find(d => d !== null);
               const weekNumber = firstDay ? format(firstDay, "w") : "";
@@ -311,12 +423,10 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
                     isCurrentWeek && "bg-primary/5"
                   )}
                 >
-                  {/* Week number */}
                   <div className="p-2 text-xs text-muted-foreground flex items-center justify-center border-r">
                     {weekNumber}
                   </div>
 
-                  {/* Days */}
                   {week.map((day, dayIndex) => {
                     if (!day) {
                       return (
@@ -326,83 +436,7 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
                         />
                       );
                     }
-
-                    const shift = getShiftForDay(day);
-                    const holiday = isHoliday(day);
-                    const holidayName = getHolidayName(day);
-                    const approvedAbsence = getApprovedAbsenceForDay(day);
-                    const lateness = getLatenessForDay(day);
-                    const timeStamp = getTimeStampForDay(day);
-                    const workTimes = getWorkTimesForDay(day);
-
-                    let bgColor = "";
-                    let icon = null;
-                    let statusText = "";
-                    let timeStampInfo: React.ReactNode = null;
-
-                    if (holiday) {
-                      bgColor = "bg-destructive/10";
-                      icon = <CalendarPlus className="h-3 w-3 text-destructive" />;
-                      statusText = holidayName || "Helligdag";
-                    } else if (approvedAbsence) {
-                      if (approvedAbsence.type === "vacation") {
-                        bgColor = "bg-amber-500/20";
-                        icon = <Palmtree className="h-3 w-3 text-amber-600" />;
-                        statusText = "Ferie";
-                      } else if (approvedAbsence.type === "sick") {
-                        bgColor = "bg-red-500/20";
-                        icon = <Thermometer className="h-3 w-3 text-red-500" />;
-                        statusText = "Syg";
-                      } else if (approvedAbsence.type === "day_off") {
-                        bgColor = "bg-blue-500/20";
-                        icon = <CalendarX2 className="h-3 w-3 text-blue-600" />;
-                        statusText = "Fridag";
-                      } else if (approvedAbsence.type === "no_show") {
-                        bgColor = "bg-gray-500/20";
-                        icon = <UserX className="h-3 w-3 text-gray-600" />;
-                        statusText = "Udeblivelse";
-                      }
-                    } else if (lateness) {
-                      bgColor = "bg-orange-500/15";
-                      icon = <AlarmClock className="h-3 w-3 text-orange-600" />;
-                      const newTime = lateness.new_start_time?.slice(0,5) || "";
-                      const endTime = workTimes?.split('-')[1] || "";
-                      statusText = newTime && endTime ? `${newTime}-${endTime}` : `+${lateness.minutes} min`;
-                    } else if (shift) {
-                      bgColor = "bg-green-500/15";
-                      icon = <Briefcase className="h-3 w-3 text-green-600" />;
-                      statusText = `${shift.start_time.slice(0, 5)}-${shift.end_time.slice(0, 5)}`;
-                    } else if (workTimes) {
-                      bgColor = "bg-green-500/15";
-                      icon = <Briefcase className="h-3 w-3 text-green-600" />;
-                      statusText = workTimes;
-                    } else {
-                      bgColor = "bg-muted/30";
-                      statusText = "";
-                    }
-                    
-                    if (timeStamp && !holiday && !approvedAbsence) {
-                      const clockIn = format(new Date(timeStamp.clock_in), "HH:mm");
-                      const clockOut = timeStamp.clock_out 
-                        ? format(new Date(timeStamp.clock_out), "HH:mm") 
-                        : "...";
-                      const effectiveHours = timeStamp.effective_hours ?? null;
-                      
-                      const isFixedSalary = salaryType === 'fixed';
-                      const hourlyRate = salaryAmount || 0;
-                      
-                      timeStampInfo = (
-                        <div className="mt-1 text-[10px] text-blue-600 flex items-center gap-1">
-                          <Clock className="h-2.5 w-2.5" />
-                          <span>{clockIn}-{clockOut}</span>
-                          {effectiveHours !== null && isFixedSalary && hourlyRate > 0 && (
-                            <span className="text-green-600 font-medium ml-1">
-                              +{Math.round(effectiveHours * hourlyRate)} kr
-                            </span>
-                          )}
-                        </div>
-                      );
-                    }
+                    const { bgColor, icon, statusText, timeStampInfo } = getDayInfo(day);
 
                     return (
                       <div
