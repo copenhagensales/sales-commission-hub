@@ -214,7 +214,7 @@ export function TodayMilestonesMini({ enabled }: { enabled: boolean }) {
     <section aria-label="Dagens milepæle" className="flex flex-col rounded-[24px] bg-[hsl(var(--cph-onyx))] p-5 text-[hsl(var(--cph-light-blue))]">
       <div className="flex items-center gap-2">
         <LiveDot />
-        <h3 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[hsl(var(--cph-emerald))]">Dagens milepæle</h3>
+        <h3 className="text-[11px] font-extrabold whitespace-nowrap uppercase tracking-[0.18em] text-[hsl(var(--cph-emerald))]">Dagens milepæle</h3>
         <span className="ml-auto whitespace-nowrap text-[12px] font-extrabold tabular-nums">{count} i dag</span>
       </div>
       {q.isLoading ? (
