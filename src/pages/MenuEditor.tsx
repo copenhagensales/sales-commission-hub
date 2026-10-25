@@ -496,7 +496,7 @@ export default function MenuEditor() {
             Træk og slip for at ændre rækkefølge eller flytte punkter mellem sektioner. Klik på navn for at omdøbe.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 max-md:w-full max-md:flex-wrap max-md:[&>*]:min-h-11 max-md:[&>*]:flex-1">
           <Button variant="outline" onClick={handleReset} disabled={!hasChanges}>
             <RotateCcw className="h-4 w-4 mr-1" />
             Nulstil
