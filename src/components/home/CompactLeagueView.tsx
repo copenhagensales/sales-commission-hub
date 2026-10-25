@@ -126,19 +126,18 @@ export function CompactLeagueView() {
                       const key = leagueTargetKey(standing.employee_id);
                       const summary = getReactions(key);
                       return (
-                        <div className="mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden">
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5">
                           {summary.total > 0 && (
                             <span className="flex flex-none items-center gap-1 text-[12px] text-muted-foreground">
                               <ReactionBubbles summary={summary} size={20} />
-                              <span className="hidden tabular-nums min-[380px]:inline">{summary.total}</span>
-                              <span aria-hidden="true" className="hidden min-[380px]:inline">·</span>
+                              <span className="tabular-nums">{summary.total}</span>
                             </span>
                           )}
                           <ReactButton
                             summary={summary}
                             disabled={!canInteract}
                             compact={isPhone}
-                            className="-ml-1 [&_button]:text-[13px]"
+                            className="flex-none [&_button]:text-[13px]"
                             onSet={(reaction) =>
                               setReaction.mutate({ targetType: "league_round", targetKey: key, reaction })
                             }
@@ -148,11 +147,13 @@ export function CompactLeagueView() {
                     })()}
                   </div>
                   <div className="flex-none pl-1 text-right">
-                    <p className="whitespace-nowrap text-[18px] min-[380px]:text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+                    <p className="whitespace-nowrap text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
                       {formatPoints(standing.total_points || 0)}
                     </p>
                     {gapText(index) && (
-                      <p className="mt-1 hidden whitespace-nowrap text-[12px] text-muted-foreground min-[380px]:block">{gapText(index)}</p>
+                      <p className="mt-1 whitespace-nowrap text-[12px] text-muted-foreground">
+                        {gapText(index).replace(/ efter nr\. \d+$/, " efter")}
+                      </p>
                     )}
                   </div>
                 </div>
