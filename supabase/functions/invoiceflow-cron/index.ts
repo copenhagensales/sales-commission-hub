@@ -27,6 +27,21 @@ async function createJobs(svc: SupabaseClient, kind: "fetch" | "catchup", period
   return n;
 }
 
+async function createKeepalive(svc: SupabaseClient, now: Date) {
+  const { data } = await svc.from("invoiceflow_sources").select("id, supplier:invoiceflow_suppliers!inner(is_active)")
+    .eq("type", "portal").eq("is_paused", false).eq("supplier.is_active", true);
+  const week = now.toISOString().slice(0, 10);
+  let n = 0;
+  for (const s of data ?? []) {
+    const { count } = await svc.from("invoiceflow_jobs").select("id", { count: "exact", head: true })
+      .eq("source_id", s.id).eq("kind", "keepalive").eq("period", week);
+    if (count) continue;
+    await svc.from("invoiceflow_jobs").insert({ source_id: s.id, kind: "keepalive", period: week });
+    n++;
+  }
+  return n;
+}
+
 /** Forventningskontrol: mangler en forventet faktura i perioden? */
 export function periodsToCheck(cadence: string, now: Date): string[] | null {
   if (cadence === "irregular") return null;
@@ -94,6 +109,9 @@ Deno.serve(async (req) => {
     if (day === st?.run_day) out.oprettet = await createJobs(svc, "fetch", period);
     if (day === st?.catchup_day) out.opsamling = await createJobs(svc, "catchup", period);
     if (day === st?.expectation_day) out.mangler = await expectationCheck(svc, now);
+    // Ugentlig hold-i-live (mandag) for aktive portal-kilder
+    const cphDow = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short" }).format(now);
+    if (cphDow === "Mon" || body.task === "keepalive") out.keepalive = await createKeepalive(svc, now);
     out.dekryptering_uden_koersel = await credentialUseCheck(svc);
   }
   out.work = await work(svc);
