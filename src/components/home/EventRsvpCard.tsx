@@ -168,7 +168,7 @@ export function EventRsvpCard({
               disabled={disabled}
               onClick={() => onRespond(o.status)}
               className={cn(
-                "flex items-center justify-center gap-1 rounded-full px-2 py-2 text-[13px] font-extrabold transition-colors",
+                "flex min-h-[44px] items-center justify-center gap-1 rounded-full px-2 py-2 text-[13px] font-extrabold transition-colors",
                 active
                   ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]"
                   : featured
@@ -189,7 +189,7 @@ export function EventRsvpCard({
             type="button"
             disabled={attendees.length === 0}
             className={cn(
-              "mt-3 flex items-center gap-2 rounded-full text-left text-[12px] hover:underline disabled:no-underline",
+              "mt-2 flex min-h-[44px] items-center gap-2 rounded-full text-left text-[12px] hover:underline disabled:no-underline",
               featured ? "opacity-90" : "text-foreground/60",
             )}
           >

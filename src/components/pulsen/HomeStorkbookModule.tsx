@@ -75,11 +75,11 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
             <span aria-hidden="true" className="text-[#146c3c]">book</span>
           </h2>
         </div>
-        <span className="flex items-center gap-2 rounded-full bg-[#d6f7e5] px-3 py-1.5 text-[12px] font-extrabold text-[#146c3c]">
+        <span className="order-last flex basis-full items-center gap-2 rounded-full bg-[#d6f7e5] px-3 py-1.5 sm:order-none sm:basis-auto text-[12px] font-extrabold text-[#146c3c]">
           <LiveDot />
           {storkLine(count)}
         </span>
-        <Link to="/storkbook" className="ml-auto flex min-h-[44px] items-center gap-1 rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))]">
+        <Link to="/storkbook" className="ml-auto flex min-h-[44px] items-center gap-1 rounded-full bg-[hsl(var(--cph-onyx))] px-4 sm:px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))]">
           Åbn Storkbook <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </header>

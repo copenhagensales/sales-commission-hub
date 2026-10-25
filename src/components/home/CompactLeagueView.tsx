@@ -1,3 +1,4 @@
+import { useIsPhone } from "@/components/mobile";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { buildTargetKey, useFeedReactions } from "@/hooks/useFeedReactions";
 import { PlayerProfileHoverCard } from "@/components/profile-card/PlayerProfileHoverCard";
 
 export function CompactLeagueView() {
+  const isPhone = useIsPhone();
   const { data: season } = useActiveSeason();
   const { data: currentEmployeeId } = useCurrentEmployeeId();
   const { data: seasonStandings = [] } = useSeasonStandings(season?.id);
@@ -128,14 +130,15 @@ export function CompactLeagueView() {
                           {summary.total > 0 && (
                             <span className="flex flex-none items-center gap-1 text-[12px] text-muted-foreground">
                               <ReactionBubbles summary={summary} size={20} />
-                              <span className="tabular-nums">{summary.total}</span>
-                              <span aria-hidden="true">·</span>
+                              <span className="hidden tabular-nums min-[380px]:inline">{summary.total}</span>
+                              <span aria-hidden="true" className="hidden min-[380px]:inline">·</span>
                             </span>
                           )}
                           <ReactButton
                             summary={summary}
                             disabled={!canInteract}
-                            className="-ml-3 [&_button]:text-[13px]"
+                            compact={isPhone}
+                            className="-ml-1 [&_button]:text-[13px]"
                             onSet={(reaction) =>
                               setReaction.mutate({ targetType: "league_round", targetKey: key, reaction })
                             }
@@ -145,11 +148,11 @@ export function CompactLeagueView() {
                     })()}
                   </div>
                   <div className="flex-none pl-1 text-right">
-                    <p className="whitespace-nowrap text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+                    <p className="whitespace-nowrap text-[18px] min-[380px]:text-[20px] sm:text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
                       {formatPoints(standing.total_points || 0)}
                     </p>
                     {gapText(index) && (
-                      <p className="mt-1 whitespace-nowrap text-[12px] text-muted-foreground">{gapText(index)}</p>
+                      <p className="mt-1 hidden whitespace-nowrap text-[12px] text-muted-foreground min-[380px]:block">{gapText(index)}</p>
                     )}
                   </div>
                 </div>
@@ -162,7 +165,7 @@ export function CompactLeagueView() {
         <div className="mt-4 flex justify-end">
           <Link
             to="/commission-league"
-            className="flex items-center gap-1.5 text-[14px] font-extrabold text-foreground hover:opacity-70"
+            className="flex min-h-[44px] items-center gap-1.5 text-[14px] font-extrabold text-foreground hover:opacity-70"
           >
             Se fuld liga
             <ArrowRight className="h-3.5 w-3.5" />
