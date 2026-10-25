@@ -78,6 +78,15 @@ const rows: DpaRow[] = [
       "Den signerede DPA fra onboarding, eller rekvirér via legal@adversus.io",
     status: "Tjek onboarding-dokumenter / rekvirér",
   },
+  {
+    vendor: "Browserbase",
+    purpose: "InvoiceFlow: cloud-browser til hentning af leverandørfakturaer fra portaler (Hiper)",
+    link: { href: "https://www.browserbase.com/legal/dpa", label: "Browserbase DPA" },
+    linkNote:
+      "Browsere køres i region eu-central-1 (Frankfurt). Browserbase er en amerikansk virksomhed: overførsel/adgang fra USA (support, metadata, kontodata) er ikke afklaret – åbent punkt. Sessionsoptagelse er slået fra.",
+    archive: "PDF",
+    status: "Mangler underskrift/arkivering",
+  },
 ];
 
 function ArchiveCell({

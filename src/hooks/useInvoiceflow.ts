@@ -81,6 +81,13 @@ export function useIfPortalRequests() {
   }});
 }
 
+export function useIfPortalCatalog() {
+  return useQuery({ queryKey: ["invoiceflow-portal-catalog"], queryFn: async () => {
+    const { data, error } = await supabase.from("invoiceflow_portal_catalog").select("id, supplier_name, slug, portal_url, status, flow_version, login_fields").order("supplier_name");
+    if (error) throw error; return data;
+  }});
+}
+
 function useInvalidate() {
   const qc = useQueryClient();
   return () => Object.values(KEYS).forEach((k) => qc.invalidateQueries({ queryKey: k }));
@@ -91,12 +98,13 @@ export function useCreateSupplierWithSource() {
   return useMutation({
     mutationFn: async (input: {
       supplier: { name: string; cvr: string | null; cadence: string; expected_day: number | null };
-      source: { type: "email"; config: Record<string, unknown>; owner_employee_id: string | null };
+      source: { type: "email" | "portal"; config: Record<string, unknown>; owner_employee_id: string | null };
     }) => {
       const { data: s, error } = await supabase.from("invoiceflow_suppliers").insert(input.supplier).select("id").single();
       if (error) throw error;
-      const { error: e2 } = await supabase.from("invoiceflow_sources").insert({ type: input.source.type, owner_employee_id: input.source.owner_employee_id, config: input.source.config as Json, supplier_id: s.id });
+      const { data: src, error: e2 } = await supabase.from("invoiceflow_sources").insert({ type: input.source.type, owner_employee_id: input.source.owner_employee_id, config: input.source.config as Json, supplier_id: s.id }).select("id").single();
       if (e2) throw e2;
+      return { sourceId: src.id as string };
     },
     onSuccess: inv,
   });
@@ -160,7 +168,7 @@ export function useInvoiceflowAdmin() {
     mutationFn: async (body: AdminAction) => {
       const { data, error } = await supabase.functions.invoke("invoiceflow-admin", { body });
       if (error) throw error;
-      return data as { ok?: boolean; message?: string; url?: string; reason?: string; error?: string };
+      return data as { ok?: boolean; code?: string; message?: string; url?: string; reason?: string; error?: string };
     },
     onSuccess: inv,
   });

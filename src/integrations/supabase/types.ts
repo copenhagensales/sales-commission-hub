@@ -10882,6 +10882,7 @@ export type Database = {
       }
       invoiceflow_credentials: {
         Row: {
+          browser_context_id: string | null
           ciphertext: string
           created_at: string
           field_names: string[]
@@ -10893,6 +10894,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          browser_context_id?: string | null
           ciphertext: string
           created_at?: string
           field_names?: string[]
@@ -10904,6 +10906,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          browser_context_id?: string | null
           ciphertext?: string
           created_at?: string
           field_names?: string[]
@@ -11093,6 +11096,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoiceflow_portal_catalog: {
+        Row: {
+          created_at: string
+          flow_version: number
+          id: string
+          login_fields: Json
+          portal_url: string
+          slug: string
+          status: string
+          supplier_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          flow_version?: number
+          id?: string
+          login_fields?: Json
+          portal_url: string
+          slug: string
+          status?: string
+          supplier_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          flow_version?: number
+          id?: string
+          login_fields?: Json
+          portal_url?: string
+          slug?: string
+          status?: string
+          supplier_name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       invoiceflow_portal_requests: {
         Row: {

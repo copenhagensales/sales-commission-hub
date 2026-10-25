@@ -2,6 +2,8 @@
 import { z } from "npm:zod@3.23.8";
 import { cors, json, requireInvoiceflowOwner, deliverInvoice } from "../_shared/invoiceflow.ts";
 import { runJob, previousPeriod } from "../_shared/invoiceflowWorker.ts";
+import { runPortal } from "../_shared/invoiceflowPortal.ts";
+import { PortalError } from "../_shared/invoiceflowPortalPeriods.ts";
 import { findMailInvoices, MailRule, MailRuleError } from "../_shared/invoiceflowMailRule.ts";
 
 const Body = z.discriminatedUnion("action", [
@@ -48,7 +50,27 @@ Deno.serve(async (req) => {
     case "test": {
       const { data: src } = await svc.from("invoiceflow_sources").select("type, config").eq("id", b.source_id).maybeSingle();
       if (!src) return json(404, { error: "Kilde findes ikke" });
-      if (src.type !== "email") return json(200, { ok: false, message: "Kun mail-regler kan testes i fase 1" });
+      if (src.type === "portal") {
+        // Testen logges som kørsel, så dekrypteringen altid har et run_id
+        const { data: tj } = await svc.from("invoiceflow_jobs").insert({ source_id: b.source_id, kind: "manual", period: "test", status: "koerer" }).select("id").single();
+        const { data: tr } = await svc.from("invoiceflow_runs").insert({ job_id: tj!.id }).select("id").single();
+        const done = (status: string, patch: Record<string, unknown>) => Promise.all([
+          svc.from("invoiceflow_jobs").update({ status, updated_at: new Date().toISOString() }).eq("id", tj!.id),
+          svc.from("invoiceflow_runs").update({ finished_at: new Date().toISOString(), result: status, ...patch }).eq("id", tr!.id),
+        ]);
+        try {
+          const r = await runPortal(svc, { id: b.source_id, config: src.config }, tr!.id, "test", []);
+          await done("ok", { invoices_found: 0 });
+          return json(200, { ok: true, message: `Login ok – fakturasiden kunne nås (Browserbase-region ${r.region})` });
+        } catch (e) {
+          const code = e instanceof PortalError ? e.code : "UNKNOWN";
+          const msg = e instanceof PortalError ? e.message : "Uventet fejl";
+          // deno-lint-ignore no-explicit-any
+          await done(code === "PORTAL_REQUIRES_CODE" ? "afventer_kode" : "fejlet", { error_code: code, error_message: msg, screenshot_path: (e as any)?.screenshotPath ?? null });
+          return json(200, { ok: false, code, message: `${msg} (${code})` });
+        }
+      }
+      if (src.type !== "email") return json(200, { ok: false, message: "Kildetypen kan ikke testes" });
       try {
         const m = await findMailInvoices(src.config as MailRule);
         const pdfs = m.reduce((n, x) => n + x.attachments.length, 0);

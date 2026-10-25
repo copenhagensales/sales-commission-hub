@@ -157,6 +157,14 @@ export default function ProcessingRegistry() {
               arkivering.
             </li>
             <li>
+              Browserbase — cloud-browser til InvoiceFlow-hentning af
+              leverandørfakturaer fra portaler (pt. kun Hiper). Behandler
+              virksomhedens portal-login (krypteret i Stork, kun dekrypteret i
+              kørslen) og fakturaer. Region: eu-central-1 (Frankfurt, EU).
+              Åbent: mulig overførsel/adgang fra USA (amerikansk leverandør).
+              Se DPA-oversigten; status: mangler underskrift/arkivering.
+            </li>
+            <li>
               e-conomic — økonomi og bogføring. Se DPA-oversigten; status: mangler
               arkivering.
             </li>

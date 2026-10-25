@@ -14,7 +14,7 @@ import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import {
   useInvoiceflowAccess, useIfSuppliers, useIfSources, useIfCredentialMeta, useIfJobs, useIfInvoices,
   useIfSettings, useIfPortalRequests, useCreateSupplierWithSource, useUpdateSource, useUpdateIfSettings,
-  useAddPortalRequest, useInvoiceflowAdmin,
+  useAddPortalRequest, useInvoiceflowAdmin, useIfPortalCatalog, useSaveCredential,
 } from "@/hooks/useInvoiceflow";
 
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleString("da-DK", { dateStyle: "short", timeStyle: "short" }) : "–");
@@ -89,7 +89,7 @@ function SuppliersTab() {
                 return (
                   <div key={src.id} className="rounded-lg border p-3 space-y-2">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <Badge>{src.type === "email" ? "Mail-regel" : src.type}</Badge>
+                      <Badge>{src.type === "email" ? "Mail-regel" : src.type === "portal" ? `Portal (${cfg.catalog_slug ?? "?"})` : src.type}</Badge>
                       {src.is_paused && <Badge variant="destructive">Pauset{src.pause_reason ? `: ${src.pause_reason}` : ""}</Badge>}
                       {src.type !== "email" && <span className="text-muted-foreground">{cred ? `Login gemt – opdateret ${fmtDate(cred.updated_at)}` : "Intet login gemt"}</span>}
                     </div>
@@ -98,6 +98,7 @@ function SuppliersTab() {
                         Indbakke {cfg.mailbox} · afsender {cfg.from_domain || "alle"} · emne {cfg.subject_contains || "alle"} · vedhæftning {cfg.attachment_contains || "alle PDF"}
                       </p>
                     )}
+                    {src.type === "portal" && <PortalLoginForm sourceId={src.id} slug={cfg.catalog_slug} hasLogin={!!cred} />}
                     <div className="flex flex-wrap items-center gap-3">
                       <label className="flex items-center gap-2 text-sm">
                         <Switch checked={src.requires_approval} onCheckedChange={(v) => updateSource.mutate({ id: src.id, patch: { requires_approval: v } })} />
@@ -130,31 +131,96 @@ function SuppliersTab() {
   );
 }
 
+const FIELD_LABEL: Record<string, string> = { email: "E-mail", password: "Adgangskode", username: "Brugernavn" };
+
+/** Write-only login: værdierne sendes kun til serveren og vises aldrig igen. */
+function PortalLoginForm({ sourceId, slug, hasLogin }: { sourceId: string; slug?: string; hasLogin: boolean }) {
+  const { data: catalog = [] } = useIfPortalCatalog();
+  const save = useSaveCredential();
+  const { toast } = useToast();
+  const entry = catalog.find((c) => c.slug === slug);
+  const fields = Array.isArray(entry?.login_fields) ? (entry!.login_fields as string[]) : [];
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState(!hasLogin);
+  if (!fields.length) return null;
+  if (!open) return <Button size="sm" variant="ghost" className="min-h-11" onClick={() => setOpen(true)}>Opdatér login</Button>;
+  return (
+    <form className="grid gap-2 md:grid-cols-3" autoComplete="off" onSubmit={(e) => {
+      e.preventDefault();
+      if (fields.some((f) => !vals[f])) return;
+      save.mutate({ action: "save", source_id: sourceId, fields: vals }, {
+        onSuccess: () => { setVals({}); setOpen(false); toast({ title: "Login gemt" }); },
+        onError: () => toast({ title: "Login kunne ikke gemmes", variant: "destructive" }),
+      });
+    }}>
+      {fields.map((f) => (
+        <Field key={f} label={FIELD_LABEL[f] ?? f}>
+          <Input type={f === "password" ? "password" : f === "email" ? "email" : "text"} inputMode={f === "email" ? "email" : undefined}
+            autoComplete="new-password" value={vals[f] ?? ""} onChange={(e) => setVals({ ...vals, [f]: e.target.value })} required />
+        </Field>
+      ))}
+      <div className="flex items-end"><Button type="submit" size="sm" className="min-h-11" disabled={save.isPending}>Gem login</Button></div>
+    </form>
+  );
+}
+
 function NewSupplierForm() {
   const create = useCreateSupplierWithSource();
+  const save = useSaveCredential();
+  const { data: catalog = [] } = useIfPortalCatalog();
   const { data: employeeId } = useCurrentEmployeeId();
   const { toast } = useToast();
+  const [type, setType] = useState<"email" | "portal">("email");
+  const [slug, setSlug] = useState("");
+  const [login, setLogin] = useState<Record<string, string>>({});
   const [f, setF] = useState({ name: "", cvr: "", cadence: "monthly", expected_day: "", mailbox: "", from_domain: "", subject_contains: "", attachment_contains: "" });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const supported = catalog.filter((c) => c.status === "understoettet");
+  const entry = supported.find((c) => c.slug === slug);
+  const loginFields = Array.isArray(entry?.login_fields) ? (entry!.login_fields as string[]) : [];
 
   return (
     <Card>
-      <CardHeader className="pb-2"><CardTitle className="text-base">Opret leverandør (mail-regel)</CardTitle></CardHeader>
+      <CardHeader className="pb-2"><CardTitle className="text-base">Opret leverandør</CardTitle></CardHeader>
       <CardContent>
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={(e) => {
+        <form className="grid gap-3 md:grid-cols-2" autoComplete="off" onSubmit={(e) => {
           e.preventDefault();
-          if (!f.name.trim() || !f.mailbox.trim()) return;
+          if (!f.name.trim()) return;
+          if (type === "email" && !f.mailbox.trim()) return;
+          if (type === "portal" && (!entry || loginFields.some((k) => !login[k]))) return;
+          const config = type === "portal" ? { catalog_slug: entry!.slug } : {
+            mailbox: f.mailbox.trim(), from_domain: f.from_domain.trim() || undefined,
+            subject_contains: f.subject_contains.trim() || undefined, attachment_contains: f.attachment_contains.trim() || undefined,
+          };
           create.mutate({
             supplier: { name: f.name.trim(), cvr: f.cvr.trim() || null, cadence: f.cadence, expected_day: f.expected_day ? Number(f.expected_day) : null },
-            source: { type: "email", owner_employee_id: employeeId ?? null, config: {
-              mailbox: f.mailbox.trim(), from_domain: f.from_domain.trim() || undefined,
-              subject_contains: f.subject_contains.trim() || undefined, attachment_contains: f.attachment_contains.trim() || undefined,
-            } },
+            source: { type, owner_employee_id: employeeId ?? null, config },
           }, {
-            onSuccess: () => { toast({ title: "Leverandør oprettet", description: "Godkendelse er slået til." }); setF({ ...f, name: "", cvr: "", from_domain: "", subject_contains: "", attachment_contains: "" }); },
+            onSuccess: (r) => {
+              const done = () => { toast({ title: "Leverandør oprettet", description: "Godkendelse er slået til. Tryk »Test nu« for at prøve forbindelsen." }); setF({ ...f, name: "", cvr: "", from_domain: "", subject_contains: "", attachment_contains: "" }); setLogin({}); };
+              if (type !== "portal") return done();
+              save.mutate({ action: "save", source_id: r.sourceId, fields: login }, {
+                onSuccess: done,
+                onError: () => toast({ title: "Leverandør oprettet, men login blev ikke gemt", description: "Gem login på leverandøren.", variant: "destructive" }),
+              });
+            },
             onError: () => toast({ title: "Kunne ikke oprette", variant: "destructive" }),
           });
         }}>
+          <Field label="Type">
+            <Select value={type} onValueChange={(v) => setType(v as "email" | "portal")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="email">Mail-regel</SelectItem><SelectItem value="portal">Portal</SelectItem></SelectContent>
+            </Select>
+          </Field>
+          {type === "portal" && (
+            <Field label="Portal">
+              <Select value={slug} onValueChange={(v) => { setSlug(v); const c = supported.find((x) => x.slug === v); if (c && !f.name) setF({ ...f, name: c.supplier_name }); }}>
+                <SelectTrigger><SelectValue placeholder="Vælg portal" /></SelectTrigger>
+                <SelectContent>{supported.map((c) => <SelectItem key={c.slug} value={c.slug}>{c.supplier_name}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Navn"><Input value={f.name} onChange={set("name")} required /></Field>
           <Field label="CVR"><Input value={f.cvr} onChange={set("cvr")} inputMode="numeric" /></Field>
           <Field label="Kadence">
@@ -164,11 +230,18 @@ function NewSupplierForm() {
             </Select>
           </Field>
           <Field label="Forventet dag i måneden"><Input value={f.expected_day} onChange={set("expected_day")} inputMode="numeric" /></Field>
-          <Field label="Indbakke der læses (M365)"><Input type="email" value={f.mailbox} onChange={set("mailbox")} required /></Field>
-          <Field label="Afsender-domæne"><Input value={f.from_domain} onChange={set("from_domain")} placeholder="leverandoer.dk" /></Field>
-          <Field label="Emneord"><Input value={f.subject_contains} onChange={set("subject_contains")} placeholder="Faktura" /></Field>
-          <Field label="Navn på vedhæftning indeholder"><Input value={f.attachment_contains} onChange={set("attachment_contains")} /></Field>
-          <div className="md:col-span-2"><Button type="submit" className="min-h-11" disabled={create.isPending}>Opret</Button></div>
+          {type === "email" ? (<>
+            <Field label="Indbakke der læses (M365)"><Input type="email" value={f.mailbox} onChange={set("mailbox")} required /></Field>
+            <Field label="Afsender-domæne"><Input value={f.from_domain} onChange={set("from_domain")} placeholder="leverandoer.dk" /></Field>
+            <Field label="Emneord"><Input value={f.subject_contains} onChange={set("subject_contains")} placeholder="Faktura" /></Field>
+            <Field label="Navn på vedhæftning indeholder"><Input value={f.attachment_contains} onChange={set("attachment_contains")} /></Field>
+          </>) : loginFields.map((k) => (
+            <Field key={k} label={FIELD_LABEL[k] ?? k}>
+              <Input type={k === "password" ? "password" : k === "email" ? "email" : "text"} inputMode={k === "email" ? "email" : undefined}
+                autoComplete="new-password" value={login[k] ?? ""} onChange={(e) => setLogin({ ...login, [k]: e.target.value })} required />
+            </Field>
+          ))}
+          <div className="md:col-span-2"><Button type="submit" className="min-h-11" disabled={create.isPending || save.isPending}>Opret</Button></div>
         </form>
       </CardContent>
     </Card>

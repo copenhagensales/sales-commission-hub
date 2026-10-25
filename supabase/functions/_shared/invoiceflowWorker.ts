@@ -53,10 +53,12 @@ export async function runJob(svc: SupabaseClient, jobId: string, opts: { dryRun?
     }
   }
 
+  if (job.source.type === "portal") return runPortalJob(svc, job, attempt, runId, finish, opts);
+
   if (job.source.type !== "email") {
     await svc.from("invoiceflow_jobs").update({ status: "pauset", attempt }).eq("id", job.id);
-    await finish({ result: "pauset", error_code: "NOT_IN_PHASE1", error_message: "Kun mail-regler understøttes i fase 1" });
-    return { ok: false, error: "NOT_IN_PHASE1" };
+    await finish({ result: "pauset", error_code: "NOT_SUPPORTED", error_message: "Kildetypen understøttes ikke" });
+    return { ok: false, error: "NOT_SUPPORTED" };
   }
 
   try {
