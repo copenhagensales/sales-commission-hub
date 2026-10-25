@@ -1,10 +1,12 @@
 import type React from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, type LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, Gamepad2, Swords, type LucideIcon } from "lucide-react";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
+import { HubSheet } from "./HubSheet";
 
 export interface BottomTab {
   to: string;
@@ -12,6 +14,10 @@ export interface BottomTab {
   icon: LucideIcon;
   /** Samme rettighedsflag som punktet i AppSidebar. */
   visible: boolean;
+  /** Samlefane, destinationen ligger under (»Mig« / »Spil«). */
+  hub?: "me" | "games";
+  /** Fast undertekst på flisen i samlefanen. */
+  hint?: string;
 }
 
 /** Højde på bundnavigationen uden safe area (px). Bruges af PageShell og StickyAction. */
@@ -20,7 +26,7 @@ export const BOTTOM_NAV_HEIGHT = 64;
 /** Sti til profilen, som ligger øverst i »Menu«-skuffen i stedet for som egen fane. */
 export const PROFILE_PATH = "/my-profile";
 
-/** Destinationerne med samme rettighedstjek som AppSidebar. Profilen nås via »Menu«. */
+/** Alle destinationer bag bundbjælken (også dem i »Mig« og »Spil«), med samme rettighedstjek som AppSidebar. */
 export function useBottomTabs(): BottomTab[] {
   const p = usePermissions();
   // »Vagter« peger på det første mål, brugeren har ret til (oversigt → egen FM-plan → egen TM-plan).
@@ -33,17 +39,27 @@ export function useBottomTabs(): BottomTab[] {
         : null;
   return [
     { to: "/home", label: "Hjem", icon: Home, visible: !!p.canViewHome },
-    { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals },
-    { to: shiftsTo ?? "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!shiftsTo },
-    { to: "/commission-league", label: "Liga", icon: Trophy, visible: !!p.canViewCommissionLeague },
+    { to: PROFILE_PATH, label: "Min profil", icon: User, visible: !!p.canViewMyProfile, hub: "me", hint: "Dine kontrakter og oplysninger" },
+    { to: shiftsTo ?? "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!shiftsTo, hub: "me", hint: "Din vagtplan" },
+    { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals, hub: "me", hint: "Dine tal og mål" },
+    { to: "/commission-league", label: "Superligaen", icon: Trophy, visible: !!p.canViewCommissionLeague, hub: "games", hint: "Provisionsligaen" },
+    { to: "/head-to-head", label: "Head2Head", icon: Swords, visible: !!p.canViewH2h, hub: "games", hint: "1v1 og holdkampe" },
     { to: "/storkbook", label: "Storkbook", icon: Newspaper, visible: !!p.canViewPulsen },
-    { to: PROFILE_PATH, label: "Mig", icon: User, visible: !!p.canViewMyProfile },
   ];
+}
+
+/** Området en destination dækker (Vagter med egen FM-plan dækker hele /vagt-flow). */
+function areaOf(t: BottomTab): string {
+  return t.to.startsWith("/vagt-flow") ? "/vagt-flow" : t.to;
+}
+function isOn(pathname: string, t: BottomTab): boolean {
+  const r = areaOf(t);
+  return pathname === r || pathname.startsWith(`${r}/`);
 }
 
 /** Faneroden for en sti (bruges af tilbage-pilen, når der ingen historik er). */
 export function tabRootFor(pathname: string, tabs: BottomTab[]): string | null {
-  const hit = tabs.find((t) => pathname === t.to || pathname.startsWith(`${t.to}/`));
+  const hit = tabs.find((t) => isOn(pathname, t));
   return hit ? hit.to : null;
 }
 
@@ -79,37 +95,56 @@ function StorkbookBadge() {
   );
 }
 
-/** Fire faste faner + »Menu« yderst til højre på telefon. Faner uden adgang vises ikke. */
+/** Hjem · Mig · Spil · Storkbook · Menu på telefon. Mig/Spil åbner en samleskuffe; faner uden adgang vises ikke. */
 export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
-  const tabs = useBottomTabs().filter((t) => t.visible && t.to !== PROFILE_PATH);
+  const all = useBottomTabs().filter((t) => t.visible);
   const { pathname } = useLocation();
-  if (tabs.length === 0 && !onMenu) return null;
-  const onProfile = pathname === PROFILE_PATH || pathname.startsWith(`${PROFILE_PATH}/`);
+  const [hubOpen, setHubOpen] = useState<null | "me" | "games">(null);
+  const home = all.find((t) => t.to === "/home");
+  const storkbook = all.find((t) => t.to === "/storkbook");
+  const me = all.filter((t) => t.hub === "me");
+  const games = all.filter((t) => t.hub === "games");
+  if (all.length === 0 && !onMenu) return null;
+
+  const link = (t: BottomTab, label: string) => {
+    const active = isOn(pathname, t);
+    return (
+      <li key={t.to} className="min-w-0 flex-1">
+        <NavLink to={t.to} aria-current={active ? "page" : undefined}
+          className={cn(itemClass, active ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}>
+          <TabIcon icon={t.icon} active={active}>{t.to === "/storkbook" && <StorkbookBadge />}</TabIcon>
+          {label}
+        </NavLink>
+      </li>
+    );
+  };
+  const hubButton = (key: "me" | "games", label: string, icon: LucideIcon, items: BottomTab[]) => {
+    if (items.length === 0) return null;
+    const active = hubOpen === key || items.some((t) => isOn(pathname, t));
+    return (
+      <li className="min-w-0 flex-1">
+        <button type="button" onClick={() => setHubOpen(key)} aria-haspopup="dialog" aria-expanded={hubOpen === key}
+          aria-current={items.some((t) => isOn(pathname, t)) ? "page" : undefined}
+          className={cn(itemClass, active ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}>
+          <TabIcon icon={icon} active={active} />
+          {label}
+        </button>
+      </li>
+    );
+  };
+  const tiles = (items: BottomTab[]) => items.map((t) => ({ to: t.to, label: t.label, hint: t.hint ?? "", icon: t.icon }));
+
   return (
+    <>
     <nav
       aria-label="Hovednavigation"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-foreground/10 bg-sidebar/[0.97] shadow-[0_-8px_24px_-12px_hsl(var(--cph-onyx)/0.5)] backdrop-blur-xl backdrop-saturate-150 pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
     >
       <ul className="flex" style={{ height: BOTTOM_NAV_HEIGHT }}>
-        {tabs.map((t) => {
-          const root = t.label === "Vagter" ? t.to.split("/").slice(0, 2).join("/") : t.to;
-          const active = pathname === root || pathname.startsWith(`${root}/`);
-          const Icon = t.icon;
-          return (
-            <li key={t.to} className="min-w-0 flex-1">
-              <NavLink
-                to={t.to}
-                aria-current={active ? "page" : undefined}
-                className={cn(itemClass, active ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
-              >
-                <TabIcon icon={Icon} active={active}>
-                  {t.to === "/storkbook" && <StorkbookBadge />}
-                </TabIcon>
-                {t.label}
-              </NavLink>
-            </li>
-          );
-        })}
+        {home && link(home, "Hjem")}
+        {hubButton("me", "Mig", User, me)}
+        {hubButton("games", "Spil", Gamepad2, games)}
+        {storkbook && link(storkbook, "Storkbook")}
         {onMenu && (
           <li className="min-w-0 flex-1">
             <button
@@ -117,14 +152,17 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
               onClick={onMenu}
               aria-haspopup="dialog"
               aria-expanded={!!menuOpen}
-              className={cn(itemClass, menuOpen || onProfile ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
+              className={cn(itemClass, menuOpen ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}
             >
-              <TabIcon icon={Menu} active={!!menuOpen || onProfile} />
+              <TabIcon icon={Menu} active={!!menuOpen} />
               Menu
             </button>
           </li>
         )}
       </ul>
     </nav>
+    <HubSheet open={hubOpen === "me"} onOpenChange={(o) => setHubOpen(o ? "me" : null)} title="Mig" tiles={tiles(me)} />
+    <HubSheet open={hubOpen === "games"} onOpenChange={(o) => setHubOpen(o ? "games" : null)} title="Spil" tiles={tiles(games)} />
+    </>
   );
 }
