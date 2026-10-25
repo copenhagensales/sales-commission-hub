@@ -50,7 +50,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
   const hwGroups = groupBy(HARDWARE);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className="grid gap-6 lg:grid-cols-[1fr_380px] max-md:[&>*]:min-w-0 max-md:[&_.text-2xl]:text-xl max-md:[&_label]:min-h-11 max-md:[&_label]:inline-flex max-md:[&_label]:items-center max-md:[&_button:not([role=checkbox]):not([role=radio]):not([role=switch])]:min-h-11 max-md:[&_input]:min-h-11">
       <div className="space-y-6">
         <Card>
           <CardHeader><CardTitle>Løsninger</CardTitle></CardHeader>
@@ -60,7 +60,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
                 <div className="mb-2 flex items-center justify-between gap-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
                   {items.some((p) => p.nonCampaignCommission) && (
-                    <label className="flex items-center gap-2 text-sm font-medium">
+                    <label className="flex items-center gap-2 text-sm font-medium max-md:min-h-11 max-md:text-base">
                       Kampagne {campaign ? "ja" : "nej"}
                       <Switch checked={campaign} onCheckedChange={onCampaign} aria-label="Kampagne" />
                     </label>
@@ -163,7 +163,7 @@ export function TdcTilbudForm({ products, hardware, onProducts, onHardware, subs
                   aria-pressed={subsidyPct === pct}
                   onClick={() => onSubsidyPct(subsidyPct === pct ? null : pct)}
                   className={cn(
-                    "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                    "rounded-md border px-3 py-2 text-sm font-medium transition-colors max-md:min-h-11 max-md:text-base active:scale-95",
                     subsidyPct === pct
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-background text-muted-foreground hover:text-foreground",

@@ -17,7 +17,7 @@ export function TdcSalgHeader() {
 export default function TdcSalg() {
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-6 max-w-7xl">
+      <div className="container mx-auto py-6 space-y-6 max-w-7xl max-md:px-0 max-md:py-2">
         <TdcSalgHeader />
         <TdcSalgTool />
       </div>

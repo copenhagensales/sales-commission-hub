@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import ClientDashboard from "@/components/dashboard/ClientDashboard";
 import { supabase } from "@/integrations/supabase/client";
+import { RouteSkeleton } from "@/components/mobile";
 
 /** Hiper-teamets board: alle salg fra medarbejderne på teamet Hiper (team-scope). */
 function useHiperTeamId() {
@@ -16,7 +17,8 @@ function useHiperTeamId() {
 }
 
 export default function HiperDashboard() {
-  const { data: teamId } = useHiperTeamId();
+  const { data: teamId, isLoading } = useHiperTeamId();
+  if (isLoading) return <RouteSkeleton />;
   if (!teamId) return null;
   return (
     <ClientDashboard
