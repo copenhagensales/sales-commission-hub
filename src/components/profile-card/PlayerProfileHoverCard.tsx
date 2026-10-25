@@ -72,7 +72,8 @@ export function PlayerProfileHoverCard({
         <DialogContent
           aria-describedby={undefined}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className="w-auto max-w-[calc(100vw-24px)] max-h-[calc(100dvh-48px)] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none [&>button:last-child]:hidden"
+          className="w-auto max-w-[calc(100vw-24px)] max-h-[calc(100dvh-48px)] overflow-y-auto overflow-x-hidden border-0 bg-transparent p-0 shadow-none"
+          hideCloseButton
         >
           <DialogTitle className="sr-only">Spillerprofil for {person.fullName}</DialogTitle>
           <div className="relative">
