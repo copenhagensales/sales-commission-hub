@@ -484,6 +484,13 @@
       "when": 1792932422657,
       "tag": "0068_invoiceflow_expectation_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1792932701284,
+      "tag": "0069_invoiceflow_credentials_column_lock",
+      "breakpoints": true
     }
   ]
 }

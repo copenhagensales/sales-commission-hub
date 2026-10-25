@@ -1,0 +1,3 @@
+REVOKE ALL ON public.invoiceflow_credentials FROM authenticated, anon, PUBLIC;
+GRANT SELECT (id, source_id, owner_user_id, field_names, created_at, last_used_at, updated_at) ON public.invoiceflow_credentials TO authenticated;
+REVOKE ALL ON public.invoiceflow_access, public.invoiceflow_suppliers, public.invoiceflow_sources, public.invoiceflow_jobs, public.invoiceflow_runs, public.invoiceflow_credential_use_log, public.invoiceflow_invoices, public.invoiceflow_deliveries, public.invoiceflow_settings, public.invoiceflow_portal_requests FROM anon;
