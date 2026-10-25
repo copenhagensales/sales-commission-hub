@@ -1,7 +1,7 @@
 import type React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, Gamepad2, Swords, type LucideIcon } from "lucide-react";
+import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, Gamepad2, Swords, BadgeCheck, type LucideIcon } from "lucide-react";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -39,9 +39,10 @@ export function useBottomTabs(): BottomTab[] {
         : null;
   return [
     { to: "/home", label: "Hjem", icon: Home, visible: !!p.canViewHome },
-    { to: PROFILE_PATH, label: "Min profil", icon: User, visible: !!p.canViewMyProfile, hub: "me", hint: "Dine kontrakter og oplysninger" },
+    { to: "/vagt-flow/sales-registration", label: "Salgsregistrering", icon: BadgeCheck, visible: !!p.canViewFmSalesRegistration, hub: "me", hint: "Registrér dit salg" },
     { to: shiftsTo ?? "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!shiftsTo, hub: "me", hint: "Din vagtplan" },
     { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals, hub: "me", hint: "Dine tal og mål" },
+    { to: PROFILE_PATH, label: "Min profil", icon: User, visible: !!p.canViewMyProfile, hub: "me", hint: "Dine kontrakter og oplysninger" },
     { to: "/commission-league", label: "Superligaen", icon: Trophy, visible: !!p.canViewCommissionLeague, hub: "games", hint: "Provisionsligaen" },
     { to: "/head-to-head", label: "Head2Head", icon: Swords, visible: !!p.canViewH2h, hub: "games", hint: "1v1 og holdkampe" },
     { to: "/storkbook", label: "Storkbook", icon: Newspaper, visible: !!p.canViewPulsen },
