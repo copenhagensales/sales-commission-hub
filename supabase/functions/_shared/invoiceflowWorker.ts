@@ -2,6 +2,10 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { deliverInvoice, nextAttempt, notifyOwner, sha256Hex } from "./invoiceflow.ts";
 import { findMailInvoices, MailRule, MailRuleError } from "./invoiceflowMailRule.ts";
+import { runPortal, resumePortal } from "./invoiceflowPortal.ts";
+import { PortalError, portalPeriods } from "./invoiceflowPortalPeriods.ts";
+import { CODE_WAIT_TIMEOUT_MS } from "./invoiceflowCodeWait.ts";
+import type { PortalInvoice, PortalMode } from "./portals/hiper.ts";
 
 export const MAX_PARALLEL = 3;
 
