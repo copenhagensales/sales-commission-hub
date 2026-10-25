@@ -39,7 +39,7 @@ Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Ind
 Dette afsnit er fast og må ikke fjernes eller omskrives af agenten.
 
 1. Én kolonne på telefon (< 768 px): intet vandret sideskrul på 360 px. En tabel må kun skrulle inden i sin egen ramme. Ingen faste pixelbredder over 320 px. Tabeller vises som kort eller lister på telefon med alle felter og handlinger tilgængelige og en »vis som tabel«-knap.
-2. Navigation: fem faste destinationer i bunden (Hjem, Tal, Vagter, Beskeder, Mig), resten under »Mere« i Mig. Undersider har titel og tilbage-pil øverst. Tilbage (pil, Android-knap, iOS-gestus) bevarer listeposition, filtre og kladde.
+2. Navigation: fast bundbjælke med fire destinationer plus »Menu« yderst til højre, som åbner skuffen med profil og resten af menuen. Hvilke fire destinationer der vises, er et layoutvalg, der kan ændres uden at røre standarden (i dag: Hjem, Tal, Vagter, Storkbook med rødt tal ved ulæst). Undersider har titel og tilbage-pil øverst. Tilbage (pil, Android-knap, iOS-gestus) bevarer listeposition, filtre og kladde.
 3. Tommelfinger: alle knapper og links mindst 44 × 44 px med 8 px luft, trykfeedback inden 100 ms. Den primære handling står fast nederst og dækkes aldrig af tastatur eller hjemmebjælke (safe areas).
 4. Hurtig: første JavaScript højst 300 KB gzip; tunge biblioteker hentes først, når siden bruger dem, aldrig som preload. Skelet (ikke spinner) inden 200 ms ved skift mellem sider. Mål i felten: LCP ≤ 2,5 s, INP ≤ 200 ms, CLS ≤ 0,1.
 5. App-følelse: træk-ned for at opdatere på lister, uendelig rulning i feed uden dubletter, optimistisk opdatering af like/kommentar/afkrydsning med tilbagerulning ved fejl, billeder med reserveret plads og forhåndsvisning højst 200 KB.
@@ -48,6 +48,7 @@ Dette afsnit er fast og må ikke fjernes eller omskrives af agenten.
 8. Formularer: rigtigt tastatur pr. felt (inputmode/type), skrift mindst 16 px i felter, fejl ved feltet, lange flows som ét trin pr. skærm, gem-knap altid synlig.
 9. Tal og tavler: KPI-kort stablet, grafer med tryk-tooltip og tallene som liste under grafen, dato- og filtervalg som skuffe fra bunden. TV-tavlerne (/tv-*) er undtaget.
 10. Tilgængelighed: brødtekst 16–17 px, sekundær tekst mindst 14 px, holder ved 200 % tekstforstørrelse, reflow ved 320 px, stående og liggende, kontrast WCAG AA i lys og mørk tilstand, reduceret bevægelse respekteres, fokus lander rigtigt efter skuffer, ingen blokerende fejl i VoiceOver/TalkBack.
+11. Flot design: telefonvisningen skal se ud som en app, man ville sende til App Store: ét designsprog (afstande, radier, typografi, farver fra temaet), ingen svævende eller halvt afskårne elementer, ingen overskrift med en knap klemt ved siden af, tal og tekst der aldrig presser hinanden. En side er først færdig, når skærmbilledet ved 360, 393 og 430 px er set og ser rigtigt ud, ikke kun når måleren er grøn.
 
 Byggeklodserne ligger i `src/components/mobile/`; lav ikke nye varianter pr. side. Mobilændringer rører aldrig datakald, login, rettigheds-hooks, routes eller migrationer.
 - Mobilændringer er først færdige, når `python3 scripts/mobile-audit/audit.py <routes>` er kørt for de berørte sider ved 360/393/430 px uden nye reelle fejl, og skærmbillederne er set. Why: fejl skal findes systematisk, ikke af brugeren én ad gangen.
