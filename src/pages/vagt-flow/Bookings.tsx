@@ -69,8 +69,14 @@ export default function VagtBookings() {
 
   // Update URL when week/year changes
   useEffect(() => {
-    setSearchParams({ week: selectedWeek.toString(), year: selectedYear.toString() });
-  }, [selectedWeek, selectedYear, setSearchParams]);
+    const w = selectedWeek.toString();
+    const y = selectedYear.toString();
+    if (searchParams.get("week") === w && searchParams.get("year") === y) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("week", w);
+    next.set("year", y);
+    setSearchParams(next, { replace: true });
+  }, [selectedWeek, selectedYear, searchParams, setSearchParams]);
 
   const weekStart = getWeekStartDate(selectedYear, selectedWeek);
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
