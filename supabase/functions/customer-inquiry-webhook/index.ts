@@ -1,5 +1,6 @@
 import { escapeHtml } from '../_shared/sanitize.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -72,26 +73,32 @@ async function sendNotificationEmail(inquiry: { name: string; company?: string; 
     message: {
       subject: `Ny kundehenvendelse fra ${inquiry.name}`,
       body: { contentType: "HTML", content: htmlBody },
-      toRecipients: [
-        { emailAddress: { address: "mg@copenhagensales.dk" } },
-        { emailAddress: { address: "km@copenhagensales.dk" } },
-        { emailAddress: { address: "some@copenhagensales.dk" } },
-      ],
+      toRecipients: [] as { emailAddress: { address: string } }[],
     },
     saveToSentItems: false,
   };
 
-  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(emailPayload),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Notification email failed:", err);
-  } else {
-    console.log("Notification email sent to mg@ and km@");
-  }
+  const faste = ["mg@copenhagensales.dk", "km@copenhagensales.dk", "some@copenhagensales.dk"];
+  await udsendFlere({
+    type: "customer-inquiry-webhook", kanal: "mail", afsenderfunktion: "customer-inquiry-webhook",
+    emne: emailPayload.message.subject,
+    modtagere: faste.map((m) => ({ modtager: m })),
+    send: async (tilladte) => {
+      emailPayload.message.toRecipients = tilladte.map((address) => ({ emailAddress: { address } }));
+      const res = await fetch(`https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(emailPayload),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Notification email failed:", err);
+        throw new Error(`Graph ${res.status}`);
+      } else {
+        console.log("Notification email sent to mg@ and km@");
+      }
+    },
+  }).catch(() => { /* fejl er logget; henvendelsen må ikke fejle pga. mail */ });
 }
 
 // --- Main handler ---
