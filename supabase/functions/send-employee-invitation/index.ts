@@ -338,17 +338,19 @@ serve(async (req) => {
       // Kun når mailen er sendt: ugyldiggør tidligere invitationer og sæt status.
       await supabase
         .from("employee_invitations")
-        .update({ status: "invalidated" })
+        .update({ status: "expired" })
         .eq("employee_id", employeeId)
         .eq("status", "pending")
-        .neq("token", token);
+        .neq("token", token)
+        .then(({ error }) => { if (error) console.error("Kunne ikke udløbe tidligere invitationer:", error.message); });
       await supabase
         .from("employee_master_data")
         .update({ invitation_status: "pending" })
         .eq("id", employeeId);
     } else {
       // Ikke sendt: den nye invitation kan aldrig bruges; den forrige gælder fortsat.
-      await supabase.from("employee_invitations").update({ status: "invalidated" }).eq("token", token);
+      const { error: expErr } = await supabase.from("employee_invitations").update({ status: "expired" }).eq("token", token);
+      if (expErr) console.error("Kunne ikke udløbe ny invitation:", expErr.message);
     }
 
     console.log(`Invitation sent for employee ${employeeId}`);

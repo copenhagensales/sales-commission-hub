@@ -138,6 +138,7 @@ async function leaderRecipients(
 }
 
 /** Typer slået fra i Udsendelser (pr. kald). Fail-open: fejler opslaget, = aktiv. */
+// Nulstilles ved starten af hvert kald (se Deno.serve), så tænd/sluk aldrig huskes på tværs af kald.
 const typeCache = new Map<string, boolean>();
 async function typeSlaaetFra(db: Client, type: string): Promise<boolean> {
   if (typeCache.has(type)) return typeCache.get(type)!;
@@ -532,7 +533,8 @@ async function handleDailySummary(
   }
 
   // Completion blokerer genkørsel: skrives ikke, når en type var slået fra.
-  if (skippedTypes.size === 0) {
+  // Skrives, når mindst én mail kom i kø (ellers dubletter ved genkørsel); kun helt tom dag kan køres igen.
+  if (leaderMails + managementMails > 0 || skippedTypes.size === 0) {
     await db.from("quality_daily_completions").insert({
       completion_date: date,
       reviewer_employee_id: reviewerEmployeeId,
@@ -552,6 +554,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    typeCache.clear();
     const db = svc();
     const caller = await resolveCaller(req, db);
     if (!caller) return json(403, { error: "Ingen adgang til kvalitetsmodulet" });
