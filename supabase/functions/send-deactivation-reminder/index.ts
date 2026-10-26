@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { formatEmploymentPeriod, formatTenure } from "../_shared/employment-tenure.ts";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -433,7 +434,11 @@ serve(async (req: Request) => {
 
     try {
       const accessToken = await getM365AccessToken();
-      await sendEmail(accessToken, recipients, subject, htmlBody);
+      await udsendFlere({
+        type: "send-deactivation-reminder", kanal: "mail", afsenderfunktion: "send-deactivation-reminder", emne: subject,
+        modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
+        send: async (tilladte) => { await sendEmail(accessToken, tilladte, subject, htmlBody); },
+      });
     } catch (sendError) {
       const message = sendError instanceof Error ? sendError.message : "Ukendt fejl";
       if (employee_id && !isTest) {
