@@ -102,7 +102,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   }, [menuConfig]);
 
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse", "/tdc-salgsvaerktoej", "/fiber-registrering"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse", "/fiber-registrering"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -112,7 +112,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const { hasAccess: invoiceflowAccess } = useInvoiceflowAccess();
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client", "/customer-inquiries", "/client-forecast"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client", "/customer-inquiries"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
