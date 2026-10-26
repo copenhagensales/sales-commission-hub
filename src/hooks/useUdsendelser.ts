@@ -36,7 +36,7 @@ export function useUdsendelsestyper() {
       }
       return (t.data ?? [])
         .map((x) => ({ ...x, antal30: stat.get(x.noegle)?.antal ?? 0, sidstSendt: stat.get(x.noegle)?.sidst ?? null }))
-        .sort((a, b) => a.kanal.localeCompare(b.kanal) || a.navn.localeCompare(b.navn, "da"));
+        .sort((a, b) => (a.gruppe ?? "").localeCompare(b.gruppe ?? "", "da") || a.kanal.localeCompare(b.kanal) || a.navn.localeCompare(b.navn, "da"));
     },
   });
 }
@@ -44,7 +44,7 @@ export function useUdsendelsestyper() {
 export function useOpdaterUdsendelsestype() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "push_titel" | "push_tekst" | "push_link">>) => {
+    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "push_titel" | "push_tekst" | "push_link" | "gruppe" | "til_medarbejdere">>) => {
       const { error } = await supabase.from("udsendelsestyper").update({ ...ret, opdateret: new Date().toISOString() }).eq("noegle", noegle);
       if (error) throw error;
     },
@@ -196,20 +196,24 @@ export function useMineUdsendelsespraeferencer() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("udsendelse_mine_typer");
       if (error) throw error;
-      return (data ?? [])
-        .map((x) => ({ noegle: x.noegle, navn: x.navn, kanal: x.kanal, beskrivelse: x.beskrivelse, aktiv: x.aktiv !== false }))
-        .sort((a, b) => a.navn.localeCompare(b.navn, "da"));
+      // Rækkefølgen fra funktionen bevares (grupper i den givne orden).
+      return (data ?? []).map((x) => ({
+        noegle: x.noegle, navn: x.navn, kanal: x.kanal, beskrivelse: x.beskrivelse, gruppe: x.gruppe, aktiv: x.aktiv !== false,
+      }));
     },
   });
-  const saet = useMutation({
-    mutationFn: async ({ noegle, kanal, aktiv }: { noegle: string; kanal: string; aktiv: boolean }) => {
+  /** Skriver til-/fravalg for flere typer/kanaler i ét kald. */
+  const saetFlere = useMutation({
+    mutationFn: async (raekker: { noegle: string; kanal: string; aktiv: boolean }[]) => {
+      if (!raekker.length) return;
+      const nu = new Date().toISOString();
       const { error } = await supabase.from("udsendelsespraeferencer").upsert(
-        { user_id: user!.id, type_noegle: noegle, kanal, aktiv, opdateret: new Date().toISOString() },
+        raekker.map((r) => ({ user_id: user!.id, type_noegle: r.noegle, kanal: r.kanal, aktiv: r.aktiv, opdateret: nu })),
         { onConflict: "user_id,type_noegle,kanal" },
       );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY_PRAEF, user?.id] }),
   });
-  return { ...query, saet };
+  return { ...query, saetFlere };
 }
