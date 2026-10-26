@@ -1,6 +1,12 @@
 import type { RouteConfig } from "./types";
 import { redirectTo, PulsenRedirect, MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesRedirect } from "./redirects";
 import {
+  VagtplanSamleside,
+  MitTeamSamleside,
+  OnboardingSamleside,
+  RekrutteringSamleside,
+  MedarbejdereSamleside,
+  KontrakterSamleside,
   VagterSamleside,
   RegistrerSalgSamleside,
   SpilSamleside,
@@ -188,7 +194,7 @@ export const routes: RouteConfig[] = [
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
   { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
   { path: "/my-goals/:employeeId", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
-  { path: "/team-goals", component: TeamGoals, access: "role", positionPermission: "menu_team_goals" },
+  { path: "/team-goals", component: redirectTo("/mit-team?tab=team-goals"), access: "protected" },
   { path: "/my-contracts", component: MyContractsRedirect, access: "protected" },
   { path: "/pulse-survey", component: PulseSurvey, access: "protected" },
   { path: "/career-wishes", component: CareerWishesRedirect, access: "protected" },
@@ -224,10 +230,10 @@ export const routes: RouteConfig[] = [
   { path: "/mg/data-import", component: redirectTo("/mg-test"), access: "protected" },
 
   { path: "/logikker", component: Logikker, access: "role", positionPermission: "menu_logics" },
-  { path: "/employees", component: EmployeeMasterData, access: "role", positionPermission: "menu_employees" },
+  { path: "/employees", component: MedarbejdereSamleside, access: "protected" },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", positionPermission: "menu_employees" },
   { path: "/login-log", component: LoginLog, access: "role", positionPermission: "menu_login_log" },
-  { path: "/upcoming-starts", component: UpcomingStarts, access: "role", positionPermission: "menu_upcoming_starts" },
+  { path: "/upcoming-starts", component: redirectTo("/employees?tab=upcoming-starts"), access: "protected" },
 
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 
@@ -249,35 +255,26 @@ export const routes: RouteConfig[] = [
   },
   { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow/booking"), access: "protected" },
   { path: "/vagt-flow/vehicles", component: redirectTo("/vagt-flow"), access: "protected" },
-  { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning/absence"), access: "protected" },
+  { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning?tab=absence"), access: "protected" },
   { path: "/vagt-flow/sales-registration", component: redirectTo("/registrer-salg?tab=fm"), access: "protected" },
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/travel-expenses", component: redirectTo("/vagt-flow"), access: "protected" },
   { path: "/vagt-flow/edit-sales", component: VagtEditSalesRegistrations, access: "role", positionPermission: "menu_fm_edit_sales" },
   { path: "/vagt-flow/eesy-fm-deviations", component: VagtEesyFmDeviations, access: "role", positionPermission: "menu_fm_eesy_deviations" },
 
-  { path: "/shift-planning", component: ShiftOverview, access: "role", positionPermission: "menu_shift_overview" },
+  { path: "/shift-planning", component: VagtplanSamleside, access: "protected" },
+  { path: "/mit-team", component: MitTeamSamleside, access: "protected" },
   { path: "/shift-planning/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
-  { path: "/shift-planning/absence", component: AbsenceManagement, access: "role", positionPermission: "menu_absence" },
+  { path: "/shift-planning/absence", component: redirectTo("/shift-planning?tab=absence"), access: "protected" },
   { path: "/shift-planning/time-tracking", component: redirectTo("/shift-planning"), access: "protected" },
 
   { path: "/extra-work-admin", component: redirectTo("/shift-planning"), access: "protected" },
-  { path: "/contracts", component: Contracts, access: "role", positionPermission: "menu_contracts" },
-  { path: "/company-overview", component: CompanyOverview, access: "role", positionPermission: "menu_contracts" },
-  { path: "/onboarding-analyse", component: OnboardingAnalyse, access: "role", positionPermission: "menu_contracts" },
-  { path: "/email-templates", component: SystemEmailTemplates, access: "role", positionPermission: "menu_contracts" },
-  {
-    path: "/pulse-survey-results",
-    component: PulseSurveyResults,
-    access: "role",
-    positionPermission: "menu_pulse_survey",
-  },
-  {
-    path: "/career-wishes-overview",
-    component: CareerWishesOverview,
-    access: "role",
-    positionPermission: "menu_career_wishes_overview",
-  },
+  { path: "/contracts", component: KontrakterSamleside, access: "protected" },
+  { path: "/company-overview", component: redirectTo("/employees?tab=company-overview"), access: "protected" },
+  { path: "/onboarding-analyse", component: redirectTo("/employees?tab=onboarding-analyse"), access: "protected" },
+  { path: "/email-templates", component: redirectTo("/contracts?tab=email-templates"), access: "protected" },
+  { path: "/pulse-survey-results", component: redirectTo("/mit-team?tab=pulse-survey-results"), access: "protected" },
+  { path: "/career-wishes-overview", component: redirectTo("/contracts?tab=career-wishes-overview"), access: "protected" },
   // Adgang håndhæves af invoiceflow_access (RLS); siden viser selv afvisning.
   { path: "/invoiceflow", component: InvoiceFlow, access: "protected" },
   { path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" },
@@ -285,81 +282,26 @@ export const routes: RouteConfig[] = [
   // Client Forecast
   { path: "/client-forecast", component: redirectTo("/home"), access: "protected" },
   { path: "/client-forecast/:id", component: redirectTo("/home"), access: "protected" },
-  { path: "/car-quiz-admin", component: CarQuizAdmin, access: "role", positionPermission: "menu_car_quiz_admin" },
-  {
-    path: "/code-of-conduct-admin",
-    component: CodeOfConductAdmin,
-    access: "role",
-    positionPermission: "menu_coc_admin",
-  },
+  { path: "/car-quiz-admin", component: redirectTo("/mit-team?tab=car-quiz-admin"), access: "protected" },
+  { path: "/code-of-conduct-admin", component: redirectTo("/mit-team?tab=code-of-conduct-admin"), access: "protected" },
 
-  {
-    path: "/recruitment",
-    component: RecruitmentDashboard,
-    access: "role",
-    positionPermission: "menu_recruitment_dashboard",
-  },
-  {
-    path: "/recruitment/candidates",
-    component: RecruitmentCandidates,
-    access: "role",
-    positionPermission: "menu_candidates",
-  },
+  { path: "/recruitment", component: RekrutteringSamleside, access: "protected" },
+  { path: "/recruitment/candidates", component: redirectTo("/recruitment?tab=candidates"), access: "protected" },
   {
     path: "/recruitment/candidates/:id",
     component: CandidateDetail,
     access: "role",
     positionPermission: "menu_candidates",
   },
-  {
-    path: "/recruitment/messages",
-    component: RecruitmentMessages,
-    access: "role",
-    positionPermission: "menu_messages",
-  },
-  {
-    path: "/recruitment/sms-templates",
-    component: SmsTemplates,
-    access: "role",
-    positionPermission: "menu_sms_templates",
-  },
-  {
-    path: "/recruitment/email-templates",
-    component: EmailTemplatesPage,
-    access: "role",
-    positionPermission: "menu_email_templates",
-  },
-  { path: "/recruitment/winback", component: Winback, access: "role", positionPermission: "menu_winback" },
-  {
-    path: "/recruitment/upcoming-interviews",
-    component: UpcomingInterviews,
-    access: "role",
-    positionPermission: "menu_upcoming_interviews",
-  },
-  {
-    path: "/recruitment/upcoming-hires",
-    component: UpcomingHires,
-    access: "role",
-    positionPermission: "menu_upcoming_hires",
-  },
-  {
-    path: "/recruitment/booking-flow",
-    component: BookingFlow,
-    access: "role",
-    positionPermission: "menu_candidates",
-  },
-  {
-    path: "/recruitment/booking-flow/engagement",
-    component: BookingFlowEngagement,
-    access: "role",
-    positionPermission: "menu_candidates",
-  },
-  {
-    path: "/recruitment/referrals",
-    component: Referrals,
-    access: "role",
-    positionPermission: "menu_candidates",
-  },
+  { path: "/recruitment/messages", component: redirectTo("/recruitment?tab=messages"), access: "protected" },
+  { path: "/recruitment/sms-templates", component: redirectTo("/recruitment?tab=sms-templates"), access: "protected" },
+  { path: "/recruitment/email-templates", component: redirectTo("/recruitment?tab=email-templates"), access: "protected" },
+  { path: "/recruitment/winback", component: redirectTo("/recruitment?tab=winback"), access: "protected" },
+  { path: "/recruitment/upcoming-interviews", component: redirectTo("/recruitment?tab=upcoming-interviews"), access: "protected" },
+  { path: "/recruitment/upcoming-hires", component: redirectTo("/recruitment?tab=upcoming-hires"), access: "protected" },
+  { path: "/recruitment/booking-flow", component: redirectTo("/recruitment?tab=booking-flow"), access: "protected" },
+  { path: "/recruitment/booking-flow/engagement", component: redirectTo("/recruitment?tab=engagement"), access: "protected" },
+  { path: "/recruitment/referrals", component: redirectTo("/recruitment?tab=referrals"), access: "protected" },
 
   { path: "/client-sales-overview", component: redirectTo("/mg-test"), access: "protected" },
   { path: "/boards/sales", component: redirectTo("/dashboards"), access: "protected" },
@@ -402,21 +344,16 @@ export const routes: RouteConfig[] = [
   { path: "/role-preview/:id", component: RolePreview, access: "role", positionPermission: "menu_permissions" },
 
   // Onboarding
-  {
-    path: "/onboarding-program",
-    component: OnboardingDashboard,
-    access: "role",
-    positionPermission: "menu_onboarding_admin",
-  },
+  { path: "/onboarding-program", component: OnboardingSamleside, access: "protected" },
   { path: "/onboarding-program/kursus", component: redirectTo("/onboarding-program"), access: "protected" },
   { path: "/my-feedback", component: redirectTo("/my-profile?tab=feedback"), access: "protected" },
-  { path: "/coaching-templates", component: CoachingTemplates, access: "role", positionPermission: "menu_onboarding_admin" },
+  { path: "/coaching-templates", component: redirectTo("/onboarding-program?tab=coaching-templates"), access: "protected" },
   // Fareflag: adgangen haandhaeves i databasen og i selve siden (kun ledere)
-  { path: "/opstartshold", component: RampTeam, access: "protected" },
+  { path: "/opstartshold", component: redirectTo("/onboarding-program?tab=opstartshold"), access: "protected" },
 
   // Kvalitetskontrol: adgangen haandhaeves i databasen (RLS + RPC) og i siden
-  { path: "/kvalitetskontrol", component: QualityControl, access: "protected" },
-  { path: "/kvalitetskontrol/administration", component: QualityAdmin, access: "protected" },
+  { path: "/kvalitetskontrol", component: redirectTo("/mit-team?tab=kvalitetskontrol"), access: "protected" },
+  { path: "/kvalitetskontrol/administration", component: redirectTo("/mit-team?tab=administration"), access: "protected" },
 
   { path: "/excel-field-matcher", component: redirectTo("/employees"), access: "protected" },
 

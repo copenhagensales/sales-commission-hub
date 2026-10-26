@@ -2315,7 +2315,7 @@ export default function MyProfile() {
           {profilFaner.kodeks && (
             <TabsContent value="kodeks" className="mt-6">
               <Suspense fallback={<RouteSkeleton />}>
-                <div className="space-y-8"><CodeOfConduct /><CarQuiz /></div>
+                <div className="space-y-8">{profilFaner.kodeksCoc && <CodeOfConduct />}{profilFaner.kodeksCar && <CarQuiz />}</div>
               </Suspense>
             </TabsContent>
           )}

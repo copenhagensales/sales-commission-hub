@@ -1,3 +1,4 @@
+import { useTeamPersonaleSynlighed } from "@/hooks/useTeamPersonaleSynlighed";
 import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
 import { clearPushSubscription } from "@/hooks/usePushNotifications";
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, FileText, Crown, User, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, Inbox, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag } from "lucide-react";
@@ -74,6 +75,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
   const mitArbejde = useMitArbejdeSynlighed();
+  const tp = useTeamPersonaleSynlighed();
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
@@ -445,7 +447,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Check if any Personnel menu items are visible (requires section permission)
   const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
-    (p.canViewEmployees || p.canViewTeams || p.canViewLoginLog || p.canViewUpcomingStarts);
+    (tp.har.medarbejdere || p.canViewLoginLog);
   
   // Check if any Ledelse menu items are visible (requires section permission)
   const showLedelseMenu = !isMenuHidden('section_ledelse') && p.canView("menu_section_ledelse") && 
@@ -466,7 +468,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
-    (p.canViewShiftOverview || p.canViewAbsence);
+    tp.har.vagtplan;
   
   
   // Check if any Recruitment items are visible (requires section permission)
@@ -671,18 +673,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
               
-              {/* Teammål */}
-              {p.canViewTeamGoals && (
-                <NavLink
-                  to="/team-goals"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/team-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Users className="h-4 w-4" />
-                  Teammål
+              {tp.har.mitTeam && (
+                <NavLink to="/mit-team" onClick={handleNavClick} className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/mit-team" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <div className="flex items-center gap-3">
+                    <Users className="h-4 w-4" />
+                    Mit team
+                  </div>
                 </NavLink>
               )}
               
@@ -805,17 +804,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {personnelOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewEmployees && (
-                  <NavLink
-                    to="/employees"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/employees" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <Users className="h-4 w-4" />
-                    {t("sidebar.employees")}
+                {tp.har.medarbejdere && (
+                  <NavLink to="/employees" onClick={handleNavClick} className={cn(
+                    "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/employees" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <div className="flex items-center gap-3">
+                      <Users className="h-4 w-4" />
+                      Medarbejdere
+                    </div>
                   </NavLink>
                 )}
                 {p.canViewLoginLog && (
@@ -829,19 +826,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   >
                     <Clock className="h-4 w-4" />
                     {t("sidebar.loginLog")}
-                  </NavLink>
-                )}
-                {p.canViewUpcomingStarts && (
-                  <NavLink
-                    to="/upcoming-starts"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/upcoming-starts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Kommende Opstarter
                   </NavLink>
                 )}
               </CollapsibleContent>
@@ -873,31 +857,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     InvoiceFlow
                   </NavLink>
                 )}
-                {p.canViewContracts && (
-                  <NavLink to="/company-overview" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/company-overview" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Building2 className="h-4 w-4" />
-                    Virksomhedsoverblik
-                  </NavLink>
-                )}
-                {p.canViewContracts && (
-                  <NavLink to="/onboarding-analyse" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/onboarding-analyse" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <TrendingDown className="h-4 w-4" />
-                    Onboarding Analyse
-                  </NavLink>
-                )}
-                {p.canViewContracts && (
+                {tp.har.kontrakter && (
                   <NavLink to="/contracts" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/contracts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
-                    <FileText className="h-4 w-4" />
-                    {t("sidebar.contracts")}
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4" />
+                      Kontrakter og karriere
+                    </div>
                   </NavLink>
                 )}
                 {p.canViewPermissions && (
@@ -907,24 +875,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Shield className="h-4 w-4" />
                     {t("sidebar.permissions")}
-                  </NavLink>
-                )}
-                {p.canViewCareerWishesOverview && (
-                  <NavLink to="/career-wishes-overview" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/career-wishes-overview" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Sparkles className="h-4 w-4" />
-                    {t("sidebar.careerWishesOverview")}
-                  </NavLink>
-                )}
-                {p.canViewContracts && (
-                  <NavLink to="/email-templates" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/email-templates" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Mail className="h-4 w-4" />
-                    Skabeloner
                   </NavLink>
                 )}
                 {p.canViewSecurityDashboard && (
@@ -946,24 +896,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   </NavLink>
                 )}
                 
-                {p.canViewCarQuizAdmin && (
-                  <NavLink to="/car-quiz-admin" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/car-quiz-admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Car className="h-4 w-4" />
-                    {t("sidebar.carQuizAdmin")}
-                  </NavLink>
-                )}
-                {p.canViewCocAdmin && (
-                  <NavLink to="/code-of-conduct-admin" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/code-of-conduct-admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Shield className="h-4 w-4" />
-                    {t("sidebar.codeOfConductAdmin")}
-                  </NavLink>
-                )}
                 {/* Adgang styres af superadmin-rollen (data i `superadmins`), ikke af en e-mailliste */}
                 {p.canView("menu_reports_revenue_by_client") && isSuperadmin && (
                   <NavLink to="/reports/revenue-by-client" onClick={handleNavClick} className={cn(
@@ -981,15 +913,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <BarChart3 className="h-4 w-4" />
                     Kampagneoversigt Tryg
-                  </NavLink>
-                )}
-                {p.canViewPulseSurvey && (
-                  <NavLink to="/pulse-survey-results" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/pulse-survey-results" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    {t("sidebar.pulseSurveyResults")}
                   </NavLink>
                 )}
                 {p.canView("menu_customer_inquiries") && (
@@ -1021,23 +944,14 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {shiftPlanningOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewShiftOverview && (
+                {tp.har.vagtplan && (
                   <NavLink to="/shift-planning" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/shift-planning" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
-                    <Calendar className="h-4 w-4" />
-                    {t("sidebar.shiftPlanLeader")}
-                  </NavLink>
-                )}
-                {p.canViewAbsence && (
-                  <NavLink to="/shift-planning/absence" onClick={handleNavClick} className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/shift-planning/absence" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
                     <div className="flex items-center gap-3">
-                      <Clock className="h-4 w-4" />
-                      {t("sidebar.absence")}
+                      <Calendar className="h-4 w-4" />
+                      {t("sidebar.shiftPlan")}
                     </div>
                     {pendingAbsenceCount > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">{pendingAbsenceCount}</Badge>
@@ -1240,221 +1154,35 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </Collapsible>
           )}
 
-          {/* Kvalitetskontrol - kvalitetskontrollant, teamledere og superadmin */}
-          {hasQualityAccess && (
-            <NavLink to="/kvalitetskontrol" onClick={handleNavClick} className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname.startsWith("/kvalitetskontrol") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+
+
+          {tp.har.onboarding && (
+            <NavLink to="/onboarding-program" onClick={handleNavClick} className={cn(
+              "flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname === "/onboarding-program" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
-              <ClipboardCheck className="h-5 w-5" />
-              Kvalitetskontrol
+              <div className="flex items-center gap-3">
+                <GraduationCap className="h-5 w-5" />
+                Onboarding
+              </div>
             </NavLink>
           )}
 
-
-          {/* Onboarding menu - Only admin access for now (system not ready for employees) */}
-          {showOnboardingMenu && (
-            <Collapsible open={onboardingOpen} onOpenChange={setOnboardingOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/onboarding-program") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <GraduationCap className="h-5 w-5" />
-                  Onboarding
-                </div>
-                {onboardingOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {showRampTeam && (
-                  <NavLink to="/opstartshold" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/opstartshold" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Users className="h-4 w-4" />
-                    Opstartshold
-                  </NavLink>
-                )}
-                {showOnboardingAdminItems && (<>
-                <NavLink to="/onboarding-program" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/onboarding-program" && !location.search ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Oversigt
-                </NavLink>
-                <NavLink to="/onboarding-program?tab=ramp" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/onboarding-program" && location.search.includes("tab=ramp") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Target className="h-4 w-4" />
-                  Forventninger
-                </NavLink>
-                <NavLink to="/onboarding-program?tab=leader" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/onboarding-program" && location.search.includes("tab=leader") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Crown className="h-4 w-4" />
-                  Leder Onboarding
-                </NavLink>
-                <NavLink to="/onboarding-program?tab=drills" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/onboarding-program" && location.search.includes("tab=drills") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <ListChecks className="h-4 w-4" />
-                  Drill Bibliotek
-                </NavLink>
-                <NavLink to="/onboarding-program?tab=admin" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/onboarding-program" && location.search.includes("tab=admin") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Settings className="h-4 w-4" />
-                  Administration
-                </NavLink>
-                <NavLink to="/coaching-templates" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/coaching-templates" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <FileText className="h-4 w-4" />
-                  Coaching Skabeloner
-                </NavLink>
-                </>)}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Rekruttering menu */}
-          {showRecruitmentMenu && (
-            <Collapsible open={recruitmentOpen} onOpenChange={setRecruitmentOpen}>
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                    location.pathname.startsWith("/recruitment") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <UserPlus className="h-5 w-5" />
-                    {t("sidebar.recruitment")}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(pendingReferralsCount > 0 || recruitmentNotificationsCount > 0) && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                        {(pendingReferralsCount + recruitmentNotificationsCount) > 99 ? "99+" : (pendingReferralsCount + recruitmentNotificationsCount)}
-                      </Badge>
-                    )}
-                    {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewRecruitmentDashboard && (
-                  <NavLink to="/recruitment" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <LayoutDashboard className="h-4 w-4" />
-                    {t("sidebar.dashboard")}
-                  </NavLink>
-                )}
-                {p.canViewCandidates && (
-                  <NavLink to="/recruitment/candidates" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname.startsWith("/recruitment/candidates") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Users className="h-4 w-4" />
-                    {t("sidebar.candidates")}
-                  </NavLink>
-                )}
-                {p.canViewUpcomingInterviews && (
-                  <NavLink to="/recruitment/upcoming-interviews" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/upcoming-interviews" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <CalendarClock className="h-4 w-4" />
-                    {t("sidebar.upcomingInterviews")}
-                  </NavLink>
-                )}
-                {p.canViewBookingFlow && (
-                  <NavLink to="/recruitment/booking-flow" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/booking-flow" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <CalendarClock className="h-4 w-4" />
-                    Booking Flow
-                  </NavLink>
-                )}
-                {p.canViewWinback && (
-                  <NavLink to="/recruitment/winback" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/winback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <RefreshCcw className="h-4 w-4" />
-                    {t("sidebar.winback")}
-                  </NavLink>
-                )}
-                {p.canViewUpcomingHires && (
-                  <NavLink to="/recruitment/upcoming-hires" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/upcoming-hires" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <UserCog className="h-4 w-4" />
-                    {t("sidebar.hires")}
-                  </NavLink>
-                )}
-                {p.canViewMessages && (
-                  <NavLink to="/recruitment/messages" onClick={handleNavClick} className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <div className="flex items-center gap-3">
-                      <MessageSquare className="h-4 w-4" />
-                      {t("sidebar.messages")}
-                    </div>
-                    {recruitmentNotificationsCount > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                        {recruitmentNotificationsCount > 99 ? "99+" : recruitmentNotificationsCount}
-                      </Badge>
-                    )}
-                  </NavLink>
-                )}
-                {p.canViewSmsTemplates && (
-                  <NavLink to="/recruitment/sms-templates" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/sms-templates" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <FileText className="h-4 w-4" />
-                    {t("sidebar.smsTemplates")}
-                  </NavLink>
-                )}
-                {p.canViewEmailTemplates && (
-                  <NavLink to="/recruitment/email-templates" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/email-templates" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <FileText className="h-4 w-4" />
-                    {t("sidebar.emailTemplates")}
-                  </NavLink>
-                )}
-                {p.canViewReferrals && (
-                  <NavLink to="/recruitment/referrals" onClick={handleNavClick} className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/recruitment/referrals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <div className="flex items-center gap-3">
-                      <Gift className="h-4 w-4" />
-                      Henvisninger
-                    </div>
-                    {pendingReferralsCount > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                        {pendingReferralsCount > 99 ? "99+" : pendingReferralsCount}
-                      </Badge>
-                    )}
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+          {tp.har.rekruttering && (
+            <NavLink to="/recruitment" onClick={handleNavClick} className={cn(
+              "flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname === "/recruitment" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <div className="flex items-center gap-3">
+                <UserPlus className="h-5 w-5" />
+                {t("sidebar.recruitment")}
+              </div>
+              {(pendingReferralsCount > 0 || recruitmentNotificationsCount > 0) && (
+                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                  {(pendingReferralsCount + recruitmentNotificationsCount) > 99 ? "99+" : (pendingReferralsCount + recruitmentNotificationsCount)}
+                </Badge>
+              )}
+            </NavLink>
           )}
 
 
