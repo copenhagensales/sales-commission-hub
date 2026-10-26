@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -89,6 +90,16 @@ Deno.serve(async (req) => {
     let processed = 0;
     let failed = 0;
 
+    // Udsendelsestype = template_key, hvis den findes som nøgle; ellers funktionens navn (fail-open).
+    let kendteTyper = new Set<string>();
+    try {
+      const { data: typer, error: typeErr } = await supabase.from('udsendelsestyper').select('noegle');
+      if (typeErr) throw typeErr;
+      kendteTyper = new Set((typer ?? []).map((t: { noegle: string }) => t.noegle));
+    } catch (e) {
+      console.error('udsend: kunne ikke hente udsendelsestyper', e);
+    }
+
     for (const email of pendingEmails) {
       try {
         console.log(`Processing email ${email.id} to ${email.recipient_email}`);
@@ -129,14 +140,27 @@ Deno.serve(async (req) => {
         };
 
         const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
-        const emailResponse = await fetch(sendMailUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json',
+        let emailResponse: Response | undefined;
+        await udsend({
+          type: email.template_key && kendteTyper.has(email.template_key) ? email.template_key : 'process-scheduled-emails',
+          kanal: 'mail', modtager: email.recipient_email, emne: email.subject, afsenderfunktion: 'process-scheduled-emails',
+          modtagerCandidateId: email.candidate_id || undefined, modtagerEmployeeId: email.employee_id || undefined,
+          send: async () => {
+            emailResponse = await fetch(sendMailUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${tokenData.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(emailPayload),
+            });
+            if (!emailResponse.ok) throw new Error(`HTTP ${emailResponse.status}`);
           },
-          body: JSON.stringify(emailPayload),
-        });
+        }).catch((e) => { if (!emailResponse) throw e; });
+        if (!emailResponse) {
+          // Slået fra eller fravalgt i Udsendelser: intet sendt; mailen bliver stående som planlagt.
+          continue;
+        }
 
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
