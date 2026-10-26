@@ -70,11 +70,6 @@ export const PERMISSION_KEYS = {
   menu_amo_audit_log: { label: 'AMO Audit Log', section: 'amo', parent: 'menu_section_amo' },
 
   // ==================== ØKONOMI (under menu_section_economic) ====================
-  menu_economic_dashboard: { label: 'Økonomi Dashboard', section: 'economic', parent: 'menu_section_economic' },
-  menu_economic_expenses: { label: 'Udgifter', section: 'economic', parent: 'menu_section_economic' },
-  menu_economic_budget: { label: 'Budget 2026', section: 'economic', parent: 'menu_section_economic' },
-  menu_economic_mapping: { label: 'Økonomi Mapping', section: 'economic', parent: 'menu_section_economic' },
-  menu_economic_upload: { label: 'E-conomic Import', section: 'economic', parent: 'menu_section_economic' },
   
 
   // ==================== MIT HJEM (under menu_section_personal) ====================
@@ -104,15 +99,10 @@ export const PERMISSION_KEYS = {
   menu_immediate_payment_ase: { label: 'Straksbetaling (ASE)', section: 'mit_hjem', parent: 'menu_section_personal' },
 
   // ==================== EKSTRAARBEJDE (top-level) ====================
-  menu_extra_work: { label: 'Ekstraarbejde', section: 'extra_work', parent: null },
-  menu_extra_work_admin: { label: 'Ekstra arbejde admin', section: 'extra_work', parent: 'menu_extra_work' },
 
   // Ekstraarbejde Tabs
-  tab_extra_work_my: { label: 'Fane: Mit ekstra arbejde', section: 'extra_work', parent: 'menu_extra_work' },
-  tab_extra_work_history: { label: 'Fane: Historik', section: 'extra_work', parent: 'menu_extra_work' },
 
   // ==================== PERSONALE (under menu_section_personale) ====================
-  menu_dashboard: { label: 'Dashboard', section: 'personale', parent: 'menu_section_personale' },
   menu_employees: { label: 'Medarbejdere', section: 'personale', parent: 'menu_section_personale' },
   menu_teams: { label: 'Teams', section: 'personale', parent: 'menu_section_personale' },
   menu_permissions: { label: 'Rettigheder', section: 'personale', parent: 'menu_section_personale' },
@@ -136,7 +126,6 @@ export const PERMISSION_KEYS = {
   menu_email_templates_ledelse: { label: 'E-mail skabeloner (Ledelse)', section: 'ledelse', parent: 'menu_section_ledelse' },
   menu_security_dashboard: { label: 'Sikkerhedsoversigt', section: 'ledelse', parent: 'menu_section_ledelse' },
   menu_customer_inquiries: { label: 'Kundehenvendelser', section: 'ledelse', parent: 'menu_section_ledelse' },
-  menu_client_forecast: { label: 'Kundeforecast', section: 'ledelse', parent: 'menu_section_ledelse' },
 
   // Contracts Tabs
   tab_contracts_all: { label: 'Fane: Alle kontrakter', section: 'ledelse', parent: 'menu_contracts' },
@@ -147,9 +136,7 @@ export const PERMISSION_KEYS = {
   // ==================== VAGTPLAN (under menu_section_vagtplan) ====================
   menu_shift_overview: { label: 'Vagtplan (leder)', section: 'vagtplan', parent: 'menu_section_vagtplan' },
   menu_absence: { label: 'Fravær', section: 'vagtplan', parent: 'menu_section_vagtplan' },
-  menu_time_tracking: { label: 'Tidsregistrering', section: 'vagtplan', parent: 'menu_section_vagtplan' },
   menu_time_stamp: { label: 'Stempelur', section: 'vagtplan', parent: 'menu_section_vagtplan' },
-  menu_closing_shifts: { label: 'Påmindelser', section: 'vagtplan', parent: 'menu_section_vagtplan' },
 
   // ==================== MG (under menu_section_mg) ====================
   menu_team_overview: { label: 'Team overblik', section: 'mg', parent: 'menu_section_mg' },
@@ -159,7 +146,6 @@ export const PERMISSION_KEYS = {
   menu_relatel_dashboard: { label: 'Relatel Dashboard', section: 'mg', parent: 'menu_section_mg' },
   menu_codan: { label: 'Codan', section: 'mg', parent: 'menu_section_mg' },
   menu_mg_test: { label: 'MG Test', section: 'mg', parent: 'menu_section_mg' },
-  menu_mg_data_import: { label: 'Data import', section: 'mg', parent: 'menu_section_mg' },
   menu_test_dashboard: { label: 'MG Test Dashboard', section: 'mg', parent: 'menu_section_mg' },
   menu_dialer_data: { label: 'Dialer data', section: 'mg', parent: 'menu_section_mg' },
   menu_calls_data: { label: 'Opkaldsdata', section: 'mg', parent: 'menu_section_mg' },
@@ -255,7 +241,6 @@ export const PERMISSION_KEYS = {
   menu_reports_admin: { label: 'Admin rapporter', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_daily: { label: 'Daglige rapporter', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_management: { label: 'Ledelsesrapporter', section: 'reports', parent: 'menu_section_reports' },
-  menu_reports_employee: { label: 'Medarbejderrapporter', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_revenue_by_client: { label: 'Omsætning per opgave', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_tdc_edit_sales: { label: 'TDC Erhverv - ret salg', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_tryg_edit_sales: { label: 'Tryg - Ret salg', section: 'reports', parent: 'menu_section_reports' },
@@ -295,15 +280,10 @@ export const PERMISSION_KEYS = {
   menu_fm_my_schedule: { label: 'Min FM vagtplan', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_overview: { label: 'Oversigt', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_booking: { label: 'Booking', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_vehicles: { label: 'Køretøjer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_sales_registration: { label: 'Salgsregistrering', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_billing: { label: 'Fakturering', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_travel_expenses: { label: 'Rejsekort og diæter', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_edit_sales: { label: 'Ret salg', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_eesy_deviations: { label: 'Eesy FM afvigelser (Leder)', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_time_off: { label: 'Fraværsanmodninger', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_book_week: { label: 'Book uge', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
-  menu_fm_bookings: { label: 'Kommende bookinger', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
   menu_fm_locations: { label: 'Lokationer', section: 'fieldmarketing', parent: 'menu_section_fieldmarketing' },
 
   // Fieldmarketing Tabs
@@ -319,7 +299,6 @@ export const PERMISSION_KEYS = {
   tab_fm_checklist: { label: 'Fane: Tjekliste', section: 'fieldmarketing', parent: 'menu_fm_booking' },
 
   // ==================== SALG & SYSTEM (under menu_section_sales_system) ====================
-  menu_sales: { label: 'Salg', section: 'sales_system', parent: 'menu_section_sales_system' },
   menu_logics: { label: 'Logikker', section: 'sales_system', parent: 'menu_section_sales_system' },
   menu_live_stats: { label: 'Live Stats', section: 'sales_system', parent: 'menu_section_sales_system' },
   menu_settings: { label: 'Indstillinger', section: 'sales_system', parent: 'menu_section_sales_system' },

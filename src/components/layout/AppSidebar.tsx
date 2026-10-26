@@ -457,16 +457,16 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Check if any Fieldmarketing items are visible. FM opt-in only opens Salgsregistrering.
   const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && (
     (p.canView("menu_section_fieldmarketing") && 
-      (p.canViewFmMySchedule || p.canViewFmOverview || p.canViewFmBookWeek || 
-       p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
-       p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
+      (p.canViewFmMySchedule || p.canViewFmOverview ||
+       p.canViewFmLocations ||
+       p.canViewFmBilling || p.canViewFmSalesRegistration ||
        false)) ||
     canAccessFmSalesRegistration
   );
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
-    (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts);
+    (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeStamp);
   
   
   // Check if any Recruitment items are visible (requires section permission)
@@ -488,7 +488,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Tryg-ret-salg-adgang (ejer/allowlist) viser sektionen uafhængigt af rollens rapport-sektionsadgang.
   const showReportsMenu = !isMenuHidden('section_rapporter') && (
     (p.canView("menu_section_reports") &&
-      (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations || p.canViewReportsTdcEditSales)) ||
+      (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || canViewCancellations || p.canViewReportsTdcEditSales)) ||
     showTrygEditSales
   );
   
