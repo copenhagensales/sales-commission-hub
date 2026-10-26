@@ -1,5 +1,8 @@
 import { usePermissions } from "@/hooks/usePositionPermissions";
-import { useCanWorkFieldmarketing } from "@/hooks/useFieldmarketingEmployee";
+import { useCanWorkFieldmarketing, useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
+import { useIsSalgskonsulent } from "@/hooks/useCodeOfConduct";
+import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
+import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 
 /**
  * Fanesynlighed for samlesiderne i »Mit arbejde«. Hver fane følger præcis sin gamle rutes regel
@@ -9,6 +12,11 @@ import { useCanWorkFieldmarketing } from "@/hooks/useFieldmarketingEmployee";
 export function useMitArbejdeSynlighed() {
   const p = usePermissions();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
+  // Samme betingelser som de tidligere menupunkter i AppSidebar (hvem ser hvad må ikke blive bredere).
+  const { data: isUnitedMember } = useIsUnitedMember();
+  const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+  const { data: isSalgskonsulent } = useIsSalgskonsulent();
+  const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
 
   const fmVagt = !!p.canViewFmMySchedule;
   const fmSalg = !!p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
@@ -20,8 +28,8 @@ export function useMitArbejdeSynlighed() {
     stempelur: p.canView("menu_time_stamp"),
   };
   const salg = {
-    salg: !fmSalg,
-    straksbetaling: !fmSalg,
+    salg: !!isUnitedMember,
+    straksbetaling: !!hasImmediatePaymentSales,
     fm: fmSalg,
   };
   const spil = {
@@ -31,7 +39,9 @@ export function useMitArbejdeSynlighed() {
   const profil = {
     fordele: p.canView("menu_employee_perks"),
     feedback: p.canView("menu_my_feedback"),
-    kodeks: true,
+    kodeks: !!isSalgskonsulent || !!isFieldmarketing,
+    kodeksCoc: !!isSalgskonsulent,
+    kodeksCar: !!isFieldmarketing,
     anbefal: p.canView("menu_refer_a_friend"),
   };
 
