@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -169,20 +170,33 @@ Deno.serve(async (req) => {
       saveToSentItems: true,
     };
 
-    const emailResponse = await fetch(sendMailUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailPayload),
-    });
-
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('Email send error:', errorText);
+    let sendErrorText: string | null = null;
+    try {
+      await udsendFlere({
+        type: 'notify-referral-received', kanal: 'mail', emne: emailPayload.message.subject,
+        afsenderfunktion: 'notify-referral-received',
+        modtagere: recipientEmails.map((email: string) => ({ modtager: email })),
+        send: async (tilladte) => {
+          emailPayload.message.toRecipients = tilladte.map(email => ({ emailAddress: { address: email } }));
+          const emailResponse = await fetch(sendMailUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(emailPayload),
+          });
+          if (!emailResponse.ok) {
+            sendErrorText = await emailResponse.text();
+            throw new Error(`Failed to send email: ${emailResponse.status}`);
+          }
+        },
+      });
+    } catch (e) {
+      if (sendErrorText === null) throw e;
+      console.error('Email send error:', sendErrorText);
       return new Response(
-        JSON.stringify({ error: 'Failed to send email', details: errorText }),
+        JSON.stringify({ error: 'Failed to send email', details: sendErrorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
