@@ -41,6 +41,8 @@ interface StrukturMenuProps {
   udelad?: string[];
   /** Ekstra punkter øverst (fx Min profil i Menu-skuffen). */
   top?: StrukturSide[];
+  /** Flad liste (telefonens Menu-skuffe): område som lille overskrift, siderne direkte under, ingen fold-ud. */
+  flad?: boolean;
 }
 
 const punkt = "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200";
@@ -48,7 +50,7 @@ const aktivCls = "bg-sidebar-accent text-sidebar-accent-foreground";
 const passivCls = "text-sidebar-foreground hover:bg-sidebar-accent/50";
 
 /** Sidebar og Menu-skuffe: ét område = én foldbar sektion, ét punkt pr. synlig side. */
-export function StrukturMenu({ badges = {}, onNavigate, udelad = [], top = [] }: StrukturMenuProps) {
+export function StrukturMenu({ badges = {}, onNavigate, udelad = [], top = [], flad = false }: StrukturMenuProps) {
   const { pathname } = useLocation();
   const omraader = useSynligStruktur().filter((o) => !udelad.includes(o.id));
   const [aaben, setAaben] = useState<Record<string, boolean>>({});
@@ -65,6 +67,26 @@ export function StrukturMenu({ badges = {}, onNavigate, udelad = [], top = [] }:
       </NavLink>
     );
   };
+
+  if (flad) {
+    return (
+      <div className="space-y-1">
+        {top.map(link)}
+        {omraader.map((o) => {
+          const Ikon = o.ikon;
+          return (
+            <section key={o.id} aria-labelledby={`menu-${o.id}`} className="pt-3">
+              <h3 id={`menu-${o.id}`} className="flex items-center gap-2 px-3 pb-1 text-sm font-semibold text-sidebar-foreground/75">
+                <Ikon className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="truncate">{o.label}</span>
+              </h3>
+              <div className="space-y-1">{o.sider.map(link)}</div>
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1">
