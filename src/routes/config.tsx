@@ -1,6 +1,9 @@
 import type { RouteConfig } from "./types";
 import { redirectTo, PulsenRedirect, MyScheduleRedirect, MyGoalsRedirect, MyContractsRedirect, CareerWishesRedirect } from "./redirects";
 import {
+  VagterSamleside,
+  RegistrerSalgSamleside,
+  SpilSamleside,
   Auth,
   Home,
   Pulsen,

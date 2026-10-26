@@ -243,3 +243,8 @@ export const MenuEditor = lazyPage(() => import("@/pages/MenuEditor"));
 export const TastSelvSalg = lazyPage(() => import("@/pages/TastSelvSalg"));
 
 export const ItWorkstations = lazyPage(() => import("@/pages/it/ItWorkstations"));
+
+// Samlesider (bundt b1)
+export const VagterSamleside = lazyPage(() => import("@/pages/samlesider/MitArbejde").then((m) => ({ default: m.VagterSamleside })));
+export const RegistrerSalgSamleside = lazyPage(() => import("@/pages/samlesider/MitArbejde").then((m) => ({ default: m.RegistrerSalgSamleside })));
+export const SpilSamleside = lazyPage(() => import("@/pages/samlesider/MitArbejde").then((m) => ({ default: m.SpilSamleside })));
