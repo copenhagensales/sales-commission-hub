@@ -241,7 +241,7 @@ export const routes: RouteConfig[] = [
     access: "role",
     positionPermission: "menu_fm_locations",
   },
-  { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow"), access: "protected" },
+  { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow/booking"), access: "protected" },
   { path: "/vagt-flow/vehicles", component: redirectTo("/vagt-flow"), access: "protected" },
   { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning/absence"), access: "protected" },
   {
@@ -461,16 +461,16 @@ export const routes: RouteConfig[] = [
   { path: "/fiber-registrering", component: FiberRegistrering, access: "role", positionPermission: "menu_tdc_opsummering" },
 
   // Economic Upload (Owner only)
-  { path: "/admin/economic-upload", component: redirectTo("/reports"), access: "protected" },
+  { path: "/admin/economic-upload", component: redirectTo("/reports/admin"), access: "protected" },
 
   // Economic (fjernet 26/10 – omdirigeringer)
-  { path: "/economic", component: redirectTo("/reports"), access: "protected" },
-  { path: "/economic/posteringer", component: redirectTo("/reports"), access: "protected" },
-  { path: "/economic/expenses", component: redirectTo("/reports"), access: "protected" },
-  { path: "/economic/budget", component: redirectTo("/reports"), access: "protected" },
-  { path: "/economic/mapping", component: redirectTo("/reports"), access: "protected" },
-  { path: "/economic/revenue-match", component: redirectTo("/reports"), access: "protected" },
-  { path: "/economic/sales-validation", component: redirectTo("/reports"), access: "protected" },
+  { path: "/economic", component: redirectTo("/reports/admin"), access: "protected" },
+  { path: "/economic/posteringer", component: redirectTo("/reports/admin"), access: "protected" },
+  { path: "/economic/expenses", component: redirectTo("/reports/admin"), access: "protected" },
+  { path: "/economic/budget", component: redirectTo("/reports/admin"), access: "protected" },
+  { path: "/economic/mapping", component: redirectTo("/reports/admin"), access: "protected" },
+  { path: "/economic/revenue-match", component: redirectTo("/reports/admin"), access: "protected" },
+  { path: "/economic/sales-validation", component: redirectTo("/reports/admin"), access: "protected" },
 
 
   // AMO Compliance Hub
