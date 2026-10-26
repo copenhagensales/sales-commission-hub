@@ -40,31 +40,46 @@ export function PushSettingsCard() {
             )}
           </div>
         )}
-        <div className="space-y-3">
-          {PUSH_PREF_TYPES.map((t) => (
-            <label key={t.key} className="flex items-center justify-between gap-4 text-sm">
-              <span>{t.label}</span>
-              <Switch
-                checked={push.prefs.data?.[t.key as keyof PushPrefs] ?? true}
-                onCheckedChange={(v) => push.setPref.mutate({ [t.key]: v } as Partial<PushPrefs>, { onError: () => toast.error("Kunne ikke gemme") })}
-              />
-            </label>
-          ))}
-        </div>
-        {["push", "mail", "sms"].map((k) => {
-          const typer = (praef.data ?? []).filter((t) => t.kanal === k);
-          if (!typer.length) return null;
+        {grupper.map(([gruppe, typer]) => {
+          const pushNoegler = PUSH_GRUPPE[gruppe] ?? [];
+          const vaerdier = [
+            ...typer.map((t) => t.aktiv),
+            ...pushNoegler.map((k) => push.prefs.data?.[k] ?? true),
+          ];
+          const tilCount = vaerdier.filter(Boolean).length;
+          const tændt = tilCount > 0;
+          const delvis = tændt && tilCount < vaerdier.length;
+          const skift = (v: boolean) => {
+            praef.saetFlere.mutate(typer.map((t) => ({ noegle: t.noegle, kanal: t.kanal, aktiv: v })), { onError: () => toast.error("Kunne ikke gemme") });
+            if (pushNoegler.length) {
+              push.setPref.mutate(Object.fromEntries(pushNoegler.map((k) => [k, v])) as Partial<PushPrefs>, { onError: () => toast.error("Kunne ikke gemme") });
+            }
+          };
           return (
-            <div key={k} className="space-y-3">
-              <p className="text-sm font-semibold">{KANAL_NAVN[k]}</p>
-              {typer.map((t) => (
-                <label key={`${t.noegle}|${t.kanal}`} className="flex min-h-11 items-center justify-between gap-4 text-sm">
-                  <span>{t.navn}</span>
-                  <Switch checked={t.aktiv}
-                    onCheckedChange={(v) => praef.saet.mutate({ noegle: t.noegle, kanal: t.kanal, aktiv: v }, { onError: () => toast.error("Kunne ikke gemme") })} />
-                </label>
-              ))}
-            </div>
+            <section key={gruppe} className="space-y-1 border-t pt-3 first:border-t-0 first:pt-0">
+              <label className="flex min-h-11 items-center justify-between gap-4">
+                <span className="min-w-0">
+                  <span className="block font-semibold">{gruppe}</span>
+                  {delvis && <span className="block text-sm text-muted-foreground">delvist fravalgt</span>}
+                </span>
+                <Switch checked={tændt} aria-label={`${gruppe} til/fra`} onCheckedChange={skift}
+                  disabled={praef.saetFlere.isPending || push.setPref.isPending} />
+              </label>
+              <details className="text-sm">
+                <summary className="flex min-h-11 cursor-pointer items-center text-muted-foreground">Vis hvad der er med ({typer.length})</summary>
+                <ul className="space-y-2 pb-2 pl-1">
+                  {typer.map((t) => {
+                    const I = KANAL_IKON[t.kanal] ?? Mail;
+                    return (
+                      <li key={`${t.noegle}|${t.kanal}`} className="flex items-center gap-2">
+                        <I className="h-4 w-4 shrink-0" aria-label={KANAL_NAVN[t.kanal] ?? t.kanal} />
+                        <span className="min-w-0 break-words">{t.navn}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            </section>
           );
         })}
         <p className="text-xs text-muted-foreground">Beskeder indeholder aldrig beløb, navne eller kundeoplysninger.</p>
