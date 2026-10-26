@@ -58,9 +58,9 @@ export default function BookingManagement() {
 
   const handleTabChange = (value: string) => {
     // Preserve week/year params when changing tabs
-    const params: Record<string, string> = { tab: value };
-    if (weekParam) params.week = weekParam;
-    if (yearParam) params.year = yearParam;
+    // Bevar øvrige parametre (fx fane= fra samlesiden, week/year)
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", value);
     setSearchParams(params);
   };
 
