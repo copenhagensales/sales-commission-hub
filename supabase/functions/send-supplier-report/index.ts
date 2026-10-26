@@ -9,6 +9,7 @@ import {
   buildSupplierReportXlsx,
   xlsxFileName,
 } from "../_shared/supplier-report-xlsx.ts";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -261,12 +262,20 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
   const cc = ((sub.cc_emails as string[] | null) ?? []).filter((e) => !!e?.trim());
 
   try {
-    await sendM365Mail({
-      to: [recipient],
-      cc,
-      subject: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
-      html: built.html,
-      attachments: built.attachments,
+    // Ingen bruger-id på modtagerne, så ingen fravalg kan fjerne nogen; to/cc bevares uændret.
+    await udsendFlere({
+      type: "send-supplier-report", kanal: "mail", afsenderfunktion: "send-supplier-report",
+      emne: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
+      modtagere: [recipient, ...cc].map((m) => ({ modtager: m })),
+      send: async () => {
+        await sendM365Mail({
+          to: [recipient],
+          cc,
+          subject: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
+          html: built.html,
+          attachments: built.attachments,
+        });
+      },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -344,11 +353,17 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
   });
 
   try {
-    await sendM365Mail({
-      to: recipients,
-      subject,
-      html: built.html,
-      attachments: built.attachments,
+    await udsendFlere({
+      type: "send-supplier-report", kanal: "mail", afsenderfunktion: "send-supplier-report", emne: subject,
+      modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
+      send: async (tilladte) => {
+        await sendM365Mail({
+          to: tilladte,
+          subject,
+          html: built.html,
+          attachments: built.attachments,
+        });
+      },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -6,6 +6,7 @@ import { sendM365Mail } from "../_shared/m365-mail.ts";
 import { buildApprovalRequestEmail } from "../_shared/supplier-report-mail.ts";
 import { runWeekPlans } from "./weekplan.ts";
 import { runDailySales } from "./dailysales.ts";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -204,7 +205,10 @@ Deno.serve(async (req) => {
             link: `${baseUrl()}/vagt-flow/billing`,
             isReminder: false,
           });
-          await sendM365Mail({ to: [to], subject: mail.subject, html: mail.html });
+          await udsend({
+          type: "supplier-report-scheduler", kanal: "mail", modtager: to, emne: mail.subject, afsenderfunktion: "supplier-report-scheduler",
+          send: async () => { await sendM365Mail({ to: [to], subject: mail.subject, html: mail.html }); },
+        });
         } catch (e) {
           errors.push(`godkendelsesmail: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -256,7 +260,10 @@ Deno.serve(async (req) => {
           isReminder: true,
           reminderNumber: d.reminder_count + 1,
         });
-        await sendM365Mail({ to: [to], subject: mail.subject, html: mail.html });
+        await udsend({
+          type: "supplier-report-scheduler", kanal: "mail", modtager: to, emne: mail.subject, afsenderfunktion: "supplier-report-scheduler",
+          send: async () => { await sendM365Mail({ to: [to], subject: mail.subject, html: mail.html }); },
+        });
         await svc
           .from("supplier_report_dispatches")
           .update({
