@@ -69,7 +69,6 @@ export const PERMISSION_KEYS = {
   menu_amo_settings: { label: 'AMO Indstillinger', section: 'amo', parent: 'menu_section_amo' },
   menu_amo_audit_log: { label: 'AMO Audit Log', section: 'amo', parent: 'menu_section_amo' },
 
-  // ==================== ØKONOMI (under menu_section_economic) ====================
   
 
   // ==================== MIT HJEM (under menu_section_personal) ====================
