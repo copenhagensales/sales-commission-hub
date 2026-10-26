@@ -26,6 +26,8 @@ interface SamlesideProps {
   parameter?: string;
   /** Ydre layout (standard MainLayout); tavler bruger DashboardLayout. */
   layout?: ComponentType<{ children: ReactNode }>;
+  /** Når `parameter` ikke er "tab": fane, der vælges, hvis kun ?tab= står i adressen (dens underfaner skriver ?tab= uden de øvrige parametre). */
+  vedTab?: string;
 }
 
 const SIDE = "side";
@@ -49,13 +51,13 @@ export function vaelgFane(
 }
 
 /** Samler flere eksisterende sider som faner. Kun den aktive fane monteres. */
-export function Samleside({ titel, faner, ejerAfTab, parameter = "tab", layout: Layout = MainLayout }: SamlesideProps) {
+export function Samleside({ titel, faner, ejerAfTab, parameter = "tab", layout: Layout = MainLayout, vedTab }: SamlesideProps) {
   const [params, setParams] = useSearchParams();
   const synlige = faner.filter((f) => f.synlig);
   const ids = synlige.map((f) => f.id);
   const gruppeIds = synlige.flatMap((f) => (f.gruppe ? [f.gruppe.id] : []));
   const ejer = ejerAfTab && ids.includes(ejerAfTab) ? ejerAfTab : null;
-  const urlTab = params.get(parameter);
+  const urlTab = params.get(parameter) ?? (parameter !== "tab" && vedTab && params.has("tab") ? vedTab : null);
   const kendt = !!urlTab && (ids.includes(urlTab) || gruppeIds.includes(urlTab));
   const fraUrl = urlTab && !kendt && ejer ? ejer : urlTab;
   const aktiv = vaelgFane(synlige, fraUrl, params.get(SIDE));
