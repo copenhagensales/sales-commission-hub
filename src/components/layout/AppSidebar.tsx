@@ -1027,16 +1027,17 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 location.pathname === "/live-stats" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}
+            >
+              <Activity className="h-5 w-5" />
+              Live-tal
+            </NavLink>
+          )}
+
           {/* Tavler (bundt b3): kundetavler nås fra vælgeren */}
-          {true && (
+          {(
             <NavLink to="/dashboards" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200", location.pathname === "/dashboards" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
               <Monitor className="h-5 w-5" />
               Tavler
-            </NavLink>
-          )}
-            >
-              <Activity className="h-5 w-5" />
-              Live Stats
             </NavLink>
           )}
 
