@@ -73,7 +73,6 @@ export const PublicUnsubscribe = lazyPage(() => import("@/pages/recruitment/Publ
 
 export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 
-export const ClientSalesOverview = lazyPage(() => import("@/pages/ClientSalesOverview"));
 
 export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 export const CompanyOverview = lazyPage(() => import("@/pages/CompanyOverview"));
@@ -165,7 +164,6 @@ export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
 // TDC Opsummering
 export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));
 export const TdcIdriftsaettelse = lazyPage(() => import("@/pages/TdcIdriftsaettelse"));
-export const TdcSalg = lazyPage(() => import("@/pages/TdcSalg"));
 export const FiberRegistrering = lazyPage(() => import("@/pages/FiberRegistrering"));
 
 // Economic
