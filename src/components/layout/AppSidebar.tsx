@@ -438,7 +438,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
         )}
         
         <nav className="flex-1 space-y-1 p-4 pt-4">
-          <StrukturMenu badges={badges} onNavigate={() => handleNavClick()} udelad={isMobile ? [MIT_ARBEJDE] : []} top={mobilTop} />
+          <StrukturMenu badges={badges} onNavigate={() => handleNavClick()} udelad={isMobile ? [MIT_ARBEJDE] : []} top={mobilTop} flad={isMobile} />
         </nav>
         <div className="border-t border-sidebar-border p-4 space-y-2">
 
