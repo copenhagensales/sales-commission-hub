@@ -135,6 +135,12 @@ import {
   CustomerInquiries,
   TvLeagueDashboard,
   PowerdagBoard,
+  FieldmarketingSamleside,
+  RetSalgSamleside,
+  TdcSamleside,
+  KunderOgPriserSamleside,
+  RapporterSamleside,
+  PowerdagSamleside,
   TdcMonthlyGoalBoard,
   RelatelMonthlyGoalBoard,
   EesyFmMonthlyGoalBoard,
@@ -226,8 +232,9 @@ export const routes: RouteConfig[] = [
   { path: "/agents", component: Agents, access: "role", positionPermission: "menu_employees" },
   { path: "/sales", component: redirectTo("/live-stats"), access: "protected" },
 
-  { path: "/mg-test", component: MgTest, access: "role", positionPermission: "menu_mg_test" },
-  { path: "/mg/data-import", component: redirectTo("/mg-test"), access: "protected" },
+  { path: "/kunder-og-priser", component: KunderOgPriserSamleside, access: "protected" },
+  { path: "/mg-test", component: redirectTo("/kunder-og-priser"), access: "protected" },
+  { path: "/mg/data-import", component: redirectTo("/kunder-og-priser"), access: "protected" },
 
   { path: "/logikker", component: Logikker, access: "role", positionPermission: "menu_logics" },
   { path: "/employees", component: MedarbejdereSamleside, access: "protected" },
@@ -238,29 +245,24 @@ export const routes: RouteConfig[] = [
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 
   { path: "/vagt-flow/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
-  { path: "/vagt-flow", component: VagtFlowIndex, access: "role", positionPermission: "menu_fm_overview" },
-  {
-    path: "/vagt-flow/booking",
-    component: VagtBookingManagement,
-    access: "role",
-    positionPermission: "menu_fm_booking",
-  },
-  { path: "/vagt-flow/book-week", component: redirectTo("/vagt-flow/booking"), access: "protected" },
-  { path: "/vagt-flow/locations", component: VagtLocations, access: "role", positionPermission: "menu_fm_locations" },
+  { path: "/vagt-flow", component: FieldmarketingSamleside, access: "protected" },
+  { path: "/vagt-flow/booking", component: redirectTo("/vagt-flow?fane=booking"), access: "protected" },
+  { path: "/vagt-flow/book-week", component: redirectTo("/vagt-flow?fane=booking"), access: "protected" },
+  { path: "/vagt-flow/locations", component: redirectTo("/vagt-flow?fane=locations"), access: "protected" },
   {
     path: "/vagt-flow/locations/:id",
     component: VagtLocationDetail,
     access: "role",
     positionPermission: "menu_fm_locations",
   },
-  { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow/booking"), access: "protected" },
+  { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow?fane=booking&tab=bookings"), access: "protected" },
   { path: "/vagt-flow/vehicles", component: redirectTo("/vagt-flow"), access: "protected" },
   { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning?tab=absence"), access: "protected" },
   { path: "/vagt-flow/sales-registration", component: redirectTo("/registrer-salg?tab=fm"), access: "protected" },
-  { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
+  { path: "/vagt-flow/billing", component: redirectTo("/vagt-flow?fane=billing"), access: "protected" },
   { path: "/vagt-flow/travel-expenses", component: redirectTo("/vagt-flow"), access: "protected" },
-  { path: "/vagt-flow/edit-sales", component: VagtEditSalesRegistrations, access: "role", positionPermission: "menu_fm_edit_sales" },
-  { path: "/vagt-flow/eesy-fm-deviations", component: VagtEesyFmDeviations, access: "role", positionPermission: "menu_fm_eesy_deviations" },
+  { path: "/vagt-flow/edit-sales", component: redirectTo("/ret-salg?tab=edit-sales"), access: "protected" },
+  { path: "/vagt-flow/eesy-fm-deviations", component: redirectTo("/vagt-flow?fane=eesy-fm-deviations"), access: "protected" },
 
   { path: "/shift-planning", component: VagtplanSamleside, access: "protected" },
   { path: "/mit-team", component: MitTeamSamleside, access: "protected" },
@@ -277,7 +279,7 @@ export const routes: RouteConfig[] = [
   { path: "/career-wishes-overview", component: redirectTo("/contracts?tab=career-wishes-overview"), access: "protected" },
   // Adgang håndhæves af invoiceflow_access (RLS); siden viser selv afvisning.
   { path: "/invoiceflow", component: InvoiceFlow, access: "protected" },
-  { path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" },
+  { path: "/customer-inquiries", component: redirectTo("/kunder-og-priser?tab=henvendelser"), access: "protected" },
   
   // Client Forecast
   { path: "/client-forecast", component: redirectTo("/home"), access: "protected" },
@@ -303,7 +305,7 @@ export const routes: RouteConfig[] = [
   { path: "/recruitment/booking-flow/engagement", component: redirectTo("/recruitment?tab=engagement"), access: "protected" },
   { path: "/recruitment/referrals", component: redirectTo("/recruitment?tab=referrals"), access: "protected" },
 
-  { path: "/client-sales-overview", component: redirectTo("/mg-test"), access: "protected" },
+  { path: "/client-sales-overview", component: redirectTo("/kunder-og-priser"), access: "protected" },
   { path: "/boards/sales", component: redirectTo("/dashboards"), access: "protected" },
 
   // Dashboard Landing Page
@@ -328,9 +330,9 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "protected" },
   { path: "/dashboards/sales-overview-all", component: SalesOverviewAll, access: "protected" },
   { path: "/dashboards/commission-league", component: TvLeagueDashboard, access: "protected" },
-  { path: "/dashboards/powerdag", component: PowerdagBoard, access: "role", positionPermission: "menu_dashboard_powerdag" },
-  { path: "/dashboards/powerdag/input", component: PowerdagInput, access: "role", positionPermission: "menu_powerdag_input" },
-  { path: "/dashboards/powerdag/admin", component: PowerdagAdmin, access: "role", positionPermission: "menu_powerdag_input" },
+  { path: "/dashboards/powerdag", component: PowerdagSamleside, access: "protected" },
+  { path: "/dashboards/powerdag/input", component: redirectTo("/dashboards/powerdag?tab=input"), access: "protected" },
+  { path: "/dashboards/powerdag/admin", component: redirectTo("/dashboards/powerdag?tab=admin"), access: "protected" },
 
   // Dashboard Admin pages - restricted to those with dashboard admin permission
   { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_admin" },
@@ -367,16 +369,17 @@ export const routes: RouteConfig[] = [
   { path: "/live-stats", component: LiveStats, access: "protected" },
 
   // Reports
-  { path: "/reports/admin", component: ReportsAdmin, access: "role", positionPermission: "menu_reports_admin" },
-  { path: "/reports/management", component: ReportsManagement, access: "role", positionPermission: "menu_reports_management" },
+  { path: "/reports/admin", component: RapporterSamleside, access: "protected" },
+  { path: "/reports/management", component: redirectTo("/reports/admin?tab=management"), access: "protected" },
   { path: "/reports/employee", component: redirectTo("/reports/admin"), access: "protected" },
-  { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_daily" },
-  { path: "/reports/revenue-by-client", component: RevenueByClient, access: "role", positionPermission: "menu_reports_revenue_by_client" },
-  { path: "/reports/tdc-erhverv-edit-sales", component: TdcErhvervEditSales, access: "role", positionPermission: "menu_reports_tdc_edit_sales" },
-  { path: "/reports/weekly-lead-closure", component: WeeklyLeadClosureReport, access: "role", positionPermission: "menu_reports_weekly_lead_closure" },
+  { path: "/reports/daily", component: redirectTo("/reports/admin?tab=daily"), access: "protected" },
+  { path: "/reports/revenue-by-client", component: redirectTo("/reports/admin?tab=revenue-by-client"), access: "protected" },
+  { path: "/ret-salg", component: RetSalgSamleside, access: "protected" },
+  { path: "/reports/tdc-erhverv-edit-sales", component: redirectTo("/ret-salg?tab=tdc-erhverv-edit-sales"), access: "protected" },
+  { path: "/reports/weekly-lead-closure", component: redirectTo("/reports/admin?tab=weekly-lead-closure"), access: "protected" },
   // Adgang håndhæves i siden via useTrygEditAccess (ejere + allowlist), da Filip/Annika
   // ikke har rollen. Rutens rolle-guard ville ellers afvise dem.
-  { path: "/reports/tryg-edit-sales", component: TrygEditSales, access: "protected" },
+  { path: "/reports/tryg-edit-sales", component: redirectTo("/ret-salg?tab=tryg-edit-sales"), access: "protected" },
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },
@@ -390,13 +393,14 @@ export const routes: RouteConfig[] = [
 
   // Salary
   { path: "/salary/types", component: SalaryTypes, access: "role", positionPermission: "menu_salary_types" },
-  { path: "/salary/cancellations", component: Cancellations, access: "role", positionPermission: "menu_cancellations" },
+  { path: "/salary/cancellations", component: redirectTo("/reports/admin?tab=cancellations"), access: "protected" },
 
   // TDC Opsummering
-  { path: "/tdc-opsummering", component: TdcOpsummering, access: "role", positionPermission: "menu_tdc_opsummering" },
-  { path: "/tdc-idriftsaettelse", component: TdcIdriftsaettelse, access: "role", positionPermission: "menu_tdc_opsummering" },
-  { path: "/tdc-salgsvaerktoej", component: redirectTo("/tdc-opsummering"), access: "protected" },
-  { path: "/fiber-registrering", component: FiberRegistrering, access: "role", positionPermission: "menu_tdc_opsummering" },
+  { path: "/tdc", component: TdcSamleside, access: "protected" },
+  { path: "/tdc-opsummering", component: redirectTo("/tdc?tab=tdc-opsummering"), access: "protected" },
+  { path: "/tdc-idriftsaettelse", component: redirectTo("/tdc?tab=tdc-idriftsaettelse"), access: "protected" },
+  { path: "/tdc-salgsvaerktoej", component: redirectTo("/tdc?tab=tdc-opsummering"), access: "protected" },
+  { path: "/fiber-registrering", component: redirectTo("/tdc?tab=fiber-registrering"), access: "protected" },
 
   // Economic Upload (Owner only)
   { path: "/admin/economic-upload", component: redirectTo("/reports/admin"), access: "protected" },
