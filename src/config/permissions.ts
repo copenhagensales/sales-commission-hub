@@ -948,12 +948,10 @@ export const LANDING_PAGE_OPTIONS = [
   { value: "/home", label: "Hjem" },
   { value: "/my-schedule", label: "Min kalender" },
   { value: "/shift-planning", label: "Vagtplan" },
-  { value: "/dashboard", label: "Dashboard" },
   { value: "/vagt-flow", label: "Fieldmarketing" },
   { value: "/employees", label: "Medarbejdere" },
   { value: "/contracts", label: "Kontrakter" },
   { value: "/recruitment", label: "Rekruttering" },
-  { value: "/sales", label: "Salg" },
   { value: "/payroll", label: "Lønkørsel" },
   { value: "/onboarding-program", label: "Onboarding" },
 ];
