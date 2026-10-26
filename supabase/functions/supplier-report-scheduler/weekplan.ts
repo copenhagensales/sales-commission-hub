@@ -50,7 +50,7 @@ export interface WeekPlanResult {
   weekEnd: string;
   locations: WeekPlanLocation[];
   totalDays: number;
-  action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail";
+  action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail" | "skipped_blocked";
   detail?: string;
 }
 
@@ -435,12 +435,17 @@ export async function runWeekPlans(
       continue;
     }
 
+    if (status !== "sendt") {
+      results.push({ ...base, locations, totalDays, action: "skipped_blocked", detail: `sprunget over: ${status}` });
+      continue;
+    }
+
     await svc
       .from("supplier_report_dispatches")
       .update({
         status: "sent",
         sent_at: new Date().toISOString(),
-        sent_to: [recipient, ...cc],
+        sent_to: sentTo,
         error_message: null,
       })
       .eq("id", inserted.id);

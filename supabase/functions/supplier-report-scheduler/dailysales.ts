@@ -52,7 +52,7 @@ export interface DailySalesResult {
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
   monthToDate: DailySalesMonthToDate;
-  action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail";
+  action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail" | "skipped_blocked";
   detail?: string;
 }
 
@@ -309,12 +309,17 @@ export async function runDailySales(
       continue;
     }
 
+    if (status !== "sendt") {
+      results.push({ ...base, ...data, action: "skipped_blocked", detail: `sprunget over: ${status}` });
+      continue;
+    }
+
     await svc
       .from("supplier_report_dispatches")
       .update({
         status: "sent",
         sent_at: new Date().toISOString(),
-        sent_to: [recipient, ...cc],
+        sent_to: sentTo,
         error_message: null,
       })
       .eq("id", dispatchId);
