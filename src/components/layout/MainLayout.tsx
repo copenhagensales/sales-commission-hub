@@ -47,7 +47,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isPhone = useIsPhone();
   const { pathname } = useLocation();
   const tabs = useBottomTabs();
-  const isTabRoot = tabs.some((t) => t.to === pathname) || pathname === "/";
+  const isTabRoot = tabs.some((t) => t.to.split("?")[0] === pathname) || pathname === "/";
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Choose sidebar based on preview mode

@@ -57,7 +57,7 @@ function isOn(pathname: string, t: BottomTab, search = ""): boolean {
 
 /** Faneroden for en sti (bruges af tilbage-pilen, når der ingen historik er). */
 export function tabRootFor(pathname: string, tabs: BottomTab[]): string | null {
-  const hit = tabs.find((t) => isOn(pathname, t));
+  const hit = tabs.find((t) => isOn(pathname, t, search));
   return hit ? hit.to : null;
 }
 
@@ -96,7 +96,7 @@ function StorkbookBadge() {
 /** Hjem · Mig · Spil · Storkbook · Menu på telefon. Mig/Spil åbner en samleskuffe; faner uden adgang vises ikke. */
 export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   const all = useBottomTabs().filter((t) => t.visible);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [hubOpen, setHubOpen] = useState<null | "me" | "games">(null);
   const home = all.find((t) => t.to === "/home");
   const storkbook = all.find((t) => t.to === "/storkbook");
@@ -105,7 +105,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   if (all.length === 0 && !onMenu) return null;
 
   const link = (t: BottomTab, label: string) => {
-    const active = isOn(pathname, t);
+    const active = isOn(pathname, t, search);
     return (
       <li key={t.to} className="min-w-0 flex-1">
         <NavLink to={t.to} aria-current={active ? "page" : undefined}
@@ -118,11 +118,11 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   };
   const hubButton = (key: "me" | "games", label: string, icon: LucideIcon, items: BottomTab[]) => {
     if (items.length === 0) return null;
-    const active = hubOpen === key || items.some((t) => isOn(pathname, t));
+    const active = hubOpen === key || items.some((t) => isOn(pathname, t, search));
     return (
       <li className="min-w-0 flex-1">
         <button type="button" onClick={() => setHubOpen(key)} aria-haspopup="dialog" aria-expanded={hubOpen === key}
-          aria-current={items.some((t) => isOn(pathname, t)) ? "page" : undefined}
+          aria-current={items.some((t) => isOn(pathname, t, search)) ? "page" : undefined}
           className={cn(itemClass, active ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}>
           <TabIcon icon={icon} active={active} />
           {label}

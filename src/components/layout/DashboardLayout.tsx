@@ -24,7 +24,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const isPhone = useIsPhone();
   const { pathname } = useLocation();
   const tabs = useBottomTabs();
-  const isTabRoot = tabs.some((t) => t.to === pathname);
+  const isTabRoot = tabs.some((t) => t.to.split("?")[0] === pathname);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Detect TV mode - skip all auth-dependent components
