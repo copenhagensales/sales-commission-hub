@@ -76,7 +76,7 @@ export function StrukturMenu({ badges = {}, onNavigate, udelad = [], top = [], f
           const Ikon = o.ikon;
           return (
             <section key={o.id} aria-labelledby={`menu-${o.id}`} className="pt-3">
-              <h3 id={`menu-${o.id}`} className="flex items-center gap-2 px-3 pb-1 text-sm font-semibold text-muted-foreground">
+              <h3 id={`menu-${o.id}`} className="flex items-center gap-2 px-3 pb-1 text-sm font-semibold text-sidebar-foreground/75">
                 <Ikon className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="truncate">{o.label}</span>
               </h3>
