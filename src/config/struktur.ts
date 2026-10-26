@@ -1,12 +1,12 @@
 import {
   Home, Target, Calendar, BadgeCheck, Newspaper, Gamepad2, User, ClipboardList, Users, GraduationCap,
   CalendarDays, PencilLine, FileText, Percent, UserPlus, UserCog, FileSignature, FileBarChart, Receipt,
-  ShieldCheck, Shield, Wrench, Monitor, Zap, Activity, type LucideIcon,
+  ShieldCheck, Shield, Wrench, Monitor, Zap, Activity, Trophy, Swords, type LucideIcon,
 } from "lucide-react";
 
 /** Flag, som synlighedsreglerne læser. Bygges kun af `useStrukturSynlighed`. */
 export interface StrukturSynlighed {
-  home: boolean; mineTal: boolean; vagter: boolean; registrerSalg: boolean; storkbook: boolean; spil: boolean; minProfil: boolean;
+  home: boolean; mineTal: boolean; vagter: boolean; registrerSalg: boolean; storkbook: boolean; spil: boolean; spilSuperligaen: boolean; spilHead2head: boolean; minProfil: boolean;
   vagtplan: boolean; mitTeam: boolean; onboarding: boolean;
   fieldmarketing: boolean; retSalg: boolean; tdc: boolean; kunder: boolean;
   rekruttering: boolean; medarbejdere: boolean; kontrakter: boolean;
@@ -21,6 +21,17 @@ export interface StrukturSide {
   label: string;
   rute: string;
   ikon: LucideIcon;
+  synlig: (s: StrukturSynlighed) => boolean;
+  /** Faner, der vises som fliser i telefonens skuffe (fx Spil). */
+  faner?: StrukturFane[];
+}
+
+export interface StrukturFane {
+  id: string;
+  label: string;
+  rute: string;
+  ikon: LucideIcon;
+  hint?: string;
   synlig: (s: StrukturSynlighed) => boolean;
 }
 
@@ -40,7 +51,10 @@ export const STRUKTUR: StrukturOmraade[] = [
     { id: "side_vagter", label: "Vagter", rute: "/vagter", ikon: Calendar, synlig: (s) => s.vagter },
     { id: "side_registrer_salg", label: "Registrér salg", rute: "/registrer-salg", ikon: BadgeCheck, synlig: (s) => s.registrerSalg },
     { id: "side_storkbook", label: "Storkbook", rute: "/storkbook", ikon: Newspaper, synlig: (s) => s.storkbook },
-    { id: "side_spil", label: "Spil", rute: "/spil", ikon: Gamepad2, synlig: (s) => s.spil },
+    { id: "side_spil", label: "Spil", rute: "/spil", ikon: Gamepad2, synlig: (s) => s.spil, faner: [
+      { id: "superligaen", label: "Superligaen", rute: "/spil?tab=superligaen", ikon: Trophy, hint: "Provisionsligaen", synlig: (s) => s.spilSuperligaen },
+      { id: "head2head", label: "Head2Head", rute: "/spil?tab=head2head", ikon: Swords, hint: "1v1 og holdkampe", synlig: (s) => s.spilHead2head },
+    ] },
     { id: "side_min_profil", label: "Min profil", rute: "/my-profile", ikon: User, synlig: (s) => s.minProfil },
   ] },
   { id: "omraade_mit_team", label: "Mit team", ikon: Users, sider: [

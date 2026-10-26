@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { InstallStorkProfileCard } from "@/components/pwa/InstallStorkProfileCard";
 import { PushSettingsCard } from "@/components/pwa/PushSettingsCard";
 import { Smartphone } from "lucide-react";
@@ -208,8 +209,16 @@ export default function MyProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const defaultTab = searchParams.get("tab") || "stamdata";
   const { profil: profilFaner } = useMitArbejdeSynlighed();
+  // Adgang (c2): menu_my_profile giver profilfanerne; ellers kun de faner, brugeren har nøgle til.
+  const perms = usePermissions();
+  const harProfil = perms.canView("menu_my_profile");
+  const ekstra = (["fordele", "feedback", "kodeks", "anbefal"] as const).filter((k) => profilFaner[k]);
+  const adgang = harProfil || profilFaner.fordele || profilFaner.feedback || profilFaner.anbefal;
+  const urlTab = searchParams.get("tab");
+  const defaultTab = harProfil
+    ? urlTab || "stamdata"
+    : (ekstra as readonly string[]).includes(urlTab ?? "") ? (urlTab as string) : ekstra[0] ?? "stamdata";
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const { isPreviewMode, previewEmployee } = useRolePreview();
   const uploadMyAvatar = useUploadMyAvatar();
@@ -1190,8 +1199,13 @@ export default function MyProfile() {
           </div>
         </div>
 
+        {!perms.isLoading && !adgang && (
+          <p className="py-16 text-center text-base text-muted-foreground">Du har ikke adgang til denne side</p>
+        )}
+        {adgang && (
         <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="h-auto flex-wrap max-md:flex max-md:w-full max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:[scrollbar-width:none] max-md:[&>button]:min-h-11 max-md:[&>button]:flex-none">
+            {harProfil && (<>
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
             <TabsTrigger value="kalender">
               <Calendar className="h-4 w-4 mr-2" />
@@ -1229,12 +1243,14 @@ export default function MyProfile() {
               <BookOpen className="h-4 w-4 mr-2" />
               Håndbog
             </TabsTrigger>
+            </>)}
             {profilFaner.fordele && <TabsTrigger value="fordele">Fordele</TabsTrigger>}
             {profilFaner.feedback && <TabsTrigger value="feedback">Feedback</TabsTrigger>}
             {profilFaner.kodeks && <TabsTrigger value="kodeks">Kodeks og firmabil</TabsTrigger>}
             {profilFaner.anbefal && <TabsTrigger value="anbefal">Anbefal en ven</TabsTrigger>}
           </TabsList>
 
+          {harProfil && (<>
           <TabsContent value="stamdata" className="mt-6">
             <div className="space-y-6">
               {/* Din opstart – opstartskurve for nye sælgere */}
@@ -2305,6 +2321,7 @@ export default function MyProfile() {
               department={employee.department}
             />
           </TabsContent>
+          </>)}
           {/* Tidligere selvstændige sider, genbrugt uændret (bundt b1). Kun den aktive fane monteres. */}
           {profilFaner.fordele && (
             <TabsContent value="fordele" className="mt-6"><Suspense fallback={<RouteSkeleton />}><EmployeePerks /></Suspense></TabsContent>
@@ -2323,6 +2340,7 @@ export default function MyProfile() {
             <TabsContent value="anbefal" className="mt-6"><Suspense fallback={<RouteSkeleton />}><ReferAFriend /></Suspense></TabsContent>
           )}
         </Tabs>
+        )}
       </div>
     </MainLayout>
   );

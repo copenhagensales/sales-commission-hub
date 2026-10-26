@@ -13,44 +13,49 @@ export function useTeamPersonaleSynlighed() {
   const { data: canViewRampTeam } = useCanViewRampTeam();
   const { hasAccess: hasQualityAccess } = useQualityAccess();
   const v = (k: string) => p.canView(k);
+  // Sektionsnøgler fra de gamle menupunkter (c2): ingen ser mere end før.
+  const sek = (x: string) => p.canView(`menu_section_${x}`);
+  const vp = sek("vagtplan"), led = sek("ledelse"), rek = sek("rekruttering"), pers = sek("personale");
+  const onbAdmin = sek("onboarding") && !!p.canViewOnboardingAdmin;
+  const kand = v("menu_candidates");
 
-  const vagtplan = { "shift-planning": v("menu_shift_overview"), absence: v("menu_absence") };
+  const vagtplan = { "shift-planning": vp && v("menu_shift_overview"), absence: vp && v("menu_absence") };
   const mitTeam = {
     "team-goals": v("menu_team_goals"),
     kvalitetskontrol: !!hasQualityAccess,
     administration: !!hasQualityAccess,
-    "pulse-survey-results": v("menu_pulse_survey"),
-    "code-of-conduct-admin": v("menu_coc_admin"),
-    "car-quiz-admin": v("menu_car_quiz_admin"),
+    "pulse-survey-results": led && v("menu_pulse_survey"),
+    "code-of-conduct-admin": led && v("menu_coc_admin"),
+    "car-quiz-admin": led && v("menu_car_quiz_admin"),
   };
   const onboarding = {
-    "onboarding-program": v("menu_onboarding_admin"),
+    "onboarding-program": onbAdmin && v("menu_onboarding_admin"),
     opstartshold: canViewRampTeam === true,
-    "coaching-templates": v("menu_onboarding_admin"),
+    "coaching-templates": onbAdmin && v("menu_onboarding_admin"),
   };
   const rekruttering = {
-    recruitment: v("menu_recruitment_dashboard"),
-    candidates: v("menu_candidates"),
-    "upcoming-interviews": v("menu_upcoming_interviews"),
-    "upcoming-hires": v("menu_upcoming_hires"),
-    "booking-flow": v("menu_booking_flow"),
-    engagement: v("menu_booking_flow"),
-    messages: v("menu_messages"),
-    referrals: v("menu_referrals"),
-    winback: v("menu_winback"),
-    "email-templates": v("menu_email_templates"),
-    "sms-templates": v("menu_sms_templates"),
+    recruitment: rek && v("menu_recruitment_dashboard"),
+    candidates: rek && kand,
+    "upcoming-interviews": rek && v("menu_upcoming_interviews"),
+    "upcoming-hires": rek && v("menu_upcoming_hires"),
+    "booking-flow": rek && kand && v("menu_booking_flow"),
+    engagement: rek && kand && v("menu_booking_flow"),
+    messages: rek && v("menu_messages"),
+    referrals: rek && kand && v("menu_referrals"),
+    winback: rek && v("menu_winback"),
+    "email-templates": rek && v("menu_email_templates"),
+    "sms-templates": rek && v("menu_sms_templates"),
   };
   const medarbejdere = {
-    employees: v("menu_employees"),
-    "upcoming-starts": v("menu_upcoming_starts"),
-    "company-overview": v("menu_contracts"),
-    "onboarding-analyse": v("menu_contracts"),
+    employees: pers && v("menu_employees"),
+    "upcoming-starts": pers && v("menu_upcoming_starts"),
+    "company-overview": led && v("menu_contracts"),
+    "onboarding-analyse": led && v("menu_contracts"),
   };
   const kontrakter = {
-    contracts: v("menu_contracts"),
-    "career-wishes-overview": v("menu_career_wishes_overview"),
-    "email-templates": v("menu_contracts"),
+    contracts: led && v("menu_contracts"),
+    "career-wishes-overview": led && v("menu_career_wishes_overview"),
+    "email-templates": led && v("menu_contracts"),
   };
   const nogen = (o: Record<string, boolean>) => Object.values(o).some(Boolean);
   return {

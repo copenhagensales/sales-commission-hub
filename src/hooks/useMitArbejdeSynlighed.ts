@@ -18,14 +18,15 @@ export function useMitArbejdeSynlighed() {
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
 
-  const fmVagt = !!p.canViewFmMySchedule;
+  // Sektionsnøglerne fra det gamle menupunkt (c2): ingen ser mere end før.
+  const fmVagt = !!p.canViewFmMySchedule && p.canView("menu_section_fieldmarketing");
   const fmSalg = !!p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
 
   const vagter = {
     vagtplanFm: fmVagt,
     // TM-vagtplan (protected): alle, der ikke er FM – og FM-brugere, der også har TM-vagtplanen.
     vagtplanTm: !fmVagt || !!p.canViewMySchedule,
-    stempelur: p.canView("menu_time_stamp"),
+    stempelur: p.canView("menu_time_stamp") && p.canView("menu_section_vagtplan"),
   };
   const salg = {
     salg: !!isUnitedMember,

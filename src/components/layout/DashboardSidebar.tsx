@@ -223,7 +223,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
 
               {canView("menu_dashboard_admin") && (
                 <NavLink
-                  to="/dashboards/settings"
+                  to="/admin?tab=tv-tavler&side=dashboards-settings"
                   onClick={handleNavClick}
                   className={({ isActive }) =>
                     cn(

@@ -532,7 +532,7 @@ export default function MenuEditor() {
               strategy={verticalListSortingStrategy}
             >
               {sections.map((section) => {
-                const isSection = section.item_key.startsWith("section_");
+                const isSection = section.item_key.startsWith("section_") || section.item_key.startsWith("omraade_");
                 const children = isSection ? getChildren(section.item_key) : [];
                 const expanded = expandedSections.has(section.item_key);
                 const isSectionDropTarget = overSectionKey === section.item_key;

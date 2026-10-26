@@ -73,7 +73,8 @@ export function RapporterSamleside() {
 export function PowerdagSamleside() {
   const s = useSalgRapporterSynlighed().powerdag;
   // TV-visning af tavlen forbliver uændret (ingen faner/menu).
-  if (isTvMode()) return <PowerdagBoard />;
+  // menu_dashboard_powerdag gælder også her; TV-login har sin egen rute.
+  if (isTvMode() && s.powerdag) return <PowerdagBoard />;
   return (
     <Samleside titel="Powerdag" layout={DashboardLayout} faner={[
       { id: "powerdag", label: "Tavle", element: <PowerdagBoard />, synlig: s.powerdag },

@@ -80,7 +80,8 @@ export const routes: RouteConfig[] = [
   { path: "/head-to-head", component: redirectTo("/spil?tab=head2head"), access: "protected" },
   
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
-  { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
+  // Adgang: menu_my_profile eller en af fanernes nøgler – håndhæves i MyProfile (c2).
+  { path: "/my-profile", component: MyProfile, access: "protected" },
   { path: "/my-goals", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
   { path: "/my-goals/:employeeId", component: MyGoals, access: "role", positionPermission: "menu_my_goals" },
   { path: "/team-goals", component: redirectTo("/mit-team?tab=team-goals"), access: "protected" },
@@ -149,7 +150,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/shift-planning", component: VagtplanSamleside, access: "protected" },
   { path: "/mit-team", component: MitTeamSamleside, access: "protected" },
-  { path: "/shift-planning/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
+  { path: "/shift-planning/my-schedule", component: redirectTo("/vagter?tab=vagtplan-tm"), access: "protected" },
   { path: "/shift-planning/absence", component: redirectTo("/shift-planning?tab=absence"), access: "protected" },
   { path: "/shift-planning/time-tracking", component: redirectTo("/shift-planning"), access: "protected" },
 
