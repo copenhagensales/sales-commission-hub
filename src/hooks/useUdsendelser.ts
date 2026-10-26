@@ -36,7 +36,7 @@ export function useUdsendelsestyper() {
       }
       return (t.data ?? [])
         .map((x) => ({ ...x, antal30: stat.get(x.noegle)?.antal ?? 0, sidstSendt: stat.get(x.noegle)?.sidst ?? null }))
-        .sort((a, b) => a.kanal.localeCompare(b.kanal) || a.navn.localeCompare(b.navn, "da"));
+        .sort((a, b) => (a.gruppe ?? "").localeCompare(b.gruppe ?? "", "da") || a.kanal.localeCompare(b.kanal) || a.navn.localeCompare(b.navn, "da"));
     },
   });
 }
@@ -44,7 +44,7 @@ export function useUdsendelsestyper() {
 export function useOpdaterUdsendelsestype() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "push_titel" | "push_tekst" | "push_link">>) => {
+    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "push_titel" | "push_tekst" | "push_link" | "gruppe" | "til_medarbejdere">>) => {
       const { error } = await supabase.from("udsendelsestyper").update({ ...ret, opdateret: new Date().toISOString() }).eq("noegle", noegle);
       if (error) throw error;
     },

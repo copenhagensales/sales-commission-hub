@@ -207,12 +207,23 @@ function Overblik() {
 
   const rows = useMemo(() => {
     const s = sog.trim().toLowerCase();
-    return (data ?? []).filter((t) => !s || [t.navn, t.noegle, t.afsenderfunktion, t.beskrivelse].some((x) => x?.toLowerCase().includes(s)));
+    return (data ?? []).filter((t) => !s || [t.navn, t.noegle, t.afsenderfunktion, t.beskrivelse, t.gruppe].some((x) => x?.toLowerCase().includes(s)));
   }, [data, sog]);
+  const grupper = useMemo(() => [...new Set((data ?? []).map((t) => t.gruppe).filter(Boolean))].sort((a, b) => a.localeCompare(b, "da")), [data]);
 
   const cols: ResponsiveColumn<Raekke>[] = [
     { key: "navn", header: "Navn", isTitle: true, cell: (t) => <TekstFelt vaerdi={t.navn} gem={(v) => gem(t.noegle, { noegle: t.noegle, navn: v })} /> },
+    { key: "gruppe", header: "Gruppe", isKey: true, cell: (t) => (
+      <>
+        <Input list="udsendelse-grupper" defaultValue={t.gruppe ?? ""} aria-label={`Gruppe for ${t.navn}`} className="min-h-11 min-w-[12rem] text-base md:text-sm"
+          onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== t.gruppe) gem(t.noegle, { noegle: t.noegle, gruppe: v }); }} />
+        <datalist id="udsendelse-grupper">{grupper.map((g) => <option key={g} value={g} />)}</datalist>
+      </>
+    ) },
     { key: "kanal", header: "Kanal", isKey: true, cell: (t) => <KanalIkon kanal={t.kanal} /> },
+    { key: "tilmedarb", header: "Til medarbejdere", isKey: true, cell: (t) => (
+      <Switch checked={t.til_medarbejdere} aria-label={`${t.navn} til medarbejdere`} onCheckedChange={(v) => gem(t.noegle, { noegle: t.noegle, til_medarbejdere: v })} />
+    ) },
     { key: "aktiv", header: "Til/fra", isKey: true, cell: (t) => (
       <Switch checked={t.aktiv} aria-label={`${t.navn} til/fra`} onCheckedChange={(v) => setBekraeft({ noegle: t.noegle, navn: t.navn, aktiv: v })} />
     ) },
