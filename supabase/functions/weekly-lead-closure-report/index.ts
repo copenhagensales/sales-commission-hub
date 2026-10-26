@@ -1565,7 +1565,16 @@ async function finishAndMail(
     // Mailkøen tømmes normalt af cron hvert 5. minut. Ved manuel afsendelse
     // skal mailen ud med det samme, så køen skubbes her.
     await flushMailQueue();
+    // Ugen er nu færdigtalt og sendt til kunden: lås den, så senere kørsler
+    // aldrig sletter eller genskriver dens tal. Ikke ved testmodtager.
+    if (!state.testRecipient) {
+      const { error: lockError } = await svc.from("weekly_lead_closure_locks")
+        .upsert({ week_start: latest, run_id: state.runId }, { onConflict: "week_start", ignoreDuplicates: true });
+      if (lockError) console.error("[weekly-lead-closure-report] kunne ikke låse ugen", lockError.message);
+    }
   }
+
+  if (state.resend) return { mailQueued, statusBreakdown: breakdown(latestRows) };
 
   await svc
     .from("weekly_lead_closure_runs")
