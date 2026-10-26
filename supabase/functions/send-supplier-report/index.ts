@@ -361,11 +361,14 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     message: (body.message as string | undefined) ?? null,
   });
 
+  let status: string;
+  let sentTo: string[] = [];
   try {
-    await udsendFlere({
+    status = await udsendFlere({
       type: "send-supplier-report", kanal: "mail", afsenderfunktion: "send-supplier-report", emne: subject,
       modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
       send: async (tilladte) => {
+        sentTo = tilladte;
         await sendM365Mail({
           to: tilladte,
           subject,
@@ -379,14 +382,18 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     return jsonResponse(500, { error: msg });
   }
 
+  if (status !== "sendt") {
+    return jsonResponse(200, { success: true, skipped: true, status, recipientCount: 0 });
+  }
+
   await svc
     .from('supplier_invoice_reports')
-    .update({ sent_at: new Date().toISOString(), sent_to: recipients })
+    .update({ sent_at: new Date().toISOString(), sent_to: sentTo })
     .eq('id', report.id);
 
   return jsonResponse(200, {
     success: true,
-    recipientCount: recipients.length,
+    recipientCount: sentTo.length,
     attachmentName: built.attachmentName,
   });
 }
