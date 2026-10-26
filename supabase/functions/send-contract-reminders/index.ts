@@ -270,7 +270,7 @@ const handler = async (req: Request): Promise<Response> => {
           type: "send-contract-reminders", kanal: "mail", modtager: employee.private_email ?? "", modtagerEmployeeId: employee.id, emne: `⏰ Påmindelse: Kontrakt "${contract.title}" afventer din underskrift`, afsenderfunktion: "send-contract-reminders",
           send: async () => {
             await sendEmail(
-          accessToken,
+          accessToken!,
           employee.private_email,
           `⏰ Påmindelse: Kontrakt "${contract.title}" afventer din underskrift`,
           htmlBody
