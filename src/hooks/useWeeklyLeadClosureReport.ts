@@ -15,6 +15,7 @@ export type ClosureTaskSummary = {
   running: number;
   done: number;
   error: number;
+  lastUpdate: string | null;
 };
 
 const MAPPING_KEY = ["weekly-lead-closure", "campaign-map"] as const;
@@ -321,5 +322,24 @@ export function useRemoveClosureRecipient() {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: RECIPIENTS_KEY }),
+  });
+}
+
+/** Genstarter kæden for en kørsel, der er gået i stå. */
+export function useRestartWeeklyLeadClosureRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      const { data, error } = await supabase.functions.invoke("weekly-lead-closure-report", {
+        body: { action: "restart", run_id: runId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { stage: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "runs"] });
+      queryClient.invalidateQueries({ queryKey: ["weekly-lead-closure", "task-summaries"] });
+    },
   });
 }

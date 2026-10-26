@@ -1736,7 +1736,11 @@ Deno.serve(async (req) => {
     if (body.action === "status") {
       const runIds = (body.run_ids ?? []).slice(0, 20);
       const summaries = await Promise.all(
-        runIds.map(async (runId) => ({ runId, ...(await taskSummary(svc, runId)) })),
+        runIds.map(async (runId) => {
+          const { data: last } = await svc.from("weekly_lead_closure_tasks").select("updated_at")
+            .eq("run_id", runId).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+          return { runId, lastUpdate: (last as { updated_at: string } | null)?.updated_at ?? null, ...(await taskSummary(svc, runId)) };
+        }),
       );
       return json(200, {
         summaries: summaries.map(({ failed: _failed, ...summary }) => summary),

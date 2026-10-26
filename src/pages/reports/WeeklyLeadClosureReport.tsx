@@ -54,6 +54,7 @@ import {
   useWeeklyLeadClosureReportData,
   useWeeklyLeadClosureRecipients,
   useWeeklyLeadClosureRuns,
+  useRestartWeeklyLeadClosureRun,
   useWeeklyLeadClosureTaskSummaries,
   useWeeklyLeadReportLines,
 } from "@/hooks/useWeeklyLeadClosureReport";
@@ -317,6 +318,7 @@ export default function WeeklyLeadClosureReport() {
     selectedWeek || null,
   );
   const { data: runs = [] } = useWeeklyLeadClosureRuns();
+  const restartRun = useRestartWeeklyLeadClosureRun();
   const { data: taskSummaries = [] } = useWeeklyLeadClosureTaskSummaries(
     runs.map((run) => run.id),
   );
@@ -1196,8 +1198,10 @@ export default function WeeklyLeadClosureReport() {
                     <TableHead>Konto</TableHead>
                     <TableHead className="text-right">Færdige</TableHead>
                     <TableHead className="text-right">Afventer</TableHead>
+                    <TableHead className="text-right">I gang</TableHead>
                     <TableHead className="text-right">Fejl</TableHead>
                     <TableHead className="text-right">Emner</TableHead>
+                    <TableHead>Sidst opdateret</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1221,14 +1225,40 @@ export default function WeeklyLeadClosureReport() {
                           : (ACCOUNT_LABEL[run.account ?? ""] ?? run.account ?? "–")}
                       </TableCell>
                       <TableCell className="text-right">{progress?.done ?? run.campaigns_scanned}</TableCell>
-                      <TableCell className="text-right">
-                        {(progress?.pending ?? 0) + (progress?.running ?? 0)}
-                      </TableCell>
+                      <TableCell className="text-right">{progress?.pending ?? 0}</TableCell>
+                      <TableCell className="text-right">{progress?.running ?? 0}</TableCell>
                       <TableCell className="text-right">{progress?.error ?? 0}</TableCell>
                       <TableCell className="text-right">{run.leads_scanned}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {progress?.lastUpdate
+                          ? new Date(progress.lastUpdate).toLocaleString("da-DK", {
+                              timeZone: "Europe/Copenhagen",
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "–"}
+                      </TableCell>
                       <TableCell>
                         {run.finished_at === null ? (
-                          <span className="text-muted-foreground">Kører</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-muted-foreground">Kører</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="max-md:min-h-11"
+                              disabled={restartRun.isPending}
+                              onClick={() =>
+                                restartRun.mutate(run.id, {
+                                  onSuccess: () => toast.success("Kæden er genstartet"),
+                                  onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke genstarte"),
+                                })
+                              }
+                            >
+                              Genstart kæden
+                            </Button>
+                          </div>
                         ) : run.error ? (
                           <span className="text-destructive">{run.error}</span>
                         ) : (
