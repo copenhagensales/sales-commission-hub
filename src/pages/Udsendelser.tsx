@@ -26,7 +26,7 @@ import * as P from "@/routes/pages";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PERMISSION_KEYS } from "@/config/permissionKeys";
-import { useRegelValg, useUdsendelseModtagerAntal, type Udsendelsestype } from "@/hooks/useUdsendelser";
+import { useRegelValg, useUdsendelseModtagerAntal, useUdsendelserOverblik, type Udsendelsestype, type SendSvar } from "@/hooks/useUdsendelser";
 
 const KANAL_IKON: Record<string, typeof Mail> = { mail: Mail, sms: MessageSquare, push: Bell };
 const KanalIkon = ({ kanal }: { kanal: string }) => {
@@ -123,6 +123,69 @@ function ModtagerDialog({ type, luk }: { type: Udsendelsestype | null; luk: () =
   );
 }
 
+const PUSH_NOTE = "Må ikke indeholde beløb, tal, navne eller kundedetaljer.";
+
+function PushTekstFelter({ t }: { t: Udsendelsestype }) {
+  const opd = useOpdaterUdsendelsestype();
+  const gem = (felt: "push_titel" | "push_tekst" | "push_link", v: string) =>
+    opd.mutate({ noegle: t.noegle, [felt]: v.trim() || null }, { onSuccess: () => toast.success("Tekst gemt"), onError: () => toast.error("Kunne ikke gemme") });
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1"><Label className="text-sm">Titel</Label><TekstFelt vaerdi={t.push_titel ?? ""} gem={(v) => gem("push_titel", v)} /></div>
+      <div className="space-y-1"><Label className="text-sm">Tekst</Label><TekstFelt flere vaerdi={t.push_tekst ?? ""} gem={(v) => gem("push_tekst", v)} /></div>
+      <div className="space-y-1"><Label className="text-sm">Link</Label><TekstFelt vaerdi={t.push_link ?? ""} gem={(v) => gem("push_link", v)} /></div>
+      <p className="text-sm text-muted-foreground">{PUSH_NOTE} Er et felt tomt, bruges standardteksten.</p>
+    </div>
+  );
+}
+
+function OverblikTal() {
+  const o = useUdsendelserOverblik();
+  const valg = useRegelValg();
+  if (o.isLoading) return <p className="text-muted-foreground">Henter tal…</p>;
+  if (o.error || !o.data) return <p className="text-sm text-muted-foreground">Tallene kunne ikke hentes.</p>;
+  const d = o.data;
+  const rolleNavn = new Map((valg.data?.roller ?? []).map((r) => [r.key, r.label]));
+  const sendt7 = (d.syv_dage ?? []).reduce((a, x) => a + (x.sendt ?? 0), 0);
+  const kort = [
+    { l: "Tilmeldt push", v: `${d.tilmeldte} af ${d.brugere_med_login}` },
+    { l: "Deaktiverede telefoner", v: d.deaktiverede },
+    { l: "Udsendt 7 dage", v: sendt7 },
+    { l: "Fejl 7 dage", v: d.fejl_7_dage },
+  ];
+  const Lille = ({ titel, rows }: { titel: string; rows: { n: string; t: number; i: number }[] }) => (
+    <Card>
+      <CardHeader className="pb-2"><CardTitle className="text-base">{titel}</CardTitle></CardHeader>
+      <CardContent>
+        <ul className="divide-y divide-border text-sm">
+          {rows.map((r) => (
+            <li key={r.n} className="flex min-h-11 items-center justify-between gap-3">
+              <span className="min-w-0 break-words">{r.n}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{r.t} / {r.i}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {kort.map((k) => (
+          <Card key={k.l}><CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">{k.l}</p>
+            <p className="text-2xl font-semibold tabular-nums">{k.v}</p>
+          </CardContent></Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Lille titel="Pr. rolle (tilmeldte / i alt)" rows={(d.pr_rolle ?? []).map((x) => ({ n: x.rolle ? rolleNavn.get(x.rolle) ?? x.rolle : "Uden rolle", t: x.tilmeldte, i: x.i_alt }))} />
+        <Lille titel="Pr. team (tilmeldte / i alt)" rows={(d.pr_team ?? []).map((x) => ({ n: x.team ?? "Uden team", t: x.tilmeldte, i: x.i_alt }))} />
+      </div>
+    </div>
+  );
+}
+
 function TekstFelt({ vaerdi, gem, flere }: { vaerdi: string; gem: (v: string) => void; flere?: boolean }) {
   const [v, setV] = useState(vaerdi);
   const ud = () => { if (v !== vaerdi) gem(v); };
@@ -137,6 +200,8 @@ function Overblik() {
   const [sog, setSog] = useState("");
   const [bekraeft, setBekraeft] = useState<{ noegle: string; navn: string; aktiv: boolean } | null>(null);
   const [regelFor, setRegelFor] = useState<string | null>(null);
+  const [tekstFor, setTekstFor] = useState<string | null>(null);
+  const tekstType = (data ?? []).find((t) => t.noegle === tekstFor) ?? null;
   type Raekke = NonNullable<typeof data>[number];
   const gem = (noegle: string, ret: Parameters<typeof opd.mutate>[0]) =>
     opd.mutate({ ...ret, noegle }, { onSuccess: () => toast.success("Gemt"), onError: () => toast.error("Kunne ikke gemme") });
@@ -170,12 +235,16 @@ function Overblik() {
         {regelTekst(t)}
       </Button>
     ) },
+    { key: "pushtekst", header: "Tekst", cell: (t) => t.kanal === "push"
+      ? <Button variant="outline" className="min-h-11" onClick={() => setTekstFor(t.noegle)}>Tekst</Button>
+      : <span className="text-muted-foreground">–</span> },
     { key: "regel", header: "Modtagerregel", cell: (t) => <TekstFelt flere vaerdi={t.modtagerregel} gem={(v) => gem(t.noegle, { noegle: t.noegle, modtagerregel: v })} /> },
     { key: "beskrivelse", header: "Beskrivelse", cell: (t) => <TekstFelt flere vaerdi={t.beskrivelse} gem={(v) => gem(t.noegle, { noegle: t.noegle, beskrivelse: v })} /> },
   ];
 
   return (
     <div className="space-y-4">
+      <OverblikTal />
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input value={sog} onChange={(e) => setSog(e.target.value)} placeholder="Søg i udsendelser" className="pl-9 text-base md:text-sm" />
@@ -186,6 +255,15 @@ function Overblik() {
           <ResponsiveTable columns={cols} rows={rows} rowKey={(t) => t.noegle} />
         </>
       )}
+      <Dialog open={!!tekstType} onOpenChange={(o) => !o && setTekstFor(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Push-tekst: {tekstType?.navn}</DialogTitle>
+            <DialogDescription>Gemmes, når du forlader feltet.</DialogDescription>
+          </DialogHeader>
+          {tekstType && <PushTekstFelter key={tekstType.noegle} t={tekstType} />}
+        </DialogContent>
+      </Dialog>
       <ModtagerDialog type={(data ?? []).find((t) => t.noegle === regelFor) ?? null} luk={() => setRegelFor(null)} />
       <AlertDialog open={!!bekraeft} onOpenChange={(o) => !o && setBekraeft(null)}>
         <AlertDialogContent>
@@ -233,6 +311,8 @@ function Log() {
     { key: "emne", header: "Emne", cell: (r) => r.emne ?? "–" },
     { key: "status", header: "Status", isKey: true, cell: (r) => r.status === "udenfor_regel"
       ? <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning">udenfor regel</Badge>
+      : r.status === "dagsloft"
+      ? <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">dagsloft</Badge>
       : <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge> },
     { key: "fejl", header: "Fejl", cell: (r) => <span className="text-destructive break-words">{r.fejl ?? ""}</span> },
   ];
@@ -243,7 +323,7 @@ function Log() {
         <Vaelg label="Kanal" value={f.kanal} onChange={(v) => set({ kanal: v })} valg={[{ v: "alle", l: "Alle" }, { v: "mail", l: "Mail" }, { v: "sms", l: "SMS" }, { v: "push", l: "Push" }]} />
         <Vaelg label="Type" value={f.type} onChange={(v) => set({ type: v })} valg={[{ v: "alle", l: "Alle" }, ...(typer ?? []).map((t) => ({ v: t.noegle, l: t.navn }))]} />
         <Vaelg label="Status" value={f.status} onChange={(v) => set({ status: v })}
-          valg={["alle", "sendt", "fejl", "fravalgt", "slaaet_fra", "stille_timer", "ingen_tilmelding", "udenfor_regel", "planlagt"].map((v) => ({ v, l: v === "alle" ? "Alle" : v === "udenfor_regel" ? "udenfor regel" : v }))} />
+          valg={["alle", "sendt", "fejl", "fravalgt", "slaaet_fra", "stille_timer", "ingen_tilmelding", "udenfor_regel", "dagsloft", "planlagt"].map((v) => ({ v, l: v === "alle" ? "Alle" : v === "udenfor_regel" ? "udenfor regel" : v }))} />
         <Vaelg label="Periode" value={f.periode} onChange={(v) => set({ periode: v as LogFilter["periode"] })}
           valg={[{ v: "i-dag", l: "I dag" }, { v: "7", l: "7 dage" }, { v: "30", l: "30 dage" }]} />
         <div className="space-y-1">
@@ -270,17 +350,17 @@ function Send() {
   const valg = useModtagerValg();
   const send = useSendBesked();
   const [kanal, setKanal] = useState<Kanal>("push");
-  const [maal, setMaal] = useState<"roller" | "teams" | "medarbejder">("roller");
+  const [maal, setMaal] = useState<"alle" | "roller" | "teams" | "medarbejder">("roller");
   const [ids, setIds] = useState<string[]>([]);
   const [emne, setEmne] = useState("");
   const [tekst, setTekst] = useState("");
-  const [bekraeft, setBekraeft] = useState<number | null>(null);
+  const [bekraeft, setBekraeft] = useState<SendSvar | null>(null);
   const liste = maal === "roller" ? (valg.data?.roller ?? []).map((r) => ({ id: r.key, l: r.label }))
     : maal === "teams" ? (valg.data?.teams ?? []).map((t) => ({ id: t.id, l: t.name }))
     : (valg.data?.medarbejdere ?? []).map((e) => ({ id: e.id, l: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() }));
   const body = (b: Partial<SendBesked>): SendBesked => ({ kanal, maal, ids, emne, tekst, ...b });
-  const resultat = (d: { antal: number; sendt?: number; sprunget?: number; fejl?: number }) =>
-    toast.success(`Sendt: ${d.sendt ?? 0} af ${d.antal}${d.sprunget ? ` · sprunget over: ${d.sprunget}` : ""}${d.fejl ? ` · fejl: ${d.fejl}` : ""}`);
+  const resultat = (d: SendSvar) =>
+    toast.success(`Sendt: ${d.sendt ?? 0} af ${d.antal}${d.sprunget ? ` · sprunget over: ${d.sprunget}` : ""}${d.loft ? ` · dagsloft: ${d.loft}` : ""}${d.fejl ? ` · fejl: ${d.fejl}` : ""}`);
   const fejl = (e: unknown) => toast.error(e instanceof Error ? e.message : "Fejl");
   const klar = tekst.trim().length > 0;
 
@@ -289,8 +369,8 @@ function Send() {
       <CardContent className="space-y-4 pt-6">
         <Vaelg label="Kanal" value={kanal} onChange={(v) => setKanal(v as Kanal)} valg={[{ v: "push", l: "Push" }, { v: "mail", l: "Mail" }, { v: "sms", l: "SMS" }]} />
         <Vaelg label="Modtagere" value={maal} onChange={(v) => { setMaal(v as typeof maal); setIds([]); }}
-          valg={[{ v: "roller", l: "Roller" }, { v: "teams", l: "Teams" }, { v: "medarbejder", l: "Én medarbejder" }]} />
-        <div className="max-h-56 overflow-y-auto rounded-xl border border-border p-2">
+          valg={[{ v: "alle", l: "Alle med login" }, { v: "roller", l: "Roller" }, { v: "teams", l: "Teams" }, { v: "medarbejder", l: "Én medarbejder" }]} />
+        {maal !== "alle" && <div className="max-h-56 overflow-y-auto rounded-xl border border-border p-2">
           {liste.map((o) => (
             <label key={o.id} className="flex min-h-11 items-center gap-3 px-2 text-sm">
               <input type={maal === "medarbejder" ? "radio" : "checkbox"} name="modtager" className="h-5 w-5"
@@ -299,7 +379,7 @@ function Send() {
               {o.l}
             </label>
           ))}
-        </div>
+        </div>}
         {kanal !== "sms" && (
           <div className="space-y-1">
             <Label htmlFor="send-emne">{kanal === "push" ? "Titel" : "Emne"}</Label>
@@ -313,22 +393,44 @@ function Send() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button variant="outline" className="min-h-11" disabled={!klar || send.isPending}
             onClick={() => send.mutate(body({ maal: "mig", ids: [] }), { onSuccess: resultat, onError: fejl })}>Send til mig først</Button>
-          <Button className="min-h-11" disabled={!klar || !ids.length || send.isPending}
-            onClick={() => send.mutate(body({ kunAntal: true }), { onSuccess: (d) => setBekraeft(d.antal), onError: fejl })}>Send til alle valgte</Button>
+          <Button className="min-h-11" disabled={!klar || (maal !== "alle" && !ids.length) || send.isPending}
+            onClick={() => send.mutate(body({ kunAntal: true, ...(maal === "alle" ? { ids: [] } : {}) }), { onSuccess: (d) => setBekraeft(d), onError: fejl })}>Send til alle valgte</Button>
         </div>
       </CardContent>
       <AlertDialog open={bekraeft !== null} onOpenChange={(o) => !o && setBekraeft(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Send til {bekraeft} modtagere?</AlertDialogTitle>
-            <AlertDialogDescription>Beskeden sendes som {kanal === "sms" ? "SMS" : kanal} til {bekraeft} aktive medarbejdere. Det kan ikke fortrydes.</AlertDialogDescription>
+            <AlertDialogTitle>Send til {(bekraeft?.antal ?? 0) - (bekraeft?.loft ?? 0)} modtagere?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Beskeden sendes som {kanal === "sms" ? "SMS" : kanal} til {(bekraeft?.antal ?? 0) - (bekraeft?.loft ?? 0)} aktive medarbejdere. Det kan ikke fortrydes.
+              {bekraeft?.loft ? ` ${bekraeft.loft} har allerede fået en besked i dag og springes over.` : ""}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annullér</AlertDialogCancel>
-            <AlertDialogAction disabled={!bekraeft} onClick={() => send.mutate(body({}), { onSuccess: resultat, onError: fejl })}>Send</AlertDialogAction>
+            <AlertDialogAction disabled={!bekraeft?.antal} onClick={() => send.mutate(body(maal === "alle" ? { ids: [] } : {}), { onSuccess: resultat, onError: fejl })}>Send</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </Card>
+  );
+}
+
+function PushTekster() {
+  const { data, isLoading } = useUdsendelsestyper();
+  const push = (data ?? []).filter((t) => t.kanal === "push");
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Push-tekster</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">{PUSH_NOTE}</p>
+        {isLoading ? <p className="text-muted-foreground">Henter…</p> : push.map((t) => (
+          <div key={t.noegle} className="rounded-xl border border-border p-3 space-y-2">
+            <p className="text-sm font-semibold">{t.navn} <code className="ml-2 text-xs text-muted-foreground">{t.noegle}</code></p>
+            <PushTekstFelter t={t} />
+          </div>
+        ))}
+      </CardContent>
     </Card>
   );
 }
@@ -344,19 +446,7 @@ function Tekster() {
       <TabsContent value="mail"><P.SystemEmailTemplates /></TabsContent>
       <TabsContent value="sms"><P.SmsTemplates /></TabsContent>
       <TabsContent value="push">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Push-tekster (skrivebeskyttet)</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">Flyttes til data senere.</p>
-            {Object.entries(PUSH_TEXT).map(([k, t]) => (
-              <div key={k} className="rounded-xl border border-border p-3">
-                <p className="text-sm font-semibold">{t.title} <code className="ml-2 text-xs text-muted-foreground">{k}</code></p>
-                <p className="text-sm">{t.body}</p>
-                <p className="text-xs text-muted-foreground">Åbner {t.url}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <PushTekster />
       </TabsContent>
     </Tabs>
   );
