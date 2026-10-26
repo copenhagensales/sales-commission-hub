@@ -265,8 +265,8 @@ const handler = async (req: Request): Promise<Response> => {
           accessToken = await getM365AccessToken();
         }
 
-        await udsend({
-          type: "send-contract-reminders", kanal: "mail", modtager: employee.private_email, modtagerEmployeeId: employee.id, emne: `⏰ Påmindelse: Kontrakt "${contract.title}" afventer din underskrift`, afsenderfunktion: "send-contract-reminders",
+        const status = await udsend({
+          type: "send-contract-reminders", kanal: "mail", modtager: employee.private_email ?? "", modtagerEmployeeId: employee.id, emne: `⏰ Påmindelse: Kontrakt "${contract.title}" afventer din underskrift`, afsenderfunktion: "send-contract-reminders",
           send: async () => {
             await sendEmail(
           accessToken,
@@ -276,6 +276,7 @@ const handler = async (req: Request): Promise<Response> => {
         );
           },
         });
+        if (status !== "sendt") { skippedCount++; continue; }
 
         // Update reminder tracking
         const newReminderCount = (contract.reminder_count || 0) + 1;
@@ -297,7 +298,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sent ${sentCount} reminder emails`);
 
     return new Response(
-      JSON.stringify({ message: "Reminders processed", sent: sentCount, total: pendingContracts.length }),
+      JSON.stringify({ message: "Reminders processed", sent: sentCount, skipped: skippedCount, total: pendingContracts.length }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
