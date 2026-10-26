@@ -1440,7 +1440,7 @@ async function finishAndMail(
   config: Config,
   state: RunState,
   failed: FailedTask[],
-): Promise<{ mailQueued: boolean; statusBreakdown: Record<string, Record<string, number>> }> {
+): Promise<{ mailQueued: boolean; skipped_blocked?: string; statusBreakdown: Record<string, Record<string, number>> }> {
   const weeks = state.weeks;
   const { data: stored } = await svc
     .from("weekly_lead_closure_stats")
@@ -1564,7 +1564,7 @@ async function finishAndMail(
         await svc.from("weekly_lead_closure_locks")
           .upsert({ week_start: latest, run_id: state.runId }, { onConflict: "week_start", ignoreDuplicates: true });
       }
-      return { mailQueued, statusBreakdown: breakdown(latestRows) };
+      return { mailQueued, skipped_blocked: skippedBlocked, statusBreakdown: breakdown(latestRows) };
     }
     // Leveringsstatus Tryg: SEPARAT intern mail, kun til interne modtagere
     // (flow_status, håndhævet @copenhagensales.dk i databasen). Aldrig til kunden.
@@ -1603,7 +1603,7 @@ async function finishAndMail(
     }
   }
 
-  if (state.resend) return { mailQueued, statusBreakdown: breakdown(latestRows) };
+  if (state.resend) return { mailQueued, skipped_blocked: skippedBlocked, statusBreakdown: breakdown(latestRows) };
 
   await svc
     .from("weekly_lead_closure_runs")
@@ -1612,13 +1612,15 @@ async function finishAndMail(
       finished_at: new Date().toISOString(),
       error: blockReason
         ? `mail stoppet: ${blockReason}`
+        : skippedBlocked
+        ? `mail stoppet: typen weekly_lead_closure_report er slået fra i Udsendelser`
         : failed.length
         ? `ikke scannet: ${failed.map((f) => `${f.account}/${f.campaign_id}`).join(", ")}`
         : null,
     })
     .eq("id", state.runId);
 
-  return { mailQueued, statusBreakdown: breakdown(latestRows) };
+  return { mailQueued, skipped_blocked: skippedBlocked, statusBreakdown: breakdown(latestRows) };
 }
 
 function breakdown(latestRows: StatRow[]): Record<string, Record<string, number>> {
