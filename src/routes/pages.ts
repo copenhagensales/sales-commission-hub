@@ -9,18 +9,13 @@ const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
 export const Auth = lazyPage(() => import("@/pages/Auth"));
 export const Pulsen = lazyPage(() => import("@/pages/Pulsen"));
-export const PulsenDemo = lazyPage(() => import("@/pages/PulsenDemo"));
-export const Dashboard = lazyPage(() => import("@/pages/Dashboard"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
-export const Sales = lazyPage(() => import("@/pages/Sales"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
 
 export const MgTest = lazyPage(() => import("@/pages/MgTest"));
-export const MgDataImport = lazyPage(() => import("@/pages/mg/DataImport"));
 
 export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const RelatelDashboard = lazyPage(() => import("@/pages/RelatelDashboard"));
-export const RelatelProductsDashboard = lazyPage(() => import("@/pages/RelatelProductsDashboard"));
 export const UnitedDashboard = lazyPage(() => import("@/pages/UnitedDashboard"));
 export const CsTop20Dashboard = lazyPage(() => import("@/pages/CsTop20Dashboard"));
 export const NotFound = lazyPage(() => import("@/pages/NotFound"));
@@ -31,17 +26,12 @@ export const EmployeeOnboarding = lazyPage(() => import("@/pages/EmployeeOnboard
 export const ResetPassword = lazyPage(() => import("@/pages/ResetPassword"));
 
 export const VagtFlowIndex = lazyPage(() => import("@/pages/vagt-flow/Index"));
-export const VagtBookWeek = lazyPage(() => import("@/pages/vagt-flow/BookWeek"));
 export const VagtLocations = lazyPage(() => import("@/pages/vagt-flow/Locations"));
-export const VagtBookings = lazyPage(() => import("@/pages/vagt-flow/Bookings"));
 export const VagtBookingManagement = lazyPage(() => import("@/pages/vagt-flow/BookingManagement"));
-export const VagtVehicles = lazyPage(() => import("@/pages/vagt-flow/Vehicles"));
-export const VagtTimeOffRequests = lazyPage(() => import("@/pages/vagt-flow/TimeOffRequests"));
 export const VagtLocationDetail = lazyPage(() => import("@/pages/vagt-flow/LocationDetail"));
 export const VagtBilling = lazyPage(() => import("@/pages/vagt-flow/Billing"));
 export const VagtSalesRegistration = lazyPage(() => import("@/pages/vagt-flow/SalesRegistration"));
 export const VagtFieldmarketingDashboard = lazyPage(() => import("@/pages/vagt-flow/FieldmarketingDashboard"));
-export const VagtTravelExpenses = lazyPage(() => import("@/pages/vagt-flow/TravelExpenses"));
 export const VagtEditSalesRegistrations = lazyPage(() => import("@/pages/vagt-flow/EditSalesRegistrations"));
 export const VagtEesyFmDeviations = lazyPage(() => import("@/pages/vagt-flow/EesyFmDeviations"));
 export const MyBookingSchedule = lazyPage(() => import("@/pages/vagt-flow/MyBookingSchedule"));
@@ -49,7 +39,6 @@ export const MyBookingSchedule = lazyPage(() => import("@/pages/vagt-flow/MyBook
 export const ShiftOverview = lazyPage(() => import("@/pages/shift-planning/ShiftOverview"));
 export const MySchedule = lazyPage(() => import("@/pages/shift-planning/MySchedule"));
 export const AbsenceManagement = lazyPage(() => import("@/pages/shift-planning/AbsenceManagement"));
-export const TimeTracking = lazyPage(() => import("@/pages/shift-planning/TimeTracking"));
 
 export const Contracts = lazyPage(() => import("@/pages/Contracts"));
 export const MyContracts = lazyPage(() => import("@/pages/MyContracts"));
@@ -67,9 +56,6 @@ export const CarQuiz = lazyPage(() => import("@/pages/CarQuiz"));
 export const CarQuizAdmin = lazyPage(() => import("@/pages/CarQuizAdmin"));
 export const CodeOfConduct = lazyPage(() => import("@/pages/CodeOfConduct"));
 export const CodeOfConductAdmin = lazyPage(() => import("@/pages/CodeOfConductAdmin"));
-export const ExtraWork = lazyPage(() => import("@/pages/ExtraWork"));
-export const ExtraWorkAdmin = lazyPage(() => import("@/pages/ExtraWorkAdmin"));
-export const MyTimeClock = lazyPage(() => import("@/pages/MyTimeClock"));
 
 export const RecruitmentDashboard = lazyPage(() => import("@/pages/recruitment/RecruitmentDashboard"));
 export const RecruitmentCandidates = lazyPage(() => import("@/pages/recruitment/Candidates"));
@@ -87,10 +73,7 @@ export const PublicUnsubscribe = lazyPage(() => import("@/pages/recruitment/Publ
 
 export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 
-export const ClientSalesOverview = lazyPage(() => import("@/pages/ClientSalesOverview"));
-export const SalesDashboard = lazyPage(() => import("@/pages/boards/SalesDashboard"));
 
-export const ClosingShifts = lazyPage(() => import("@/pages/ClosingShifts"));
 export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 export const CompanyOverview = lazyPage(() => import("@/pages/CompanyOverview"));
 export const SystemEmailTemplates = lazyPage(() => import("@/pages/EmailTemplates"));
@@ -106,7 +89,6 @@ export const FieldmarketingDashboardFull = lazyPage(() => import("@/pages/dashbo
 export const AseFmDashboard = lazyPage(() => import("@/pages/dashboards/AseFmDashboard"));
 export const CphSalesDashboard = lazyPage(() => import("@/pages/dashboards/CphSalesDashboard"));
 export const DashboardSettings = lazyPage(() => import("@/pages/dashboards/DashboardSettings"));
-export const DesignDashboard = lazyPage(() => import("@/pages/dashboards/DesignDashboard"));
 export const SalesOverviewAll = lazyPage(() => import("@/pages/dashboards/SalesOverviewAll"));
 
 export const Messages = lazyPage(() => import("@/pages/Messages"));
@@ -117,10 +99,8 @@ export const RampTeam = lazyPage(() => import("@/pages/onboarding/RampTeam"));
 export const QualityControl = lazyPage(() => import("@/pages/quality/QualityControl"));
 export const QualityAdmin = lazyPage(() => import("@/pages/quality/QualityAdmin"));
 export const OnboardingAdmin = lazyPage(() => import("@/pages/onboarding/OnboardingAdmin"));
-export const OnboardingCourse = lazyPage(() => import("@/pages/onboarding/OnboardingCourse"));
 export const MyFeedback = lazyPage(() => import("@/pages/onboarding/MyFeedback"));
 
-export const ExcelFieldMatcher = lazyPage(() => import("@/pages/ExcelFieldMatcher"));
 
 // TV Board
 export const TvBoardLogin = lazyPage(() => import("@/pages/tv-board/TvBoardLogin"));
@@ -153,7 +133,6 @@ export const UpcomingStarts = lazyPage(() => import("@/pages/personnel/UpcomingS
 // Reports
 export const ReportsAdmin = lazyPage(() => import("@/pages/reports/ReportsAdmin"));
 export const ReportsManagement = lazyPage(() => import("@/pages/reports/ReportsManagement"));
-export const ReportsEmployee = lazyPage(() => import("@/pages/reports/ReportsEmployee"));
 export const DailyReports = lazyPage(() => import("@/pages/reports/DailyReports"));
 export const RevenueByClient = lazyPage(() => import("@/pages/reports/RevenueByClient"));
 export const WeeklyLeadClosureReport = lazyPage(() => import("@/pages/reports/WeeklyLeadClosureReport"));
@@ -185,19 +164,9 @@ export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
 // TDC Opsummering
 export const TdcOpsummering = lazyPage(() => import("@/pages/TdcOpsummering"));
 export const TdcIdriftsaettelse = lazyPage(() => import("@/pages/TdcIdriftsaettelse"));
-export const TdcSalg = lazyPage(() => import("@/pages/TdcSalg"));
 export const FiberRegistrering = lazyPage(() => import("@/pages/FiberRegistrering"));
 
 // Economic
-export const EconomicUpload = lazyPage(() => import("@/pages/admin/EconomicUpload"));
-export const EconomicLayout = lazyPage(() => import("@/pages/economic/EconomicLayout"));
-export const EconomicDashboard = lazyPage(() => import("@/pages/economic/EconomicDashboard"));
-export const EconomicExpenses = lazyPage(() => import("@/pages/economic/EconomicExpenses"));
-export const EconomicPosteringer = lazyPage(() => import("@/pages/economic/EconomicPosteringer"));
-export const EconomicBudget = lazyPage(() => import("@/pages/economic/EconomicBudget"));
-export const EconomicMapping = lazyPage(() => import("@/pages/economic/EconomicMapping"));
-export const EconomicRevenueMatch = lazyPage(() => import("@/pages/economic/EconomicRevenueMatch"));
-export const SalesValidation = lazyPage(() => import("@/pages/economic/SalesValidation"));
 
 export const ImmediatePaymentASE = lazyPage(() => import("@/pages/ImmediatePaymentASE"));
 
@@ -227,8 +196,6 @@ export const AmoSettings = lazyPage(() => import("@/pages/amo/AmoSettings"));
 export const CustomerInquiries = lazyPage(() => import("@/pages/CustomerInquiries"));
 
 // Client Forecast
-export const ClientForecast = lazyPage(() => import("@/pages/ClientForecast"));
-export const ClientForecastDetail = lazyPage(() => import("@/pages/ClientForecastDetail"));
 
 // Powerdag
 export const PowerdagBoard = lazyPage(() => import("@/pages/dashboards/PowerdagBoard"));
@@ -242,7 +209,6 @@ export const PowerdagInput = lazyPage(() => import("@/pages/dashboards/PowerdagI
 export const PowerdagAdmin = lazyPage(() => import("@/pages/dashboards/PowerdagAdmin"));
 
 // System Feedback
-export const SystemFeedback = lazyPage(() => import("@/pages/SystemFeedback"));
 
 // Compliance
 export const ComplianceOverview = lazyPage(() => import("@/pages/compliance/ComplianceOverview"));

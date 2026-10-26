@@ -1,5 +1,5 @@
 import { clearPushSubscription } from "@/hooks/usePushNotifications";
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag, Upload } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, FileText, Crown, User, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, Inbox, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag } from "lucide-react";
 import { PulsenUnreadBadge } from "@/components/pulsen/PulsenUnreadBadge";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
@@ -13,7 +13,6 @@ import {
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useState, useMemo, useEffect } from "react";
@@ -32,7 +31,6 @@ import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
-import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
@@ -81,7 +79,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
-  const { data: hasActiveTimeClock } = useHasActiveTimeClock();
 
   // Menu config from database - controls sort_order and visibility
   const { data: menuConfig } = useSidebarMenuConfig();
@@ -105,24 +102,24 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   }, [menuConfig]);
 
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse", "/tdc-salgsvaerktoej", "/fiber-registrering"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse", "/fiber-registrering"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [spilOpen, setSpilOpen] = useState(
     ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
-  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
+  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const { hasAccess: invoiceflowAccess } = useInvoiceflowAccess();
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client", "/customer-inquiries", "/client-forecast"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client", "/customer-inquiries"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
   // Dashboard state removed - dashboards are now in separate environment
   // (SOME menu removed; Ekstraarbejde is now top-level)
   const [onboardingOpen, setOnboardingOpen] = useState(
-    location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus" || location.pathname === "/coaching-templates"
+    location.pathname.startsWith("/onboarding-program") || location.pathname === "/coaching-templates"
   );
   const [reportsOpen, setReportsOpen] = useState(
     location.pathname.startsWith("/reports") || location.pathname === "/salary/cancellations"
@@ -145,9 +142,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const canViewCancellations = p.canView("menu_cancellations");
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith("/admin")
-  );
-  const [economicOpen, setEconomicOpen] = useState(
-    location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload"
   );
   const [amoOpen, setAmoOpen] = useState(
     location.pathname.startsWith("/amo")
@@ -446,7 +440,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // This ensures the sidebar matches what the Permission Editor shows
   
   // Check if Ekstraarbejde menu should be visible (top-level standalone)
-  const showExtraWorkMenu = p.canViewExtraWork;
 
   // Check if any Personnel menu items are visible (requires section permission)
   const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
@@ -457,8 +450,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
   
   // Check if any MG menu items are visible (requires section permission)
-  const canViewMgDataImport = p.canView("menu_mg_data_import");
-  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && (p.canViewMgTest || canViewMgDataImport);
+  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
   
   const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
 
@@ -508,9 +500,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   ];
   const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
   
-  // Check if Economic menu should be visible (owner always has access)
   const isOwner = p.position?.name?.toLowerCase() === "ejer";
-  const showEconomicMenu = !isMenuHidden('section_economic') && (isOwner || p.canView("menu_section_economic"));
 
   // Check if Admin menu should be visible (KPI or owner for menu editor)
   const showAdminMenu = !isMenuHidden('section_admin') && (p.canViewKpiDefinitions || isOwner);
@@ -559,7 +549,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-time-clock"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -784,19 +774,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               )}
               {p.canViewTdcOpsummering && (
                 <NavLink
-                  to="/tdc-salgsvaerktoej"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/tdc-salgsvaerktoej" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <FileText className="h-4 w-4" />
-                  TDC Salgsværktøj (test)
-                </NavLink>
-              )}
-              {p.canViewTdcOpsummering && (
-                <NavLink
                   to="/fiber-registrering"
                   onClick={handleNavClick}
                   className={cn(
@@ -809,20 +786,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
 
-              {/* Stempelur - only visible if employee has active time clocks */}
-              {hasActiveTimeClock && (
-                <NavLink
-                  to="/my-time-clock"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/my-time-clock" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Timer className="h-4 w-4" />
-                  Stempelur
-                </NavLink>
-              )}
             </CollapsibleContent>
           </Collapsible>
 
@@ -921,22 +884,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             );
           })}
 
-          {/* Ekstraarbejde (top-level) */}
-          {showExtraWorkMenu && (
-            <NavLink
-              to="/extra-work"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/extra-work"
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <HeartHandshake className="h-5 w-5" />
-              {t("sidebar.extraWork")}
-            </NavLink>
-          )}
 
           {/* Personale (Personnel) menu */}
           {showPersonnelMenu && (
@@ -1150,15 +1097,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     Kundehenvendelser
                   </NavLink>
                 )}
-                {p.canViewClientForecast && (
-                  <NavLink to="/client-forecast" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname.startsWith("/client-forecast") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Kundeforecast
-                  </NavLink>
-                )}
               </CollapsibleContent>
             </Collapsible>
           )}
@@ -1183,15 +1121,13 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </NavLink>
           )}
 
-          {/* Fejlrapportering - standalone, visible for users with access */}
-          <FeedbackNavLink handleNavClick={handleNavClick} />
 
           {/* Intern Vagtplan menu */}
           {showShiftPlanningMenu && (
             <Collapsible open={shiftPlanningOpen} onOpenChange={setShiftPlanningOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                (location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                (location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <ClipboardList className="h-5 w-5" />
@@ -1223,15 +1159,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     )}
                   </NavLink>
                 )}
-                {p.canViewTimeTracking && (
-                  <NavLink to="/shift-planning/time-tracking" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/shift-planning/time-tracking" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Timer className="h-4 w-4" />
-                    {t("sidebar.timeTracking")}
-                  </NavLink>
-                )}
                 {p.canViewTimeStamp && (
                   <NavLink to="/time-stamp" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1239,15 +1166,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Clock className="h-4 w-4" />
                     {t("sidebar.timeClock")}
-                  </NavLink>
-                )}
-                {p.canViewClosingShifts && (
-                  <NavLink to="/closing-shifts" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/closing-shifts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Lock className="h-4 w-4" />
-                    {t("sidebar.closingShifts")}
                   </NavLink>
                 )}
               </CollapsibleContent>
@@ -1291,8 +1209,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   <NavLink to="/vagt-flow/booking" onClick={handleNavClick} className={cn(
                     "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname.startsWith("/vagt-flow/booking") || 
-                    location.pathname === "/vagt-flow/book-week" || 
-                    location.pathname === "/vagt-flow/bookings" || 
                     location.pathname.startsWith("/vagt-flow/locations")
                       ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -1317,15 +1233,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     )}
                   </NavLink>
                 )}
-                {p.canViewFmVehicles && (
-                  <NavLink to="/vagt-flow/vehicles" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/vehicles" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Car className="h-4 w-4" />
-                    {t("sidebar.vehicles")}
-                  </NavLink>
-                )}
                 {canAccessFmSalesRegistration && (
                   <NavLink to="/vagt-flow/sales-registration" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1347,15 +1254,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                         {pendingDispatchCount}
                       </span>
                     )}
-                  </NavLink>
-                )}
-                {p.canViewFmTravelExpenses && (
-                  <NavLink to="/vagt-flow/travel-expenses" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/travel-expenses" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <CreditCard className="h-4 w-4" />
-                    {t("sidebar.travelExpenses")}
                   </NavLink>
                 )}
                 {p.canViewFmEditSales && (
@@ -1401,15 +1299,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Percent className="h-4 w-4" />
                     {t("sidebar.mgTest")}
-                  </NavLink>
-                )}
-                {canViewMgDataImport && (
-                  <NavLink to="/mg/data-import" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/mg/data-import" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Upload className="h-4 w-4" />
-                    Data import
                   </NavLink>
                 )}
               </CollapsibleContent>
@@ -1479,15 +1368,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Users className="h-4 w-4" />
                     Rapporter Ledelse
-                  </NavLink>
-                )}
-                {p.canViewReportsEmployee && (
-                  <NavLink to="/reports/employee" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/employee" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <User className="h-4 w-4" />
-                    Rapporter Medarbejder
                   </NavLink>
                 )}
                 {canViewCancellations && (
@@ -1563,13 +1443,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 )}>
                   <BarChart3 className="h-4 w-4" />
                   Oversigt
-                </NavLink>
-                <NavLink to="/onboarding-program/kursus" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/onboarding-program/kursus" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <GraduationCap className="h-4 w-4" />
-                  Kursus
                 </NavLink>
                 <NavLink to="/onboarding-program?tab=ramp" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1745,20 +1618,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </Collapsible>
           )}
 
-          {/* Salg - near bottom */}
-          {p.canViewSales && (
-            <NavLink
-              to="/sales"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {t("sidebar.sales")}
-            </NavLink>
-          )}
 
           {/* Tast selv salg (team United) */}
           {isUnitedMember && (
@@ -1803,97 +1662,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </Collapsible>
           )}
 
-          {/* Økonomi menu */}
-          {showEconomicMenu && (
-            <Collapsible open={economicOpen} onOpenChange={setEconomicOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                (location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload")
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Receipt className="h-5 w-5" />
-                  Økonomi
-                </div>
-                {economicOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewEconomicDashboard && (
-                <NavLink to="/economic" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <LayoutDashboard className="h-4 w-4" />
-                  Overblik
-                </NavLink>
-                )}
-                {p.canViewEconomicDashboard && (
-                <NavLink to="/economic/posteringer" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic/posteringer" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <List className="h-4 w-4" />
-                  Posteringer
-                </NavLink>
-                )}
-                {p.canViewEconomicExpenses && (
-                <NavLink to="/economic/expenses" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic/expenses" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Receipt className="h-4 w-4" />
-                  Udgifter
-                </NavLink>
-                )}
-                {p.canViewEconomicBudget && (
-                <NavLink to="/economic/budget" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic/budget" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Target className="h-4 w-4" />
-                  Budget 2026
-                </NavLink>
-                )}
-                {p.canViewEconomicMapping && (
-                <NavLink to="/economic/mapping" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic/mapping" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Database className="h-4 w-4" />
-                  Mapping
-                </NavLink>
-                )}
-                {p.canViewEconomicDashboard && (
-                <NavLink to="/economic/revenue-match" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic/revenue-match" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Receipt className="h-4 w-4" />
-                  Omsætning
-                </NavLink>
-                )}
-                {p.canViewEconomicDashboard && (
-                <NavLink to="/economic/sales-validation" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/economic/sales-validation" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <ShieldCheck className="h-4 w-4" />
-                  Salgsvalidering
-                </NavLink>
-                )}
-                {p.canViewEconomicUpload && (
-                <NavLink to="/admin/economic-upload" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/admin/economic-upload" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Database className="h-4 w-4" />
-                  Import
-                </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
 
 
           {/* Logikker - near bottom */}
@@ -2115,22 +1883,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           )}
         </nav>
         <div className="border-t border-sidebar-border p-4 space-y-2">
-          {/* Time tracking icon link */}
-          {(p.canViewTimeTracking || p.canViewExtraWork) && (
-            <NavLink
-              to={p.canViewTimeTracking ? "/shift-planning/time-tracking" : "/extra-work"}
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 w-10 h-10",
-                (location.pathname === "/shift-planning/time-tracking" || location.pathname === "/extra-work" || location.pathname === "/extra-work-admin") 
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-              title={t("sidebar.timeTracking")}
-            >
-              <Timer className="h-5 w-5" />
-            </NavLink>
-          )}
 
           {p.canView("menu_compliance_overview") && (
             <NavLink
@@ -2168,46 +1920,5 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
         </div>
       </div>
     </aside>
-  );
-}
-
-function FeedbackNavLink({ handleNavClick }: { handleNavClick: () => void }) {
-  const location = useLocation();
-  const { user } = useAuth();
-
-  const { data: hasAccess } = useQuery({
-    queryKey: ["feedback-sidebar-access", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return false;
-      // Check if owner
-      const { data: ownerCheck } = await supabase.rpc("is_owner", { _user_id: user.id });
-      if (ownerCheck) return true;
-      // Check access table
-      const { data: emp } = await findEmployeeByAuth<{ id: string }>(
-        user,
-        "id"
-      );
-
-      if (!emp?.id) return false;
-      const { data: access } = await supabase
-        .from("system_feedback_access" as any)
-        .select("id")
-        .eq("employee_id", emp.id)
-        .maybeSingle();
-      return !!access;
-    },
-    enabled: !!user?.id,
-  });
-
-  if (!hasAccess) return null;
-
-  return (
-    <NavLink to="/system-feedback" onClick={handleNavClick} className={cn(
-      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-      location.pathname === "/system-feedback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-    )}>
-      <Bug className="h-4 w-4" />
-      Fejlrapportering
-    </NavLink>
   );
 }

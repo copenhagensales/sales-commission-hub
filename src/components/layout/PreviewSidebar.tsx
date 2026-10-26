@@ -4,9 +4,9 @@ import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useCanAccess } from "@/hooks/useSystemRoles";
 import { 
-  LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, 
+  LayoutDashboard, Users, Wallet, Settings, 
   Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight,
-  Car, Clock, UserCheck, Receipt, Database, ListChecks, Timer, 
+  Car, Clock, UserCheck, Receipt, Database, ListChecks, 
   FileText, Crown, User, Sparkles, BarChart3, Video, Phone, FlaskConical,
   Home, Inbox
 } from "lucide-react";
@@ -22,11 +22,8 @@ interface PreviewSidebarProps {
 
 // Map permission keys to menu items (aligned with PositionsTab.tsx)
 const MAIN_MENU_ITEMS = {
-  menu_dashboard: { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   // menu_some removed
-  menu_sales: { name: "Salg", href: "/sales", icon: ShoppingCart },
   menu_logics: { name: "Logikker", href: "/logikker", icon: ListChecks },
-  menu_closing_shifts: { name: "Påmindelser", href: "/closing-shifts", icon: Clock },
 };
 
 const PERSONAL_MENU_ITEMS = {
@@ -71,20 +68,13 @@ const MG_ITEMS = {
 const SHIFT_PLANNING_ITEMS = {
   menu_shift_overview: { name: "Vagtplan", href: "/shift-planning", icon: Calendar },
   menu_absence: { name: "Fravær", href: "/shift-planning/absence", icon: Clock },
-  menu_time_tracking: { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
-  menu_extra_work: { name: "Ekstra arbejde", href: "/extra-work", icon: Clock },
-  menu_extra_work_admin: { name: "Ekstra arbejde admin", href: "/extra-work-admin", icon: Clock },
 };
 
 const VAGT_FLOW_ITEMS = {
   menu_fm_my_schedule: { name: "Min vagtplan", href: "/vagt-flow/my-schedule", icon: UserCheck },
   menu_fm_overview: { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
-  menu_fm_book_week: { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
-  menu_fm_bookings: { name: "Bookinger", href: "/vagt-flow/bookings", icon: Calendar },
   menu_fm_locations: { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
-  menu_fm_vehicles: { name: "Køretøjer", href: "/vagt-flow/vehicles", icon: Car },
   menu_fm_billing: { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
-  menu_fm_time_off: { name: "Fraværsanmodninger", href: "/vagt-flow/time-off-requests", icon: Clock },
 };
 
 const RECRUITMENT_ITEMS = {
@@ -99,21 +89,11 @@ const RECRUITMENT_ITEMS = {
   menu_booking_flow: { name: "Booking Flow", href: "/recruitment/booking-flow", icon: Calendar },
 };
 
-const BOARDS_ITEMS = {
-  menu_boards_sales: { name: "Sales Dashboard", href: "/boards/sales", icon: ShoppingCart },
-};
 
 const SALARY_ITEMS = {
   menu_salary_types: { name: "Lønarter", href: "/salary/types", icon: Receipt },
 };
 
-const ECONOMIC_ITEMS = {
-  menu_economic_dashboard: { name: "Overblik", href: "/economic", icon: LayoutDashboard },
-  menu_economic_expenses: { name: "Udgifter", href: "/economic/expenses", icon: Receipt },
-  menu_economic_budget: { name: "Budget 2026", href: "/economic/budget", icon: Wallet },
-  menu_economic_mapping: { name: "Mapping", href: "/economic/mapping", icon: Database },
-  menu_economic_upload: { name: "Import", href: "/admin/economic-upload", icon: Database },
-};
 
 export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = false, onToggle }: PreviewSidebarProps) {
   const location = useLocation();
@@ -128,9 +108,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
   const [shiftOpen, setShiftOpen] = useState(false);
   const [vagtFlowOpen, setVagtFlowOpen] = useState(false);
   const [recruitmentOpen, setRecruitmentOpen] = useState(false);
-  const [boardsOpen, setBoardsOpen] = useState(false);
   const [salaryOpen, setSalaryOpen] = useState(false);
-  const [economicOpen, setEconomicOpen] = useState(false);
 
   // Helper to check if permission is enabled
   const hasPermission = (key: string): boolean => {
@@ -198,19 +176,9 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
     ? getEnabledItems(RECRUITMENT_ITEMS)
     : [];
     
-  // Boards section - check parent first
-  const boardsItems = hasSectionPermission('menu_section_boards')
-    ? getEnabledItems(BOARDS_ITEMS)
-    : [];
-    
   // Salary section - check parent first
   const salaryItems = hasSectionPermission('menu_section_salary')
     ? (isOwner ? Object.values(SALARY_ITEMS) : getEnabledItems(SALARY_ITEMS))
-    : [];
-    
-  // Economic section - check parent first
-  const economicItems = hasSectionPermission('menu_section_economic')
-    ? (isOwner ? Object.values(ECONOMIC_ITEMS) : getEnabledItems(ECONOMIC_ITEMS))
     : [];
 
   const handleNavClick = () => {
@@ -337,7 +305,7 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
           {renderCollapsibleMenu("MG", Percent, mgItems, mgOpen, setMgOpen, ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/calls-data", "/adversus-data"])}
           
           {/* Shift Planning submenu */}
-          {renderCollapsibleMenu("Vagtplan", Calendar, shiftItems, shiftOpen, setShiftOpen, ["/shift-planning", "/extra-work"])}
+          {renderCollapsibleMenu("Vagtplan", Calendar, shiftItems, shiftOpen, setShiftOpen, ["/shift-planning"])}
           
           {/* Vagt Flow submenu */}
           {renderCollapsibleMenu("Fieldmarketing", MapPin, vagtFlowItems, vagtFlowOpen, setVagtFlowOpen, ["/vagt-flow"])}
@@ -345,14 +313,8 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
           {/* Recruitment submenu */}
           {renderCollapsibleMenu("Rekruttering", Users, recruitmentItems, recruitmentOpen, setRecruitmentOpen, ["/recruitment"])}
           
-          {/* Boards submenu */}
-          {renderCollapsibleMenu("Boards", Tv, boardsItems, boardsOpen, setBoardsOpen, ["/boards"])}
-          
           {/* Salary submenu */}
           {renderCollapsibleMenu("Løn", Wallet, salaryItems, salaryOpen, setSalaryOpen, ["/salary"])}
-          
-          {/* Economic submenu */}
-          {renderCollapsibleMenu("Økonomi", Receipt, economicItems, economicOpen, setEconomicOpen, ["/economic", "/admin/economic-upload"])}
           
           {/* Settings */}
           {hasPermission("menu_settings") && (

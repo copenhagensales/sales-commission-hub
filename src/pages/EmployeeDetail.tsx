@@ -882,12 +882,10 @@ export default function EmployeeDetail() {
                       { value: "/home", label: "Hjem" },
                       { value: "/my-schedule", label: "Min kalender" },
                       { value: "/shift-planning", label: "Vagtplan" },
-                      { value: "/dashboard", label: "Dashboard" },
                       { value: "/vagt-flow", label: "Fieldmarketing" },
                       { value: "/employees", label: "Medarbejdere" },
                       { value: "/contracts", label: "Kontrakter" },
                       { value: "/recruitment", label: "Rekruttering" },
-                      { value: "/sales", label: "Salg" },
                       { value: "/payroll", label: "Lønkørsel" },
                     ]}
                     onSave={handleSave}
@@ -897,14 +895,12 @@ export default function EmployeeDetail() {
                             { value: "/home", label: "Hjem" },
                             { value: "/my-schedule", label: "Min kalender" },
                             { value: "/shift-planning", label: "Vagtplan" },
-                            { value: "/dashboard", label: "Dashboard" },
                             { value: "/vagt-flow", label: "Fieldmarketing" },
                             { value: "/employees", label: "Medarbejdere" },
                             { value: "/contracts", label: "Kontrakter" },
                             { value: "/recruitment", label: "Rekruttering" },
-                            { value: "/sales", label: "Salg" },
                             { value: "/payroll", label: "Lønkørsel" },
-                          ].find(o => o.value === (employee as any).default_landing_page)?.label
+                          ].find(o => o.value === (employee as any).default_landing_page)?.label ?? (employee as any).default_landing_page
                         : "Brug stilling standard"
                     }
                     allowClear

@@ -1,5 +1,16 @@
 import { Navigate, useSearchParams } from "react-router-dom";
 
+/** Fjernede sider (oprydning 26/10): gamle links og bogmærker sendes videre i stedet for 404. */
+const redirectCache = new Map<string, () => JSX.Element>();
+export function redirectTo(to: string) {
+  let c = redirectCache.get(to);
+  if (!c) {
+    c = () => <Navigate to={to} replace />;
+    redirectCache.set(to, c);
+  }
+  return c;
+}
+
 // Redirect components for consolidated menu items
 // These redirect old routes to the new consolidated location in MyProfile
 
@@ -8,10 +19,6 @@ export function PulsenRedirect() {
   const [params] = useSearchParams();
   const q = params.toString();
   return <Navigate to={`/storkbook${q ? `?${q}` : ""}`} replace />;
-}
-
-export function PulsenDemoRedirect() {
-  return <Navigate to="/storkbook/demo" replace />;
 }
 
 export function MyScheduleRedirect() {
