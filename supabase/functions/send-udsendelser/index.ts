@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -101,8 +102,13 @@ serve(async (req) => {
         let fejl: string | null = null;
         try {
           if (!token) token = await getM365AccessToken();
-          await sendEmail(token, row.modtager, row.emne, row.html);
-          ok = true;
+          const tk = token;
+          const st = await udsend({
+            type: "send-udsendelser", kanal: "mail", modtager: row.modtager, emne: row.emne, afsenderfunktion: "send-udsendelser",
+            send: async () => { await sendEmail(tk, row.modtager, row.emne, row.html); },
+          });
+          if (st === "sendt") ok = true;
+          else fejl = st; // slået fra/fravalgt i Udsendelser – ikke sendt
         } catch (e) {
           fejl = (e instanceof Error ? e.message : "ukendt fejl").slice(0, 200);
         }
