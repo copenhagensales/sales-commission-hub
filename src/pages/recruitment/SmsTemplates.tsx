@@ -1,3 +1,4 @@
+import { AlleUdsendelserLink } from "@/components/udsendelser/AlleUdsendelserLink";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,6 +136,7 @@ export default function SmsTemplates() {
   return (
     <MainLayout>
       <div className="container max-w-4xl py-8">
+        <AlleUdsendelserLink />
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">SMS-skabeloner</h1>

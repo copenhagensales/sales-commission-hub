@@ -4,7 +4,7 @@
  * Mail: _shared/m365-mail.ts · SMS: Twilio som send-employee-sms · Push: _shared/push.ts.
  */
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { z } from "npm:zod@3.23.8";
+import { z } from "https://esm.sh/zod@3.23.8";
 import { requireOwner } from "../_shared/auth.ts";
 import { udsend } from "../_shared/udsend.ts";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
