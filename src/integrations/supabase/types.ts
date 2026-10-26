@@ -19219,6 +19219,33 @@ export type Database = {
           },
         ]
       }
+      weekly_lead_closure_locks: {
+        Row: {
+          locked_at: string
+          run_id: string | null
+          unlock_order: string | null
+          unlocked_by_run: string | null
+          unlocked_until: string | null
+          week_start: string
+        }
+        Insert: {
+          locked_at?: string
+          run_id?: string | null
+          unlock_order?: string | null
+          unlocked_by_run?: string | null
+          unlocked_until?: string | null
+          week_start: string
+        }
+        Update: {
+          locked_at?: string
+          run_id?: string | null
+          unlock_order?: string | null
+          unlocked_by_run?: string | null
+          unlocked_until?: string | null
+          week_start?: string
+        }
+        Relationships: []
+      }
       weekly_lead_closure_runs: {
         Row: {
           account: string | null
@@ -19230,6 +19257,7 @@ export type Database = {
           mail_sent: boolean
           started_at: string
           triggered_by: string | null
+          unlock_log: string | null
           weeks_covered: number
         }
         Insert: {
@@ -19242,6 +19270,7 @@ export type Database = {
           mail_sent?: boolean
           started_at?: string
           triggered_by?: string | null
+          unlock_log?: string | null
           weeks_covered?: number
         }
         Update: {
@@ -19254,6 +19283,7 @@ export type Database = {
           mail_sent?: boolean
           started_at?: string
           triggered_by?: string | null
+          unlock_log?: string | null
           weeks_covered?: number
         }
         Relationships: []
