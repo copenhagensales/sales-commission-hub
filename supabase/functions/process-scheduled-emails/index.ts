@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 
         const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
         let emailResponse: Response | undefined;
-        await udsend({
+        const udsendStatus = await udsend({
           type: email.template_key && kendteTyper.has(email.template_key) ? email.template_key : 'process-scheduled-emails',
           kanal: 'mail', modtager: email.recipient_email, emne: email.subject, afsenderfunktion: 'process-scheduled-emails',
           modtagerCandidateId: email.candidate_id || undefined, modtagerEmployeeId: email.employee_id || undefined,
@@ -156,9 +156,21 @@ Deno.serve(async (req) => {
             });
             if (!emailResponse.ok) throw new Error(`HTTP ${emailResponse.status}`);
           },
-        }).catch((e) => { if (!emailResponse) throw e; });
+        }).catch((e) => { if (!emailResponse) throw e; return null; });
+        const blokeret: Record<string, string> = {
+          slaaet_fra: 'Slået fra i Udsendelser',
+          fravalgt: 'Fravalgt af modtageren',
+          udenfor_regel: 'Uden for modtagerreglen',
+        };
+        if (udsendStatus && blokeret[udsendStatus]) {
+          // Blokeret i Udsendelser: annulleres, så den ikke fylder i næste batch.
+          await supabase
+            .from('scheduled_emails')
+            .update({ status: 'cancelled', error_message: blokeret[udsendStatus] })
+            .eq('id', email.id);
+          continue;
+        }
         if (!emailResponse) {
-          // Slået fra eller fravalgt i Udsendelser: intet sendt; mailen bliver stående som planlagt.
           continue;
         }
 
