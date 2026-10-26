@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
   const skipped: Array<{ subscription: string; reason: string }> = [];
   const reminders: string[] = [];
   const errors: string[] = [];
+  const springetOver: string[] = [];
 
   // Kun månedlige leverandørrapporter håndteres af create/remind-flowet.
   const { data: subscriptions, error: subError } = await svc
@@ -292,6 +293,7 @@ Deno.serve(async (req) => {
       created,
       skipped,
       reminders,
+      springetOver,
       errors,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },

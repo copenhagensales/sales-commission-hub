@@ -195,6 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const baseUrl = "https://stork.copenhagensales.dk";
     let sentCount = 0;
+    let skippedCount = 0;
     let accessToken: string | null = null;
 
     for (const contract of eligibleContracts) {
