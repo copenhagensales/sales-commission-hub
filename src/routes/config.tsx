@@ -4,7 +4,6 @@ import {
   Auth,
   Home,
   Pulsen,
-  Dashboard,
   Agents,
   Settings,
   MgTest,
@@ -108,7 +107,6 @@ import {
   FiberRegistrering,
   TdcSalgPublic,
   ImmediatePaymentASE,
-  EconomicLayout,
   Cancellations,
   SystemStability,
   TeamGoals,
@@ -465,7 +463,7 @@ export const routes: RouteConfig[] = [
   // Economic Upload (Owner only)
   { path: "/admin/economic-upload", component: redirectTo("/reports"), access: "protected" },
 
-  // Economic Dashboard (with nested routes)
+  // Economic (fjernet 26/10 – omdirigeringer)
   { path: "/economic", component: redirectTo("/reports"), access: "protected" },
   { path: "/economic/posteringer", component: redirectTo("/reports"), access: "protected" },
   { path: "/economic/expenses", component: redirectTo("/reports"), access: "protected" },

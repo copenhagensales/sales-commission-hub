@@ -167,7 +167,6 @@ export const TdcIdriftsaettelse = lazyPage(() => import("@/pages/TdcIdriftsaette
 export const FiberRegistrering = lazyPage(() => import("@/pages/FiberRegistrering"));
 
 // Economic
-export const EconomicLayout = lazyPage(() => import("@/pages/economic/EconomicLayout"));
 
 export const ImmediatePaymentASE = lazyPage(() => import("@/pages/ImmediatePaymentASE"));
 
