@@ -18,7 +18,7 @@ export function useStrukturSynlighed(): StrukturSynlighed {
     home: !!p.canViewHome, mineTal: !!p.canViewMyGoals, vagter: m.harVagter, registrerSalg: m.harSalg,
     storkbook: !!p.canViewPulsen, spil: m.harSpil, spilSuperligaen: m.spil.superligaen, spilHead2head: m.spil.head2head, minProfil: !!p.canViewMyProfile || m.profil.fordele || m.profil.feedback || m.profil.anbefal,
     vagtplan: tp.vagtplan, mitTeam: tp.mitTeam, onboarding: tp.onboarding,
-    fieldmarketing: sr.fieldmarketing, retSalg: sr.retSalg, tdc: sr.tdc, kunder: sr.kunder,
+    salg: p.canView("menu_sales") && p.canView("menu_section_sales_system"), fieldmarketing: sr.fieldmarketing, retSalg: sr.retSalg, tdc: sr.tdc, kunder: sr.kunder,
     rekruttering: tp.rekruttering, medarbejdere: tp.medarbejdere, kontrakter: tp.kontrakter,
     rapporter: sr.rapporter, invoiceflow: !!invoiceflowAccess,
     compliance: ad.compliance, amo: ad.amo, admin: ad.admin,

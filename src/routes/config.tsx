@@ -42,6 +42,7 @@ import {
   TvBoardView,
   TvBoardDirect,
   LiveStats,
+  Sales,
   PublicReferralForm,
   TdcOpsummeringPublic,
   TdcSalgPublic,
@@ -114,7 +115,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/dashboard", component: redirectTo("/home"), access: "protected" },
   { path: "/agents", component: redirectTo("/admin?tab=agenter"), access: "protected" },
-  { path: "/sales", component: redirectTo("/live-stats"), access: "protected" },
+  { path: "/sales", component: Sales, access: "role", positionPermission: "menu_sales" },
 
   { path: "/kunder-og-priser", component: KunderOgPriserSamleside, access: "protected" },
   { path: "/mg-test", component: redirectTo("/kunder-og-priser"), access: "protected" },

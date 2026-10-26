@@ -298,6 +298,7 @@ export const PERMISSION_KEYS = {
   tab_fm_checklist: { label: 'Fane: Tjekliste', section: 'fieldmarketing', parent: 'menu_fm_booking' },
 
   // ==================== SALG & SYSTEM (under menu_section_sales_system) ====================
+  menu_sales: { label: 'Salg', section: 'sales_system', parent: 'menu_section_sales_system' },
   menu_logics: { label: 'Logikker', section: 'sales_system', parent: 'menu_section_sales_system' },
   menu_live_stats: { label: 'Live Stats', section: 'sales_system', parent: 'menu_section_sales_system' },
   menu_settings: { label: 'Indstillinger', section: 'sales_system', parent: 'menu_section_sales_system' },
