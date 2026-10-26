@@ -31,12 +31,12 @@ export function useAdminSynlighed() {
 
   const compliance = {
     overblik: v("menu_compliance_overview"),
-    "processing-activities": ca, "data-transfers": ca, "retention-policies": ca, "dpa-addenda": ca, dpia: ca, "impact-assessments": ca,
-    "access-log": ca, "contract-access-log": ca, "breach-log": ca, "security-incidents": ca,
-    "backup-policy": ca, "processing-registry": ca, "dpa-overview": ca, "client-agreements": ca, persondatapolitik: ca,
-    databrudsprocedure: ca, "konsekvensvurdering-procedure": ca, "art30-pulsen": ca, "art30-push": ca,
-    processes: v("menu_compliance_processes"), awareness: ca, "ai-governance": ca,
-    "employee-privacy": v("menu_compliance_employee"), admin: ca, notifications: ca,
+    "processing-activities": v("tab_compliance_processing_activities"), "data-transfers": v("tab_compliance_data_transfers"), "retention-policies": v("tab_compliance_retention_policies"), "dpa-addenda": v("tab_compliance_dpa_addenda"), dpia: v("tab_compliance_dpia"), "impact-assessments": v("tab_compliance_impact_assessments"),
+    "access-log": v("tab_compliance_access_log"), "contract-access-log": v("tab_compliance_contract_access_log"), "breach-log": v("tab_compliance_breach_log"), "security-incidents": v("tab_compliance_security_incidents"),
+    "backup-policy": v("tab_compliance_backup_policy"), "processing-registry": v("tab_compliance_processing_registry"), "dpa-overview": v("tab_compliance_dpa_overview"), "client-agreements": v("tab_compliance_client_agreements"), persondatapolitik: v("tab_compliance_persondatapolitik"),
+    databrudsprocedure: v("tab_compliance_databrudsprocedure"), "konsekvensvurdering-procedure": v("tab_compliance_konsekvensvurdering_procedure"), "art30-pulsen": v("tab_compliance_art30_pulsen"), "art30-push": v("tab_compliance_art30_push"),
+    processes: v("menu_compliance_processes"), awareness: v("tab_compliance_awareness"), "ai-governance": v("tab_compliance_ai_governance"),
+    "employee-privacy": v("menu_compliance_employee"), admin: v("tab_compliance_admin"), notifications: v("tab_compliance_notifications"),
     it: !!hasItAccess && v("menu_it_workstations"),
   };
   const amo = {
@@ -48,15 +48,15 @@ export function useAdminSynlighed() {
     documents: amoSek && v("menu_amo_documents"), "audit-log": amoSek && v("menu_amo_audit_log"), settings: amoSek && v("menu_amo_settings"),
   };
   const admin = {
-    settings: v("menu_settings"), types: loen && v("menu_salary_types"),
-    rettigheder: led && v("menu_permissions"),
-    menu: isOwner,
+    settings: v("tab_administration_indstillinger"), types: loen && v("menu_salary_types"),
+    rettigheder: led && v("tab_administration_rettigheder"),
+    menu: isOwner && v("tab_administration_menu"),
     "kpi-definitioner": adminSek && v("menu_kpi_definitions"),
-    security: led && v("menu_security_dashboard"), "login-log": pers && v("menu_login_log"),
-    stabilitet: led && v("menu_security_dashboard"),
+    security: led && v("tab_administration_sikkerhed"), "login-log": pers && v("menu_login_log"),
+    stabilitet: led && v("tab_administration_stabilitet"),
     logikker: v("menu_logics"),
-    agenter: adminSek && v("menu_employees"),
-    "tv-board-admin": adminSek && v("menu_settings"), "dashboards-settings": v("menu_dashboard_admin"),
+    agenter: adminSek && v("tab_administration_agenter"),
+    "tv-board-admin": adminSek && v("tab_administration_tv_tavler"), "dashboards-settings": v("menu_dashboard_admin"),
   };
   const nogen = (o: Record<string, boolean>) => Object.values(o).some(Boolean);
   return { compliance, amo, admin, har: { compliance: nogen(compliance), amo: nogen(amo), admin: nogen(admin), udsendelser: isOwner } };

@@ -17,45 +17,44 @@ export function useTeamPersonaleSynlighed() {
   const sek = (x: string) => p.canView(`menu_section_${x}`);
   const vp = sek("vagtplan"), led = sek("ledelse"), rek = sek("rekruttering"), pers = sek("personale");
   const onbAdmin = sek("onboarding") && !!p.canViewOnboardingAdmin;
-  const kand = v("menu_candidates");
 
   const vagtplan = { "shift-planning": vp && v("menu_shift_overview"), absence: vp && v("menu_absence") };
   const mitTeam = {
     "team-goals": v("menu_team_goals"),
-    kvalitetskontrol: !!hasQualityAccess,
-    administration: !!hasQualityAccess,
+    kvalitetskontrol: !!hasQualityAccess && v("tab_mit_team_kvalitetskontrol"),
+    administration: !!hasQualityAccess && v("tab_mit_team_kvalitet_administration"),
     "pulse-survey-results": led && v("menu_pulse_survey"),
     "code-of-conduct-admin": led && v("menu_coc_admin"),
     "car-quiz-admin": led && v("menu_car_quiz_admin"),
   };
   const onboarding = {
-    "onboarding-program": onbAdmin && v("menu_onboarding_admin"),
-    opstartshold: canViewRampTeam === true,
-    "coaching-templates": onbAdmin && v("menu_onboarding_admin"),
+    "onboarding-program": onbAdmin && v("tab_onboarding_program"),
+    opstartshold: canViewRampTeam === true && v("tab_onboarding_opstartshold"),
+    "coaching-templates": onbAdmin && v("tab_onboarding_coaching_skabeloner"),
   };
   const rekruttering = {
     recruitment: rek && v("menu_recruitment_dashboard"),
-    candidates: rek && kand,
+    candidates: rek && v("tab_rekruttering_kandidater"),
     "upcoming-interviews": rek && v("menu_upcoming_interviews"),
     "upcoming-hires": rek && v("menu_upcoming_hires"),
-    "booking-flow": rek && kand && v("menu_booking_flow"),
-    engagement: rek && kand && v("menu_booking_flow"),
+    "booking-flow": rek && v("tab_rekruttering_booking") && v("menu_booking_flow"),
+    engagement: rek && v("tab_rekruttering_booking_engagement") && v("menu_booking_flow"),
     messages: rek && v("menu_messages"),
-    referrals: rek && kand && v("menu_referrals"),
+    referrals: rek && v("tab_rekruttering_anbefalinger") && v("menu_referrals"),
     winback: rek && v("menu_winback"),
     "email-templates": rek && v("menu_email_templates"),
     "sms-templates": rek && v("menu_sms_templates"),
   };
   const medarbejdere = {
-    employees: pers && v("menu_employees"),
+    employees: pers && v("tab_medarbejdere_aktive"),
     "upcoming-starts": pers && v("menu_upcoming_starts"),
-    "company-overview": led && v("menu_contracts"),
-    "onboarding-analyse": led && v("menu_contracts"),
+    "company-overview": led && v("tab_medarbejdere_virksomhedsoverblik"),
+    "onboarding-analyse": led && v("tab_medarbejdere_onboarding_analyse"),
   };
   const kontrakter = {
-    contracts: led && v("menu_contracts"),
+    contracts: led && v("tab_kontrakter_og_karriere_kontrakter"),
     "career-wishes-overview": led && v("menu_career_wishes_overview"),
-    "email-templates": led && v("menu_contracts"),
+    "email-templates": led && v("tab_kontrakter_og_karriere_mailskabeloner"),
   };
   const nogen = (o: Record<string, boolean>) => Object.values(o).some(Boolean);
   return {

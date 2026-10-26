@@ -24,13 +24,13 @@ export function useSalgRapporterSynlighed() {
   };
   const retSalg = {
     "tdc-erhverv-edit-sales": rap && v("menu_reports_tdc_edit_sales"),
-    "tryg-edit-sales": !!trygEditAccess,
+    "tryg-edit-sales": !!trygEditAccess && v("tab_ret_salg_tryg"),
     "edit-sales": fm && v("menu_fm_edit_sales"),
   };
   const tdc = {
-    "fiber-registrering": v("menu_tdc_opsummering"),
-    "tdc-idriftsaettelse": v("menu_tdc_opsummering"),
-    "tdc-opsummering": v("menu_tdc_opsummering"),
+    "fiber-registrering": v("tab_tdc_vaerktoejer_fiber"),
+    "tdc-idriftsaettelse": v("tab_tdc_vaerktoejer_idriftsaettelse"),
+    "tdc-opsummering": v("tab_tdc_vaerktoejer_opsummering"),
   };
   const kunder = { "mg-test": mg && v("menu_mg_test"), henvendelser: led && v("menu_customer_inquiries") };
   const rapporter = {
@@ -43,8 +43,8 @@ export function useSalgRapporterSynlighed() {
   };
   const powerdag = {
     powerdag: v("menu_dashboard_powerdag"),
-    input: v("menu_powerdag_input"),
-    admin: v("menu_powerdag_input"),
+    input: v("tab_powerdag_input"),
+    admin: v("tab_powerdag_administration"),
   };
   const nogen = (o: Record<string, boolean>) => Object.values(o).some(Boolean);
   return {
