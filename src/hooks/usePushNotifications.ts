@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { urlBase64ToUint8Array } from "@/lib/push/pushPrompt";
 
-export type PushPrefs = { klub: boolean; opstart_flag: boolean; missing_one_on_one: boolean; compliance: boolean };
-const DEFAULT_PREFS: PushPrefs = { klub: true, opstart_flag: true, missing_one_on_one: true, compliance: true };
 
 export function pushSupported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -40,7 +38,6 @@ if (typeof window !== "undefined") {
 
 /** Push-status og præferencer for den indloggede bruger. */
 export function usePushNotifications() {
-  const qc = useQueryClient();
   const supported = pushSupported();
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     supported ? Notification.permission : "unsupported",
@@ -56,28 +53,6 @@ export function usePushNotifications() {
       .catch(() => alive && setReady(true));
     return () => { alive = false; };
   }, []);
-
-  const prefs = useQuery({
-    queryKey: ["push-preferences"],
-    queryFn: async (): Promise<PushPrefs> => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return DEFAULT_PREFS;
-      const { data, error } = await supabase.from("push_preferences").select("klub, opstart_flag, missing_one_on_one, compliance").eq("user_id", u.user.id).maybeSingle();
-      if (error) throw error;
-      return data ?? DEFAULT_PREFS;
-    },
-  });
-
-  const setPref = useMutation({
-    mutationFn: async (patch: Partial<PushPrefs>) => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error("Ikke logget ind");
-      const next = { ...DEFAULT_PREFS, ...(prefs.data ?? {}), ...patch };
-      const { error } = await supabase.from("push_preferences").upsert({ user_id: u.user.id, ...next, updated_at: new Date().toISOString() });
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["push-preferences"] }),
-  });
 
   const subscribe = useCallback(async () => {
     const reg = await getRegistration();
@@ -117,5 +92,5 @@ export function usePushNotifications() {
     },
   });
 
-  return { supported, permission, subscribed, ready, prefs, setPref, subscribe, unsubscribe, sendTest };
+  return { supported, permission, subscribed, ready, subscribe, unsubscribe, sendTest };
 }
