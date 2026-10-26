@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { requireManager } from "../_shared/auth.ts";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -334,12 +335,17 @@ serve(async (req) => {
 </html>`;
 
     // Send to employee
-    await sendEmail(
+    await udsend({
+      type: "send-employee-invitation", kanal: "mail", modtager: email, modtagerEmployeeId: employeeId, emne: "Velkommen til Copenhagen Sales - Opret din profil", afsenderfunktion: "send-employee-invitation",
+      send: async () => {
+        await sendEmail(
       accessToken,
       email,
       "Velkommen til Copenhagen Sales - Opret din profil",
       emailHtml
     );
+      },
+    });
 
     console.log(`Invitation sent for employee ${employeeId}`);
 

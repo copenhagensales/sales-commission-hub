@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://esm.sh/zod@3.23.8";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,26 +132,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const accessToken = await getM365AccessToken();
 
-    const sendResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: {
-            subject,
-            body: { contentType: "HTML", content: htmlBody },
-            toRecipients: TRYG_RECIPIENTS.map((address) => ({
-              emailAddress: { address },
-            })),
+    let sendResponse: Response | undefined;
+    const sendStatus = await udsendFlere({
+      type: "send-tryg-cancellation", kanal: "mail", afsenderfunktion: "send-tryg-cancellation", emne: subject,
+      modtagere: TRYG_RECIPIENTS.map((m: string) => ({ modtager: m })),
+      send: async (tilladte) => {
+        sendResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: {
+                subject,
+                body: { contentType: "HTML", content: htmlBody },
+                toRecipients: tilladte.map((address) => ({
+                  emailAddress: { address },
+                })),
+              },
+              saveToSentItems: true,
+            }),
           },
-          saveToSentItems: true,
-        }),
+        );
+        if (!sendResponse.ok) throw new Error(`Graph ${sendResponse.status}`);
       },
-    );
+    }).catch((e) => { if (!sendResponse) throw e; return "fejl" as const; });
+    if (!sendResponse) {
+      // Slået fra eller fravalgt i Udsendelser – intet sendt.
+      return jsonResponse(409, { error: "Udsendelsen er slået fra", status: sendStatus });
+    }
 
     if (!sendResponse.ok) {
       const details = await sendResponse.text();

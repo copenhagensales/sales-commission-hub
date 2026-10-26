@@ -233,6 +233,7 @@ Deno.serve(async (req) => {
     ];
     const pushed = await sendPush(supabase, await authUsersForEmployees(supabase, pushEmployeeIds), "missing_one_on_one", {
       dedupeKey: `${monday.getFullYear()}-W${week}`,
+      udsendType: "send-ramp-weekly-alerts", afsenderfunktion: "send-ramp-weekly-alerts",
     });
 
     return new Response(

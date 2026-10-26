@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,14 +61,25 @@ Deno.serve(async (req) => {
     formData.append('Body', message);
     formData.append('StatusCallback', statusCallbackUrl);
 
-    const twilioResponse = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${twilioAuth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+    let twilioResponse: Response | undefined;
+    const twilioResponseStatus = await udsend({
+      type: "send-recruitment-sms", kanal: "sms", modtager: formattedPhone, modtagerCandidateId: candidateId || undefined, afsenderfunktion: "send-recruitment-sms",
+      send: async () => {
+        twilioResponse = await fetch(twilioUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${twilioAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      });
+        if (!twilioResponse.ok) throw new Error(`HTTP ${twilioResponse.status}`);
       },
-      body: formData.toString(),
-    });
+    }).catch((e) => { if (!twilioResponse) throw e; return "fejl" as const; });
+    if (!twilioResponse) {
+      // Slået fra eller fravalgt i Udsendelser – intet sendt.
+      return new Response(JSON.stringify({ success: true, skipped: twilioResponseStatus }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const twilioResult = await twilioResponse.json();
 

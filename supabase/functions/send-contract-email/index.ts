@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -170,7 +171,12 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending contract email to ${employeeEmail} for contract ${contractId}`);
 
     const accessToken = await getM365AccessToken();
-    await sendEmail(accessToken, employeeEmail, `Ny kontrakt til underskrift: ${contractTitle}`, htmlBody);
+    await udsend({
+      type: "send-contract-email", kanal: "mail", modtager: employeeEmail, emne: `Ny kontrakt til underskrift: ${contractTitle}`, afsenderfunktion: "send-contract-email",
+      send: async () => {
+        await sendEmail(accessToken, employeeEmail, `Ny kontrakt til underskrift: ${contractTitle}`, htmlBody);
+      },
+    });
 
     console.log(`Contract email sent successfully to ${employeeEmail}`);
 

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,14 +95,25 @@ Deno.serve(async (req) => {
       saveToSentItems: true,
     };
 
-    const emailResponse = await fetch(sendMailUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Content-Type': 'application/json',
+    let emailResponse: Response | undefined;
+    const emailResponseStatus = await udsend({
+      type: "send-recruitment-email", kanal: "mail", modtager: email, modtagerCandidateId: candidateId || undefined, modtagerEmployeeId: employeeId || undefined, emne: subject, afsenderfunktion: "send-recruitment-email", metadata: templateKey ? { template_key: templateKey } : undefined,
+      send: async () => {
+        emailResponse = await fetch(sendMailUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailPayload),
+      });
+        if (!emailResponse.ok) throw new Error(`HTTP ${emailResponse.status}`);
       },
-      body: JSON.stringify(emailPayload),
-    });
+    }).catch((e) => { if (!emailResponse) throw e; return "fejl" as const; });
+    if (!emailResponse) {
+      // Slået fra eller fravalgt i Udsendelser – intet sendt.
+      return new Response(JSON.stringify({ success: true, skipped: emailResponseStatus }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (!emailResponse.ok) {
       const errorText = await emailResponse.text();

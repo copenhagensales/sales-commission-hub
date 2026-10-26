@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,7 +180,12 @@ Deno.serve(async (req) => {
     // Send in batches of 50
     const batchSize = 50;
     for (let i = 0; i < recipientEmails.length; i += batchSize) {
-      const batch = recipientEmails.slice(i, i + batchSize);
+      const batchEmps = validEmployees.slice(i, i + batchSize);
+      await udsendFlere({
+        type: "send-ai-instruction-email", kanal: "mail", afsenderfunktion: "send-ai-instruction-email",
+        emne: "🤖 AI-instruktion — Vigtig information om brug af AI (EU AI Act)",
+        modtagere: batchEmps.map((e: any) => ({ modtager: e.work_email, modtagerEmployeeId: e.id })),
+        send: async (batch) => {
       const toRecipients = batch.map((email: string) => ({
         emailAddress: { address: email },
       }));
@@ -207,6 +213,8 @@ Deno.serve(async (req) => {
         console.error(`M365 send error batch ${i}:`, errorText);
         throw new Error(`Failed to send email batch: ${response.status}`);
       }
+        },
+      });
     }
 
     // Log each employee

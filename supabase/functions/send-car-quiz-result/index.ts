@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -136,41 +137,46 @@ const handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
-    // Send email via Microsoft Graph
-    const sendEmailResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: {
-            subject: `Bil-quiz Resultat: ${statusText} - ${employeeName}`,
-            body: {
-              contentType: "HTML",
-              content: emailHtml,
-            },
-            toRecipients: [
-              {
-                emailAddress: {
-                  address: employeeEmail,
-                },
-              },
-            ],
+    await udsend({
+      type: "send-car-quiz-result", kanal: "mail", modtager: employeeEmail, modtagerEmployeeId: employeeId, emne: `Bil-quiz Resultat: ${statusText} - ${employeeName}`, afsenderfunktion: "send-car-quiz-result",
+      send: async () => {
+      // Send email via Microsoft Graph
+      const sendEmailResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
           },
-          saveToSentItems: true,
-        }),
+          body: JSON.stringify({
+            message: {
+              subject: `Bil-quiz Resultat: ${statusText} - ${employeeName}`,
+              body: {
+                contentType: "HTML",
+                content: emailHtml,
+              },
+              toRecipients: [
+                {
+                  emailAddress: {
+                    address: employeeEmail,
+                  },
+                },
+              ],
+            },
+            saveToSentItems: true,
+          }),
+        }
+      );
+
+      if (!sendEmailResponse.ok) {
+        const errorText = await sendEmailResponse.text();
+        console.error("Failed to send email:", errorText);
+        throw new Error("Failed to send email");
       }
-    );
 
-    if (!sendEmailResponse.ok) {
-      const errorText = await sendEmailResponse.text();
-      console.error("Failed to send email:", errorText);
-      throw new Error("Failed to send email");
-    }
-
+      },
+    });
     console.log(`Quiz result email sent successfully to ${employeeEmail}`);
 
     return new Response(

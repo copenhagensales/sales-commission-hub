@@ -1,5 +1,6 @@
 import { escapeHtml } from '../_shared/sanitize.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -137,32 +138,40 @@ Deno.serve(async (req) => {
             console.error("[unsubscribe-candidate] M365 token error:", tokenData);
           } else {
             const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${m365SenderEmail}/sendMail`;
-            const emailRes = await fetch(sendMailUrl, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${tokenData.access_token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                message: {
-                  subject: `Afmelding: ${candidateName} har afmeldt sig`,
-                  body: {
-                    contentType: "HTML",
-                    content: `<h3>Kandidat afmeldt</h3>
-<p><strong>${candidateName}</strong> har afmeldt sig via afmeldingslinket.</p>
-<p>Alle aktive flows er blevet annulleret, og ansøgningen er markeret som trukket.</p>`,
+            await udsendFlere({
+              type: "unsubscribe-candidate", kanal: "mail", afsenderfunktion: "unsubscribe-candidate", emne: `Afmelding: ${candidateName} har afmeldt sig`,
+              modtagere: (recipientEmails as string[]).map((m) => ({ modtager: m })),
+              send: async (tilladte) => {
+                const emailRes = await fetch(sendMailUrl, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${tokenData.access_token}`,
+                    "Content-Type": "application/json",
                   },
-                  toRecipients: recipientEmails.map(e => ({ emailAddress: { address: e } })),
-                },
-                saveToSentItems: false,
-              }),
-            });
+                  body: JSON.stringify({
+                    message: {
+                      subject: `Afmelding: ${candidateName} har afmeldt sig`,
+                      body: {
+                        contentType: "HTML",
+                        content: `<h3>Kandidat afmeldt</h3>
+    <p><strong>${candidateName}</strong> har afmeldt sig via afmeldingslinket.</p>
+    <p>Alle aktive flows er blevet annulleret, og ansøgningen er markeret som trukket.</p>`,
+                      },
+                      toRecipients: tilladte.map(e => ({ emailAddress: { address: e } })),
+                    },
+                    saveToSentItems: false,
+                  }),
+                });
 
-            if (emailRes.ok) {
-              console.log(`[unsubscribe-candidate] Cancel notification sent via M365 to ${recipientEmails.join(", ")}`);
-            } else {
-              console.error("[unsubscribe-candidate] M365 email error:", await emailRes.text());
-            }
+                if (emailRes.ok) {
+                  console.log(`[unsubscribe-candidate] Cancel notification sent via M365 to ${tilladte.join(", ")}`);
+                } else {
+                  const errText = await emailRes.text();
+                  console.error("[unsubscribe-candidate] M365 email error:", errText);
+                  throw new Error(`M365 ${emailRes.status}`);
+                }
+              },
+            });
           }
         }
       } catch (emailErr) {

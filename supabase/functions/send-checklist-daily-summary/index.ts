@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -225,12 +226,19 @@ Deno.serve(async (req) => {
 
     // 5. Send email
     const accessToken = await getM365AccessToken();
-    await sendEmail(
-      accessToken,
-      recipientEmails,
-      `FM Checkliste — ${DAY_NAMES[weekdayIndex]} — ${pct}% udført`,
-      htmlBody
-    );
+    await udsendFlere({
+      type: "send-checklist-daily-summary", kanal: "mail", afsenderfunktion: "send-checklist-daily-summary",
+      emne: `FM Checkliste — ${DAY_NAMES[weekdayIndex]} — ${pct}% udført`,
+      modtagere: recipientEmails.map((m: string) => ({ modtager: m })),
+      send: async (tilladte) => {
+        await sendEmail(
+          accessToken,
+          tilladte,
+          `FM Checkliste — ${DAY_NAMES[weekdayIndex]} — ${pct}% udført`,
+          htmlBody
+        );
+      },
+    });
 
     console.log(`Checklist summary sent to ${recipientEmails.length} recipients`);
 

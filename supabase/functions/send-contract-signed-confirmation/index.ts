@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -363,7 +364,12 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending contract signed confirmation to ${employeeEmail} for contract ${contractId}`);
 
     // Send confirmation to employee
-    await sendEmail(accessToken, employeeEmail, `Bekræftelse: Du har underskrevet "${contractTitle}"`, htmlBody);
+    await udsend({
+      type: "send-contract-signed-confirmation", kanal: "mail", modtager: employeeEmail, emne: `Bekræftelse: Du har underskrevet "${contractTitle}"`, afsenderfunktion: "send-contract-signed-confirmation",
+      send: async () => {
+        await sendEmail(accessToken, employeeEmail, `Bekræftelse: Du har underskrevet "${contractTitle}"`, htmlBody);
+      },
+    });
     console.log(`Contract signed confirmation sent successfully to ${employeeEmail}`);
 
     // Send copy to HR/job email (skip for confidential contracts)
@@ -411,7 +417,12 @@ const handler = async (req: Request): Promise<Response> => {
         </html>
       `;
 
-      await sendEmail(accessToken, hrEmail, hrSubject, hrBody);
+      await udsend({
+        type: "send-contract-signed-confirmation", kanal: "mail", modtager: hrEmail, emne: hrSubject, afsenderfunktion: "send-contract-signed-confirmation",
+        send: async () => {
+          await sendEmail(accessToken, hrEmail, hrSubject, hrBody);
+        },
+      });
       console.log(`Contract copy sent to HR at ${hrEmail}`);
     } else {
       console.log("Skipping HR email for confidential contract:", contractId);

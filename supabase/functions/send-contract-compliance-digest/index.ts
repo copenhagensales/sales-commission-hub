@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -206,12 +207,18 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const accessToken = await getM365AccessToken();
-    await sendEmail(
-      accessToken,
-      recipients,
-      `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
-      htmlBody
-    );
+    await udsendFlere({
+      type: "send-contract-compliance-digest", kanal: "mail", afsenderfunktion: "send-contract-compliance-digest", emne: `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
+      modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
+      send: async (tilladte) => {
+        await sendEmail(
+          accessToken,
+          tilladte,
+          `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
+          htmlBody
+        );
+      },
+    });
 
     console.log(`Digest sent to ${recipients.length} recipient(s)`);
     return new Response(

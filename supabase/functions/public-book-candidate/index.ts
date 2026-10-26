@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -195,36 +196,44 @@ Deno.serve(async (req) => {
             console.error("[public-book-candidate] M365 token error:", tokenData);
           } else {
             const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${m365SenderEmail}/sendMail`;
-            const emailRes = await fetch(sendMailUrl, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${tokenData.access_token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                message: {
-                  subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
-                  body: {
-                    contentType: "HTML",
-                    content: `<h3>Ny kandidatbooking</h3>
-<p><strong>Kandidat:</strong> ${candidateName}</p>
-<p><strong>Stilling:</strong> ${role}</p>
-<p><strong>Dato:</strong> ${date}</p>
-<p><strong>Tid:</strong> ${startTime} – ${endTime}</p>
-<p><strong>Telefon:</strong> ${candidate.phone || "Ikke oplyst"}</p>
-<p><strong>Email:</strong> ${candidate.email || "Ikke oplyst"}</p>`,
+            await udsendFlere({
+              type: "public-book-candidate", kanal: "mail", afsenderfunktion: "public-book-candidate", emne: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
+              modtagere: (recipientEmails as string[]).map((m) => ({ modtager: m })),
+              send: async (tilladte) => {
+                const emailRes = await fetch(sendMailUrl, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${tokenData.access_token}`,
+                    "Content-Type": "application/json",
                   },
-                  toRecipients: recipientEmails.map(e => ({ emailAddress: { address: e } })),
-                },
-                saveToSentItems: false,
-              }),
-            });
+                  body: JSON.stringify({
+                    message: {
+                      subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
+                      body: {
+                        contentType: "HTML",
+                        content: `<h3>Ny kandidatbooking</h3>
+    <p><strong>Kandidat:</strong> ${candidateName}</p>
+    <p><strong>Stilling:</strong> ${role}</p>
+    <p><strong>Dato:</strong> ${date}</p>
+    <p><strong>Tid:</strong> ${startTime} – ${endTime}</p>
+    <p><strong>Telefon:</strong> ${candidate.phone || "Ikke oplyst"}</p>
+    <p><strong>Email:</strong> ${candidate.email || "Ikke oplyst"}</p>`,
+                      },
+                      toRecipients: tilladte.map(e => ({ emailAddress: { address: e } })),
+                    },
+                    saveToSentItems: false,
+                  }),
+                });
 
-            if (emailRes.ok) {
-              console.log(`[public-book-candidate] Booking email sent via M365 to ${recipientEmails.join(", ")}`);
-            } else {
-              console.error("[public-book-candidate] M365 email error:", await emailRes.text());
-            }
+                if (emailRes.ok) {
+                  console.log(`[public-book-candidate] Booking email sent via M365 to ${tilladte.join(", ")}`);
+                } else {
+                  const errText = await emailRes.text();
+                  console.error("[public-book-candidate] M365 email error:", errText);
+                  throw new Error(`M365 ${emailRes.status}`);
+                }
+              },
+            });
           }
         } else {
           console.log("[public-book-candidate] No booking notification recipients configured");

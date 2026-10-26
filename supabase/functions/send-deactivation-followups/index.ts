@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { formatEmploymentPeriod, formatTenure } from "../_shared/employment-tenure.ts";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -228,7 +229,11 @@ serve(async (req: Request) => {
       }
 
       try {
-        await sendEmail(accessToken, recipients, subject, htmlBody);
+        await udsendFlere({
+          type: "send-deactivation-followups", kanal: "mail", afsenderfunktion: "send-deactivation-followups", emne: subject,
+          modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
+          send: async (tilladte) => { await sendEmail(accessToken, tilladte, subject, htmlBody); },
+        });
       } catch (emailError) {
         console.error(`Failed to send followup for ${reminder.id}:`, emailError);
         continue;
