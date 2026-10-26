@@ -1,0 +1,110 @@
+// deno-lint-ignore-file no-explicit-any
+/**
+ * Ejerens manuelle besked (Udsendelser → Send). Kun ejere. Én logrække pr. modtager via udsend.
+ * Mail: _shared/m365-mail.ts · SMS: Twilio som send-employee-sms · Push: _shared/push.ts.
+ */
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { z } from "npm:zod@3.23.8";
+import { requireOwner } from "../_shared/auth.ts";
+import { udsend } from "../_shared/udsend.ts";
+import { sendM365Mail } from "../_shared/m365-mail.ts";
+import { sendPush } from "../_shared/push.ts";
+
+const json = (b: unknown, status = 200) =>
+  new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const Body = z.object({
+  kanal: z.enum(["mail", "sms", "push"]),
+  maal: z.enum(["mig", "roller", "teams", "medarbejder"]),
+  ids: z.array(z.string().max(100)).max(200).default([]),
+  emne: z.string().trim().max(200).default(""),
+  tekst: z.string().trim().min(1).max(5000),
+  kunAntal: z.boolean().default(false),
+});
+
+const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+
+async function sendSms(to: string, body: string): Promise<string | undefined> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID"), token = Deno.env.get("TWILIO_AUTH_TOKEN"), from = Deno.env.get("TWILIO_PHONE_NUMBER");
+  if (!sid || !token || !from) throw new Error("SMS service not configured");
+  let toNumber = to.replace(/\s/g, "");
+  if (!toNumber.startsWith("+")) toNumber = "+45" + toNumber.replace(/^0+/, "");
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+    method: "POST",
+    headers: { Authorization: "Basic " + btoa(`${sid}:${token}`), "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ From: from, To: toNumber, Body: body, StatusCallback: `${Deno.env.get("SUPABASE_URL")}/functions/v1/twilio-sms-status` }),
+  });
+  const r = await res.json();
+  if (!res.ok) throw new Error(`Twilio-fejl ${res.status}: ${r?.message ?? ""}`);
+  return r?.sid;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const auth = await requireOwner(req);
+  if (auth instanceof Response) return auth;
+  const svc: any = auth.svc;
+  try {
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
+    const b = parsed.data;
+
+    // Modtagere: aktive medarbejdere
+    let q = svc.from("employee_master_data").select("id, auth_user_id, work_email, private_phone").eq("is_active", true);
+    if (b.maal === "mig") q = q.eq("auth_user_id", auth.userId);
+    else {
+      if (!b.ids.length) return json({ error: "Vælg mindst én modtager" }, 400);
+      if (b.maal === "medarbejder") q = q.in("id", b.ids);
+      else if (b.maal === "teams") {
+        const { data: tm, error } = await svc.from("team_members").select("employee_id").in("team_id", b.ids);
+        if (error) throw error;
+        q = q.in("id", [...new Set((tm ?? []).map((r: any) => r.employee_id))].concat(["00000000-0000-0000-0000-000000000000"]));
+      } else {
+        const { data: pos, error } = await svc.from("job_positions").select("id").in("system_role_key", b.ids);
+        if (error) throw error;
+        q = q.in("position_id", (pos ?? []).map((r: any) => r.id).concat(["00000000-0000-0000-0000-000000000000"]));
+      }
+    }
+    const { data: emps, error: eErr } = await q;
+    if (eErr) throw eErr;
+    const modt = (emps ?? []) as any[];
+    if (b.kunAntal) return json({ antal: modt.length });
+
+    const type = `send-besked-${b.kanal}`;
+    const emne = b.emne || "Besked fra Stork";
+    let sendt = 0, sprunget = 0, fejl = 0;
+
+    if (b.kanal === "push") {
+      const users = modt.map((e) => e.auth_user_id).filter(Boolean);
+      sprunget = modt.length - users.length;
+      sendt = await sendPush(svc, users, "test", {
+        udsendType: type, afsenderfunktion: "send-besked", url: "/", tekst: { title: emne, body: b.tekst },
+      });
+    } else {
+      for (const e of modt) {
+        const adr = b.kanal === "mail" ? e.work_email : e.private_phone;
+        if (!adr) { sprunget++; continue; }
+        try {
+          const s = await udsend({
+            type, kanal: b.kanal, modtager: adr, modtagerEmployeeId: e.id, modtagerUserId: e.auth_user_id ?? undefined,
+            emne, afsenderfunktion: "send-besked",
+            send: async () => {
+              if (b.kanal === "mail") {
+                await sendM365Mail({ to: [adr], subject: emne, html: `<div style="font-family:Arial,sans-serif;white-space:pre-wrap">${esc(b.tekst)}</div>` });
+                return;
+              }
+              return { reference: await sendSms(adr, b.tekst) };
+            },
+          });
+          if (s === "sendt") sendt++; else sprunget++;
+        } catch (err) {
+          fejl++;
+          console.error("send-besked: afsendelse fejlede", err instanceof Error ? err.message : err);
+        }
+      }
+    }
+    return json({ antal: modt.length, sendt, sprunget, fejl });
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : "Fejl" }, 500);
+  }
+});
