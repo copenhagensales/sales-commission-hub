@@ -250,7 +250,7 @@ Deno.serve(async (req) => {
       ...leaders.filter((l) => l.sellers.length > 0).map((l) => l.leader_id),
       ...(allSellers.length > 0 ? (await getRampCcRecipients(supabase)).map((c) => c.employeeId) : []),
     ];
-    const pushed = await sendPush(supabase, await authUsersForEmployees(supabase, pushEmployeeIds), "opstart_flag", { dedupeKey: day });
+    const pushed = await sendPush(supabase, await authUsersForEmployees(supabase, pushEmployeeIds), "opstart_flag", { dedupeKey: day, udsendType: "send-ramp-risk-alerts", afsenderfunktion: "send-ramp-risk-alerts" });
 
     return new Response(
       JSON.stringify({ queued, skipped, leaders: leaders.length, pushed }),
