@@ -416,6 +416,7 @@ async function handleDailySummary(
 
   // Sammenfatning pr. team med kontroller i dag.
   let leaderMails = 0;
+  const skippedTypes = new Set<string>();
   const teamsWithReviewsToday = Array.from(
     new Set(todaysReviews.map((r) => r.team_id).filter((t): t is string => !!t)),
   );
