@@ -1,7 +1,7 @@
 import {
   Home, Target, Calendar, BadgeCheck, Newspaper, Gamepad2, User, ClipboardList, Users, GraduationCap,
   CalendarDays, PencilLine, FileText, Percent, UserPlus, UserCog, FileSignature, FileBarChart, Receipt,
-  ShieldCheck, Shield, Wrench, Monitor, Zap, Activity, Trophy, Swords, ShoppingCart, type LucideIcon,
+  ShieldCheck, Shield, Wrench, Monitor, Zap, Activity, Trophy, Swords, ShoppingCart, Send, type LucideIcon,
 } from "lucide-react";
 
 /** Flag, som synlighedsreglerne læser. Bygges kun af `useStrukturSynlighed`. */
@@ -11,7 +11,7 @@ export interface StrukturSynlighed {
   salg: boolean; fieldmarketing: boolean; retSalg: boolean; tdc: boolean; kunder: boolean;
   rekruttering: boolean; medarbejdere: boolean; kontrakter: boolean;
   rapporter: boolean; invoiceflow: boolean;
-  compliance: boolean; amo: boolean; admin: boolean;
+  compliance: boolean; amo: boolean; admin: boolean; udsendelser: boolean;
   tavler: boolean; powerdag: boolean; liveTal: boolean;
 }
 
@@ -84,6 +84,7 @@ export const STRUKTUR: StrukturOmraade[] = [
   ] },
   { id: "omraade_administration", label: "Administration", ikon: Wrench, sider: [
     { id: "side_administration", label: "Administration", rute: "/admin", ikon: Wrench, synlig: (s) => s.admin },
+    { id: "side_udsendelser", label: "Udsendelser", rute: "/udsendelser", ikon: Send, synlig: (s) => s.udsendelser },
   ] },
   { id: "omraade_tavler", label: "Tavler", ikon: Monitor, sider: [
     { id: "side_tavler", label: "Tavler", rute: "/dashboards", ikon: Monitor, synlig: (s) => s.tavler },

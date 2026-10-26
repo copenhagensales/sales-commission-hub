@@ -59,5 +59,5 @@ export function useAdminSynlighed() {
     "tv-board-admin": adminSek && v("menu_settings"), "dashboards-settings": v("menu_dashboard_admin"),
   };
   const nogen = (o: Record<string, boolean>) => Object.values(o).some(Boolean);
-  return { compliance, amo, admin, har: { compliance: nogen(compliance), amo: nogen(amo), admin: nogen(admin) } };
+  return { compliance, amo, admin, har: { compliance: nogen(compliance), amo: nogen(amo), admin: nogen(admin), udsendelser: isOwner } };
 }
