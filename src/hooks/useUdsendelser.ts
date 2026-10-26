@@ -44,7 +44,7 @@ export function useUdsendelsestyper() {
 export function useOpdaterUdsendelsestype() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle">>) => {
+    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "push_titel" | "push_tekst" | "push_link">>) => {
       const { error } = await supabase.from("udsendelsestyper").update({ ...ret, opdateret: new Date().toISOString() }).eq("noegle", noegle);
       if (error) throw error;
     },
@@ -144,7 +144,28 @@ export function useModtagerValg() {
 }
 
 export interface SendBesked {
-  kanal: Kanal; maal: "mig" | "roller" | "teams" | "medarbejder"; ids: string[]; emne: string; tekst: string; kunAntal?: boolean;
+  kanal: Kanal; maal: "mig" | "alle" | "roller" | "teams" | "medarbejder"; ids: string[]; emne: string; tekst: string; kunAntal?: boolean;
+}
+
+export type SendSvar = { antal: number; sendt?: number; sprunget?: number; fejl?: number; loft?: number };
+
+export interface UdsendelserOverblik {
+  brugere_med_login: number; tilmeldte: number; deaktiverede: number; fejl_7_dage: number;
+  pr_rolle: { rolle: string | null; tilmeldte: number; i_alt: number }[];
+  pr_team: { team: string | null; tilmeldte: number; i_alt: number }[];
+  syv_dage: { kanal: string; type: string; sendt: number; fejl: number; sprunget: number }[];
+}
+
+/** Overblikstal (kun ejere; RPC returnerer null for andre). */
+export function useUdsendelserOverblik() {
+  return useQuery({
+    queryKey: ["udsendelser-overblik"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("udsendelser_overblik");
+      if (error) throw error;
+      return (data ?? null) as unknown as UdsendelserOverblik | null;
+    },
+  });
 }
 
 export function useSendBesked() {
@@ -154,7 +175,7 @@ export function useSendBesked() {
       const { data, error } = await supabase.functions.invoke("send-besked", { body: b });
       if (error) throw error;
       if (data?.error) throw new Error(typeof data.error === "string" ? data.error : "Ugyldige felter");
-      return data as { antal: number; sendt?: number; sprunget?: number; fejl?: number };
+      return data as SendSvar;
     },
     onSuccess: (_d, b) => {
       if (!b.kunAntal) {
