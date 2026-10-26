@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -221,6 +222,10 @@ Deno.serve(async (req) => {
         : "🛡️ Påmindelse: Gennemfør Code of Conduct & GDPR";
 
       try {
+        await udsend({
+          type: "send-code-of-conduct-reminder", kanal: "mail", modtager: r.email, modtagerEmployeeId: r.id,
+          emne: subject, afsenderfunktion: "send-code-of-conduct-reminder",
+          send: async () => {
         const response = await fetch(
           `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`,
           {
@@ -242,10 +247,11 @@ Deno.serve(async (req) => {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`M365 send error for ${r.email}:`, errorText);
-          failures.push(r.email);
-        } else {
-          sentCount += 1;
+          throw new Error(`M365 send error ${response.status}`);
         }
+          },
+        });
+        sentCount += 1;
       } catch (err) {
         console.error(`Send error for ${r.email}:`, err);
         failures.push(r.email);
