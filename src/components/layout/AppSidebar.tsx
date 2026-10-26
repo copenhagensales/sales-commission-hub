@@ -91,26 +91,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
 
   // Menu config from database - controls sort_order and visibility
-  const { data: menuConfig } = useSidebarMenuConfig();
   const { data: isUnitedMember } = useIsUnitedMember();
   
-  // Helper: check if a menu item is hidden via the menu editor
-  const isMenuHidden = useMemo(() => {
-    if (!menuConfig) return (_key: string) => false;
-    const configMap = new Map(menuConfig.map(c => [c.item_key, c]));
-    return (key: string) => {
-      const config = configMap.get(key);
-      return config ? !config.visible : false;
-    };
-  }, [menuConfig]);
-
-  // Helper: get sort order for top-level items
-  const getSortOrder = useMemo(() => {
-    if (!menuConfig) return (_key: string) => 0;
-    const configMap = new Map(menuConfig.map(c => [c.item_key, c]));
-    return (key: string) => configMap.get(key)?.sort_order ?? 999;
-  }, [menuConfig]);
-
   // Live clock (Danish time)
   const [clockTime, setClockTime] = useState(() =>
     new Date().toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })
@@ -383,8 +365,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Wait for permissions to load
   // IT-modul: kun stab med IT-rettigheden (verificeret i databasen)
-  const { data: hasItAccess = false } = useItAccess();
-  const showItMenu = !isMenuHidden('section_it') && hasItAccess && p.canView("menu_it_workstations");
 
   if (p.isLoading) {
     return (
