@@ -7,7 +7,7 @@ import { useStorkbookUnread } from "@/hooks/useStorkbookUnread";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
 import { HubSheet } from "./HubSheet";
-import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
+import { useStrukturSynlighed } from "@/hooks/useStrukturSynlighed";
 import { useSynligStruktur } from "@/components/layout/StrukturMenu";
 import { MIT_ARBEJDE } from "@/config/struktur";
 
@@ -40,17 +40,19 @@ const EGEN_FANE = ["side_hjem", "side_storkbook", "side_spil"];
 
 /** Alle destinationer bag bundbjælken, fra `STRUKTUR` (samme synlighed som sidebaren). */
 export function useBottomTabs(): BottomTab[] {
-  const m = useMitArbejdeSynlighed();
+  const s = useStrukturSynlighed();
   const mitArbejde = useSynligStruktur().find((o) => o.id === MIT_ARBEJDE)?.sider ?? [];
   const has = (id: string) => mitArbejde.find((x) => x.id === id);
   const home = has("side_hjem");
   const stork = has("side_storkbook");
+  const spilSide = has("side_spil");
   return [
     ...(home ? [{ to: home.rute, label: home.label, icon: home.ikon, visible: true }] : []),
     ...mitArbejde.filter((x) => !EGEN_FANE.includes(x.id))
       .map((x) => ({ to: x.rute, label: x.label, icon: x.ikon, visible: true, hub: "me" as const, hint: HINT[x.id] })),
-    { to: "/spil?tab=superligaen", label: "Superligaen", icon: Trophy, visible: m.spil.superligaen && !!has("side_spil"), hub: "games", hint: "Provisionsligaen" },
-    { to: "/spil?tab=head2head", label: "Head2Head", icon: Swords, visible: m.spil.head2head && !!has("side_spil"), hub: "games", hint: "1v1 og holdkampe" },
+    // Spil-skuffens fliser kommer fra sidens faner i STRUKTUR.
+    ...(spilSide?.faner ?? []).filter((f) => f.synlig(s))
+      .map((f) => ({ to: f.rute, label: f.label, icon: f.ikon, visible: true, hub: "games" as const, hint: f.hint })),
     ...(stork ? [{ to: stork.rute, label: stork.label, icon: Newspaper, visible: true }] : []),
   ];
 }
