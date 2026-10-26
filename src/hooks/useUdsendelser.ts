@@ -44,11 +44,46 @@ export function useUdsendelsestyper() {
 export function useOpdaterUdsendelsestype() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til">>) => {
+    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle">>) => {
       const { error } = await supabase.from("udsendelsestyper").update({ ...ret, opdateret: new Date().toISOString() }).eq("noegle", noegle);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY_TYPER] }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: [KEY_TYPER] });
+      qc.invalidateQueries({ queryKey: [KEY_MODTAGERE, v.noegle] });
+    },
+  });
+}
+
+const KEY_MODTAGERE = "udsendelse-modtagere";
+
+/** Antal aktive medarbejdere inden for typens gemte modtagerregel (kun ejere). */
+export function useUdsendelseModtagerAntal(noegle: string | null) {
+  return useQuery({
+    queryKey: [KEY_MODTAGERE, noegle],
+    enabled: !!noegle,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("udsendelse_modtagere", { p_type: noegle! });
+      if (error) throw error;
+      return (data ?? []).length;
+    },
+  });
+}
+
+/** Valgmuligheder til modtagerregler: roller og teams. */
+export function useRegelValg() {
+  return useQuery({
+    queryKey: ["udsendelse-regel-valg"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const [r, t] = await Promise.all([
+        supabase.from("system_role_definitions").select("key, label").order("priority", { ascending: false }),
+        supabase.from("teams").select("id, name").order("name"),
+      ]);
+      if (r.error) throw r.error;
+      if (t.error) throw t.error;
+      return { roller: r.data ?? [], teams: t.data ?? [] };
+    },
   });
 }
 
@@ -145,7 +180,12 @@ export function useMineUdsendelsespraeferencer() {
       if (t.error) throw t.error;
       if (p.error) throw p.error;
       const fra = new Set((p.data ?? []).filter((r) => r.aktiv === false).map((r) => `${r.type_noegle}|${r.kanal}`));
-      return (t.data ?? []).map((x) => ({ ...x, aktiv: !fra.has(`${x.noegle}|${x.kanal}`) }));
+      // Kun typer, brugeren er inden for modtagerreglen på (fejl i tjekket = vis typen).
+      const tilladt = await Promise.all((t.data ?? []).map(async (x) => {
+        const { data, error } = await supabase.rpc("udsendelse_tilladt", { p_user_id: user!.id, p_type: x.noegle });
+        return error ? true : data !== false;
+      }));
+      return (t.data ?? []).filter((_, i) => tilladt[i]).map((x) => ({ ...x, aktiv: !fra.has(`${x.noegle}|${x.kanal}`) }));
     },
   });
   const saet = useMutation({
