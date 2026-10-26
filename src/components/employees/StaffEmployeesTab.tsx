@@ -301,8 +301,14 @@ export function StaffEmployeesTab() {
 
       if (error) throw error;
 
-      if ((inviteResult as { sent?: boolean } | null)?.sent === false) {
-        toast({ title: "Sprunget over: typen er slået fra i Udsendelser" });
+      const invite = inviteResult as { sent?: boolean; status?: string } | null;
+      if (invite?.sent === false) {
+        const tekst: Record<string, string> = {
+          slaaet_fra: "Ikke sendt: typen er slået fra i Udsendelser",
+          udenfor_regel: "Ikke sendt: medarbejderen er uden for modtagerreglen",
+          fravalgt: "Ikke sendt: medarbejderen har fravalgt denne mail",
+        };
+        toast({ title: tekst[invite.status ?? ""] ?? `Ikke sendt (${invite.status ?? "ukendt"})` });
         return;
       }
 
