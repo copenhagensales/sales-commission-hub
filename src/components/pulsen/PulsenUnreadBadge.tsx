@@ -1,10 +1,9 @@
-import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
-import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
+import { formatUnread } from "@/hooks/usePulsen";
+import { useStorkbookUnread } from "@/hooks/useStorkbookUnread";
 
-/** Antal nye Huset-elementer siden sidste besøg i Pulsen (maks. "9+"). */
+/** Nyt i Storkbook: Huset-elementer siden sidste besøg + ulæste chatbeskeder (maks. "9+"). */
 export function PulsenUnreadBadge() {
-  const { data: employeeId } = useCurrentEmployeeId();
-  const { data: count = 0 } = usePulsenUnread(employeeId);
+  const count = useStorkbookUnread();
   if (count <= 0) return null;
   return (
     <span
