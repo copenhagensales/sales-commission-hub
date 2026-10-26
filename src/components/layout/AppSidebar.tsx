@@ -366,6 +366,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Wait for permissions to load
   // IT-modul: kun stab med IT-rettigheden (verificeret i databasen)
 
+  const synligStruktur = useSynligStruktur();
   if (p.isLoading) {
     return (
       <aside className={sidebarClasses}>
@@ -401,7 +402,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     side_rekruttering: tal(pendingReferralsCount + recruitmentNotificationsCount),
     side_compliance: p.canView("menu_compliance_admin") ? tal(complianceReviewCount ?? 0) : null,
   };
-  const synligStruktur = useSynligStruktur();
   // Respekterer sidebar_menu_config (skjul/label) og samme synlighed som de øvrige punkter.
   const profilSide = synligStruktur.flatMap((o) => o.sider).find((sd) => sd.id === "side_min_profil");
   // Telefonens Menu-skuffe: Mit arbejde ligger i bundbjælken/Mig; Min profil står øverst.
