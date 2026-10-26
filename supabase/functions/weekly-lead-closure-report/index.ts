@@ -1616,6 +1616,91 @@ async function taskSummary(
   };
 }
 
+/** Genskaber kørslens tilstand ud fra taskkøen. Cron-kørsler sender mail; manuelle gør ikke ved genstart. */
+async function stateForRun(svc: SupabaseClient, runId: string): Promise<RunState | null> {
+  const { data: run } = await svc
+    .from("weekly_lead_closure_runs")
+    .select("id, triggered_by, finished_at")
+    .eq("id", runId)
+    .maybeSingle();
+  const r = run as { id: string; triggered_by: string | null; finished_at: string | null } | null;
+  if (!r || r.finished_at) return null;
+  const { data: tasks } = await svc.from("weekly_lead_closure_tasks").select("week_start").eq("run_id", runId);
+  const weeks = [...new Set(((tasks ?? []) as { week_start: string }[]).map((t) => t.week_start))].sort();
+  if (weeks.length === 0) return null;
+  const triggeredBy = r.triggered_by ?? "cron";
+  return { runId, weeks, sendMail: triggeredBy === "cron", forceMail: false, triggeredBy, flowOnly: false };
+}
+
+async function watchdog(svc: SupabaseClient): Promise<Record<string, unknown>> {
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data: open } = await svc
+    .from("weekly_lead_closure_runs")
+    .select("id")
+    .is("finished_at", null)
+    .gte("started_at", since);
+  const restarted: string[] = [];
+  for (const { id } of (open ?? []) as { id: string }[]) {
+    const { data: last } = await svc
+      .from("weekly_lead_closure_tasks")
+      .select("updated_at")
+      .eq("run_id", id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const lastAt = (last as { updated_at: string } | null)?.updated_at;
+    if (lastAt && Date.now() - new Date(lastAt).getTime() < STALE_TASK_MS) continue;
+    const state = await stateForRun(svc, id);
+    if (!state) continue;
+    // weekly_lead_closure_take_task sætter døde tasks tilbage (forsøg +1) eller
+    // markerer dem som fejl efter 3 forsøg, så kæden fortsætter med resten.
+    await chainNext(state);
+    restarted.push(id);
+  }
+
+  // Alarm: mandag kl. 09 dansk tid uden sendt mandagsmail.
+  const now = new Date();
+  const dk = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short", hour: "2-digit", hour12: false })
+    .formatToParts(now);
+  const weekday = dk.find((p) => p.type === "weekday")?.value;
+  const hour = Number(dk.find((p) => p.type === "hour")?.value);
+  let alarm = false;
+  if (weekday === "Mon" && hour >= 9) {
+    const dayStart = new Date(`${copenhagenDay(now.toISOString())}T00:00:00Z`);
+    dayStart.setUTCHours(dayStart.getUTCHours() - 2);
+    const { data: sent } = await svc.from("weekly_lead_closure_runs").select("id")
+      .eq("mail_sent", true).gte("started_at", dayStart.toISOString()).limit(1);
+    const { data: alarmed } = await svc.from("scheduled_emails").select("id")
+      .eq("template_key", "weekly_lead_closure_alarm").gte("scheduled_at", dayStart.toISOString()).limit(1);
+    if ((sent ?? []).length === 0 && (alarmed ?? []).length === 0) {
+      const { data: runs } = await svc.from("weekly_lead_closure_runs")
+        .select("id, started_at, finished_at, error, triggered_by")
+        .gte("started_at", dayStart.toISOString()).order("started_at", { ascending: false }).limit(5);
+      const lines: string[] = [];
+      for (const r of (runs ?? []) as { id: string; started_at: string; finished_at: string | null; error: string | null; triggered_by: string | null }[]) {
+        const { data: stuck } = await svc.from("weekly_lead_closure_tasks")
+          .select("account, campaign_id, week_start, attempts, claimed_at, error")
+          .eq("run_id", r.id).eq("status", "running").limit(3);
+        const st = ((stuck ?? []) as { account: string; campaign_id: string; week_start: string; attempts: number; claimed_at: string; error: string | null }[])
+          .map((t) => `${t.account}/${t.campaign_id} uge ${t.week_start} (forsøg ${t.attempts}, taget ${t.claimed_at}${t.error ? `, ${t.error}` : ""})`)
+          .join("; ") || "ingen opgave i gang";
+        lines.push(`<li>Kørsel ${r.id} (${r.triggered_by ?? "?"}, start ${r.started_at}, ${r.finished_at ? "afsluttet" : "ikke afsluttet"}${r.error ? `, fejl: ${r.error}` : ""}) – fast opgave: ${st}</li>`);
+      }
+      await svc.from("scheduled_emails").insert({
+        recipient_email: ALARM_RECIPIENT,
+        subject: "Tryg-rapport ikke sendt",
+        content: `<p>Mandagsmailen med Tryg-rapporten er ikke sendt kl. 09:00.</p><ul>${lines.join("") || "<li>Ingen kørsel startet i dag.</li>"}</ul><p>Genstart kæden under Ledelse → Tryg rapport.</p>`,
+        template_key: "weekly_lead_closure_alarm",
+        scheduled_at: now.toISOString(),
+        status: "pending",
+      });
+      await flushMailQueue();
+      alarm = true;
+    }
+  }
+  return { stage: "vagthund", restarted, alarm };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: sharedCorsHeaders });
 
@@ -1638,7 +1723,7 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status" | "sync_campaign_names" | "test_mail";
+      action?: "status" | "sync_campaign_names" | "test_mail" | "watchdog" | "restart" | "resend_mail";
       test_recipient?: string;
       week_start?: string;
       run_ids?: string[];
@@ -1707,6 +1792,42 @@ Deno.serve(async (req) => {
       if (error) throw new Error(`Kunne ikke lægge testmailen i køen: ${error.message}`);
       await flushMailQueue();
       return json(200, { stage: "testmail sendt", recipient, week: latest });
+    }
+
+    // Vagthund (cron hvert 5. min): genstarter kæder der er gået i stå, og
+    // sender alarm, hvis mandagsmailen ikke er sendt kl. 09 dansk tid.
+    if (body.action === "watchdog") {
+      return json(200, await watchdog(svc));
+    }
+
+    // Genstart kæden for én kørsel (knap i Stork eller vagthund).
+    if (body.action === "restart") {
+      if (!body.run_id) return json(400, { error: "run_id mangler" });
+      const state = await stateForRun(svc, body.run_id);
+      if (!state) return json(404, { error: "Kørslen findes ikke eller er afsluttet" });
+      await chainNext(state);
+      return json(200, { stage: "genstartet", runId: body.run_id });
+    }
+
+    // Gensend mandagsmailen for en afsluttet kørsel ud fra de GEMTE tal
+    // (ingen ny hentning). Samme indhold og modtagere som mandagsmailen.
+    if (body.action === "resend_mail") {
+      if (!body.run_id || !body.week_start || !/^\d{4}-\d{2}-\d{2}$/.test(body.week_start)) {
+        return json(400, { error: "run_id og week_start mangler" });
+      }
+      const config = await loadConfig(svc);
+      const summary = await taskSummary(svc, body.run_id);
+      if (summary.pending > 0 || summary.running > 0) return json(409, { error: "Kørslen er ikke færdig" });
+      const state: RunState = {
+        runId: body.run_id,
+        weeks: [4, 3, 2, 1, 0].map((n) => addDays(body.week_start!, -7 * n)),
+        sendMail: true,
+        forceMail: true,
+        triggeredBy: "manuel",
+        flowOnly: false,
+      };
+      const finished = await finishAndMail(svc, config, state, summary.failed);
+      return json(200, { stage: "mail gensendt", recipients: config.recipients, ...finished });
     }
 
     if (body.action === "sync_campaign_names") {
@@ -1816,14 +1937,27 @@ Deno.serve(async (req) => {
     }
 
     const taskWeeks = [task.week_start];
+    // Lukkes funktionen af platformen (tids- eller hukommelsesgrænse), skrives
+    // det på tasken, før den slipper. Vagthunden genstarter derefter kæden.
+    let taskSettled = false;
+    const onUnload = () => {
+      if (taskSettled) return;
+      void svc.from("weekly_lead_closure_tasks")
+        .update({ error: "funktionen blev lukket midt i tasken (tids-/hukommelsesgrænse)", updated_at: new Date().toISOString() })
+        .eq("id", task.id).eq("status", "running");
+      void svc.from("weekly_lead_closure_runs")
+        .update({ error: `afbrudt i ${task.account}/${task.campaign_id} uge ${task.week_start} – genstartes af vagthunden` })
+        .eq("id", state.runId).is("finished_at", null);
+    };
+    addEventListener("beforeunload", onUnload);
     try {
       // next_page = 0 betyder at emnerne er hentet, og opkaldsdelen mangler.
       if (task.next_page === 0 && !task.calls_done) {
-        const calls = state.flowOnly ? null : await processCalls(svc, {
+        const calls = state.flowOnly ? null : await withDeadline(processCalls(svc, {
           account: task.account,
           campaignId: task.campaign_id,
           weekStart: task.week_start,
-        });
+        }), TASK_DEADLINE_MS, "Opkaldsdelen");
         await svc
           .from("weekly_lead_closure_tasks")
           .update({
@@ -1843,13 +1977,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { scanned, nextPage } = await processTask(svc, config, {
+      const { scanned, nextPage } = await withDeadline(processTask(svc, config, {
         account: task.account,
         campaignId: task.campaign_id,
         weeks: taskWeeks,
         nextPage: task.next_page,
         flowOnly: state.flowOnly,
-      });
+      }), TASK_DEADLINE_MS, "Emnedelen");
       await svc
         .from("weekly_lead_closure_tasks")
         .update({
@@ -1894,6 +2028,11 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", task.id);
+      await svc
+        .from("weekly_lead_closure_runs")
+        .update({ error: `${giveUp ? "opgivet" : "fejl, forsøges igen"}: ${task.account}/${task.campaign_id} uge ${task.week_start}: ${message}` })
+        .eq("id", state.runId)
+        .is("finished_at", null);
       await chainNext(state);
       return json(200, {
         stage: giveUp ? "task opgivet" : "task forsøges igen",
@@ -1902,6 +2041,9 @@ Deno.serve(async (req) => {
         weekStart: task.week_start,
         attempts: task.attempts,
       });
+    } finally {
+      taskSettled = true;
+      removeEventListener("beforeunload", onUnload);
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
