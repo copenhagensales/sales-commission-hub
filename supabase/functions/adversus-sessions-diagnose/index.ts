@@ -57,6 +57,93 @@ async function main(req: Request, svc: any) {
   const url = new URL(req.url);
 
   // MIDLERTIDIG read-only: tæl dagens salg på en anden Adversus-konto (fx Eesy TM). Kun antal.
+  // MIDLERTIDIG read-only (Kasper 26/10): opkaldsadgang og kontaktrate på en anden Adversus-konto. Kun aggregater, intet gemmes.
+  if (url.searchParams.get("mode") === "accountcalls") {
+    const integ = url.searchParams.get("integration") ?? "Eesy TM";
+    const from = url.searchParams.get("from") ?? "", to = url.searchParams.get("to") ?? "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return json(400, { error: "from/to YYYY-MM-DD" });
+    const { data: di } = await svc.from("dialer_integrations").select("id").eq("name", integ).maybeSingle();
+    if (!di) return json(404, { error: "Integration ikke fundet" });
+    const { data: cred } = await svc.rpc("get_dialer_credentials", { p_integration_id: di.id, p_encryption_key: Deno.env.get("DB_ENCRYPTION_KEY") });
+    const c = (typeof cred === "string" ? JSON.parse(cred) : cred) as Row | null;
+    const u2 = s(c?.username ?? c?.user ?? c?.ADVERSUS_API_USERNAME), p2 = s(c?.password ?? c?.pass ?? c?.ADVERSUS_API_PASSWORD);
+    if (!u2 || !p2) return json(500, { error: "Legitimation mangler" });
+    const h2 = { Authorization: `Basic ${btoa(`${u2}:${p2}`)}`, "Content-Type": "application/json" };
+    const g2 = async (path: string, base = BASE) => {
+      for (let a = 0; a < 4; a++) {
+        apiCalls++;
+        const r = await fetch(`${base}${path}`, { headers: h2 });
+        if (r.status === 429) { await new Promise((x) => setTimeout(x, 2000 * (a + 1))); continue; }
+        const t = await r.text(); let d: unknown = null; try { d = JSON.parse(t); } catch { d = null; }
+        return { status: r.status, data: d, fejl: r.ok ? null : t.slice(0, 300) };
+      }
+      return { status: 429, data: null, fejl: "rate limit" };
+    };
+    const f0 = cphOffsetIso(from), f1 = cphOffsetIso(addDays(from, 1));
+    const sf = encodeURIComponent(JSON.stringify({ startTime: { $gt: f0, $lt: f1 } }));
+    const cf = encodeURIComponent(JSON.stringify({ insertedTime: { $gt: f0, $lt: f1 } }));
+    const probe: Record<string, unknown> = {};
+    for (const [navn, path, base] of [
+      ["GET /v1/sessions", `/sessions?filters=${sf}&page=1&pageSize=5`, BASE],
+      ["GET /v1/cdr", `/cdr?filters=${cf}&page=1&pageSize=5`, BASE],
+      ["GET /cdr (uden v1)", `/cdr?filters=${cf}&page=0&pageSize=5`, "https://api.adversus.io"],
+      ["GET /v1/calls", `/calls?page=1&pageSize=5`, BASE],
+      ["GET /v1/campaigns", `/campaigns`, BASE],
+    ] as const) {
+      const r = await g2(path, base);
+      const arr = Array.isArray(r.data) ? r.data : (r.data as Row)?.sessions ?? (r.data as Row)?.cdr ?? (r.data as Row)?.campaigns ?? null;
+      probe[navn] = { status: r.status, fejl: r.fejl, felter: Array.isArray(arr) && arr[0] ? Object.keys(arr[0] as Row) : null };
+    }
+    const cr = await g2(`/campaigns`);
+    const cArr = (Array.isArray(cr.data) ? cr.data : (cr.data as Row)?.campaigns ?? []) as Row[];
+    const kampagner: Record<string, string> = {};
+    for (const k of cArr) kampagner[s(k.id)] = s((k.settings as Row)?.name ?? k.name);
+    if ((probe["GET /v1/sessions"] as Row).status !== 200) return json(200, { probe, kampagner, apiKald: apiCalls });
+
+    const isoUge = (iso: string) => {
+      const d = new Date(new Date(iso).toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
+      const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dn = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - dn + 3);
+      const y = t.getUTCFullYear(); const f = new Date(Date.UTC(y, 0, 4));
+      return `${y}-W${String(1 + Math.round(((t.getTime() - f.getTime()) / 864e5 - 3 + ((f.getUTCDay() + 6) % 7)) / 7)).padStart(2, "0")}`;
+    };
+    type Agg = { forsoeg: number; kontakt: number; leads: Set<string>; leadsKontakt: Set<string>; status: Record<string, number> };
+    const agg: Record<string, Agg> = {};
+    const listeFelter = new Set<string>();
+    let sider = 0, afbrudt: string | null = null;
+    const seen = new Set<string>();
+    for (let day = from; day <= to; day = addDays(day, 1)) {
+      const a0 = cphOffsetIso(day), a1 = cphOffsetIso(addDays(day, 1));
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        const fl = encodeURIComponent(JSON.stringify({ startTime: { $gt: a0, $lt: a1 } }));
+        const r = await g2(`/sessions?filters=${fl}&page=${page}&pageSize=${PAGE_SIZE}&sortProperty=startTime&sortDirection=ASC`);
+        sider++;
+        if (r.status !== 200) { afbrudt = `${day} side ${page}: status ${r.status} ${r.fejl ?? ""}`; break; }
+        const arr = (Array.isArray(r.data) ? r.data : (r.data as Row)?.sessions ?? []) as Row[];
+        for (const x of arr) {
+          const id = s(x.id); if (!id || seen.has(id)) continue; seen.add(id);
+          for (const k of Object.keys(x)) if (/list|pool/i.test(k)) listeFelter.add(k);
+          const cdr = (x.cdr ?? null) as Row | null;
+          const kontakt = !!(cdr && s(cdr.answerTime));
+          const key = `${isoUge(s(x.startTime))}|${s(x.campaignId)}`;
+          const g = agg[key] ??= { forsoeg: 0, kontakt: 0, leads: new Set(), leadsKontakt: new Set(), status: {} };
+          g.forsoeg++; if (kontakt) g.kontakt++;
+          const lead = s(x.leadId); if (lead) { g.leads.add(lead); if (kontakt) g.leadsKontakt.add(lead); }
+          inc(g.status, s(x.status) || "(tom)");
+        }
+        if (arr.length < PAGE_SIZE) break;
+      }
+      if (afbrudt) break;
+    }
+    const raekker = Object.entries(agg).map(([k, g]) => {
+      const [uge, cid] = k.split("|");
+      return { uge, kampagneId: cid, kampagne: kampagner[cid] ?? "", forsoeg: g.forsoeg, kontakt: g.kontakt,
+        kontaktrate: g.forsoeg ? Math.round((g.kontakt / g.forsoeg) * 1000) / 10 : 0,
+        unikkeLeads: g.leads.size, unikkeLeadsKontakt: g.leadsKontakt.size, status: g.status };
+    }).sort((a, b) => a.uge.localeCompare(b.uge) || a.kampagneId.localeCompare(b.kampagneId));
+    return json(200, { probe, from, to, sessions: seen.size, sider, afbrudt, listeFelter: [...listeFelter], raekker, apiKald: apiCalls });
+  }
+
   if (url.searchParams.get("mode") === "salescount") {
     const integ = url.searchParams.get("integration") ?? "Eesy TM";
     const day = url.searchParams.get("day") ?? new Date().toISOString().slice(0, 10);
