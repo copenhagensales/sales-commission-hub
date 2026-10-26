@@ -1,11 +1,14 @@
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 /** Fjernede sider (oprydning 26/10): gamle links og bogmærker sendes videre i stedet for 404. */
 const redirectCache = new Map<string, () => JSX.Element>();
 export function redirectTo(to: string) {
   let c = redirectCache.get(to);
   if (!c) {
-    c = () => <Navigate to={to} replace />;
+    c = function RedirectKeepQuery() {
+      const { search } = useLocation();
+      return <Navigate to={`${to}${search}`} replace />;
+    };
     redirectCache.set(to, c);
   }
   return c;

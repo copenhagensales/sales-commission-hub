@@ -130,7 +130,7 @@ export default function VagtFlowIndex() {
                 <MapPin className="h-4 w-4 mr-2" />
                 Administrer lokationer
               </Button>
-              <Button className="w-full justify-start" variant="outline" onClick={() => navigate(`/vagt-flow/booking?week=${currentWeek}&year=${currentYear}`)}>
+              <Button className="w-full justify-start" variant="outline" onClick={() => navigate(`/vagt-flow/booking?week=${currentWeek}&year=${currentYear}&tab=bookings`)}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Se alle bookinger
               </Button>
@@ -158,7 +158,7 @@ export default function VagtFlowIndex() {
                     </div>
                   ))}
                   {thisWeekBookings.length > 5 && (
-                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate(`/vagt-flow/booking?week=${currentWeek}&year=${currentYear}`)}>
+                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate(`/vagt-flow/booking?week=${currentWeek}&year=${currentYear}&tab=bookings`)}>
                       Se alle {thisWeekBookings.length} bookinger
                     </Button>
                   )}
