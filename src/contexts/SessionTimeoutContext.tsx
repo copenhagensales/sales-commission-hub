@@ -1,4 +1,3 @@
-import { clearPushSubscription } from "@/hooks/usePushNotifications";
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,7 +78,6 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
   }, [isExemptRoute]);
 
   const handleLogout = useCallback(async () => {
-    await clearPushSubscription();
     await supabase.auth.signOut();
     navigate("/auth");
   }, [navigate]);

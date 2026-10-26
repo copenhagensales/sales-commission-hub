@@ -25,15 +25,29 @@ export async function clearPushSubscription(): Promise<void> {
   } catch { /* må aldrig blokere logud */ }
 }
 
-// Ved logud: afmeld browserens abonnement. Serveren deaktiverer det ved næste afsendelse (410).
-if (typeof window !== "undefined") {
-  supabase.auth.onAuthStateChange((event) => {
-    if (event !== "SIGNED_OUT") return;
-    void getRegistration()
-      .then((r) => r?.pushManager.getSubscription())
-      .then((s) => s?.unsubscribe())
-      .catch(() => undefined);
-  });
+/** Selvhelende tilmelding: genopretter enhedens række/abonnement, når tilladelsen allerede er givet. Fejler stille. */
+export async function ensurePushSubscription(): Promise<void> {
+  try {
+    if (!pushSupported() || Notification.permission !== "granted") return;
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (!standalone) return;
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const reg = await getRegistration();
+    if (!reg) return;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const { data: keyRes, error: keyErr } = await supabase.functions.invoke("push-public-key", { body: {} });
+      if (keyErr || !keyRes?.publicKey) return;
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey) });
+    }
+    const json = sub.toJSON();
+    await supabase.from("push_subscriptions").upsert(
+      { user_id: u.user.id, endpoint: sub.endpoint, p256dh: json.keys?.p256dh ?? "", auth: json.keys?.auth ?? "", user_agent: navigator.userAgent.slice(0, 200), is_active: true, deactivated_at: null },
+      { onConflict: "endpoint" },
+    );
+  } catch { /* stille */ }
 }
 
 /** Push-status og præferencer for den indloggede bruger. */
@@ -52,6 +66,14 @@ export function usePushNotifications() {
       .then((s) => { if (alive) { setSubscribed(!!s); setReady(true); } })
       .catch(() => alive && setReady(true));
     return () => { alive = false; };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    try {
+      const s = await (await getRegistration())?.pushManager.getSubscription();
+      setSubscribed(!!s);
+      if (pushSupported()) setPermission(Notification.permission);
+    } catch { /* ignore */ }
   }, []);
 
   const subscribe = useCallback(async () => {
@@ -92,5 +114,5 @@ export function usePushNotifications() {
     },
   });
 
-  return { supported, permission, subscribed, ready, subscribe, unsubscribe, sendTest };
+  return { supported, permission, subscribed, ready, refresh, subscribe, unsubscribe, sendTest };
 }

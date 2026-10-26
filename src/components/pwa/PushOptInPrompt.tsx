@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { ensurePushSubscription, usePushNotifications } from "@/hooks/usePushNotifications";
 import { useInstallStork } from "@/hooks/useInstallStork";
 import { PUSH_PROMPT_DISMISS_KEY, shouldShowPushPrompt } from "@/lib/push/pushPrompt";
 
@@ -14,6 +14,12 @@ export function PushOptInPrompt() {
     try { return localStorage.getItem(PUSH_PROMPT_DISMISS_KEY); } catch { return null; }
   });
   const [busy, setBusy] = useState(false);
+  const { refresh } = push;
+  useEffect(() => {
+    let alive = true;
+    void ensurePushSubscription().then(() => { if (alive) void refresh(); });
+    return () => { alive = false; };
+  }, [refresh]);
 
   if (!push.ready || !shouldShowPushPrompt({ loggedIn: true, standalone, supported: push.supported, permission: push.permission, subscribed: push.subscribed, dismissedAt })) return null;
 
