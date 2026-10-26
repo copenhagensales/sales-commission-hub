@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { udsend } from "../_shared/udsend.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { requireOwner } from "../_shared/auth.ts";
 
@@ -134,7 +135,11 @@ serve(async (req) => {
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
 
-    await sendEmail(accessToken, recipientEmail, `[TEST] ${subject}`, processedHtml);
+    await udsend({
+      type: "send-test-email", kanal: "mail", modtager: recipientEmail, emne: `[TEST] ${subject}`,
+      afsenderfunktion: "send-test-email",
+      send: async () => { await sendEmail(accessToken, recipientEmail, `[TEST] ${subject}`, processedHtml); },
+    });
 
     console.log(`Test email sent to ${recipientEmail}`);
 

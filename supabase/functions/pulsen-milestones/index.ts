@@ -196,6 +196,7 @@ Deno.serve(async (req) => {
       if (c.milestone_type !== "club" || !c.employee_id || (c as Out & { _existing?: boolean })._existing) continue;
       pushed += await sendPush(service, await authUsersForEmployees(service, [c.employee_id]), "klub", {
         dedupeKey: `${c.period_key}:${c.level}`,
+        udsendType: "pulsen-milestones", afsenderfunktion: "pulsen-milestones",
       });
     }
     return json({ dry_run: false, from, to, written, pushed, timings_ms: timings });

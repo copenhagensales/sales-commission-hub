@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     if (error || !u?.user) return json({ error: "Ikke logget ind" }, 401);
 
     if (body?.action === "test") {
-      const sent = await sendPush(svc, [u.user.id], "test");
+      const sent = await sendPush(svc, [u.user.id], "test", { udsendType: "send-push", afsenderfunktion: "send-push" });
       return json({ sent });
     }
     return json({ error: "Ukendt handling" }, 400);
