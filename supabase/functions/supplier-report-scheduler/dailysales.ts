@@ -1,7 +1,7 @@
 // Daglig salgsrapport til kunder (report_type = 'client_daily_sales').
 // Samme abonnement-/dispatch-tabel, samme mailskabelon og samme afsendelsesvej
 // som de to andre rapporttyper. Ingen godkendelse, ingen beløb, ingen navne.
-import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import type { AuthOk } from "../_shared/auth.ts";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import { udsendFlere } from "../_shared/udsend.ts";
 import {
@@ -11,8 +11,7 @@ import {
   type DailySalesTrendPoint,
 } from "../_shared/supplier-report-mail.ts";
 
-// deno-lint-ignore no-explicit-any
-type Svc = SupabaseClient<any, "public", any>;
+type Svc = AuthOk["svc"];
 
 /** Antal dage MED aktivitet der vises i trendgrafen. */
 const TREND_ACTIVE_DAYS = 7;
