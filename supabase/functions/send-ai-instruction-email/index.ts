@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
       await udsendFlere({
         type: "send-ai-instruction-email", kanal: "mail", afsenderfunktion: "send-ai-instruction-email",
         emne: "🤖 AI-instruktion — Vigtig information om brug af AI (EU AI Act)",
-        modtagere: batchEmps.map((e: any) => ({ modtager: e.work_email, modtagerEmployeeId: e.id, modtagerUserId: e.auth_user_id ?? undefined })),
+        modtagere: batchEmps.map((e: any) => ({ modtager: e.work_email, modtagerEmployeeId: e.id })),
         send: async (batch) => {
       const toRecipients = batch.map((email: string) => ({
         emailAddress: { address: email },
