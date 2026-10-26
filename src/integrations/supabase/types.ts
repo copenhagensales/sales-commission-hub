@@ -17817,6 +17817,12 @@ export type Database = {
           noegle: string
           opdateret: string
           oprettet: string
+          push_link: string | null
+          push_tekst: string | null
+          push_titel: string | null
+          regel_noegle: string | null
+          regel_roller: string[]
+          regel_teams: string[]
           skabelon_noegle: string | null
           stille_fra: string | null
           stille_til: string | null
@@ -17832,6 +17838,12 @@ export type Database = {
           noegle: string
           opdateret?: string
           oprettet?: string
+          push_link?: string | null
+          push_tekst?: string | null
+          push_titel?: string | null
+          regel_noegle?: string | null
+          regel_roller?: string[]
+          regel_teams?: string[]
           skabelon_noegle?: string | null
           stille_fra?: string | null
           stille_til?: string | null
@@ -17847,6 +17859,12 @@ export type Database = {
           noegle?: string
           opdateret?: string
           oprettet?: string
+          push_link?: string | null
+          push_tekst?: string | null
+          push_titel?: string | null
+          regel_noegle?: string | null
+          regel_roller?: string[]
+          regel_teams?: string[]
           skabelon_noegle?: string | null
           stille_fra?: string | null
           stille_til?: string | null
@@ -18982,6 +19000,16 @@ export type Database = {
       }
       geo_ip_in_eea: { Args: { _ip: string }; Returns: string }
       geo_ip_outside_eea: { Args: { _ip: string }; Returns: string }
+      get_active_cron_jobs: {
+        Args: never
+        Returns: {
+          active: boolean
+          command: string
+          jobid: number
+          jobname: string
+          schedule: string
+        }[]
+      }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
         Args: never
@@ -20035,6 +20063,18 @@ export type Database = {
       trigger_kpi_calculation: { Args: never; Returns: undefined }
       trigger_kpi_incremental: { Args: never; Returns: undefined }
       trigger_leaderboard_calculation: { Args: never; Returns: undefined }
+      udsendelse_modtagere: {
+        Args: { p_type: string }
+        Returns: {
+          auth_user_id: string
+          employee_id: string
+        }[]
+      }
+      udsendelse_tilladt: {
+        Args: { p_type: string; p_user_id: string }
+        Returns: boolean
+      }
+      udsendelser_overblik: { Args: never; Returns: Json }
       update_checklist_email_cron: {
         Args: { new_time: string }
         Returns: undefined
