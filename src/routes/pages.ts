@@ -255,3 +255,11 @@ export const OnboardingSamleside = lazyPage(() => tp().then((m) => ({ default: m
 export const RekrutteringSamleside = lazyPage(() => tp().then((m) => ({ default: m.RekrutteringSamleside })));
 export const MedarbejdereSamleside = lazyPage(() => tp().then((m) => ({ default: m.MedarbejdereSamleside })));
 export const KontrakterSamleside = lazyPage(() => tp().then((m) => ({ default: m.KontrakterSamleside })));
+// Samlesider (bundt b3)
+const sr = () => import("@/pages/samlesider/SalgRapporter");
+export const FieldmarketingSamleside = lazyPage(() => sr().then((m) => ({ default: m.FieldmarketingSamleside })));
+export const RetSalgSamleside = lazyPage(() => sr().then((m) => ({ default: m.RetSalgSamleside })));
+export const TdcSamleside = lazyPage(() => sr().then((m) => ({ default: m.TdcSamleside })));
+export const KunderOgPriserSamleside = lazyPage(() => sr().then((m) => ({ default: m.KunderOgPriserSamleside })));
+export const RapporterSamleside = lazyPage(() => sr().then((m) => ({ default: m.RapporterSamleside })));
+export const PowerdagSamleside = lazyPage(() => sr().then((m) => ({ default: m.PowerdagSamleside })));

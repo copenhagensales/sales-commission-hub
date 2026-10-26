@@ -1,4 +1,5 @@
 import { useTeamPersonaleSynlighed } from "@/hooks/useTeamPersonaleSynlighed";
+import { useSalgRapporterSynlighed } from "@/hooks/useSalgRapporterSynlighed";
 import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
 import { clearPushSubscription } from "@/hooks/usePushNotifications";
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, FileText, Crown, User, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, Inbox, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag } from "lucide-react";
@@ -76,6 +77,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
   const mitArbejde = useMitArbejdeSynlighed();
   const tp = useTeamPersonaleSynlighed();
+  const sr = useSalgRapporterSynlighed();
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
@@ -721,44 +723,11 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
 
-              {/* TDC Opsummering */}
-              {p.canViewTdcOpsummering && (
-                <NavLink
-                  to="/tdc-opsummering"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/tdc-opsummering" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <FileText className="h-4 w-4" />
-                  TDC Opsummering
-                </NavLink>
-              )}
-              {p.canViewTdcOpsummering && (
-                <NavLink
-                  to="/tdc-idriftsaettelse"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/tdc-idriftsaettelse" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <FileText className="h-4 w-4" />
-                  TDC Idriftsættelsesmail
-                </NavLink>
-              )}
-              {p.canViewTdcOpsummering && (
-                <NavLink
-                  to="/fiber-registrering"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/fiber-registrering" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <FileText className="h-4 w-4" />
-                  Fiber registrering
+              {/* TDC-værktøjer (samleside, bundt b3) */}
+              {sr.har.tdc && (
+                <NavLink to="/tdc" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200", location.pathname === "/tdc" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
+                  <FileText className="h-5 w-5" />
+                  TDC-værktøjer
                 </NavLink>
               )}
 
@@ -896,34 +865,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   </NavLink>
                 )}
                 
-                {/* Adgang styres af superadmin-rollen (data i `superadmins`), ikke af en e-mailliste */}
-                {p.canView("menu_reports_revenue_by_client") && isSuperadmin && (
-                  <NavLink to="/reports/revenue-by-client" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/revenue-by-client" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <TrendingUp className="h-4 w-4" />
-                    Omsætning per opgave
-                  </NavLink>
-                )}
-                {p.canView("menu_reports_weekly_lead_closure") && (
-                  <NavLink to="/reports/weekly-lead-closure" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/weekly-lead-closure" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <BarChart3 className="h-4 w-4" />
-                    Kampagneoversigt Tryg
-                  </NavLink>
-                )}
-                {p.canView("menu_customer_inquiries") && (
-                  <NavLink to="/customer-inquiries" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/customer-inquiries" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Inbox className="h-4 w-4" />
-                    Kundehenvendelser
-                  </NavLink>
-                )}
               </CollapsibleContent>
             </Collapsible>
           )}
@@ -962,119 +903,28 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </Collapsible>
           )}
 
-          {/* Fieldmarketing menu */}
-          {showFieldmarketingMenu && (
-            <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/vagt-flow") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5" />
-                  {t("sidebar.fieldmarketing")}
-                </div>
-                {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewFmOverview && (
-                  <NavLink to="/vagt-flow" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <LayoutDashboard className="h-4 w-4" />
-                    {t("sidebar.overview")}
-                  </NavLink>
-                )}
-                {/* Booking - single link to tabbed page */}
-                {(p.canViewFmBookWeek || p.canViewFmBookings || p.canViewFmLocations) && (
-                  <NavLink to="/vagt-flow/booking" onClick={handleNavClick} className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname.startsWith("/vagt-flow/booking") || 
-                    location.pathname.startsWith("/vagt-flow/locations")
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <div className="flex items-center gap-3">
-                      <CalendarDays className="h-4 w-4" />
-                      {t("sidebar.booking", "Booking")}
-                    </div>
-                    {fmBookingConflictsCount > 0 && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                              {fmBookingConflictsCount > 99 ? "99+" : fmBookingConflictsCount}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {fmBookingConflictsCount} medarbejder(e) er tildelt vagter under godkendt fravær
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </NavLink>
-                )}
-                {p.canViewFmBilling && (
-                  <NavLink to="/vagt-flow/billing" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/billing" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Receipt className="h-4 w-4" />
-                    {t("sidebar.billing")}
-                    {pendingDispatchCount > 0 && (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground">
-                        {pendingDispatchCount}
-                      </span>
-                    )}
-                  </NavLink>
-                )}
-                {p.canViewFmEditSales && (
-                  <NavLink to="/vagt-flow/edit-sales" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/edit-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Pencil className="h-4 w-4" />
-                    Ret salgsregistrering (Leder)
-                  </NavLink>
-                )}
-                {p.canViewFmEesyDeviations && (
-                  <NavLink to="/vagt-flow/eesy-fm-deviations" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/eesy-fm-deviations" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <AlertTriangle className="h-4 w-4" />
-                    Eesy FM afvigelser (Leder)
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+          {/* Salg og kunder (samlesider, bundt b3) */}
+          {!isMenuHidden('section_fieldmarketing') && p.canView("menu_section_fieldmarketing") && sr.har.fieldmarketing && (
+            <NavLink to="/vagt-flow" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200", location.pathname.startsWith("/vagt-flow") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
+              <Calendar className="h-5 w-5" />
+              {t("sidebar.fieldmarketing")} {(fmBookingConflictsCount + pendingDispatchCount) > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground">
+                  {fmBookingConflictsCount + pendingDispatchCount}
+                </span>
+              )}
+            </NavLink>
           )}
-
-          {/* MG menu */}
-          {showMgMenu && (
-            <Collapsible open={mgOpen} onOpenChange={setMgOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Percent className="h-5 w-5" />
-                  {t("sidebar.mg")}
-                </div>
-                {mgOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewMgTest && (
-                  <NavLink to="/mg-test" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Percent className="h-4 w-4" />
-                    {t("sidebar.mgTest")}
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+          {sr.har.retSalg && (
+            <NavLink to="/ret-salg" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200", location.pathname === "/ret-salg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
+              <PencilLine className="h-5 w-5" />
+              Ret salg
+            </NavLink>
+          )}
+          {sr.har.kunder && (
+            <NavLink to="/kunder-og-priser" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200", location.pathname === "/kunder-og-priser" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
+              <Percent className="h-5 w-5" />
+              {t("sidebar.mgTest")}
+            </NavLink>
           )}
 
 
@@ -1082,76 +932,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
 
 
-          {/* Rapporter menu */}
-          {showReportsMenu && (
-            <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/reports") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <FileBarChart className="h-5 w-5" />
-                  Rapporter
-                </div>
-                {reportsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewReportsAdmin && (
-                  <NavLink to="/reports/admin" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Crown className="h-4 w-4" />
-                    Rapporter Admin
-                  </NavLink>
-                )}
-                {p.canViewReportsDailyReports && (
-                  <NavLink to="/reports/daily" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/daily" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Calendar className="h-4 w-4" />
-                    Dagsrapporter
-                  </NavLink>
-                )}
-                {p.canViewReportsManagement && (
-                  <NavLink to="/reports/management" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/management" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Users className="h-4 w-4" />
-                    Rapporter Ledelse
-                  </NavLink>
-                )}
-                {canViewCancellations && (
-                  <NavLink to="/salary/cancellations" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/salary/cancellations" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <XCircle className="h-4 w-4" />
-                    Annulleringer
-                  </NavLink>
-                )}
-                {p.canViewReportsTdcEditSales && (
-                  <NavLink to="/reports/tdc-erhverv-edit-sales" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/tdc-erhverv-edit-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <PencilLine className="h-4 w-4" />
-                    TDC Erhverv - ret salg
-                  </NavLink>
-                )}
-                {showTrygEditSales && (
-                  <NavLink to="/reports/tryg-edit-sales" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/reports/tryg-edit-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <PencilLine className="h-4 w-4" />
-                    Tryg - Ret salg
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+          {/* Rapporter (samleside, bundt b3) */}
+          {!isMenuHidden('section_rapporter') && p.canView("menu_section_reports") && sr.har.rapporter && (
+            <NavLink to="/reports/admin" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200", location.pathname === "/reports/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
+              <FileBarChart className="h-5 w-5" />
+              Rapporter
+            </NavLink>
           )}
 
 
@@ -1232,7 +1018,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </NavLink>
           )}
 
-          {/* Live Stats */}
+          {/* Live-tal */}
           {p.canViewLiveStats && (
             <NavLink
               to="/live-stats"
@@ -1243,7 +1029,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               )}
             >
               <Activity className="h-5 w-5" />
-              Live Stats
+              Live-tal
+            </NavLink>
+          )}
+
+          {/* Tavler (bundt b3): kundetavler nås fra vælgeren */}
+          {(
+            <NavLink to="/dashboards" onClick={handleNavClick} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200", location.pathname === "/dashboards" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50")}>
+              <Monitor className="h-5 w-5" />
+              Tavler
             </NavLink>
           )}
 

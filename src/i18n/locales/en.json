@@ -22,7 +22,7 @@
     "teamOverview": "Team Overview",
     "tdcErhverv": "TDC Business",
     "codan": "Codan",
-    "mgTest": "MG Test",
+    "mgTest": "Customers and prices",
     "testDashboard": "Test Dashboard",
     "dialerData": "Dialer Data",
     "callsData": "Call Data",
@@ -233,7 +233,7 @@
     "rawPayload": "Raw Payload"
   },
   "mgTest": {
-    "title": "MG Test – Adversus Mapping",
+    "title": "Customers and prices",
     "description": "Here you can map both products and campaigns from Adversus to your internal products and customer campaigns, as well as maintain the list of customer names.",
     "tabProduct": "Product Mapping",
     "tabCampaign": "Customer / Campaign Mapping",
