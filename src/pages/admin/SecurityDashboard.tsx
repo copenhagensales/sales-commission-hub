@@ -33,7 +33,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 
 interface FailedLoginAttempt {
   id: string;
-  email: string;
+  email: string | null;
   ip_address: string | null;
   user_agent: string | null;
   attempted_at: string;
