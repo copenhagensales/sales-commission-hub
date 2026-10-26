@@ -25,12 +25,12 @@ export function useMitArbejdeSynlighed() {
   const vagter = {
     vagtplanFm: fmVagt,
     // TM-vagtplan (protected): alle, der ikke er FM – og FM-brugere, der også har TM-vagtplanen.
-    vagtplanTm: !fmVagt || !!p.canViewMySchedule,
+    vagtplanTm: (!fmVagt || !!p.canViewMySchedule) && p.canView("tab_vagter_min_vagtplan"),
     stempelur: p.canView("menu_time_stamp") && p.canView("menu_section_vagtplan"),
   };
   const salg = {
-    salg: !!isUnitedMember,
-    straksbetaling: !!hasImmediatePaymentSales,
+    salg: !!isUnitedMember && p.canView("tab_registrer_salg_salg"),
+    straksbetaling: !!hasImmediatePaymentSales && p.canView("tab_registrer_salg_straksbetaling"),
     fm: fmSalg,
   };
   const spil = {
@@ -40,9 +40,9 @@ export function useMitArbejdeSynlighed() {
   const profil = {
     fordele: p.canView("menu_employee_perks"),
     feedback: p.canView("menu_my_feedback"),
-    kodeks: !!isSalgskonsulent || !!isFieldmarketing,
-    kodeksCoc: !!isSalgskonsulent,
-    kodeksCar: !!isFieldmarketing,
+    kodeks: (!!isSalgskonsulent && p.canView("tab_min_profil_kodeks")) || (!!isFieldmarketing && p.canView("tab_min_profil_firmabil")),
+    kodeksCoc: !!isSalgskonsulent && p.canView("tab_min_profil_kodeks"),
+    kodeksCar: !!isFieldmarketing && p.canView("tab_min_profil_firmabil"),
     anbefal: p.canView("menu_refer_a_friend"),
   };
 
