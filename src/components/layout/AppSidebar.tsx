@@ -111,33 +111,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     return (key: string) => configMap.get(key)?.sort_order ?? 999;
   }, [menuConfig]);
 
-  const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering", "/tdc-idriftsaettelse", "/fiber-registrering"].some(path => location.pathname === path || location.pathname.startsWith(path))
-  );
-  const [spilOpen, setSpilOpen] = useState(
-    ["/head-to-head", "/commission-league", "/admin/league", "/admin/h2h", "/team/h2h"].some(path => location.pathname === path || location.pathname.startsWith(path))
-  );
-  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp");
-  const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
-  const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
-  const { hasAccess: invoiceflowAccess } = useInvoiceflowAccess();
-  const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/onboarding-analyse", "/email-templates", "/admin/security", "/system-stability", "/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results", "/reports/revenue-by-client", "/customer-inquiries"].some(path => location.pathname.startsWith(path))
-  );
-  const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
-  const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
-  // Dashboard state removed - dashboards are now in separate environment
-  // (SOME menu removed; Ekstraarbejde is now top-level)
-  const [onboardingOpen, setOnboardingOpen] = useState(
-    location.pathname.startsWith("/onboarding-program") || location.pathname === "/coaching-templates"
-  );
-  const [reportsOpen, setReportsOpen] = useState(
-    location.pathname.startsWith("/reports") || location.pathname === "/salary/cancellations"
-  );
-  const [salaryOpen, setSalaryOpen] = useState(
-    location.pathname.startsWith("/salary")
-  );
-
   // Live clock (Danish time)
   const [clockTime, setClockTime] = useState(() =>
     new Date().toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })
@@ -150,12 +123,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   }, []);
 
   const canViewCancellations = p.canView("menu_cancellations");
-  const [adminOpen, setAdminOpen] = useState(
-    location.pathname.startsWith("/admin")
-  );
-  const [amoOpen, setAmoOpen] = useState(
-    location.pathname.startsWith("/amo")
-  );
 
   // Fetch employee name and pending contracts count
   // OPTIMIZED: Removed refetchInterval to reduce DB load - only refetch on window focus
@@ -442,84 +409,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   }
 
   // Build main navigation based on position permissions (items NOT in "Mit Hjem" menu)
-  const mainNavigation: NavItem[] = [];
-
-  // Non-personal menu items (Salg and Logikker moved to bottom)
-
-  // SECTION-PERMISSION ENFORCEMENT: Section permission must be true for ANY child items to show
-  // This ensures the sidebar matches what the Permission Editor shows
-  
-  // Check if Ekstraarbejde menu should be visible (top-level standalone)
-
-  // Check if any Personnel menu items are visible (requires section permission)
-  const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
-    (tp.har.medarbejdere || p.canViewLoginLog);
-  
-  // Check if any Ledelse menu items are visible (requires section permission)
-  const showLedelseMenu = !isMenuHidden('section_ledelse') && p.canView("menu_section_ledelse") && 
-    (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
-  
-  // Check if any MG menu items are visible (requires section permission)
-  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
-  
-  const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
-
-  // Check if any Fieldmarketing items are visible. FM opt-in only opens Salgsregistrering.
-  const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && (
-    // Min vagtplan og Salgsregistrering ligger nu under Mit Hjem → Vagter / Registrér salg (bundt b1).
-    p.canView("menu_section_fieldmarketing") && 
-      (p.canViewFmOverview || p.canViewFmLocations || p.canViewFmBilling ||
-       p.canViewFmBookWeek || p.canViewFmBookings || p.canViewFmEditSales || p.canViewFmEesyDeviations)
-  );
-  
-  // Check if any Shift Planning items are visible (requires section permission)
-  const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
-    tp.har.vagtplan;
-  
-  
-  // Check if any Recruitment items are visible (requires section permission)
-  const showRecruitmentMenu = !isMenuHidden('section_rekruttering') && p.canView("menu_section_rekruttering") && 
-    (p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
-     p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
-     p.canViewUpcomingInterviews || p.canViewUpcomingHires || p.canViewBookingFlow);
-  
-  // Check if any Onboarding items are visible (requires section permission) - only show for admin users
-  const showOnboardingAdminItems = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
-  // "Opstartshold" foelger sin egen regel i databasen (can_view_ramp_team)
-  const showRampTeam = canViewRampTeam === true;
-  const showOnboardingMenu = showOnboardingAdminItems || showRampTeam;
-
-  // "Tryg - Ret salg": kun ejere samt allowlisten (Filip, Annika)
-  const showTrygEditSales = trygEditAccess;
-
-  // Check if any Reports menu items are visible (requires section permission)
-  // Tryg-ret-salg-adgang (ejer/allowlist) viser sektionen uafhængigt af rollens rapport-sektionsadgang.
-  const showReportsMenu = !isMenuHidden('section_rapporter') && (
-    (p.canView("menu_section_reports") &&
-      (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || canViewCancellations || p.canViewReportsTdcEditSales)) ||
-    showTrygEditSales
-  );
-  
-  // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
-  const SALARY_ALLOWED_USER_IDS = [
-    'f0fb7ec3-5f00-4fcd-a6ca-2a53669147b9', // Kasper Mikkelsen
-    '71267f4e-fd9e-4c16-8fe9-da0f48ce2598', // Mathias Grubak
-    'e1ac7b84-aedb-400e-88f6-dd24687317e4', // Lone Mikkelsen
-  ];
-  const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
-  
-  const isOwner = p.position?.name?.toLowerCase() === "ejer";
-
-  // Check if Admin menu should be visible (KPI or owner for menu editor)
-  const showAdminMenu = !isMenuHidden('section_admin') && (p.canViewKpiDefinitions || isOwner);
-  
-  // Check if AMO menu should be visible
-  const showAmoMenu = !isMenuHidden('section_amo') && p.canView("menu_section_amo") && (
-    p.canViewAmoDashboard || p.canViewAmoOrganisation || p.canViewAmoMeetings || p.canViewAmoApv
-  );
-  
-  // Check if Spil (Games) menu should be visible
-  const showSpilMenu = !isMenuHidden('section_spil') && (p.canViewH2h || p.canViewCommissionLeague);
   const tal = (n: number) => n > 0 ? (
     <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1.5 text-xs">{n > 99 ? "99+" : n}</Badge>
   ) : null;
