@@ -255,7 +255,7 @@ export const routes: RouteConfig[] = [
   },
   { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow/booking"), access: "protected" },
   { path: "/vagt-flow/vehicles", component: redirectTo("/vagt-flow"), access: "protected" },
-  { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning/absence"), access: "protected" },
+  { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning?tab=absence"), access: "protected" },
   { path: "/vagt-flow/sales-registration", component: redirectTo("/registrer-salg?tab=fm"), access: "protected" },
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/travel-expenses", component: redirectTo("/vagt-flow"), access: "protected" },
