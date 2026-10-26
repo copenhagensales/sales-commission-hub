@@ -51,11 +51,11 @@ export async function sendPush(
   svc: any,
   userIds: string[],
   type: PushType,
-  opts: { dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string } = {},
+  opts: { dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string; tekst?: { title: string; body: string } } = {},
 ): Promise<number> {
   try {
     if (!userIds.length || !configure()) return 0;
-    const msg = PUSH_TEXT[type];
+    const msg = opts.tekst ? { ...PUSH_TEXT[type], ...opts.tekst } : PUSH_TEXT[type];
     let sent = 0;
     const udsendType = opts.udsendType ?? `push-${type}`;
     const afsender = opts.afsenderfunktion ?? "push";
