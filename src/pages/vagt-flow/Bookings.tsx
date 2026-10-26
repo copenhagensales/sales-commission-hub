@@ -219,8 +219,8 @@ export default function VagtBookings() {
     queryFn: async () => {
       const weekEnd = addDays(weekStart, 6);
       const { data, error } = await supabase
-        .from("vehicle_mileage")
-        .select(`*, vehicle:vehicle(name)`)
+        .from("booking_vehicle")
+        .select("id, booking_id, vehicle_id, date, vehicle:vehicle_id(name)")
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(weekEnd, "yyyy-MM-dd"));
       if (error) throw error;
@@ -315,10 +315,8 @@ export default function VagtBookings() {
         booking_id: bookingId,
         vehicle_id: vehicleId,
         date,
-        start_mileage: 0,
-        end_mileage: 0,
       }));
-      const { error } = await supabase.from("vehicle_mileage").insert(inserts);
+      const { error } = await supabase.from("booking_vehicle").insert(inserts);
       if (error) throw error;
     },
     onSuccess: () => {
