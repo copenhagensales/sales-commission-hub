@@ -1,7 +1,7 @@
 import type React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, Gamepad2, Swords, BadgeCheck, type LucideIcon } from "lucide-react";
+import { Home, Target, Calendar, Newspaper, User, Menu, Gamepad2, BadgeCheck, type LucideIcon } from "lucide-react";
 import { formatUnread } from "@/hooks/usePulsen";
 import { useStorkbookUnread } from "@/hooks/useStorkbookUnread";
 import { usePermissions } from "@/hooks/usePositionPermissions";
