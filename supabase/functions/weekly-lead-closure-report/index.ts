@@ -41,6 +41,23 @@ const BOOKED_STATUS = "success";
 const UNKNOWN_BUCKET = "ukendt";
 /** Feature-flag for leveringsstatus (side + mailsektion). Slås til, når Kasper har godkendt afstemningen. */
 const TRYG_FLOW_FLAG = "tryg_leveringsstatus";
+/** Kort timeout på alle eksterne kald, så en hængende forbindelse aldrig dræber funktionen stille. */
+const EXTERNAL_TIMEOUT_MS = 25_000;
+/** Én task må højst tage så lang tid; derefter skrives fejlen, og tasken forsøges igen. */
+const TASK_DEADLINE_MS = 120_000;
+/** En task i 'running' uden opdatering i så lang tid regnes som død (vagthund). */
+const STALE_TASK_MS = 5 * 60_000;
+const ALARM_RECIPIENT = "km@copenhagensales.dk";
+
+function withDeadline<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: number | undefined;
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} overskred ${Math.round(ms / 1000)} sek`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 type AccountKey = "main" | "lederne" | "enreach";
 
@@ -145,6 +162,7 @@ async function getJson(path: string, auth: string): Promise<unknown> {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${BASE_URL}${path}`, {
       headers: { Authorization: auth, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
     });
     if (res.ok) return await res.json();
     const retryable = res.status === 429 || res.status >= 500;
@@ -461,7 +479,7 @@ async function streamEnreachWeek(
   const delays = [1000, 3000, 7000];
   let payload: unknown = null;
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { headers: access.headers });
+    const res = await fetch(url, { headers: access.headers, signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS) });
     if (res.ok) {
       payload = await res.json();
       break;
@@ -536,7 +554,7 @@ async function enreachCallChunk(
     `&Limit=${ENREACH_CALL_LIMIT}`;
   const delays = [1000, 3000, 7000];
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { headers: access.headers });
+    const res = await fetch(url, { headers: access.headers, signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS) });
     if (res.ok) return asArray(await res.json(), "Results", "results", "calls", "data");
     if (res.status < 500 || attempt >= delays.length) {
       throw new Error(`Enreach calls svarede ${res.status}`);
