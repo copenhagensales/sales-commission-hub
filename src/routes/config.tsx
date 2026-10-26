@@ -149,7 +149,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/shift-planning", component: VagtplanSamleside, access: "protected" },
   { path: "/mit-team", component: MitTeamSamleside, access: "protected" },
-  { path: "/shift-planning/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
+  { path: "/shift-planning/my-schedule", component: redirectTo("/vagter?tab=vagtplan-tm"), access: "protected" },
   { path: "/shift-planning/absence", component: redirectTo("/shift-planning?tab=absence"), access: "protected" },
   { path: "/shift-planning/time-tracking", component: redirectTo("/shift-planning"), access: "protected" },
 
