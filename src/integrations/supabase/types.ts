@@ -17811,6 +17811,7 @@ export type Database = {
           afsenderfunktion: string
           aktiv: boolean
           beskrivelse: string
+          gruppe: string
           kanal: string
           modtagerregel: string
           navn: string
@@ -17826,12 +17827,14 @@ export type Database = {
           skabelon_noegle: string | null
           stille_fra: string | null
           stille_til: string | null
+          til_medarbejdere: boolean
           udloeser: string
         }
         Insert: {
           afsenderfunktion: string
           aktiv?: boolean
           beskrivelse?: string
+          gruppe?: string
           kanal: string
           modtagerregel?: string
           navn: string
@@ -17847,12 +17850,14 @@ export type Database = {
           skabelon_noegle?: string | null
           stille_fra?: string | null
           stille_til?: string | null
+          til_medarbejdere?: boolean
           udloeser: string
         }
         Update: {
           afsenderfunktion?: string
           aktiv?: boolean
           beskrivelse?: string
+          gruppe?: string
           kanal?: string
           modtagerregel?: string
           navn?: string
@@ -17868,6 +17873,7 @@ export type Database = {
           skabelon_noegle?: string | null
           stille_fra?: string | null
           stille_til?: string | null
+          til_medarbejdere?: boolean
           udloeser?: string
         }
         Relationships: []
@@ -20068,6 +20074,7 @@ export type Database = {
         Returns: {
           aktiv: boolean
           beskrivelse: string
+          gruppe: string
           kanal: string
           navn: string
           noegle: string
