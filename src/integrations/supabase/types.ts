@@ -20063,6 +20063,16 @@ export type Database = {
       trigger_kpi_calculation: { Args: never; Returns: undefined }
       trigger_kpi_incremental: { Args: never; Returns: undefined }
       trigger_leaderboard_calculation: { Args: never; Returns: undefined }
+      udsendelse_mine_typer: {
+        Args: never
+        Returns: {
+          aktiv: boolean
+          beskrivelse: string
+          kanal: string
+          navn: string
+          noegle: string
+        }[]
+      }
       udsendelse_modtagere: {
         Args: { p_type: string }
         Returns: {
