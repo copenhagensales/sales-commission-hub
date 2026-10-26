@@ -111,6 +111,7 @@ export const TvBoardDirect = lazyPage(() => import("@/pages/tv-board/TvBoardDire
 
 // Live Stats
 export const LiveStats = lazyPage(() => import("@/pages/LiveStats"));
+export const Sales = lazyPage(() => import("@/pages/Sales"));
 
 // Head to Head
 export const HeadToHead = lazyPage(() => import("@/pages/HeadToHead"));

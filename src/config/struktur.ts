@@ -1,14 +1,14 @@
 import {
   Home, Target, Calendar, BadgeCheck, Newspaper, Gamepad2, User, ClipboardList, Users, GraduationCap,
   CalendarDays, PencilLine, FileText, Percent, UserPlus, UserCog, FileSignature, FileBarChart, Receipt,
-  ShieldCheck, Shield, Wrench, Monitor, Zap, Activity, Trophy, Swords, type LucideIcon,
+  ShieldCheck, Shield, Wrench, Monitor, Zap, Activity, Trophy, Swords, ShoppingCart, type LucideIcon,
 } from "lucide-react";
 
 /** Flag, som synlighedsreglerne læser. Bygges kun af `useStrukturSynlighed`. */
 export interface StrukturSynlighed {
   home: boolean; mineTal: boolean; vagter: boolean; registrerSalg: boolean; storkbook: boolean; spil: boolean; spilSuperligaen: boolean; spilHead2head: boolean; minProfil: boolean;
   vagtplan: boolean; mitTeam: boolean; onboarding: boolean;
-  fieldmarketing: boolean; retSalg: boolean; tdc: boolean; kunder: boolean;
+  salg: boolean; fieldmarketing: boolean; retSalg: boolean; tdc: boolean; kunder: boolean;
   rekruttering: boolean; medarbejdere: boolean; kontrakter: boolean;
   rapporter: boolean; invoiceflow: boolean;
   compliance: boolean; amo: boolean; admin: boolean;
@@ -63,6 +63,7 @@ export const STRUKTUR: StrukturOmraade[] = [
     { id: "side_onboarding", label: "Onboarding", rute: "/onboarding-program", ikon: GraduationCap, synlig: (s) => s.onboarding },
   ] },
   { id: "omraade_salg_og_kunder", label: "Salg og kunder", ikon: CalendarDays, sider: [
+    { id: "side_salg", label: "Salg", rute: "/sales", ikon: ShoppingCart, synlig: (s) => s.salg },
     { id: "side_fieldmarketing", label: "Fieldmarketing", rute: "/vagt-flow", ikon: CalendarDays, synlig: (s) => s.fieldmarketing },
     { id: "side_ret_salg", label: "Ret salg", rute: "/ret-salg", ikon: PencilLine, synlig: (s) => s.retSalg },
     { id: "side_tdc_vaerktoejer", label: "TDC-værktøjer", rute: "/tdc", ikon: FileText, synlig: (s) => s.tdc },

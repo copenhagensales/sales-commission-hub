@@ -719,6 +719,13 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Hovedmenuer",
     icon: "📱",
     permissions: [
+      {
+        key: "menu_sales",
+        label: "Salg",
+        description: "Adgang til salgsdata (Salg og kunder)",
+        hasEditOption: true,
+        scopeKey: "scope_sales",
+      },
       { key: "menu_logics", label: "Logikker", description: "Adgang til logikker", hasEditOption: true },
     ],
   },
