@@ -38,7 +38,6 @@ import {
   AseFmDashboard,
   CphSalesDashboard,
   SalesOverviewAll,
-  Messages,
   TvBoardLogin,
   TvBoardView,
   TvBoardDirect,
