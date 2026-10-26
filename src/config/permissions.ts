@@ -107,14 +107,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
-  {
-    key: "tabs_extra_work",
-    label: "Ekstra arbejde faner",
-    icon: "📑",
-    permissions: [
-    ],
-  },
-
   // ==================== PERSONALE MENU ====================
   {
     key: "menu_personnel",
