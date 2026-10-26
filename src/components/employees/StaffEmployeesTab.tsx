@@ -290,7 +290,7 @@ export function StaffEmployeesTab() {
 
     setSendingResetTo(employee.id);
     try {
-      const { error } = await supabase.functions.invoke("send-employee-invitation", {
+      const { data: inviteResult, error } = await supabase.functions.invoke("send-employee-invitation", {
         body: {
           employeeId: employee.id,
           email: email,
@@ -300,6 +300,11 @@ export function StaffEmployeesTab() {
       });
 
       if (error) throw error;
+
+      if ((inviteResult as { sent?: boolean } | null)?.sent === false) {
+        toast({ title: "Sprunget over: typen er slået fra i Udsendelser" });
+        return;
+      }
 
       await supabase
         .from("employee_master_data")
