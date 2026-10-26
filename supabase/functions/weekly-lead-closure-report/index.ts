@@ -1370,11 +1370,13 @@ async function enqueueTasks(
   runId: string,
   weeks: string[],
   onlyAccounts: string[] | null = null,
+  onlyCampaigns: string[] | null = null,
 ): Promise<number> {
   const tasks: Record<string, unknown>[] = [];
   for (const account of ACCOUNTS) {
     if (onlyAccounts && !onlyAccounts.includes(account.key)) continue;
     for (const campaign of campaignsFor(account.key, config)) {
+      if (onlyCampaigns && !onlyCampaigns.includes(campaign.id)) continue;
       for (const week of weeks) {
         tasks.push({
           run_id: runId,
@@ -1780,7 +1782,9 @@ Deno.serve(async (req) => {
       force_mail?: boolean;
       current_week?: boolean;
       triggered_by?: string;
-      action?: "status" | "sync_campaign_names" | "test_mail" | "watchdog" | "restart" | "resend_mail";
+      action?: "status" | "sync_campaign_names" | "test_mail" | "watchdog" | "restart" | "resend_mail" | "check_unmapped";
+      /** Valgfrit: kun disse kampagne-id'er lægges i køen (backfill af én linje). */
+      campaign_ids?: string[];
       test_recipient?: string;
       week_start?: string;
       run_ids?: string[];
@@ -1857,6 +1861,38 @@ Deno.serve(async (req) => {
 
     // Vagthund (cron hvert 5. min): genstarter kæder der er gået i stå, og
     // sender alarm, hvis mandagsmailen ikke er sendt kl. 09 dansk tid.
+    if (body.action === "check_unmapped") {
+      // Tryg-kampagner i adversus_campaign_mappings uden række i rapportens
+      // kampagnemap. Ingen automatisk mapping – Kasper bekræfter selv.
+      const [trygRes, mapRes] = await Promise.all([
+        svc.from("adversus_campaign_mappings")
+          .select("adversus_campaign_id, adversus_campaign_name, created_at, client_campaigns!inner(clients!inner(name))"),
+        svc.from("weekly_lead_report_campaign_map").select("adversus_campaign_id"),
+      ]);
+      if (trygRes.error) throw new Error(`Kunne ikke læse kampagnemappings: ${trygRes.error.message}`);
+      if (mapRes.error) throw new Error(`Kunne ikke læse rapportens kampagnemap: ${mapRes.error.message}`);
+      const mapped = new Set(((mapRes.data ?? []) as { adversus_campaign_id: string }[]).map((r) => r.adversus_campaign_id));
+      const missing = ((trygRes.data ?? []) as Record<string, unknown>[])
+        .filter((r) => (r.client_campaigns as { clients?: { name?: string } } | null)?.clients?.name === "Tryg")
+        .filter((r) => !mapped.has(safeString(r.adversus_campaign_id)));
+      if (missing.length > 0) {
+        const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+        const items = missing.map((r) =>
+          `<li>${esc(safeString(r.adversus_campaign_id))} – ${esc(safeString(r.adversus_campaign_name) || "(uden navn)")} (oprettet ${esc(safeString(r.created_at).slice(0, 10))})</li>`
+        ).join("");
+        await svc.from("scheduled_emails").insert({
+          recipient_email: ALARM_RECIPIENT,
+          subject: `Tryg-rapport: ${missing.length} kampagne(r) mangler rapportlinje`,
+          content: `<p>Disse kampagner er mappet til Tryg, men er ikke med i Tryg-ugerapporten:</p><ul>${items}</ul><p>Opret rapportlinje og bekræft kampagnen, før mandagskørslen.</p>`,
+          template_key: "weekly_lead_closure_unmapped",
+          scheduled_at: new Date().toISOString(),
+          status: "pending",
+        });
+        await flushMailQueue();
+      }
+      return json(200, { stage: "kontrol", missing: missing.length });
+    }
+
     if (body.action === "watchdog") {
       return json(200, await watchdog(svc));
     }
@@ -1949,7 +1985,10 @@ Deno.serve(async (req) => {
       if (onlyAccounts?.some((a) => !ACCOUNTS.some((acc) => acc.key === a))) {
         throw new Error(`Ukendt konto i accounts: ${onlyAccounts.join(", ")}`);
       }
-      const tasks = await enqueueTasks(svc, config, runId, weeks, onlyAccounts);
+      const onlyCampaigns = Array.isArray(body.campaign_ids) && body.campaign_ids.length > 0
+        ? body.campaign_ids.map((c) => safeString(c))
+        : null;
+      const tasks = await enqueueTasks(svc, config, runId, weeks, onlyAccounts, onlyCampaigns);
       await chainNext(state);
       return json(200, { stage: "startet", runId, weeks, tasks });
     }
