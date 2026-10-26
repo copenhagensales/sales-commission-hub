@@ -1,4 +1,4 @@
-import { ReactNode, Suspense, useEffect } from "react";
+import { ComponentType, ReactNode, Suspense, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -23,6 +23,10 @@ interface SamlesideProps {
    * Ukendte tab-værdier tilhører denne fane, og når den vælges, fjernes tab= fra adressen.
    */
   ejerAfTab?: string;
+  /** URL-parameter for fanevalget (standard "tab"). Brug fx "fane", når en fane selv læser ?tab=. */
+  parameter?: string;
+  /** Ydre layout (standard MainLayout); tavler bruger DashboardLayout. */
+  layout?: ComponentType<{ children: ReactNode }>;
 }
 
 /** Valgt fane: ?tab= → sidst valgte (localStorage) → standard → første synlige. */
@@ -32,7 +36,7 @@ export function vaelgFane(synlige: string[], fraUrl: string | null, gemt: string
 }
 
 /** Samler flere eksisterende sider som faner. Kun den aktive fane monteres. */
-export function Samleside({ titel, faner, standard, ejerAfTab }: SamlesideProps) {
+export function Samleside({ titel, faner, standard, ejerAfTab, parameter = "tab", layout: Layout = MainLayout }: SamlesideProps) {
   const { pathname } = useLocation();
   const [params, setParams] = useSearchParams();
   const noegle = `samleside:${pathname}`;
@@ -41,7 +45,7 @@ export function Samleside({ titel, faner, standard, ejerAfTab }: SamlesideProps)
   const ejer = ejerAfTab && ids.includes(ejerAfTab) ? ejerAfTab : null;
   let gemt: string | null = null;
   try { gemt = localStorage.getItem(noegle); } catch { /* ingen lager */ }
-  const urlTab = params.get("tab");
+  const urlTab = params.get(parameter);
   const fraUrl = urlTab && !ids.includes(urlTab) && ejer ? ejer : urlTab;
   const aktiv = vaelgFane(ids, fraUrl, gemt, standard);
 
@@ -54,16 +58,16 @@ export function Samleside({ titel, faner, standard, ejerAfTab }: SamlesideProps)
   useEffect(() => {
     if (ejer && urlTab === ejer) {
       const next = new URLSearchParams(params);
-      next.delete("tab");
+      next.delete(parameter);
       setParams(next, { replace: true });
     }
-  }, [ejer, urlTab, params, setParams]);
+  }, [ejer, urlTab, params, setParams, parameter]);
 
   const skift = (id: string) => {
     try { localStorage.setItem(noegle, id); } catch { /* ingen lager */ }
     const next = new URLSearchParams(params);
-    if (id === ejer) next.delete("tab");
-    else next.set("tab", id);
+    if (id === ejer) next.delete(parameter);
+    else next.set(parameter, id);
     setParams(next, { replace: true });
   };
 
@@ -78,7 +82,7 @@ export function Samleside({ titel, faner, standard, ejerAfTab }: SamlesideProps)
   const iGruppe = fane?.gruppe ? synlige.filter((f) => f.gruppe?.id === fane.gruppe!.id) : [];
 
   return (
-    <MainLayout>
+    <Layout>
       {!fane ? (
         <div className="mx-auto max-w-md py-16 text-center">
           <p className="text-base text-muted-foreground">Du har ikke adgang til denne side</p>
@@ -109,6 +113,6 @@ export function Samleside({ titel, faner, standard, ejerAfTab }: SamlesideProps)
           </Suspense>
         </Tabs>
       )}
-    </MainLayout>
+    </Layout>
   );
 }
