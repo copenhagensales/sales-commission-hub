@@ -1418,7 +1418,7 @@ async function finishAndMail(
   const weeks = state.weeks;
   const { data: stored } = await svc
     .from("weekly_lead_closure_stats")
-    .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, invalid_reason, lead_count")
+    .select("week_start, account, adversus_campaign_id, report_line, agent_reference, status, invalid_reason, lead_count, updated_at")
     .in("week_start", weeks);
   /**
    * Rapportlinjen slås altid op i mappingen, så en rettet mapping virker med
@@ -1448,8 +1448,39 @@ async function finishAndMail(
       callRows: callRows.filter((r) => r.week_start === week),
     }));
 
+  // Sikring: mailen sendes aldrig, hvis ugen har 0 lukkede emner på alle
+  // rapportlinjer, eller hvis ugens tal ikke er skrevet af denne kørsel.
+  let blockReason: string | null = null;
+  if (state.sendMail && !state.flowOnly) {
+    const closedLatest = latestRows
+      .filter((r) => config.closing.has(r.status))
+      .reduce((n, r) => n + (r.lead_count ?? 0), 0);
+    const { data: runRow } = await svc
+      .from("weekly_lead_closure_runs").select("started_at").eq("id", state.runId).maybeSingle();
+    const startedAt = (runRow as { started_at: string } | null)?.started_at ?? "";
+    const newest = ((stored ?? []) as { week_start: string; updated_at?: string }[])
+      .filter((r) => r.week_start === latest)
+      .reduce((m, r) => (r.updated_at && r.updated_at > m ? r.updated_at : m), "");
+    if (closedLatest === 0) blockReason = `0 lukkede emner i uge ${isoWeekNumber(latest)} på alle rapportlinjer`;
+    else if (!startedAt || !newest || new Date(newest) < new Date(startedAt)) {
+      blockReason = `ugens tal (uge ${isoWeekNumber(latest)}) er ikke skrevet af kørsel ${state.runId}`;
+    }
+    if (blockReason) {
+      await svc.from("scheduled_emails").insert({
+        recipient_email: ALARM_RECIPIENT,
+        subject: "Tryg-rapport stoppet – mail ikke sendt",
+        content: `<p>Mandagsmailen blev IKKE sendt til modtagerne.</p><p>Kørsel: ${state.runId}<br>Årsag: ${blockReason}</p>`,
+        template_key: "weekly_lead_closure_alarm",
+        scheduled_at: new Date().toISOString(),
+        status: "pending",
+      });
+      await flushMailQueue();
+    }
+  }
+
   let mailQueued = false;
   if (
+    !blockReason &&
     state.sendMail &&
     !state.flowOnly &&
     config.recipients.length > 0 &&
@@ -1512,7 +1543,9 @@ async function finishAndMail(
     .update({
       mail_sent: mailQueued,
       finished_at: new Date().toISOString(),
-      error: failed.length
+      error: blockReason
+        ? `mail stoppet: ${blockReason}`
+        : failed.length
         ? `ikke scannet: ${failed.map((f) => `${f.account}/${f.campaign_id}`).join(", ")}`
         : null,
     })
