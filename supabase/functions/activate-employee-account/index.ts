@@ -265,7 +265,7 @@ serve(async (req) => {
     let mailError: string | null = null;
     if (recipient && isEmail(recipient)) {
       try {
-        await udsend({
+        const status = await udsend({
           type: "activate-employee-account", kanal: "mail", modtager: recipient, modtagerEmployeeId: employeeId, emne: "Velkommen til Copenhagen Sales — din adgang til Stork", afsenderfunktion: "activate-employee-account",
           send: async () => {
           await sendM365Mail({
@@ -279,7 +279,8 @@ serve(async (req) => {
           });
           },
         });
-        mailSent = true;
+        mailSent = status === "sendt";
+        if (!mailSent) mailError = `Ikke sendt (${status})`;
       } catch (err) {
         mailError = err instanceof Error ? err.message : "Ukendt mailfejl";
         console.error("Velkomstmail-fejl:", mailError);

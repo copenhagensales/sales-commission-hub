@@ -3,6 +3,7 @@
 // som de to andre rapporttyper. Ingen godkendelse, ingen beløb, ingen navne.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
+import { udsendFlere } from "../_shared/udsend.ts";
 import {
   buildClientDailySalesEmail,
   type DailySalesMonthToDate,
@@ -51,7 +52,7 @@ export interface DailySalesResult {
   trend: DailySalesTrendPoint[];
   comparison: { date: string; quantity: number } | null;
   monthToDate: DailySalesMonthToDate;
-  action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail";
+  action: "sent" | "skipped_empty" | "already_handled" | "not_due" | "dry_run" | "test_mail" | "skipped_blocked";
   detail?: string;
 }
 
@@ -283,8 +284,21 @@ export async function runDailySales(
 
     const cc = (sub.cc_emails ?? []).filter((e) => !!e?.trim());
     const recipient = String(sub.recipient_email).trim();
+    let status: string;
+    let sentTo: string[] = [];
     try {
-      await sendM365Mail({ to: [recipient], cc, subject: mail.subject, html: mail.html });
+      // Én mail, To/CC bevaret; kun tilladte modtagere (én logrække pr. modtager).
+      status = await udsendFlere({
+        type: "supplier-report-scheduler", kanal: "mail", emne: mail.subject, afsenderfunktion: "supplier-report-scheduler",
+        modtagere: [recipient, ...cc].map((m) => ({ modtager: m })),
+        send: async (tilladte) => {
+          const ok = new Set(tilladte);
+          const ccOk = cc.filter((m) => ok.has(m));
+          const to = ok.has(recipient) ? [recipient] : ccOk.splice(0, 1);
+          sentTo = [...to, ...ccOk];
+          await sendM365Mail({ to, cc: ccOk, subject: mail.subject, html: mail.html });
+        },
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await svc
@@ -295,12 +309,17 @@ export async function runDailySales(
       continue;
     }
 
+    if (status !== "sendt") {
+      results.push({ ...base, ...data, action: "skipped_blocked", detail: `sprunget over: ${status}` });
+      continue;
+    }
+
     await svc
       .from("supplier_report_dispatches")
       .update({
         status: "sent",
         sent_at: new Date().toISOString(),
-        sent_to: [recipient, ...cc],
+        sent_to: sentTo,
         error_message: null,
       })
       .eq("id", dispatchId);

@@ -261,16 +261,22 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
 
   const cc = ((sub.cc_emails as string[] | null) ?? []).filter((e) => !!e?.trim());
 
+  let status: string;
+  let sentTo: string[] = [];
   try {
-    // Ingen bruger-id på modtagerne, så ingen fravalg kan fjerne nogen; to/cc bevares uændret.
-    await udsendFlere({
+    // To/CC bevares, men kun tilladte modtagere (modulet fjerner fravalgte/uden for regel).
+    status = await udsendFlere({
       type: "send-supplier-report", kanal: "mail", afsenderfunktion: "send-supplier-report",
       emne: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
       modtagere: [recipient, ...cc].map((m) => ({ modtager: m })),
-      send: async () => {
+      send: async (tilladte) => {
+        const ok = new Set(tilladte);
+        const ccOk = cc.filter((m) => ok.has(m));
+        const to = ok.has(recipient) ? [recipient] : ccOk.splice(0, 1);
+        sentTo = [...to, ...ccOk];
         await sendM365Mail({
-          to: [recipient],
-          cc,
+          to,
+          cc: ccOk,
           subject: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
           html: built.html,
           attachments: built.attachments,
@@ -286,7 +292,10 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
     return jsonResponse(500, { error: msg });
   }
 
-  const sentTo = [recipient, ...cc];
+  if (status !== "sendt") {
+    return jsonResponse(200, { success: true, skipped: true, status });
+  }
+
   await svc
     .from('supplier_report_dispatches')
     .update({
@@ -352,11 +361,14 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     message: (body.message as string | undefined) ?? null,
   });
 
+  let status: string;
+  let sentTo: string[] = [];
   try {
-    await udsendFlere({
+    status = await udsendFlere({
       type: "send-supplier-report", kanal: "mail", afsenderfunktion: "send-supplier-report", emne: subject,
       modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
       send: async (tilladte) => {
+        sentTo = tilladte;
         await sendM365Mail({
           to: tilladte,
           subject,
@@ -370,14 +382,18 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     return jsonResponse(500, { error: msg });
   }
 
+  if (status !== "sendt") {
+    return jsonResponse(200, { success: true, skipped: true, status, recipientCount: 0 });
+  }
+
   await svc
     .from('supplier_invoice_reports')
-    .update({ sent_at: new Date().toISOString(), sent_to: recipients })
+    .update({ sent_at: new Date().toISOString(), sent_to: sentTo })
     .eq('id', report.id);
 
   return jsonResponse(200, {
     success: true,
-    recipientCount: recipients.length,
+    recipientCount: sentTo.length,
     attachmentName: built.attachmentName,
   });
 }

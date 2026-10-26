@@ -213,6 +213,7 @@ Deno.serve(async (req) => {
     if (!senderEmail) throw new Error("Missing M365_SENDER_EMAIL");
 
     let sentCount = 0;
+    let skippedCount = 0;
     const failures: string[] = [];
 
     for (const r of recipients) {
@@ -222,7 +223,7 @@ Deno.serve(async (req) => {
         : "🛡️ Påmindelse: Gennemfør Code of Conduct & GDPR";
 
       try {
-        await udsend({
+        const status = await udsend({
           type: "send-code-of-conduct-reminder", kanal: "mail", modtager: r.email, modtagerEmployeeId: r.id,
           emne: subject, afsenderfunktion: "send-code-of-conduct-reminder",
           send: async () => {
@@ -251,7 +252,8 @@ Deno.serve(async (req) => {
         }
           },
         });
-        sentCount += 1;
+        if (status === "sendt") sentCount += 1;
+        else skippedCount += 1;
       } catch (err) {
         console.error(`Send error for ${r.email}:`, err);
         failures.push(r.email);
@@ -262,6 +264,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         sent_count: sentCount,
+        skippedCount,
         total_recipients: recipients.length,
         failures,
         missing_count: recipients.filter((r) => r.status === "missing").length,

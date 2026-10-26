@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
   const skipped: Array<{ subscription: string; reason: string }> = [];
   const reminders: string[] = [];
   const errors: string[] = [];
+  const springetOver: string[] = [];
 
   // Kun månedlige leverandørrapporter håndteres af create/remind-flowet.
   const { data: subscriptions, error: subError } = await svc
@@ -260,10 +261,11 @@ Deno.serve(async (req) => {
           isReminder: true,
           reminderNumber: d.reminder_count + 1,
         });
-        await udsend({
+        const status = await udsend({
           type: "supplier-report-scheduler", kanal: "mail", modtager: to, emne: mail.subject, afsenderfunktion: "supplier-report-scheduler",
           send: async () => { await sendM365Mail({ to: [to], subject: mail.subject, html: mail.html }); },
         });
+        if (status !== "sendt") { springetOver.push(d.id); continue; }
         await svc
           .from("supplier_report_dispatches")
           .update({
@@ -291,6 +293,7 @@ Deno.serve(async (req) => {
       created,
       skipped,
       reminders,
+      springetOver,
       errors,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
