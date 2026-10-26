@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     const b = parsed.data;
 
     // Modtagere: aktive medarbejdere
-    let q = svc.from("employee_master_data").select("id, auth_user_id, work_email, private_phone").eq("is_active", true);
+    let q = svc.from("employee_master_data").select("id, auth_user_id, work_email, private_phone, first_name, last_name").eq("is_active", true);
     if (b.maal === "mig") q = q.eq("auth_user_id", auth.userId);
     else if (b.maal === "alle") q = q.not("auth_user_id", "is", null);
     else {
@@ -121,8 +121,10 @@ Deno.serve(async (req) => {
     const loft = fikIDag.size;
     if (b.kunAntal) return json({ antal: alleModt.length, loft });
     const modt = alleModt.filter((e) => !fikIDag.has(e.id));
+    const navn = (e: { id: string; first_name?: string | null; last_name?: string | null }) =>
+      `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.id;
     for (const e of alleModt.filter((x) => fikIDag.has(x.id))) {
-      const adr = b.kanal === "mail" ? e.work_email : b.kanal === "sms" ? e.private_phone : e.auth_user_id;
+      const adr = b.kanal === "mail" ? e.work_email : b.kanal === "sms" ? e.private_phone : (e.auth_user_id ? navn(e) : null);
       const { error } = await svc.from("udsendelser").insert({
         kanal: b.kanal, type_noegle: type, modtager: adr ?? e.id, modtager_employee_id: e.id,
         modtager_user_id: e.auth_user_id ?? null, emne, status: "dagsloft", afsenderfunktion: "send-besked", metadata: {},
@@ -134,8 +136,10 @@ Deno.serve(async (req) => {
     if (b.kanal === "push") {
       const users = modt.map((e) => e.auth_user_id).filter(Boolean);
       udenAdresse = modt.length - users.length;
+      const navne: Record<string, string> = {};
+      for (const e of modt) if (e.auth_user_id) navne[e.auth_user_id] = navn(e);
       sendt = await sendPush(svc, users, "test", {
-        udsendType: type, afsenderfunktion: "send-besked", url: "/", tekst: { title: emne, body: b.tekst },
+        navne, udsendType: type, afsenderfunktion: "send-besked", url: "/", tekst: { title: emne, body: b.tekst },
       });
       sprunget = users.length - sendt;
     } else {

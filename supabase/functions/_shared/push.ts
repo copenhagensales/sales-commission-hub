@@ -51,7 +51,7 @@ export async function sendPush(
   svc: any,
   userIds: string[],
   type: PushType,
-  opts: { dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string; tekst?: { title: string; body: string } } = {},
+  opts: { dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string; tekst?: { title: string; body: string }; navne?: Record<string, string> } = {},
 ): Promise<number> {
   try {
     if (!userIds.length || !configure()) return 0;
@@ -79,7 +79,7 @@ export async function sendPush(
           if ((count ?? 0) > 0) continue;
         }
         const status = await udsend({
-          type: udsendType, kanal: "push", modtager: userId, modtagerUserId: userId,
+          type: udsendType, kanal: "push", modtager: opts.navne?.[userId] ?? userId, modtagerUserId: userId,
           emne: msg.title, afsenderfunktion: afsender, metadata: { push_type: type, dedupe_key: opts.dedupeKey ?? null },
           send: async () => {
             if (type !== "test") {
