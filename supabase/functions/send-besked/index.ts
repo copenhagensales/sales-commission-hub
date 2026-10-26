@@ -107,6 +107,16 @@ Deno.serve(async (req) => {
         console.error("send-besked: dagsloft-opslag fejlede", err instanceof Error ? err.message : err);
       }
     }
+    // Ejere er undtaget dagsloftet. Fail-open: fejler opslaget, gælder loftet som i dag.
+    for (const e of alleModt.filter((x) => fikIDag.has(x.id) && x.auth_user_id)) {
+      try {
+        const { data, error } = await svc.rpc("is_owner", { _user_id: e.auth_user_id });
+        if (error) throw error;
+        if (data === true) fikIDag.delete(e.id);
+      } catch (err) {
+        console.error("send-besked: ejer-opslag fejlede", err instanceof Error ? err.message : err);
+      }
+    }
     // Bevidst ikke atomisk: to samtidige kald kan begge nå forbi loftet (accepteret, kun ejere sender manuelt).
     const loft = fikIDag.size;
     if (b.kunAntal) return json({ antal: alleModt.length, loft });
