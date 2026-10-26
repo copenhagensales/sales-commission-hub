@@ -458,7 +458,7 @@ export default function VagtBookings() {
           </div>
           <Button 
             className="bg-green-600 hover:bg-green-700"
-            onClick={() => navigate(`/vagt-flow/book-week?week=${selectedWeek}&year=${selectedYear}`)}
+            onClick={() => navigate(`/vagt-flow?fane=booking&tab=book-week&week=${selectedWeek}&year=${selectedYear}`)}
           >
             <Plus className="h-4 w-4 mr-2" /> Book uge
           </Button>
