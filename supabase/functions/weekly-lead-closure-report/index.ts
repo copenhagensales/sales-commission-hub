@@ -1456,13 +1456,18 @@ async function finishAndMail(
       .filter((r) => config.closing.has(r.status))
       .reduce((n, r) => n + (r.lead_count ?? 0), 0);
     const { data: runRow } = await svc
-      .from("weekly_lead_closure_runs").select("started_at").eq("id", state.runId).maybeSingle();
+      .from("weekly_lead_closure_runs").select("started_at, finished_at").eq("id", state.runId).maybeSingle();
     const startedAt = (runRow as { started_at: string } | null)?.started_at ?? "";
+    // Afsluttet kørsel (gensendelse): tallene skal være skrevet MENS den kørte.
+    const finishedAt = (runRow as { finished_at: string | null } | null)?.finished_at ?? null;
     const newest = ((stored ?? []) as { week_start: string; updated_at?: string }[])
       .filter((r) => r.week_start === latest)
       .reduce((m, r) => (r.updated_at && r.updated_at > m ? r.updated_at : m), "");
     if (closedLatest === 0) blockReason = `0 lukkede emner i uge ${isoWeekNumber(latest)} på alle rapportlinjer`;
-    else if (!startedAt || !newest || new Date(newest) < new Date(startedAt)) {
+    else if (
+      !startedAt || !newest || new Date(newest) < new Date(startedAt) ||
+      (finishedAt && new Date(newest) > new Date(new Date(finishedAt).getTime() + 60_000))
+    ) {
       blockReason = `ugens tal (uge ${isoWeekNumber(latest)}) er ikke skrevet af kørsel ${state.runId}`;
     }
     if (blockReason) {
