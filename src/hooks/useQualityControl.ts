@@ -439,7 +439,7 @@ export function useFinishQualityDay() {
         body: { action: "daily_summary", date },
       });
       if (error) throw error;
-      return data as { already_done?: boolean; leaders?: number; management?: number };
+      return data as { already_done?: boolean; leaders?: number; management?: number; skipped?: boolean };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quality-daily-completion"] });

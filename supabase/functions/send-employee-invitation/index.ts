@@ -124,13 +124,6 @@ serve(async (req) => {
     // Generate unique token
     const token = generateToken();
 
-    // Invalidate any existing pending invitations for this employee
-    await supabase
-      .from("employee_invitations")
-      .update({ status: "invalidated" })
-      .eq("employee_id", employeeId)
-      .eq("status", "pending");
-
     // Create invitation record with 48 hour expiry (security fix 2.2)
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     
@@ -151,12 +144,6 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Update employee invitation status
-    await supabase
-      .from("employee_master_data")
-      .update({ invitation_status: "pending" })
-      .eq("id", employeeId);
 
     // Build invitation URL - hardcoded to Stork production domain to prevent
     // a misconfigured PUBLIC_APP_URL from sending users to Lovable login.
@@ -346,6 +333,23 @@ serve(async (req) => {
     );
       },
     });
+
+    if (udsendStatus === "sendt") {
+      // Kun når mailen er sendt: ugyldiggør tidligere invitationer og sæt status.
+      await supabase
+        .from("employee_invitations")
+        .update({ status: "invalidated" })
+        .eq("employee_id", employeeId)
+        .eq("status", "pending")
+        .neq("token", token);
+      await supabase
+        .from("employee_master_data")
+        .update({ invitation_status: "pending" })
+        .eq("id", employeeId);
+    } else {
+      // Ikke sendt: den nye invitation kan aldrig bruges; den forrige gælder fortsat.
+      await supabase.from("employee_invitations").update({ status: "invalidated" }).eq("token", token);
+    }
 
     console.log(`Invitation sent for employee ${employeeId}`);
 

@@ -203,6 +203,17 @@ Deno.serve(async (req) => {
       return json(400, { error: "Ingen modtagere har en e-mailadresse" });
     }
 
+    // Er typen slået fra i Udsendelser, lægges intet i kø og handlingen skrives ikke. Fail-open.
+    try {
+      const { data: t, error: tErr } = await svc.from("udsendelsestyper").select("aktiv").eq("noegle", TEMPLATE_KEY).maybeSingle();
+      if (tErr) throw tErr;
+      if (t?.aktiv === false) {
+        return json(200, { ok: true, skipped: true, skipped_reason: TEMPLATE_KEY, kind: KIND_LABEL[kind], recipients: [] });
+      }
+    } catch (e) {
+      console.error("send-ramp-session-feedback: typeopslag fejlede", e instanceof Error ? e.message : e);
+    }
+
     for (const mail of mails) {
       const { error } = await svc.from("scheduled_emails").insert({
         employee_id: mail.employeeId,

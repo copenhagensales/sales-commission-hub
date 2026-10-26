@@ -311,7 +311,7 @@ serve(async (req) => {
       JSON.stringify({
         ok: true,
         confirmed: true,
-        notified: recipientEmails.length,
+        notified: mailStatus === "sendt" ? recipientEmails.length : 0,
         recipients: recipientEmails,
         sms_sent: smsSentCount,
         sms_skipped: smsSkipped(),

@@ -363,14 +363,15 @@ export function useSendRampSessionFeedback() {
         const message = (data as { error?: string } | null)?.error;
         throw new Error(message || error.message || "Kunne ikke sende feedbacken");
       }
-      const payload = data as { error?: string; recipients?: string[] } | null;
+      const payload = data as { error?: string; recipients?: string[]; skipped?: boolean } | null;
       if (payload?.error) throw new Error(payload.error);
-      return payload?.recipients ?? [];
+      return Object.assign([...(payload?.recipients ?? [])], { skipped: payload?.skipped === true });
     },
     onSuccess: (recipients) => {
       queryClient.invalidateQueries({ queryKey: ["ramp-team-overview"] });
       queryClient.invalidateQueries({ queryKey: ["ramp-full-team"] });
-      toast.success(`Feedback sendt til ${recipients.length} modtagere`);
+      if (recipients.skipped) toast.info("Sprunget over: typen er slået fra i Udsendelser");
+      else toast.success(`Feedback sendt til ${recipients.length} modtagere`);
     },
     onError: (error: Error) => {
       toast.error(error.message || "Kunne ikke sende feedbacken");

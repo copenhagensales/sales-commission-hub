@@ -393,7 +393,11 @@ export default function QualityControl() {
     try {
       const result = await finishDay.mutateAsync(date);
       toast({
-        title: result?.already_done ? "Dagen er allerede afsluttet" : "Mails er sendt",
+        title: result?.already_done
+          ? "Dagen er allerede afsluttet"
+          : result?.skipped
+          ? "Sprunget over: typen er slået fra i Udsendelser"
+          : "Mails er sendt",
         description: result?.already_done
           ? undefined
           : `${result?.leaders ?? 0} til teamledere og ${result?.management ?? 0} til ledelsen.`,
