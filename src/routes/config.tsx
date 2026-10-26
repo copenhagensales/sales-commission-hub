@@ -56,6 +56,7 @@ import {
   ComplianceSamleside,
   AmoSamleside,
   AdministrationSamleside,
+  Udsendelser,
   TdcMonthlyGoalBoard,
   RelatelMonthlyGoalBoard,
   EesyFmMonthlyGoalBoard,
@@ -346,6 +347,7 @@ export const routes: RouteConfig[] = [
 
   // Menu Editor (owner only)
   { path: "/admin", component: AdministrationSamleside, access: "protected" },
+  { path: "/udsendelser", component: Udsendelser, access: "protected" },
   { path: "/admin/menu-editor", component: redirectTo("/admin?tab=menu"), access: "protected" },
 
   // Manual sales entry (team United — enforced in the edge function)

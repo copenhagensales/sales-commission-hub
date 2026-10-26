@@ -1,3 +1,4 @@
+import { AlleUdsendelserLink } from "@/components/udsendelser/AlleUdsendelserLink";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -340,6 +341,7 @@ export default function EmailTemplates() {
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
+        <AlleUdsendelserLink />
         <div>
           <h1 className="text-3xl font-bold">Skabeloner</h1>
           <p className="text-muted-foreground mt-1">

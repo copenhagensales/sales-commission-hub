@@ -77,6 +77,7 @@ export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 export const CompanyOverview = lazyPage(() => import("@/pages/CompanyOverview"));
 export const SystemEmailTemplates = lazyPage(() => import("@/pages/EmailTemplates"));
+export const Udsendelser = lazyPage(() => import("@/pages/Udsendelser"));
 
 export const RolePreview = lazyPage(() => import("@/pages/RolePreview"));
 export const LoginLog = lazyPage(() => import("@/pages/LoginLog"));

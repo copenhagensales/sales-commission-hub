@@ -5,10 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePushNotifications, type PushPrefs } from "@/hooks/usePushNotifications";
 import { useInstallStork } from "@/hooks/useInstallStork";
 import { PUSH_PREF_TYPES } from "@/lib/push/pushText";
+import { useMineUdsendelsespraeferencer } from "@/hooks/useUdsendelser";
+
+const KANAL_NAVN: Record<string, string> = { push: "Push", mail: "Mail", sms: "SMS" };
 
 export function PushSettingsCard() {
   const { standalone, ios } = useInstallStork();
   const push = usePushNotifications();
+  const praef = useMineUdsendelsespraeferencer();
 
   const status = !standalone
     ? "Notifikationer slås til i Stork-appen på telefonen: åbn Stork fra ikonet på hjemmeskærmen og kom tilbage hertil. Kontakterne nedenfor gælder alle dine enheder."
@@ -47,6 +51,22 @@ export function PushSettingsCard() {
             </label>
           ))}
         </div>
+        {["push", "mail", "sms"].map((k) => {
+          const typer = (praef.data ?? []).filter((t) => t.kanal === k);
+          if (!typer.length) return null;
+          return (
+            <div key={k} className="space-y-3">
+              <p className="text-sm font-semibold">{KANAL_NAVN[k]}</p>
+              {typer.map((t) => (
+                <label key={`${t.noegle}|${t.kanal}`} className="flex min-h-11 items-center justify-between gap-4 text-sm">
+                  <span>{t.navn}</span>
+                  <Switch checked={t.aktiv}
+                    onCheckedChange={(v) => praef.saet.mutate({ noegle: t.noegle, kanal: t.kanal, aktiv: v }, { onError: () => toast.error("Kunne ikke gemme") })} />
+                </label>
+              ))}
+            </div>
+          );
+        })}
         <p className="text-xs text-muted-foreground">Beskeder indeholder aldrig beløb, navne eller kundeoplysninger.</p>
       </CardContent>
     </Card>

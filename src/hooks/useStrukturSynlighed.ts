@@ -21,7 +21,7 @@ export function useStrukturSynlighed(): StrukturSynlighed {
     salg: p.canView("menu_sales") && p.canView("menu_section_sales_system"), fieldmarketing: sr.fieldmarketing, retSalg: sr.retSalg, tdc: sr.tdc, kunder: sr.kunder,
     rekruttering: tp.rekruttering, medarbejdere: tp.medarbejdere, kontrakter: tp.kontrakter,
     rapporter: sr.rapporter, invoiceflow: !!invoiceflowAccess,
-    compliance: ad.compliance, amo: ad.amo, admin: ad.admin,
+    compliance: ad.compliance, amo: ad.amo, admin: ad.admin, udsendelser: ad.udsendelser,
     tavler: true, powerdag: sr.powerdag, liveTal: !!p.canViewLiveStats,
   };
 }
