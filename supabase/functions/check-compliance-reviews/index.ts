@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    await udsendFlere({
+    const udsendStatus = await udsendFlere({
       type: "check-compliance-reviews", kanal: "mail", emne: "Ugentlig compliance-oversigt – GDPR påmindelse",
       afsenderfunktion: "check-compliance-reviews", modtagere: recipientEmails.map((m: string) => ({ modtager: m })),
       send: async (tilladte) => {
@@ -215,7 +215,10 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: "Email sent",
+        message: udsendStatus === "sendt" ? "Email sent" : "Email not sent",
+        sent: udsendStatus === "sendt",
+        skipped: udsendStatus === "sendt" ? 0 : recipientEmails.length,
+        status: udsendStatus,
         recipients: recipientEmails.length,
         alerts: alerts.length,
       }),

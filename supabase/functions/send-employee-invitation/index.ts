@@ -335,7 +335,7 @@ serve(async (req) => {
 </html>`;
 
     // Send to employee
-    await udsend({
+    const udsendStatus = await udsend({
       type: "send-employee-invitation", kanal: "mail", modtager: email, modtagerEmployeeId: employeeId, emne: "Velkommen til Copenhagen Sales - Opret din profil", afsenderfunktion: "send-employee-invitation",
       send: async () => {
         await sendEmail(
@@ -350,7 +350,7 @@ serve(async (req) => {
     console.log(`Invitation sent for employee ${employeeId}`);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Invitation sent successfully" }),
+      JSON.stringify({ success: true, sent: udsendStatus === "sendt", skipped: udsendStatus === "sendt" ? 0 : 1, status: udsendStatus, message: udsendStatus === "sendt" ? "Invitation sent successfully" : `Invitation not sent (${udsendStatus})` }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

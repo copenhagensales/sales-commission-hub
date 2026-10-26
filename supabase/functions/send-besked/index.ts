@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
     else if (b.maal === "alle") q = q.not("auth_user_id", "is", null);
     else {
       if (!b.ids.length) return json({ error: "Vælg mindst én modtager" }, 400);
+      if (b.maal === "medarbejder" && b.ids.length !== 1) return json({ error: "Vælg én medarbejder" }, 400);
       if (b.maal === "medarbejder") q = q.in("id", b.ids);
       else if (b.maal === "teams") {
         const { data: tm, error } = await svc.from("team_members").select("employee_id").in("team_id", b.ids);
@@ -106,6 +107,7 @@ Deno.serve(async (req) => {
         console.error("send-besked: dagsloft-opslag fejlede", err instanceof Error ? err.message : err);
       }
     }
+    // Bevidst ikke atomisk: to samtidige kald kan begge nå forbi loftet (accepteret, kun ejere sender manuelt).
     const loft = fikIDag.size;
     if (b.kunAntal) return json({ antal: alleModt.length, loft });
     const modt = alleModt.filter((e) => !fikIDag.has(e.id));
@@ -117,18 +119,19 @@ Deno.serve(async (req) => {
       });
       if (error) console.error("send-besked: kunne ikke logge dagsloft", error.message);
     }
-    let sendt = 0, sprunget = 0, fejl = 0;
+    let sendt = 0, sprunget = 0, fejl = 0, udenAdresse = 0;
 
     if (b.kanal === "push") {
       const users = modt.map((e) => e.auth_user_id).filter(Boolean);
-      sprunget = modt.length - users.length;
+      udenAdresse = modt.length - users.length;
       sendt = await sendPush(svc, users, "test", {
         udsendType: type, afsenderfunktion: "send-besked", url: "/", tekst: { title: emne, body: b.tekst },
       });
+      sprunget = users.length - sendt;
     } else {
       for (const e of modt) {
         const adr = b.kanal === "mail" ? e.work_email : e.private_phone;
-        if (!adr) { sprunget++; continue; }
+        if (!adr) { udenAdresse++; continue; }
         try {
           const s = await udsend({
             type, kanal: b.kanal, modtager: adr, modtagerEmployeeId: e.id, modtagerUserId: e.auth_user_id ?? undefined,
@@ -148,7 +151,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return json({ antal: alleModt.length, sendt, sprunget, fejl, loft });
+    return json({ antal: alleModt.length, sendt, sprunget, fejl, loft, udenAdresse });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Fejl" }, 500);
   }

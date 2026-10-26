@@ -253,6 +253,7 @@ serve(async (req) => {
     }
 
     // 4. Send email (if recipients found)
+    let mailStatus: string | null = null;
     if (recipientEmails.length > 0) {
       const accessToken = await getM365AccessToken();
 
@@ -271,7 +272,7 @@ serve(async (req) => {
         </div>
       `;
 
-      await udsendFlere({
+      mailStatus = await udsendFlere({
         type: "notify-vehicle-returned-mail", kanal: "mail", afsenderfunktion: "notify-vehicle-returned", emne: `Nøgle afleveret: ${vehicle_name} (${booking_date})`,
         modtagere: (recipientEmails as string[]).map((m) => ({ modtager: m })),
         send: async (tilladte) => { await sendEmail(accessToken, tilladte, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody); },
@@ -283,6 +284,7 @@ serve(async (req) => {
 
     // 5. Send SMS (if recipients found) - does not block on failure
     let smsSentCount = 0;
+    const smsSkipped = () => smsRecipientNumbers.length - smsSentCount;
     if (smsRecipientNumbers.length > 0) {
       const now = new Date();
       const timeStr = now.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" });
@@ -312,6 +314,9 @@ serve(async (req) => {
         notified: recipientEmails.length,
         recipients: recipientEmails,
         sms_sent: smsSentCount,
+        sms_skipped: smsSkipped(),
+        mail_sent: mailStatus === "sendt",
+        mail_status: mailStatus,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

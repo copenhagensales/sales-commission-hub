@@ -135,7 +135,7 @@ serve(async (req) => {
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
 
-    await udsend({
+    const udsendStatus = await udsend({
       type: "send-test-email", kanal: "mail", modtager: recipientEmail, emne: `[TEST] ${subject}`,
       afsenderfunktion: "send-test-email",
       send: async () => { await sendEmail(accessToken, recipientEmail, `[TEST] ${subject}`, processedHtml); },
@@ -144,7 +144,7 @@ serve(async (req) => {
     console.log(`Test email sent to ${recipientEmail}`);
 
     return new Response(
-      JSON.stringify({ success: true, message: `Test email sent to ${recipientEmail}` }),
+      JSON.stringify({ success: true, sent: udsendStatus === "sendt", skipped: udsendStatus === "sendt" ? 0 : 1, status: udsendStatus, message: udsendStatus === "sendt" ? `Test email sent to ${recipientEmail}` : `Test email not sent (${udsendStatus})` }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
