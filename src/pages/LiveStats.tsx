@@ -317,7 +317,7 @@ export default function LiveStats() {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <h1 className="text-xl sm:text-3xl font-bold text-foreground">Live Statistics</h1>
+                <h1 className="text-xl sm:text-3xl font-bold text-foreground">Live-tal</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground">Comprehensive data overview</p>
               </div>
             </div>
