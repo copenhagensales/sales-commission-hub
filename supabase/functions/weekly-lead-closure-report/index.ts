@@ -1510,13 +1510,29 @@ async function finishAndMail(
   }
 
   let mailQueued = false;
+  let skippedBlocked: string | undefined;
   const recipients = state.testRecipient ? [state.testRecipient] : config.recipients;
+  // Er typen slået fra i Udsendelser, ville køen annullere mailen: læg ikke i kø,
+  // lås ikke ugen og sæt ikke mail_sent. Fail-open: fejler opslaget, fortsæt.
+  const typeSlaaetFra = async (): Promise<boolean> => {
+    if (state.testRecipient) return false;
+    try {
+      const { data, error } = await svc.from("udsendelsestyper")
+        .select("aktiv").eq("noegle", "weekly_lead_closure_report").maybeSingle();
+      if (error) throw error;
+      if (data?.aktiv === false) { skippedBlocked = latest; return true; }
+    } catch (e) {
+      console.error("[weekly-lead-closure-report] typeopslag fejlede", e instanceof Error ? e.message : e);
+    }
+    return false;
+  };
   if (
     !blockReason &&
     state.sendMail &&
     !state.flowOnly &&
     recipients.length > 0 &&
-    (state.forceMail || !(await alreadyMailedToday(svc)))
+    (state.forceMail || !(await alreadyMailedToday(svc))) &&
+    !(await typeSlaaetFra())
   ) {
     const built = buildMail(
       latest,
