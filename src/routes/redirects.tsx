@@ -29,18 +29,12 @@ export function PulsenRedirect() {
   return <Navigate to={`/storkbook${q ? `?${q}` : ""}`} replace />;
 }
 
-export function MyScheduleRedirect() {
-  return <Navigate to="/my-profile?tab=kalender" replace />;
-}
+export const MyScheduleRedirect = redirectTo("/my-profile?tab=kalender");
 
 export function MyGoalsRedirect() {
   return <Navigate to="/my-profile?tab=maal" replace />;
 }
 
-export function MyContractsRedirect() {
-  return <Navigate to="/my-profile?tab=kontrakter" replace />;
-}
+export const MyContractsRedirect = redirectTo("/my-profile?tab=kontrakter");
 
-export function CareerWishesRedirect() {
-  return <Navigate to="/my-profile?tab=karriere" replace />;
-}
+export const CareerWishesRedirect = redirectTo("/my-profile?tab=karriere");
