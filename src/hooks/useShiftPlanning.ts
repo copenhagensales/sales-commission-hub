@@ -93,6 +93,8 @@ export function useShifts(startDate: string, endDate: string, teamId?: string) {
   return useQuery({
     queryKey: ["shifts", startDate, endDate, teamId],
     queryFn: async () => {
+      // "none" = intet team fundet endnu; ugyldig uuid i databasen
+      if (teamId === "none") return [];
       // If team is selected, first get team member IDs
       let teamMemberIds: string[] | null = null;
       if (teamId && teamId !== "all") {
