@@ -164,6 +164,7 @@ serve(async (req: Request) => {
 
     const accessToken = await getM365AccessToken();
     let sentCount = 0;
+    let skippedCount = 0;
 
     for (const reminder of pendingFollowups || []) {
       const employeeData = reminder.employee_master_data as unknown as {

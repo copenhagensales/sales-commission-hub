@@ -179,6 +179,7 @@ Deno.serve(async (req) => {
 
     // Send in batches of 50
     const batchSize = 50;
+    const faktiskSendt = new Set<string>();
     for (let i = 0; i < recipientEmails.length; i += batchSize) {
       const batchEmps = validEmployees.slice(i, i + batchSize);
       await udsendFlere({
@@ -213,12 +214,14 @@ Deno.serve(async (req) => {
         console.error(`M365 send error batch ${i}:`, errorText);
         throw new Error(`Failed to send email batch: ${response.status}`);
       }
+      batch.forEach((email: string) => faktiskSendt.add(email));
         },
       });
     }
 
     // Log each employee
-    const logEntries = validEmployees.map((e: any) => ({
+    const modtog = validEmployees.filter((e: any) => faktiskSendt.has(e.work_email));
+    const logEntries = modtog.map((e: any) => ({
       employee_id: e.id,
       employee_name: `${e.first_name} ${e.last_name}`,
       employee_email: e.work_email,
@@ -228,13 +231,15 @@ Deno.serve(async (req) => {
       notes: "AI-instruktionsmail sendt via M365 Graph API",
     }));
 
-    const { error: logError } = await supabase.from("ai_instruction_log").insert(logEntries);
+    const { error: logError } = logEntries.length
+      ? await supabase.from("ai_instruction_log").insert(logEntries)
+      : { error: null };
     if (logError) {
       console.error("Failed to log instructions:", logError);
     }
 
     return new Response(
-      JSON.stringify({ success: true, sent_count: validEmployees.length }),
+      JSON.stringify({ success: true, sent_count: modtog.length, skipped_count: validEmployees.length - modtog.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
