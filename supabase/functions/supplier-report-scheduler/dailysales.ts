@@ -11,7 +11,8 @@ import {
   type DailySalesTrendPoint,
 } from "../_shared/supplier-report-mail.ts";
 
-type Svc = SupabaseClient;
+// deno-lint-ignore no-explicit-any
+type Svc = SupabaseClient<any, "public", any>;
 
 /** Antal dage MED aktivitet der vises i trendgrafen. */
 const TREND_ACTIVE_DAYS = 7;

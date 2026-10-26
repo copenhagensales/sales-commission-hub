@@ -11,7 +11,8 @@ import {
   type WeekPlanLocation,
 } from "../_shared/supplier-report-mail.ts";
 
-type Svc = SupabaseClient;
+// deno-lint-ignore no-explicit-any
+type Svc = SupabaseClient<any, "public", any>;
 
 interface BookingRow {
   id: string;
