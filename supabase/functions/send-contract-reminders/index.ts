@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -264,12 +265,17 @@ const handler = async (req: Request): Promise<Response> => {
           accessToken = await getM365AccessToken();
         }
 
-        await sendEmail(
+        await udsend({
+          type: "send-contract-reminders", kanal: "mail", modtager: employee.private_email, modtagerEmployeeId: employee.id, emne: `⏰ Påmindelse: Kontrakt "${contract.title}" afventer din underskrift`, afsenderfunktion: "send-contract-reminders",
+          send: async () => {
+            await sendEmail(
           accessToken,
           employee.private_email,
           `⏰ Påmindelse: Kontrakt "${contract.title}" afventer din underskrift`,
           htmlBody
         );
+          },
+        });
 
         // Update reminder tracking
         const newReminderCount = (contract.reminder_count || 0) + 1;
