@@ -34,7 +34,7 @@ export default function ComplianceOverview() {
       icon: Users,
       badge: "For medarbejdere",
       badgeColor: "bg-blue-500/10 text-blue-700 border-blue-500/30",
-      href: "/compliance/employee-privacy",
+      href: "/compliance?tab=procedurer&side=employee-privacy",
       permKey: "menu_compliance_employee",
     },
     {
@@ -43,7 +43,7 @@ export default function ComplianceOverview() {
       icon: Lock,
       badge: "Intern",
       badgeColor: "bg-orange-500/10 text-orange-700 border-orange-500/30",
-      href: "/compliance/processes",
+      href: "/compliance?tab=procedurer&side=processes",
       permKey: "menu_compliance_processes",
     },
     {
@@ -52,7 +52,7 @@ export default function ComplianceOverview() {
       icon: FileText,
       badge: "Admin",
       badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
-      href: "/compliance/admin",
+      href: "/compliance?tab=procedurer&side=admin",
       permKey: "menu_compliance_admin",
     },
     {
@@ -61,7 +61,7 @@ export default function ComplianceOverview() {
       icon: Bell,
       badge: "Admin",
       badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
-      href: "/compliance/notifications",
+      href: "/compliance?tab=procedurer&side=notifications",
       permKey: "menu_compliance_admin",
     },
     {
@@ -70,7 +70,7 @@ export default function ComplianceOverview() {
       icon: ClipboardList,
       badge: "Art. 30",
       badgeColor: "bg-purple-500/10 text-purple-700 border-purple-500/30",
-      href: "/compliance/processing-activities",
+      href: "/compliance?tab=registre&side=processing-activities",
       permKey: "menu_compliance_admin",
     },
     {
@@ -79,7 +79,7 @@ export default function ComplianceOverview() {
       icon: AlertTriangle,
       badge: "Art. 33",
       badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
-      href: "/compliance/security-incidents",
+      href: "/compliance?tab=logs&side=security-incidents",
       permKey: "menu_compliance_admin",
     },
     {
@@ -88,7 +88,7 @@ export default function ComplianceOverview() {
       icon: Globe,
       badge: "Art. 28",
       badgeColor: "bg-green-500/10 text-green-700 border-green-500/30",
-      href: "/compliance/data-transfers",
+      href: "/compliance?tab=registre&side=data-transfers",
       permKey: "menu_compliance_admin",
     },
     {
@@ -97,7 +97,7 @@ export default function ComplianceOverview() {
       icon: Clock,
       badge: "GDPR",
       badgeColor: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
-      href: "/compliance/retention-policies",
+      href: "/compliance?tab=registre&side=retention-policies",
       permKey: "menu_compliance_admin",
     },
     {
@@ -106,7 +106,7 @@ export default function ComplianceOverview() {
       icon: Search,
       badge: "Art. 35",
       badgeColor: "bg-indigo-500/10 text-indigo-700 border-indigo-500/30",
-      href: "/compliance/dpia",
+      href: "/compliance?tab=registre&side=dpia",
       permKey: "menu_compliance_admin",
     },
     {
@@ -115,7 +115,7 @@ export default function ComplianceOverview() {
       icon: GraduationCap,
       badge: "Awareness",
       badgeColor: "bg-teal-500/10 text-teal-700 border-teal-500/30",
-      href: "/compliance/awareness",
+      href: "/compliance?tab=procedurer&side=awareness",
       permKey: "menu_compliance_admin",
     },
     {
@@ -124,7 +124,7 @@ export default function ComplianceOverview() {
       icon: Brain,
       badge: "EU AI Act",
       badgeColor: "bg-violet-500/10 text-violet-700 border-violet-500/30",
-      href: "/compliance/ai-governance",
+      href: "/compliance?tab=procedurer&side=ai-governance",
       permKey: "menu_compliance_admin",
     },
     {
@@ -133,7 +133,7 @@ export default function ComplianceOverview() {
       icon: Eye,
       badge: "Audit",
       badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
-      href: "/compliance/access-log",
+      href: "/compliance?tab=logs&side=access-log",
       permKey: "menu_compliance_admin",
     },
     {
@@ -142,7 +142,7 @@ export default function ComplianceOverview() {
       icon: FileText,
       badge: "Audit",
       badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
-      href: "/compliance/contract-access-log",
+      href: "/compliance?tab=logs&side=contract-access-log",
       permKey: "menu_compliance_admin",
     },
   ];
@@ -154,7 +154,7 @@ export default function ComplianceOverview() {
         "Backup-retention, hvornår anonymisering er fuldt irreversibel, og hvem der må gendanne data.",
       icon: Database,
       ...docStatus("backup-policy"),
-      href: "/compliance/documents/backup-policy",
+      href: "/compliance?tab=dokumenter&side=backup-policy",
       permKey: "menu_compliance_admin",
     },
     {
@@ -163,7 +163,7 @@ export default function ComplianceOverview() {
         "Roller, behandlingsaktiviteter, databehandlere, sikkerhedsforanstaltninger og åbne punkter.",
       icon: ClipboardList,
       ...docStatus("processing-registry"),
-      href: "/compliance/documents/processing-registry",
+      href: "/compliance?tab=dokumenter&side=processing-registry",
       permKey: "menu_compliance_admin",
     },
     {
@@ -172,7 +172,7 @@ export default function ComplianceOverview() {
         "Oversigt pr. leverandør med DPA-link, hvad der skal arkiveres, og status på arkivering.",
       icon: FileText,
       ...docStatus("dpa-overview"),
-      href: "/compliance/documents/dpa-overview",
+      href: "/compliance?tab=dokumenter&side=dpa-overview",
       permKey: "menu_compliance_admin",
     },
     {
@@ -180,7 +180,7 @@ export default function ComplianceOverview() {
       description: "Intern politik for behandling af kunders persondata: dataminimering, sletning, adfærd, adgang og underdatabehandlere.",
       icon: Shield,
       ...docStatus("persondatapolitik"),
-      href: "/compliance/documents/persondatapolitik",
+      href: "/compliance?tab=dokumenter&side=persondatapolitik",
       permKey: "menu_compliance_admin",
     },
     {
@@ -188,7 +188,7 @@ export default function ComplianceOverview() {
       description: "Fortegnelse for Storkbook: formål, kategorier, modtagere, slettefrister og forbud mod kundeoplysninger.",
       icon: Shield,
       ...docStatus("art30-pulsen"),
-      href: "/compliance/documents/art30-pulsen",
+      href: "/compliance?tab=dokumenter&side=art30-pulsen",
       permKey: "menu_compliance_admin",
     },
     {
@@ -196,7 +196,7 @@ export default function ComplianceOverview() {
       description: "Fortegnelse for push-beskeder i Stork-appen: formål, kategorier, modtagere og slettefrister.",
       icon: Shield,
       ...docStatus("art30-push"),
-      href: "/compliance/documents/art30-push",
+      href: "/compliance?tab=dokumenter&side=art30-push",
       permKey: "menu_compliance_admin",
     },
     {
@@ -204,7 +204,7 @@ export default function ComplianceOverview() {
       description: "Hvad et brud er, roller, og trinene fra anmeldelse til underretning af kunden inden for 24 timer.",
       icon: AlertTriangle,
       ...docStatus("databrudsprocedure"),
-      href: "/compliance/documents/databrudsprocedure",
+      href: "/compliance?tab=dokumenter&side=databrudsprocedure",
       permKey: "menu_compliance_admin",
     },
     {
@@ -212,7 +212,7 @@ export default function ComplianceOverview() {
       description: "Vurdering af nye systemer, integrationer, felter og anvendelser, før de tages i brug.",
       icon: Search,
       ...docStatus("konsekvensvurdering-procedure"),
-      href: "/compliance/documents/konsekvensvurdering-procedure",
+      href: "/compliance?tab=dokumenter&side=konsekvensvurdering-procedure",
       permKey: "menu_compliance_admin",
     },
     {
@@ -221,7 +221,7 @@ export default function ComplianceOverview() {
       icon: AlertTriangle,
       badge: "Register",
       badgeColor: "bg-rose-500/10 text-rose-700 border-rose-500/30",
-      href: "/compliance/breach-log",
+      href: "/compliance?tab=logs&side=breach-log",
       permKey: "menu_compliance_admin",
     },
     {
@@ -230,7 +230,7 @@ export default function ComplianceOverview() {
       icon: ClipboardList,
       badge: "Register",
       badgeColor: "bg-rose-500/10 text-rose-700 border-rose-500/30",
-      href: "/compliance/impact-assessments",
+      href: "/compliance?tab=registre&side=impact-assessments",
       permKey: "menu_compliance_admin",
     },
     {
@@ -240,7 +240,7 @@ export default function ComplianceOverview() {
       icon: Building2,
       badge: "Kunder",
       badgeColor: "bg-sky-500/10 text-sky-700 border-sky-500/30",
-      href: "/compliance/documents/client-agreements",
+      href: "/compliance?tab=dokumenter&side=client-agreements",
       permKey: "menu_compliance_admin",
     },
     {
@@ -250,7 +250,7 @@ export default function ComplianceOverview() {
       icon: FileText,
       badge: "Kunder",
       badgeColor: "bg-sky-500/10 text-sky-700 border-sky-500/30",
-      href: "/compliance/dpa-addenda",
+      href: "/compliance?tab=registre&side=dpa-addenda",
       permKey: "menu_compliance_admin",
     },
   ];

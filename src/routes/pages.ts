@@ -263,3 +263,8 @@ export const TdcSamleside = lazyPage(() => sr().then((m) => ({ default: m.TdcSam
 export const KunderOgPriserSamleside = lazyPage(() => sr().then((m) => ({ default: m.KunderOgPriserSamleside })));
 export const RapporterSamleside = lazyPage(() => sr().then((m) => ({ default: m.RapporterSamleside })));
 export const PowerdagSamleside = lazyPage(() => sr().then((m) => ({ default: m.PowerdagSamleside })));
+// Samlesider (bundt b4)
+const ac = () => import("@/pages/samlesider/AdminCompliance");
+export const ComplianceSamleside = lazyPage(() => ac().then((m) => ({ default: m.ComplianceSamleside })));
+export const AmoSamleside = lazyPage(() => ac().then((m) => ({ default: m.AmoSamleside })));
+export const AdministrationSamleside = lazyPage(() => ac().then((m) => ({ default: m.AdministrationSamleside })));
