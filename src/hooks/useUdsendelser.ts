@@ -56,6 +56,11 @@ export interface LogFilter {
   kanal: string; type: string; status: string; periode: "i-dag" | "7" | "30"; tekst: string; historik: boolean;
 }
 
+interface LogQuery extends PromiseLike<{ data: unknown[] | null; error: Error | null }> {
+  gte(c: string, v: string): LogQuery; lt(c: string, v: string): LogQuery; eq(c: string, v: string): LogQuery;
+  or(f: string): LogQuery; order(c: string, o: { ascending: boolean }): LogQuery; range(a: number, b: number): LogQuery;
+}
+
 export function useUdsendelseLog(f: LogFilter) {
   return useInfiniteQuery({
     queryKey: [KEY_LOG, f],
@@ -65,9 +70,10 @@ export function useUdsendelseLog(f: LogFilter) {
       const fra = f.periode === "i-dag"
         ? new Date(nu.getFullYear(), nu.getMonth(), nu.getDate()).toISOString()
         : new Date(nu.getTime() - Number(f.periode) * 864e5).toISOString();
-      const tabel = f.historik ? "udsendelser_historik" : "udsendelser";
-      let q = supabase.from(tabel).select("tidspunkt, kanal, type_noegle, modtager, emne, status, fejl" + (f.historik ? ", kilde" : ", id"))
-        .gte("tidspunkt", fra).order("tidspunkt", { ascending: false })
+      const kol = "tidspunkt, kanal, type_noegle, modtager, emne, status, fejl" + (f.historik ? ", kilde" : ", id");
+      // To kilder med samme kolonner; en smal type undgår union-typer for dybe for TS.
+      let q = (f.historik ? supabase.from("udsendelser_historik").select(kol) : supabase.from("udsendelser").select(kol)) as unknown as LogQuery;
+      q = q.gte("tidspunkt", fra).order("tidspunkt", { ascending: false })
         .range(pageParam, pageParam + LOG_SIDE - 1);
       if (f.historik) q = q.lt("tidspunkt", new Date(nu.getFullYear(), nu.getMonth(), nu.getDate()).toISOString());
       if (f.kanal !== "alle") q = q.eq("kanal", f.kanal);
