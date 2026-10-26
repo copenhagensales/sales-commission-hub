@@ -7,7 +7,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export type Kanal = "mail" | "sms" | "push";
-export type UdsendStatus = "sendt" | "fejl" | "slaaet_fra" | "fravalgt" | "stille_timer" | "ingen_tilmelding";
+export type UdsendStatus = "sendt" | "fejl" | "slaaet_fra" | "fravalgt" | "stille_timer" | "ingen_tilmelding" | "udenfor_regel";
 
 export interface Modtager {
   modtager: string;
@@ -105,13 +105,43 @@ async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?
   }
 }
 
+/** Brugerens auth-id: kendt direkte eller slået op via medarbejder-id. Fail-open: null ved fejl. */
+async function brugerId(m: Modtager): Promise<string | undefined> {
+  if (m.modtagerUserId) return m.modtagerUserId;
+  if (!m.modtagerEmployeeId) return undefined;
+  try {
+    const { data, error } = await svc().from("employee_master_data")
+      .select("auth_user_id").eq("id", m.modtagerEmployeeId).maybeSingle();
+    if (error) throw error;
+    return data?.auth_user_id ?? undefined;
+  } catch (e) {
+    console.error("udsend: kunne ikke slå bruger op", (e as Error)?.message ?? e);
+    return undefined;
+  }
+}
+
+/** Modtagerregel (roller/teams/rettighed). Kun et eksplicit false stopper; ukendt bruger eller fejl = send. */
+async function udenforRegel(u: Faelles, userId?: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { data, error } = await svc().rpc("udsendelse_tilladt", { p_user_id: userId, p_type: u.type });
+    if (error) throw error;
+    return data === false;
+  } catch (e) {
+    console.error("udsend: regeltjek fejlede", u.type, (e as Error)?.message ?? e);
+    return false;
+  }
+}
+
 const fejltekst = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Én udsendelse til én modtager. Kaster videre, hvis send() kaster. */
 export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
   const gate = await typeGate(u);
   if (gate) { await log(u, u, gate); return gate; }
-  if (await fravalgt(u, u.modtagerUserId)) { await log(u, u, "fravalgt"); return "fravalgt"; }
+  const uid = await brugerId(u);
+  if (await udenforRegel(u, uid)) { await log(u, u, "udenfor_regel"); return "udenfor_regel"; }
+  if (await fravalgt(u, uid)) { await log(u, u, "fravalgt"); return "fravalgt"; }
   try {
     const r = await u.send();
     const status: UdsendStatus = (r && r.status) || "sendt";
@@ -133,11 +163,14 @@ export async function udsendFlere(
   const gate = await typeGate(u);
   if (gate) { for (const m of u.modtagere) await log(u, m, gate); return gate; }
   const tilladte: Modtager[] = [];
+  let udenfor = 0;
   for (const m of u.modtagere) {
-    if (await fravalgt(u, m.modtagerUserId)) await log(u, m, "fravalgt");
+    const uid = await brugerId(m);
+    if (await udenforRegel(u, uid)) { await log(u, m, "udenfor_regel"); udenfor++; }
+    else if (await fravalgt(u, uid)) await log(u, m, "fravalgt");
     else tilladte.push(m);
   }
-  if (!tilladte.length && u.modtagere.length) return "fravalgt";
+  if (!tilladte.length && u.modtagere.length) return udenfor === u.modtagere.length ? "udenfor_regel" : "fravalgt";
   try {
     const r = await u.send(tilladte.map((m) => m.modtager));
     for (const m of tilladte) await log(u, m, "sendt", { reference: r?.reference });

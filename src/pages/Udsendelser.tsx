@@ -23,6 +23,10 @@ import {
 } from "@/hooks/useUdsendelser";
 import { PUSH_TEXT } from "@/lib/push/pushText";
 import * as P from "@/routes/pages";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PERMISSION_KEYS } from "@/config/permissionKeys";
+import { useRegelValg, useUdsendelseModtagerAntal, type Udsendelsestype } from "@/hooks/useUdsendelser";
 
 const KANAL_IKON: Record<string, typeof Mail> = { mail: Mail, sms: MessageSquare, push: Bell };
 const KanalIkon = ({ kanal }: { kanal: string }) => {
@@ -34,6 +38,90 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("da-DK",
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   sendt: "default", sent: "default", fejl: "destructive", failed: "destructive", error: "destructive",
 };
+
+const regelTekst = (t: Pick<Udsendelsestype, "regel_roller" | "regel_teams" | "regel_noegle">) => {
+  const dele = [
+    t.regel_roller?.length ? t.regel_roller.join(", ") : null,
+    t.regel_teams?.length ? `${t.regel_teams.length} ${t.regel_teams.length === 1 ? "team" : "teams"}` : null,
+    t.regel_noegle || null,
+  ].filter(Boolean);
+  return dele.length ? dele.join(" · ") : "Alle";
+};
+
+const NOEGLE_VALG = Object.entries(PERMISSION_KEYS)
+  .map(([k, v]) => ({ k, l: (v as { label: string }).label }))
+  .sort((a, b) => a.l.localeCompare(b.l, "da"));
+const INGEN = "__ingen__";
+
+function FlereValg({ titel, valg, valgt, saet }: { titel: string; valg: { v: string; l: string }[]; valgt: string[]; saet: (v: string[]) => void }) {
+  return (
+    <fieldset className="space-y-1">
+      <legend className="text-sm font-medium">{titel} <span className="text-muted-foreground font-normal">({valgt.length ? `${valgt.length} valgt` : "alle"})</span></legend>
+      <div className="max-h-48 overflow-y-auto rounded-md border p-2">
+        {valg.map((o) => (
+          <label key={o.v} className="flex min-h-11 items-center gap-3 text-sm">
+            <Checkbox checked={valgt.includes(o.v)}
+              onCheckedChange={(c) => saet(c ? [...valgt, o.v] : valgt.filter((x) => x !== o.v))} />
+            {o.l}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function ModtagerDialog({ type, luk }: { type: Udsendelsestype | null; luk: () => void }) {
+  const valg = useRegelValg();
+  const opd = useOpdaterUdsendelsestype();
+  const antal = useUdsendelseModtagerAntal(type?.noegle ?? null);
+  const [roller, setRoller] = useState<string[]>([]);
+  const [teams, setTeams] = useState<string[]>([]);
+  const [noegle, setNoegle] = useState<string>(INGEN);
+  const [aaben, setAaben] = useState<string | null>(null);
+  if (type && aaben !== type.noegle) {
+    setAaben(type.noegle);
+    setRoller(type.regel_roller ?? []);
+    setTeams(type.regel_teams ?? []);
+    setNoegle(type.regel_noegle || INGEN);
+  }
+  const gem = (lukBagefter: boolean) => type && opd.mutate(
+    { noegle: type.noegle, regel_roller: roller, regel_teams: teams, regel_noegle: noegle === INGEN ? null : noegle },
+    { onSuccess: () => { toast.success("Modtagerregel gemt"); if (lukBagefter) { setAaben(null); luk(); } }, onError: () => toast.error("Kunne ikke gemme") },
+  );
+  return (
+    <Dialog open={!!type} onOpenChange={(o) => { if (!o) { setAaben(null); luk(); } }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Modtagere: {type?.navn}</DialogTitle>
+          <DialogDescription>Tomme felter betyder alle. Ejere får altid udsendelsen.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <FlereValg titel="Roller" valgt={roller} saet={setRoller}
+            valg={(valg.data?.roller ?? []).map((r) => ({ v: r.key, l: r.label }))} />
+          <FlereValg titel="Teams" valgt={teams} saet={setTeams}
+            valg={(valg.data?.teams ?? []).map((t) => ({ v: t.id, l: t.name }))} />
+          <div className="space-y-1">
+            <Label className="text-sm">Rettighed</Label>
+            <Select value={noegle} onValueChange={setNoegle}>
+              <SelectTrigger className="min-h-11 text-base md:text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={INGEN}>Ingen krav</SelectItem>
+                {NOEGLE_VALG.map((o) => <SelectItem key={o.k} value={o.k}>{o.l} ({o.k})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-sm">
+            Hvem får denne (gemt regel): <strong>{antal.isLoading ? "…" : antal.error ? "kunne ikke tælles" : `${antal.data} medarbejdere`}</strong>
+          </p>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" className="min-h-11" disabled={opd.isPending} onClick={() => gem(false)}>Gem og opdatér antal</Button>
+          <Button className="min-h-11" disabled={opd.isPending} onClick={() => gem(true)}>Gem</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function TekstFelt({ vaerdi, gem, flere }: { vaerdi: string; gem: (v: string) => void; flere?: boolean }) {
   const [v, setV] = useState(vaerdi);
@@ -48,6 +136,7 @@ function Overblik() {
   const opd = useOpdaterUdsendelsestype();
   const [sog, setSog] = useState("");
   const [bekraeft, setBekraeft] = useState<{ noegle: string; navn: string; aktiv: boolean } | null>(null);
+  const [regelFor, setRegelFor] = useState<string | null>(null);
   type Raekke = NonNullable<typeof data>[number];
   const gem = (noegle: string, ret: Parameters<typeof opd.mutate>[0]) =>
     opd.mutate({ ...ret, noegle }, { onSuccess: () => toast.success("Gemt"), onError: () => toast.error("Kunne ikke gemme") });
@@ -76,6 +165,11 @@ function Overblik() {
           onBlur={(e) => { const v = e.target.value || null; if (v !== (t.stille_til?.slice(0, 5) ?? null)) gem(t.noegle, { noegle: t.noegle, stille_til: v }); }} />
       </div>
     ) },
+    { key: "modtagere", header: "Modtagere", isKey: true, cell: (t) => (
+      <Button variant="outline" className="min-h-11 h-auto max-w-[16rem] whitespace-normal text-left text-sm" onClick={() => setRegelFor(t.noegle)}>
+        {regelTekst(t)}
+      </Button>
+    ) },
     { key: "regel", header: "Modtagerregel", cell: (t) => <TekstFelt flere vaerdi={t.modtagerregel} gem={(v) => gem(t.noegle, { noegle: t.noegle, modtagerregel: v })} /> },
     { key: "beskrivelse", header: "Beskrivelse", cell: (t) => <TekstFelt flere vaerdi={t.beskrivelse} gem={(v) => gem(t.noegle, { noegle: t.noegle, beskrivelse: v })} /> },
   ];
@@ -92,6 +186,7 @@ function Overblik() {
           <ResponsiveTable columns={cols} rows={rows} rowKey={(t) => t.noegle} />
         </>
       )}
+      <ModtagerDialog type={(data ?? []).find((t) => t.noegle === regelFor) ?? null} luk={() => setRegelFor(null)} />
       <AlertDialog open={!!bekraeft} onOpenChange={(o) => !o && setBekraeft(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -136,7 +231,9 @@ function Log() {
     { key: "type", header: "Type", isTitle: true, cell: (r) => navn.get(r.type_noegle) ?? r.type_noegle },
     { key: "modtager", header: "Modtager", isKey: true, cell: (r) => <span className="break-all">{r.modtager}</span> },
     { key: "emne", header: "Emne", cell: (r) => r.emne ?? "–" },
-    { key: "status", header: "Status", isKey: true, cell: (r) => <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge> },
+    { key: "status", header: "Status", isKey: true, cell: (r) => r.status === "udenfor_regel"
+      ? <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning">udenfor regel</Badge>
+      : <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge> },
     { key: "fejl", header: "Fejl", cell: (r) => <span className="text-destructive break-words">{r.fejl ?? ""}</span> },
   ];
   const set = (p: Partial<LogFilter>) => setF((x) => ({ ...x, ...p }));
@@ -146,7 +243,7 @@ function Log() {
         <Vaelg label="Kanal" value={f.kanal} onChange={(v) => set({ kanal: v })} valg={[{ v: "alle", l: "Alle" }, { v: "mail", l: "Mail" }, { v: "sms", l: "SMS" }, { v: "push", l: "Push" }]} />
         <Vaelg label="Type" value={f.type} onChange={(v) => set({ type: v })} valg={[{ v: "alle", l: "Alle" }, ...(typer ?? []).map((t) => ({ v: t.noegle, l: t.navn }))]} />
         <Vaelg label="Status" value={f.status} onChange={(v) => set({ status: v })}
-          valg={["alle", "sendt", "fejl", "fravalgt", "slaaet_fra", "stille_timer", "ingen_tilmelding", "planlagt"].map((v) => ({ v, l: v === "alle" ? "Alle" : v }))} />
+          valg={["alle", "sendt", "fejl", "fravalgt", "slaaet_fra", "stille_timer", "ingen_tilmelding", "udenfor_regel", "planlagt"].map((v) => ({ v, l: v === "alle" ? "Alle" : v === "udenfor_regel" ? "udenfor regel" : v }))} />
         <Vaelg label="Periode" value={f.periode} onChange={(v) => set({ periode: v as LogFilter["periode"] })}
           valg={[{ v: "i-dag", l: "I dag" }, { v: "7", l: "7 dage" }, { v: "30", l: "30 dage" }]} />
         <div className="space-y-1">
