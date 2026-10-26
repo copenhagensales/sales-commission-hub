@@ -6,9 +6,6 @@ verify_jwt = false
 [functions.calculate-leaderboard-incremental]
 verify_jwt = false
 
-[functions.generate-dashboard-layout]
-verify_jwt = false
-
 [functions.parse-expense-formula]
 verify_jwt = false
 
@@ -118,12 +115,6 @@ verify_jwt = false
 [functions.batch-set-fieldmarketing-passwords]
 verify_jwt = false
 
-[functions.send-closing-reminder]
-verify_jwt = true
-
-[functions.send-weekend-cleanup]
-verify_jwt = true
-
 [functions.tv-dashboard-data]
 verify_jwt = false
 
@@ -202,9 +193,6 @@ verify_jwt = false
 [functions.recalculate-dynamic-expenses]
 verify_jwt = false
 
-[functions.import-economic-zip]
-verify_jwt = false
-
 [functions.adversus-lead-check]
 verify_jwt = false
 
@@ -245,12 +233,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.gdpr-data-cleanup]
-verify_jwt = false
-
-[functions.notify-system-feedback]
-verify_jwt = false
-
-[functions.notify-feedback-status-change]
 verify_jwt = false
 
 [functions.twilio-sms-status]
