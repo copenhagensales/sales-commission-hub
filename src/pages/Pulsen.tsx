@@ -33,7 +33,7 @@ type FeedItem =
   | { kind: "post"; at: number; post: PulsenPost }
   | { kind: "event"; at: number; eventId: string };
 
-export default function Pulsen() {
+function PulsenFeed() {
   useEffect(() => {
     const prev = document.title;
     document.title = "Storkbook";

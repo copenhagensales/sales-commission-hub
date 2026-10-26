@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export interface SamlesideFane {
   id: string;
-  label: string;
+  label: ReactNode;
   element: ReactNode;
   synlig: boolean;
   /** Flere faner kan dele én hovedfane; de vælges med en undervælger (?side=<id>). */
@@ -83,7 +83,7 @@ export function Samleside({ titel, faner, ejerAfTab, parameter = "tab", layout: 
 
   const fane = synlige.find((f) => f.id === aktiv);
   // Én plads pr. gruppe i fanebjælken.
-  const pladser: { value: string; label: string; foerste: string }[] = [];
+  const pladser: { value: string; label: ReactNode; foerste: string }[] = [];
   for (const f of synlige) {
     const v = f.gruppe?.id ?? f.id;
     if (!pladser.some((p) => p.value === v)) pladser.push({ value: v, label: f.gruppe?.label ?? f.label, foerste: f.id });

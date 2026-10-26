@@ -681,3 +681,49 @@ export function useTeamMembers(teamId: string | null) {
     enabled: !!teamId,
   });
 }
+
+export const CHAT_UNREAD_KEY = ["chat-unread-total"] as const;
+
+/**
+ * Ulæste chatbeskeder i alt: beskeder i samtaler, brugeren er medlem af, fra andre, ikke slettet,
+ * og uden læsekvittering fra brugeren i chat_message_read_receipts. Opdateres via realtime.
+ */
+export function useChatUnreadTotal(employeeId: string | null | undefined, enabled = true) {
+  const queryClient = useQueryClient();
+  const on = enabled && !!employeeId;
+
+  useEffect(() => {
+    if (!on) return;
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+    const channel = supabase
+      .channel(`chat-unread-${employeeId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_message_read_receipts", filter: `employee_id=eq.${employeeId}` }, invalidate)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [on, employeeId, queryClient]);
+
+  return useQuery({
+    queryKey: [...CHAT_UNREAD_KEY, employeeId],
+    enabled: on,
+    staleTime: 60000,
+    queryFn: async () => {
+      const me = employeeId as string;
+      const { data: members, error: mErr } = await supabase
+        .from("chat_conversation_members").select("conversation_id").eq("employee_id", me);
+      if (mErr) throw mErr;
+      const ids = (members ?? []).map((m) => m.conversation_id);
+      if (!ids.length) return 0;
+      const [all, read] = await Promise.all([
+        supabase.from("chat_messages").select("id", { count: "exact", head: true })
+          .in("conversation_id", ids).neq("sender_id", me).is("deleted_at", null),
+        supabase.from("chat_message_read_receipts").select("id, chat_messages!inner(id)", { count: "exact", head: true })
+          .eq("employee_id", me).in("chat_messages.conversation_id", ids)
+          .neq("chat_messages.sender_id", me).is("chat_messages.deleted_at", null),
+      ]);
+      if (all.error) throw all.error;
+      if (read.error) throw read.error;
+      return Math.max(0, (all.count ?? 0) - (read.count ?? 0));
+    },
+  });
+}
