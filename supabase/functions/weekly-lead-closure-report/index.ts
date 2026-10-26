@@ -1287,6 +1287,28 @@ interface RunState {
   triggeredBy: string;
   /** Kun leveringsstatus: ugetal, opkald og mail røres ikke (backfill/opdatering). */
   flowOnly: boolean;
+  /** Kun gensendelse: kort linje øverst i mailen. */
+  notice?: string;
+  /** Kun gensendelse: send til denne ene interne modtager i stedet for listen. */
+  testRecipient?: string;
+  /** Gensendelse: kørslens finished_at/mail_sent røres ikke. */
+  resend?: boolean;
+}
+
+/** Uger, der er låst (mandagsmail sendt), og som ikke er midlertidigt låst op. */
+async function lockedWeeks(svc: SupabaseClient, weeks: string[]): Promise<Set<string>> {
+  if (weeks.length === 0) return new Set();
+  const { data, error } = await svc
+    .from("weekly_lead_closure_locks")
+    .select("week_start, unlocked_until")
+    .in("week_start", weeks);
+  if (error) throw new Error(`Kunne ikke læse ugelåse: ${error.message}`);
+  const now = Date.now();
+  return new Set(
+    ((data ?? []) as { week_start: string; unlocked_until: string | null }[])
+      .filter((r) => !r.unlocked_until || new Date(r.unlocked_until).getTime() < now)
+      .map((r) => r.week_start),
+  );
 }
 
 const MAX_ATTEMPTS = 3;
