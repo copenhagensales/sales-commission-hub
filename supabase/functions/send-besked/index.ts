@@ -15,7 +15,7 @@ const json = (b: unknown, status = 200) =>
 
 const Body = z.object({
   kanal: z.enum(["mail", "sms", "push"]),
-  maal: z.enum(["mig", "roller", "teams", "medarbejder"]),
+  maal: z.enum(["mig", "alle", "roller", "teams", "medarbejder"]),
   ids: z.array(z.string().max(100)).max(200).default([]),
   emne: z.string().trim().max(200).default(""),
   tekst: z.string().trim().min(1).max(5000),
@@ -39,6 +39,16 @@ async function sendSms(to: string, body: string): Promise<string | undefined> {
   return r?.sid;
 }
 
+/** Start på dagen i Europe/Copenhagen som ISO (UTC). */
+function dagsStartKbh(): string {
+  const nu = new Date();
+  const d = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen", year: "numeric", month: "2-digit", day: "2-digit" }).format(nu);
+  const midnatUtc = new Date(`${d}T00:00:00Z`);
+  const kbh = new Date(midnatUtc.toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
+  const off = kbh.getTime() - new Date(midnatUtc.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+  return new Date(midnatUtc.getTime() - off).toISOString();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const auth = await requireOwner(req);
@@ -52,6 +62,7 @@ Deno.serve(async (req) => {
     // Modtagere: aktive medarbejdere
     let q = svc.from("employee_master_data").select("id, auth_user_id, work_email, private_phone").eq("is_active", true);
     if (b.maal === "mig") q = q.eq("auth_user_id", auth.userId);
+    else if (b.maal === "alle") q = q.not("auth_user_id", "is", null);
     else {
       if (!b.ids.length) return json({ error: "Vælg mindst én modtager" }, 400);
       if (b.maal === "medarbejder") q = q.in("id", b.ids);
@@ -67,11 +78,45 @@ Deno.serve(async (req) => {
     }
     const { data: emps, error: eErr } = await q;
     if (eErr) throw eErr;
-    const modt = (emps ?? []) as any[];
-    if (b.kunAntal) return json({ antal: modt.length });
-
+    const alleModt = (emps ?? []) as any[];
     const type = `send-besked-${b.kanal}`;
     const emne = b.emne || "Besked fra Stork";
+
+    // Dagsloft: højst én send-besked pr. modtager pr. dansk kalenderdag (ikke for »mig«). Fail-open.
+    const fikIDag = new Set<string>();
+    if (b.maal !== "mig" && alleModt.length) {
+      try {
+        const start = dagsStartKbh();
+        const empIds = alleModt.map((e) => e.id);
+        const uids = alleModt.map((e) => e.auth_user_id).filter(Boolean);
+        for (let i = 0; i < Math.max(empIds.length, uids.length); i += 200) {
+          const [a, c] = await Promise.all([
+            svc.from("udsendelser").select("modtager_employee_id").like("type_noegle", "send-besked-%").eq("status", "sendt")
+              .gte("tidspunkt", start).in("modtager_employee_id", empIds.slice(i, i + 200).concat(["00000000-0000-0000-0000-000000000000"])),
+            svc.from("udsendelser").select("modtager_user_id").like("type_noegle", "send-besked-%").eq("status", "sendt")
+              .gte("tidspunkt", start).in("modtager_user_id", uids.slice(i, i + 200).concat(["00000000-0000-0000-0000-000000000000"])),
+          ]);
+          if (a.error) throw a.error;
+          if (c.error) throw c.error;
+          const harE = new Set((a.data ?? []).map((r: any) => r.modtager_employee_id));
+          const harU = new Set((c.data ?? []).map((r: any) => r.modtager_user_id));
+          for (const e of alleModt) if (harE.has(e.id) || (e.auth_user_id && harU.has(e.auth_user_id))) fikIDag.add(e.id);
+        }
+      } catch (err) {
+        console.error("send-besked: dagsloft-opslag fejlede", err instanceof Error ? err.message : err);
+      }
+    }
+    const loft = fikIDag.size;
+    if (b.kunAntal) return json({ antal: alleModt.length, loft });
+    const modt = alleModt.filter((e) => !fikIDag.has(e.id));
+    for (const e of alleModt.filter((x) => fikIDag.has(x.id))) {
+      const adr = b.kanal === "mail" ? e.work_email : b.kanal === "sms" ? e.private_phone : e.auth_user_id;
+      const { error } = await svc.from("udsendelser").insert({
+        kanal: b.kanal, type_noegle: type, modtager: adr ?? e.id, modtager_employee_id: e.id,
+        modtager_user_id: e.auth_user_id ?? null, emne, status: "dagsloft", afsenderfunktion: "send-besked", metadata: {},
+      });
+      if (error) console.error("send-besked: kunne ikke logge dagsloft", error.message);
+    }
     let sendt = 0, sprunget = 0, fejl = 0;
 
     if (b.kanal === "push") {
@@ -103,7 +148,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return json({ antal: modt.length, sendt, sprunget, fejl });
+    return json({ antal: alleModt.length, sendt, sprunget, fejl, loft });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Fejl" }, 500);
   }

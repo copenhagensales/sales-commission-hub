@@ -55,7 +55,19 @@ export async function sendPush(
 ): Promise<number> {
   try {
     if (!userIds.length || !configure()) return 0;
-    const msg = opts.tekst ? { ...PUSH_TEXT[type], ...opts.tekst } : PUSH_TEXT[type];
+    // Tekst fra udsendelsestyper, hvis alle tre felter er udfyldt; ellers PUSH_TEXT (fail-open). opts.tekst vinder.
+    let basis: { title: string; body: string; url: string } = PUSH_TEXT[type];
+    if (opts.udsendType) {
+      try {
+        const { data: t, error } = await svc.from("udsendelsestyper").select("push_titel, push_tekst, push_link")
+          .eq("noegle", opts.udsendType).maybeSingle();
+        if (error) throw error;
+        if (t?.push_titel && t?.push_tekst && t?.push_link) basis = { title: t.push_titel, body: t.push_tekst, url: t.push_link };
+      } catch (e) {
+        console.error("push: kunne ikke hente tekst for", opts.udsendType, (e as Error)?.message ?? e);
+      }
+    }
+    const msg = opts.tekst ? { ...basis, ...opts.tekst } : basis;
     let sent = 0;
     const udsendType = opts.udsendType ?? `push-${type}`;
     const afsender = opts.afsenderfunktion ?? "push";
