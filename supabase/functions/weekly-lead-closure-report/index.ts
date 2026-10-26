@@ -1589,13 +1589,17 @@ async function finishAndMail(
     })
     .eq("id", state.runId);
 
+  return { mailQueued, statusBreakdown: breakdown(latestRows) };
+}
+
+function breakdown(latestRows: StatRow[]): Record<string, Record<string, number>> {
   const statusBreakdown: Record<string, Record<string, number>> = {};
   for (const r of latestRows) {
     const line = r.report_line ?? `Ikke mappet (${r.account}/${r.adversus_campaign_id})`;
     statusBreakdown[line] = statusBreakdown[line] ?? {};
     statusBreakdown[line][r.status] = (statusBreakdown[line][r.status] ?? 0) + r.lead_count;
   }
-  return { mailQueued, statusBreakdown };
+  return statusBreakdown;
 }
 
 /**
