@@ -494,7 +494,7 @@ export default function QualityControl() {
             </SelectContent>
           </Select>
           {isSuperadmin && (
-            <Button variant="outline" onClick={() => navigate("/kvalitetskontrol/administration")}>
+            <Button variant="outline" onClick={() => navigate("/mit-team?tab=administration")}>
               <Settings2 className="mr-2 h-4 w-4" />
               Administration
             </Button>

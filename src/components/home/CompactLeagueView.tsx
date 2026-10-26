@@ -165,7 +165,7 @@ export function CompactLeagueView() {
 
         <div className="mt-4 flex justify-end">
           <Link
-            to="/commission-league"
+            to="/spil?tab=superligaen"
             className="flex min-h-[44px] items-center gap-1.5 text-[14px] font-extrabold text-foreground hover:opacity-70"
           >
             Se fuld liga

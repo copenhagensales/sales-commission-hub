@@ -411,7 +411,7 @@ export default function CandidateDetail() {
         <div className="flex flex-col items-center justify-center h-64 gap-4">
           <User className="h-12 w-12 text-muted-foreground" />
           <p className="text-muted-foreground">Kandidat ikke fundet</p>
-          <Button variant="outline" onClick={() => navigate("/recruitment/candidates")}>
+          <Button variant="outline" onClick={() => navigate("/recruitment?tab=candidates")}>
             Tilbage til kandidater
           </Button>
         </div>
@@ -430,7 +430,7 @@ export default function CandidateDetail() {
   return <MainLayout>
       <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto px-0">
         {/* Back button */}
-        <Button variant="ghost" onClick={() => navigate("/recruitment/candidates")} className="w-fit -ml-2 max-md:hidden">
+        <Button variant="ghost" onClick={() => navigate("/recruitment?tab=candidates")} className="w-fit -ml-2 max-md:hidden">
           <ArrowLeft className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Tilbage til kandidater</span>
           <span className="sm:hidden">Tilbage</span>

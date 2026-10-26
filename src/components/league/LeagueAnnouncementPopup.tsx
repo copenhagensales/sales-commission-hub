@@ -50,7 +50,7 @@ export function LeagueAnnouncementPopup() {
   const handleViewMore = () => {
     localStorage.setItem(STORAGE_KEY, "true");
     setOpen(false);
-    navigate("/commission-league");
+    navigate("/spil?tab=superligaen");
   };
 
   return (

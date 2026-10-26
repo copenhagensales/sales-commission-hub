@@ -228,7 +228,7 @@ export default function LeaderOnboardingView() {
               <CardDescription>Giv feedback via skabeloner</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Link to="/coaching-templates">
+              <Link to="/onboarding-program?tab=coaching-templates">
                 <Button variant="outline" size="sm">
                   <FileText className="h-4 w-4 mr-2" />
                   Skabeloner

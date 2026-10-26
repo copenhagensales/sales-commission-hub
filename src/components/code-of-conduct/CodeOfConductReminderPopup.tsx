@@ -34,7 +34,7 @@ export function CodeOfConductReminderPopup() {
     } catch (e) {
       console.error(e);
     }
-    navigate("/code-of-conduct");
+    navigate("/my-profile?tab=kodeks");
   };
 
   const handleSnooze = async () => {

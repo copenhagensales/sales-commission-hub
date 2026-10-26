@@ -46,7 +46,7 @@ export function CodeOfConductLockOverlay() {
           <Button 
             className="w-full" 
             size="lg"
-            onClick={() => navigate("/code-of-conduct")}
+            onClick={() => navigate("/my-profile?tab=kodeks")}
           >
             Gå til testen
           </Button>

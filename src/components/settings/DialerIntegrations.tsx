@@ -1643,7 +1643,7 @@ export function DialerIntegrations() {
                                 : "Deaktiveret"}
                             </Badge>
                           </div>
-                          <a href="/system-stability" className="text-xs text-primary hover:underline">
+                          <a href="/admin?tab=stabilitet" className="text-xs text-primary hover:underline">
                             Ændr i Systemstabilitet
                           </a>
                         </div>

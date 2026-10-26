@@ -207,7 +207,7 @@ export default function PulseSurvey() {
   };
 
   const doSubmit = async () => {
-    if (isTestMode) { toast.success('Test afsluttet – ingen data blev gemt'); navigate('/pulse-survey-results'); return; }
+    if (isTestMode) { toast.success('Test afsluttet – ingen data blev gemt'); navigate('/mit-team?tab=pulse-survey-results'); return; }
 
     const requiredScales = SCALE_QUESTIONS.map(q => q.key);
     for (const key of requiredScales) {
