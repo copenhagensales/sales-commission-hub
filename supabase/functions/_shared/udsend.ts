@@ -141,7 +141,7 @@ export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
   if (gate) { await log(u, u, gate); return gate; }
   const uid = await brugerId(u);
   if (await udenforRegel(u, uid)) { await log(u, u, "udenfor_regel"); return "udenfor_regel"; }
-  if (await fravalgt(u, u.modtagerUserId)) { await log(u, u, "fravalgt"); return "fravalgt"; }
+  if (await fravalgt(u, uid)) { await log(u, u, "fravalgt"); return "fravalgt"; }
   try {
     const r = await u.send();
     const status: UdsendStatus = (r && r.status) || "sendt";
@@ -165,8 +165,9 @@ export async function udsendFlere(
   const tilladte: Modtager[] = [];
   let udenfor = 0;
   for (const m of u.modtagere) {
-    if (await udenforRegel(u, await brugerId(m))) { await log(u, m, "udenfor_regel"); udenfor++; }
-    else if (await fravalgt(u, m.modtagerUserId)) await log(u, m, "fravalgt");
+    const uid = await brugerId(m);
+    if (await udenforRegel(u, uid)) { await log(u, m, "udenfor_regel"); udenfor++; }
+    else if (await fravalgt(u, uid)) await log(u, m, "fravalgt");
     else tilladte.push(m);
   }
   if (!tilladte.length && u.modtagere.length) return udenfor === u.modtagere.length ? "udenfor_regel" : "fravalgt";
