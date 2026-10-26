@@ -107,41 +107,55 @@ async function main(req: Request, svc: any) {
       const y = t.getUTCFullYear(); const f = new Date(Date.UTC(y, 0, 4));
       return `${y}-W${String(1 + Math.round(((t.getTime() - f.getTime()) / 864e5 - 3 + ((f.getUTCDay() + 6) % 7)) / 7)).padStart(2, "0")}`;
     };
-    type Agg = { forsoeg: number; kontakt: number; leads: Set<string>; leadsKontakt: Set<string>; status: Record<string, number> };
+    type Agg = { forsoeg: number; besvaret: number; sessions: number; sessKontakt: number; leads: Set<string>; leadsBesvaret: Set<string>; leadsKontakt: Set<string>; status: Record<string, number> };
+    const KONTAKT = new Set(["success", "notInterested", "unqualified"]);
     const agg: Record<string, Agg> = {};
+    const nyAgg = (): Agg => ({ forsoeg: 0, besvaret: 0, sessions: 0, sessKontakt: 0, leads: new Set(), leadsBesvaret: new Set(), leadsKontakt: new Set(), status: {} });
     const listeFelter = new Set<string>();
-    let sider = 0, afbrudt: string | null = null;
-    const seen = new Set<string>();
-    for (let day = from; day <= to; day = addDays(day, 1)) {
+    let sider = 0; const afbrudt: string[] = [];
+    const seenS = new Set<string>(), seenC = new Set<string>();
+    const hentDag = async (day: string, kind: "sessions" | "cdr") => {
       const a0 = cphOffsetIso(day), a1 = cphOffsetIso(addDays(day, 1));
+      const out: Row[] = [];
       for (let page = 1; page <= MAX_PAGES; page++) {
         const fl = encodeURIComponent(JSON.stringify({ startTime: { $gt: a0, $lt: a1 } }));
-        const r = await g2(`/sessions?filters=${fl}&page=${page}&pageSize=${PAGE_SIZE}&sortProperty=startTime&sortDirection=ASC`);
+        const r = await g2(`/${kind}?filters=${fl}&page=${page}&pageSize=${PAGE_SIZE}&sortProperty=startTime&sortDirection=ASC`);
         sider++;
-        if (r.status !== 200) { afbrudt = `${day} side ${page}: status ${r.status} ${r.fejl ?? ""}`; break; }
-        const arr = (Array.isArray(r.data) ? r.data : (r.data as Row)?.sessions ?? []) as Row[];
-        for (const x of arr) {
-          const id = s(x.id); if (!id || seen.has(id)) continue; seen.add(id);
-          for (const k of Object.keys(x)) if (/list|pool/i.test(k)) listeFelter.add(k);
-          const cdr = (x.cdr ?? null) as Row | null;
-          const kontakt = !!(cdr && s(cdr.answerTime));
-          const key = `${isoUge(s(x.startTime))}|${s(x.campaignId)}`;
-          const g = agg[key] ??= { forsoeg: 0, kontakt: 0, leads: new Set(), leadsKontakt: new Set(), status: {} };
-          g.forsoeg++; if (kontakt) g.kontakt++;
-          const lead = s(x.leadId); if (lead) { g.leads.add(lead); if (kontakt) g.leadsKontakt.add(lead); }
-          inc(g.status, s(x.status) || "(tom)");
-        }
+        if (r.status !== 200) { afbrudt.push(`${kind} ${day} side ${page}: ${r.status} ${r.fejl ?? ""}`); break; }
+        const arr = (Array.isArray(r.data) ? r.data : (r.data as Row)?.[kind] ?? []) as Row[];
+        out.push(...arr);
         if (arr.length < PAGE_SIZE) break;
       }
-      if (afbrudt) break;
-    }
+      return out;
+    };
+    const dage: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) dage.push(d);
+    const res = await Promise.all(dage.flatMap((d) => [hentDag(d, "sessions"), hentDag(d, "cdr")]));
+    res.forEach((arr, i) => {
+      const kind = i % 2 === 0 ? "sessions" : "cdr";
+      for (const x of arr) {
+        const id = s(x.id); const seen = kind === "sessions" ? seenS : seenC;
+        if (!id || seen.has(id)) continue; seen.add(id);
+        for (const k of Object.keys(x)) if (/list|pool/i.test(k)) listeFelter.add(`${kind}.${k}`);
+        const g = agg[`${isoUge(s(x.startTime))}|${s(x.campaignId)}`] ??= nyAgg();
+        const lead = s(x.leadId);
+        if (kind === "cdr") {
+          const svar = !!s(x.answerTime);
+          g.forsoeg++; if (svar) g.besvaret++;
+          if (lead) { g.leads.add(lead); if (svar) g.leadsBesvaret.add(lead); }
+        } else {
+          g.sessions++; inc(g.status, s(x.status) || "(tom)");
+          if (KONTAKT.has(s(x.status))) { g.sessKontakt++; if (lead) g.leadsKontakt.add(lead); }
+        }
+      }
+    });
+    const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : 0);
     const raekker = Object.entries(agg).map(([k, g]) => {
       const [uge, cid] = k.split("|");
-      return { uge, kampagneId: cid, kampagne: kampagner[cid] ?? "", forsoeg: g.forsoeg, kontakt: g.kontakt,
-        kontaktrate: g.forsoeg ? Math.round((g.kontakt / g.forsoeg) * 1000) / 10 : 0,
-        unikkeLeads: g.leads.size, unikkeLeadsKontakt: g.leadsKontakt.size, status: g.status };
+      return { uge, kampagneId: cid, kampagne: kampagner[cid] ?? "", forsoeg: g.forsoeg, besvaret: g.besvaret, svarrate: pct(g.besvaret, g.forsoeg),
+        unikkeLeads: g.leads.size, unikkeLeadsBesvaret: g.leadsBesvaret.size,
+        sessions: g.sessions, sessKontakt: g.sessKontakt, kontaktrateSess: pct(g.sessKontakt, g.sessions), unikkeLeadsKontakt: g.leadsKontakt.size, status: g.status };
     }).sort((a, b) => a.uge.localeCompare(b.uge) || a.kampagneId.localeCompare(b.kampagneId));
-    return json(200, { probe, from, to, sessions: seen.size, sider, afbrudt, listeFelter: [...listeFelter], raekker, apiKald: apiCalls });
+    return json(200, { probe, from, to, sessions: seenS.size, cdr: seenC.size, sider, afbrudt, listeFelter: [...listeFelter], raekker, apiKald: apiCalls });
   }
 
   if (url.searchParams.get("mode") === "salescount") {
