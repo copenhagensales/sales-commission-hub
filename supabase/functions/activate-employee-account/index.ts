@@ -266,7 +266,18 @@ serve(async (req) => {
     if (recipient && isEmail(recipient)) {
       try {
         const status = await udsend({
-...
+          type: "activate-employee-account", kanal: "mail", modtager: recipient, modtagerEmployeeId: employeeId, emne: "Velkommen til Copenhagen Sales — din adgang til Stork", afsenderfunktion: "activate-employee-account",
+          send: async () => {
+          await sendM365Mail({
+            to: [recipient],
+            subject: "Velkommen til Copenhagen Sales — din adgang til Stork",
+            html: welcomeHtml({
+              firstName,
+              workEmail,
+              startDate: formatDanishDate(startDate),
+            }),
+          });
+          },
         });
         mailSent = status === "sendt";
         if (!mailSent) mailError = `Ikke sendt (${status})`;
