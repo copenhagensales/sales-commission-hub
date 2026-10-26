@@ -137,6 +137,23 @@ async function leaderRecipients(
   return Array.from(out.values());
 }
 
+/** Typer slået fra i Udsendelser (pr. kald). Fail-open: fejler opslaget, = aktiv. */
+const typeCache = new Map<string, boolean>();
+async function typeSlaaetFra(db: Client, type: string): Promise<boolean> {
+  if (typeCache.has(type)) return typeCache.get(type)!;
+  let fra = false;
+  try {
+    const { data, error } = await db.from("udsendelsestyper").select("aktiv").eq("noegle", type).maybeSingle();
+    if (error) throw error;
+    fra = data?.aktiv === false;
+  } catch (e) {
+    console.error("quality-mails: typeopslag fejlede", type, e instanceof Error ? e.message : e);
+  }
+  typeCache.set(type, fra);
+  return fra;
+}
+
+/** Returnerer false, hvis typen er slået fra (intet lagt i kø). */
 async function queueMail(
   db: Client,
   args: {
@@ -148,7 +165,8 @@ async function queueMail(
     saleId?: string | null;
     teamId?: string | null;
   },
-) {
+): Promise<boolean> {
+  if (await typeSlaaetFra(db, args.mailType)) return false;
   const { error } = await db.from("scheduled_emails").insert({
     employee_id: args.recipient.employeeId ?? null,
     recipient_email: args.recipient.email,
@@ -173,6 +191,7 @@ async function queueMail(
   });
 
   if (error) throw error;
+  return true;
 }
 
 async function handleRejectedReview(db: Client, reviewId: string) {
@@ -216,8 +235,9 @@ async function handleRejectedReview(db: Client, reviewId: string) {
     saleLink: `${APP_URL}/kvalitetskontrol?sale=${review.sale_id}`,
   });
 
+  let queued = 0, skipped = 0;
   for (const recipient of recipients) {
-    await queueMail(db, {
+    if (await queueMail(db, {
       mailType: "quality_rejected",
       recipient,
       subject,
@@ -225,10 +245,10 @@ async function handleRejectedReview(db: Client, reviewId: string) {
       reviewId: review.id,
       saleId: review.sale_id,
       teamId: review.team_id,
-    });
+    })) queued++; else skipped++;
   }
 
-  return { queued: recipients.length };
+  return { queued, skipped, ...(skipped ? { skipped_reason: "quality_rejected" } : {}) };
 }
 
 /**
@@ -267,8 +287,9 @@ async function handleFeedbackReview(db: Client, reviewId: string) {
     saleLink: `${APP_URL}/kvalitetskontrol?sale=${review.sale_id}`,
   });
 
+  let queued = 0, skipped = 0;
   for (const recipient of recipients) {
-    await queueMail(db, {
+    if (await queueMail(db, {
       mailType: "quality_feedback",
       recipient,
       subject,
@@ -276,10 +297,10 @@ async function handleFeedbackReview(db: Client, reviewId: string) {
       reviewId: review.id,
       saleId: review.sale_id,
       teamId: review.team_id,
-    });
+    })) queued++; else skipped++;
   }
 
-  return { queued: recipients.length };
+  return { queued, skipped, ...(skipped ? { skipped_reason: "quality_feedback" } : {}) };
 }
 
 interface Counters {
@@ -432,14 +453,13 @@ async function handleDailySummary(
     });
 
     for (const recipient of await leaderRecipients(db, teamId)) {
-      await queueMail(db, {
+      if (await queueMail(db, {
         mailType: "quality_team_summary",
         recipient,
         subject,
         html,
         teamId,
-      });
-      leaderMails++;
+      })) leaderMails++; else skippedTypes.add("quality_team_summary");
     }
   }
 
@@ -497,7 +517,7 @@ async function handleDailySummary(
     const employee = (managementEmployees ?? []).find(
       (e) => (e.work_email ?? "").toLowerCase() === email,
     );
-    await queueMail(db, {
+    if (!(await queueMail(db, {
       mailType: "quality_management_summary",
       recipient: {
         email,
@@ -506,17 +526,23 @@ async function handleDailySummary(
       },
       subject: management.subject,
       html: management.html,
-    });
+    }))) { skippedTypes.add("quality_management_summary"); continue; }
     managementMails++;
   }
 
-  await db.from("quality_daily_completions").insert({
-    completion_date: date,
-    reviewer_employee_id: reviewerEmployeeId,
-    reviewed_count: todaysReviews.length,
-  });
+  // Completion blokerer genkørsel: skrives ikke, når en type var slået fra.
+  if (skippedTypes.size === 0) {
+    await db.from("quality_daily_completions").insert({
+      completion_date: date,
+      reviewer_employee_id: reviewerEmployeeId,
+      reviewed_count: todaysReviews.length,
+    });
+  }
 
-  return { already_done: false, leaders: leaderMails, management: managementMails };
+  return {
+    already_done: false, leaders: leaderMails, management: managementMails,
+    ...(skippedTypes.size ? { skipped: true, skipped_reason: [...skippedTypes].join(", ") } : {}),
+  };
 }
 
 Deno.serve(async (req) => {
