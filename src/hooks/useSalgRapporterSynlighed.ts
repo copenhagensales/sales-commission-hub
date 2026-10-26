@@ -12,32 +12,34 @@ export function useSalgRapporterSynlighed() {
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
   const { isSuperadmin } = useIsSuperadmin();
   const v = (k: string) => p.canView(k);
+  // Sektionsnøgler fra de gamle menupunkter (c2): ingen ser mere end før.
+  const fm = v("menu_section_fieldmarketing"), rap = v("menu_section_reports"), led = v("menu_section_ledelse"), mg = v("menu_section_mg");
 
   const fieldmarketing = {
-    "vagt-flow": v("menu_fm_overview"),
-    booking: v("menu_fm_booking"),
-    billing: v("menu_fm_billing"),
-    "eesy-fm-deviations": v("menu_fm_eesy_deviations"),
-    locations: v("menu_fm_locations"),
+    "vagt-flow": fm && v("menu_fm_overview"),
+    booking: fm && v("menu_fm_booking"),
+    billing: fm && v("menu_fm_billing"),
+    "eesy-fm-deviations": fm && v("menu_fm_eesy_deviations"),
+    locations: fm && v("menu_fm_locations"),
   };
   const retSalg = {
-    "tdc-erhverv-edit-sales": v("menu_reports_tdc_edit_sales"),
+    "tdc-erhverv-edit-sales": rap && v("menu_reports_tdc_edit_sales"),
     "tryg-edit-sales": !!trygEditAccess,
-    "edit-sales": v("menu_fm_edit_sales"),
+    "edit-sales": fm && v("menu_fm_edit_sales"),
   };
   const tdc = {
     "fiber-registrering": v("menu_tdc_opsummering"),
     "tdc-idriftsaettelse": v("menu_tdc_opsummering"),
     "tdc-opsummering": v("menu_tdc_opsummering"),
   };
-  const kunder = { "mg-test": v("menu_mg_test"), henvendelser: v("menu_customer_inquiries") };
+  const kunder = { "mg-test": mg && v("menu_mg_test"), henvendelser: led && v("menu_customer_inquiries") };
   const rapporter = {
-    admin: v("menu_reports_admin"),
-    management: v("menu_reports_management"),
-    daily: v("menu_reports_daily"),
-    "revenue-by-client": v("menu_reports_revenue_by_client") && !!isSuperadmin,
-    "weekly-lead-closure": v("menu_reports_weekly_lead_closure"),
-    cancellations: v("menu_cancellations"),
+    admin: rap && v("menu_reports_admin"),
+    management: rap && v("menu_reports_management"),
+    daily: rap && v("menu_reports_daily"),
+    "revenue-by-client": led && v("menu_reports_revenue_by_client") && !!isSuperadmin,
+    "weekly-lead-closure": led && v("menu_reports_weekly_lead_closure"),
+    cancellations: rap && v("menu_cancellations"),
   };
   const powerdag = {
     powerdag: v("menu_dashboard_powerdag"),
