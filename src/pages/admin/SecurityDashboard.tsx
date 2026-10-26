@@ -189,7 +189,7 @@ export default function SecurityDashboard() {
 
   // Filter failed attempts by search
   const filteredAttempts = failedAttempts.filter((attempt) =>
-    attempt.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (attempt.email ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     attempt.ip_address?.includes(searchTerm)
   );
 
@@ -202,7 +202,8 @@ export default function SecurityDashboard() {
 
   // Group attempts by email for statistics
   const attemptsByEmail = failedAttempts.reduce((acc, attempt) => {
-    acc[attempt.email] = (acc[attempt.email] || 0) + 1;
+    const key = attempt.email ?? "(ingen e-mail)";
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
@@ -404,7 +405,7 @@ export default function SecurityDashboard() {
                 ) : (
                   filteredAttempts.map((attempt) => (
                     <TableRow key={attempt.id}>
-                      <TableCell className="font-medium">{attempt.email}</TableCell>
+                      <TableCell className="font-medium">{attempt.email ?? "(ingen e-mail)"}</TableCell>
                       <TableCell className="font-mono text-sm">
                         {attempt.ip_address || "-"}
                       </TableCell>
