@@ -17715,6 +17715,145 @@ export type Database = {
         }
         Relationships: []
       }
+      udsendelser: {
+        Row: {
+          afsenderfunktion: string
+          emne: string | null
+          fejl: string | null
+          id: string
+          kanal: string
+          metadata: Json
+          modtager: string
+          modtager_candidate_id: string | null
+          modtager_employee_id: string | null
+          modtager_user_id: string | null
+          reference: string | null
+          status: string
+          tidspunkt: string
+          type_noegle: string
+        }
+        Insert: {
+          afsenderfunktion: string
+          emne?: string | null
+          fejl?: string | null
+          id?: string
+          kanal: string
+          metadata?: Json
+          modtager: string
+          modtager_candidate_id?: string | null
+          modtager_employee_id?: string | null
+          modtager_user_id?: string | null
+          reference?: string | null
+          status: string
+          tidspunkt?: string
+          type_noegle: string
+        }
+        Update: {
+          afsenderfunktion?: string
+          emne?: string | null
+          fejl?: string | null
+          id?: string
+          kanal?: string
+          metadata?: Json
+          modtager?: string
+          modtager_candidate_id?: string | null
+          modtager_employee_id?: string | null
+          modtager_user_id?: string | null
+          reference?: string | null
+          status?: string
+          tidspunkt?: string
+          type_noegle?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "udsendelser_type_noegle_fkey"
+            columns: ["type_noegle"]
+            isOneToOne: false
+            referencedRelation: "udsendelsestyper"
+            referencedColumns: ["noegle"]
+          },
+        ]
+      }
+      udsendelsespraeferencer: {
+        Row: {
+          aktiv: boolean
+          kanal: string
+          opdateret: string
+          type_noegle: string
+          user_id: string
+        }
+        Insert: {
+          aktiv?: boolean
+          kanal: string
+          opdateret?: string
+          type_noegle: string
+          user_id: string
+        }
+        Update: {
+          aktiv?: boolean
+          kanal?: string
+          opdateret?: string
+          type_noegle?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "udsendelsespraeferencer_type_noegle_fkey"
+            columns: ["type_noegle"]
+            isOneToOne: false
+            referencedRelation: "udsendelsestyper"
+            referencedColumns: ["noegle"]
+          },
+        ]
+      }
+      udsendelsestyper: {
+        Row: {
+          afsenderfunktion: string
+          aktiv: boolean
+          beskrivelse: string
+          kanal: string
+          modtagerregel: string
+          navn: string
+          noegle: string
+          opdateret: string
+          oprettet: string
+          skabelon_noegle: string | null
+          stille_fra: string | null
+          stille_til: string | null
+          udloeser: string
+        }
+        Insert: {
+          afsenderfunktion: string
+          aktiv?: boolean
+          beskrivelse?: string
+          kanal: string
+          modtagerregel?: string
+          navn: string
+          noegle: string
+          opdateret?: string
+          oprettet?: string
+          skabelon_noegle?: string | null
+          stille_fra?: string | null
+          stille_til?: string | null
+          udloeser: string
+        }
+        Update: {
+          afsenderfunktion?: string
+          aktiv?: boolean
+          beskrivelse?: string
+          kanal?: string
+          modtagerregel?: string
+          navn?: string
+          noegle?: string
+          opdateret?: string
+          oprettet?: string
+          skabelon_noegle?: string | null
+          stille_fra?: string | null
+          stille_til?: string | null
+          udloeser?: string
+        }
+        Relationships: []
+      }
       user_menu_permissions: {
         Row: {
           created_at: string | null
@@ -18562,6 +18701,19 @@ export type Database = {
           oprettet: string | null
           team: string | null
           teamskifte_motivation: string | null
+        }
+        Relationships: []
+      }
+      udsendelser_historik: {
+        Row: {
+          emne: string | null
+          fejl: string | null
+          kanal: string | null
+          kilde: string | null
+          modtager: string | null
+          status: string | null
+          tidspunkt: string | null
+          type_noegle: string | null
         }
         Relationships: []
       }
