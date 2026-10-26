@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { udsendFlere, udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -270,7 +271,11 @@ serve(async (req) => {
         </div>
       `;
 
-      await sendEmail(accessToken, recipientEmails, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody);
+      await udsendFlere({
+        type: "notify-vehicle-returned-mail", kanal: "mail", afsenderfunktion: "notify-vehicle-returned", emne: `Nøgle afleveret: ${vehicle_name} (${booking_date})`,
+        modtagere: (recipientEmails as string[]).map((m) => ({ modtager: m })),
+        send: async (tilladte) => { await sendEmail(accessToken, tilladte, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody); },
+      });
       console.log("[notify-vehicle-returned] Email sent to", recipientEmails.length, "recipients");
     } else {
       console.warn("[notify-vehicle-returned] No email recipients found");
@@ -287,7 +292,14 @@ serve(async (req) => {
       const smsBody = `🔑 ${vehicle_name} afleveret d. ${dateStr} kl. ${timeStr} af ${employeeName}`;
 
       const smsResults = await Promise.all(
-        smsRecipientNumbers.map(num => sendSmsViaTwilio(num, smsBody))
+        smsRecipientNumbers.map((num) =>
+          udsend({
+            type: "notify-vehicle-returned-sms", kanal: "sms", modtager: num, afsenderfunktion: "notify-vehicle-returned",
+            send: async () => {
+              if (!(await sendSmsViaTwilio(num, smsBody))) throw new Error("SMS ikke sendt");
+            },
+          }).then((st) => st === "sendt").catch(() => false)
+        )
       );
       smsSentCount = smsResults.filter(Boolean).length;
       console.log("[notify-vehicle-returned] SMS sent to", smsSentCount, "of", smsRecipientNumbers.length);
