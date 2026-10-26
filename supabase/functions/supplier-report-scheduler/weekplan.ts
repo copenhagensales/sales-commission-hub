@@ -3,6 +3,7 @@
 // som leverandørrapporten. Ingen godkendelse, ingen beløb, ingen sælgernavne.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
+import { udsend } from "../_shared/udsend.ts";
 import {
   buildClientWeekPlanEmail,
   buildWeekPlanEmptyWarningEmail,
@@ -409,13 +410,19 @@ export async function runWeekPlans(
 
     const cc = (sub.cc_emails ?? []).filter((e) => !!e?.trim());
     const recipient = String(sub.recipient_email).trim();
+    let status: string;
+    let sentTo: string[] = [];
     try {
-      await sendM365Mail({
-        to: [recipient],
-        cc,
-        subject: mail.subject,
-        html: mail.html,
+      status = await udsend({
+        type: "supplier-report-scheduler", kanal: "mail", modtager: recipient, emne: mail.subject, afsenderfunktion: "supplier-report-scheduler",
+        send: async () => { await sendM365Mail({ to: [recipient], cc, subject: mail.subject, html: mail.html }); },
       });
+      // CC-modtagere logges hver for sig (samme mail).
+      for (const m of cc) {
+        if (status !== "sendt") break;
+        await udsend({ type: "supplier-report-scheduler", kanal: "mail", modtager: m, emne: mail.subject, afsenderfunktion: "supplier-report-scheduler", metadata: { cc: true }, send: async () => {} });
+      }
+      sentTo = [recipient, ...cc];
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await svc
