@@ -1,8 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
-import { StrukturMenu } from "./StrukturMenu";
-import { findSide, MIT_ARBEJDE } from "@/config/struktur";
-import { usePermissions } from "@/hooks/usePositionPermissions";
+import { StrukturMenu, useSynligStruktur } from "./StrukturMenu";
+import { MIT_ARBEJDE } from "@/config/struktur";
 
 interface PreviewSidebarProps {
   isMobile?: boolean;
@@ -14,7 +13,6 @@ interface PreviewSidebarProps {
 /** Rolle-forhåndsvisning: samme menu som AppSidebar (STRUKTUR), med den forhåndsviste rolles rettigheder. */
 export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarProps) {
   const navigate = useNavigate();
-  const p = usePermissions();
   // Respekterer sidebar_menu_config (skjul/label) og samme synlighed som de øvrige punkter.
   const profil = useSynligStruktur().flatMap((o) => o.sider).find((sd) => sd.id === "side_min_profil");
   const top = isMobile && profil ? [profil] : [];

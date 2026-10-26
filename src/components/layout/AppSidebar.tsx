@@ -42,8 +42,8 @@ import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import { useCanViewRampTeam } from "@/hooks/useRampTeam";
 import { useQualityAccess } from "@/hooks/useQualityControl";
 import { ViewAsSelector } from "./ViewAsSelector";
-import { StrukturMenu } from "./StrukturMenu";
-import { findSide, MIT_ARBEJDE } from "@/config/struktur";
+import { StrukturMenu, useSynligStruktur } from "./StrukturMenu";
+import { MIT_ARBEJDE } from "@/config/struktur";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
 import { useInvoiceflowAccess } from "@/hooks/useInvoiceflow";
@@ -401,6 +401,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     side_rekruttering: tal(pendingReferralsCount + recruitmentNotificationsCount),
     side_compliance: p.canView("menu_compliance_admin") ? tal(complianceReviewCount ?? 0) : null,
   };
+  const synligStruktur = useSynligStruktur();
   // Respekterer sidebar_menu_config (skjul/label) og samme synlighed som de øvrige punkter.
   const profilSide = synligStruktur.flatMap((o) => o.sider).find((sd) => sd.id === "side_min_profil");
   // Telefonens Menu-skuffe: Mit arbejde ligger i bundbjælken/Mig; Min profil står øverst.
