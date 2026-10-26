@@ -432,9 +432,10 @@ serve(async (req: Request) => {
 
     const htmlBody = buildHtml(emailBody, is_followup, isTest);
 
+    let status: string;
     try {
       const accessToken = await getM365AccessToken();
-      await udsendFlere({
+      status = await udsendFlere({
         type: "send-deactivation-reminder", kanal: "mail", afsenderfunktion: "send-deactivation-reminder", emne: subject,
         modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
         send: async (tilladte) => { await sendEmail(accessToken, tilladte, subject, htmlBody); },
@@ -455,6 +456,13 @@ serve(async (req: Request) => {
         });
       }
       throw sendError;
+    }
+
+    if (status !== "sendt") {
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: status }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (isTest) {

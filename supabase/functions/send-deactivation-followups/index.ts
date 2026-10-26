@@ -229,11 +229,12 @@ serve(async (req: Request) => {
       }
 
       try {
-        await udsendFlere({
+        const status = await udsendFlere({
           type: "send-deactivation-followups", kanal: "mail", afsenderfunktion: "send-deactivation-followups", emne: subject,
           modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
           send: async (tilladte) => { await sendEmail(accessToken, tilladte, subject, htmlBody); },
         });
+        if (status !== "sendt") { skippedCount++; continue; }
       } catch (emailError) {
         console.error(`Failed to send followup for ${reminder.id}:`, emailError);
         continue;
@@ -250,7 +251,7 @@ serve(async (req: Request) => {
 
     console.log(`Completed: sent ${sentCount} followup emails`);
 
-    return new Response(JSON.stringify({ success: true, sentCount }), {
+    return new Response(JSON.stringify({ success: true, sentCount, skippedCount }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
