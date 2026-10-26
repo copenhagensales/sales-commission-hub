@@ -21,7 +21,6 @@ import {
   useUdsendelsestyper, useOpdaterUdsendelsestype, useUdsendelseLog, useModtagerValg, useSendBesked,
   type LogFilter, type UdsendelseLogRaekke, type Kanal, type SendBesked,
 } from "@/hooks/useUdsendelser";
-import { PUSH_TEXT } from "@/lib/push/pushText";
 import * as P from "@/routes/pages";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
