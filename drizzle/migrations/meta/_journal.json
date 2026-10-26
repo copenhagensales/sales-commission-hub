@@ -505,6 +505,13 @@
       "when": 1792933860371,
       "tag": "0071_invoiceflow_runs_browserbase",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793010613963,
+      "tag": "0072_migration",
+      "breakpoints": true
     }
   ]
 }
