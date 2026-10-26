@@ -4,9 +4,9 @@ import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useCanAccess } from "@/hooks/useSystemRoles";
 import { 
-  LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, 
+  LayoutDashboard, Users, Wallet, Settings, 
   Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight,
-  Car, Clock, UserCheck, Receipt, Database, ListChecks, Timer, 
+  Car, Clock, UserCheck, Receipt, Database, ListChecks, 
   FileText, Crown, User, Sparkles, BarChart3, Video, Phone, FlaskConical,
   Home, Inbox
 } from "lucide-react";
