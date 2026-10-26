@@ -15,8 +15,9 @@ interface PreviewSidebarProps {
 export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarProps) {
   const navigate = useNavigate();
   const p = usePermissions();
-  const profil = findSide("side_min_profil");
-  const top = isMobile && p.canViewMyProfile && profil ? [profil] : [];
+  // Respekterer sidebar_menu_config (skjul/label) og samme synlighed som de øvrige punkter.
+  const profil = useSynligStruktur().flatMap((o) => o.sider).find((sd) => sd.id === "side_min_profil");
+  const top = isMobile && profil ? [profil] : [];
   const sidebarClasses = isMobile
     ? "h-full w-full bg-sidebar overflow-y-auto pt-safe pb-safe"
     : "fixed left-0 top-10 z-40 h-[calc(100vh-40px)] w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto";

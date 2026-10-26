@@ -401,9 +401,10 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     side_rekruttering: tal(pendingReferralsCount + recruitmentNotificationsCount),
     side_compliance: p.canView("menu_compliance_admin") ? tal(complianceReviewCount ?? 0) : null,
   };
-  const profilSide = findSide("side_min_profil");
+  // Respekterer sidebar_menu_config (skjul/label) og samme synlighed som de øvrige punkter.
+  const profilSide = synligStruktur.flatMap((o) => o.sider).find((sd) => sd.id === "side_min_profil");
   // Telefonens Menu-skuffe: Mit arbejde ligger i bundbjælken/Mig; Min profil står øverst.
-  const mobilTop = isMobile && p.canViewMyProfile && profilSide ? [profilSide] : [];
+  const mobilTop = isMobile && profilSide ? [profilSide] : [];
 
   return (
     <aside className={sidebarClasses}>
