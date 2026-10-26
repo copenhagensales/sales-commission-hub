@@ -7,7 +7,12 @@ export function redirectTo(to: string) {
   if (!c) {
     c = function RedirectKeepQuery() {
       const { search } = useLocation();
-      return <Navigate to={`${to}${search}`} replace />;
+      // Bevar den gamle query-streng; mål-parametre (fx tab=) lægges til/vinder.
+      const [path, targetQuery = ""] = to.split("?");
+      const merged = new URLSearchParams(search);
+      new URLSearchParams(targetQuery).forEach((v, k) => merged.set(k, v));
+      const q = merged.toString();
+      return <Navigate to={`${path}${q ? `?${q}` : ""}`} replace />;
     };
     redirectCache.set(to, c);
   }

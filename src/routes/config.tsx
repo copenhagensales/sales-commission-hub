@@ -179,7 +179,7 @@ export const routes: RouteConfig[] = [
   { path: "/storkbook/demo", component: redirectTo("/storkbook"), access: "protected" },
   { path: "/pulsen", component: PulsenRedirect, access: "protected" },
   { path: "/pulsen/demo", component: redirectTo("/storkbook"), access: "protected" },
-  { path: "/head-to-head", component: HeadToHead, access: "role", positionPermission: "menu_h2h" },
+  { path: "/head-to-head", component: redirectTo("/spil?tab=head2head"), access: "protected" },
   
   { path: "/my-schedule", component: MyScheduleRedirect, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "role", positionPermission: "menu_my_profile" },
@@ -189,16 +189,19 @@ export const routes: RouteConfig[] = [
   { path: "/my-contracts", component: MyContractsRedirect, access: "protected" },
   { path: "/pulse-survey", component: PulseSurvey, access: "protected" },
   { path: "/career-wishes", component: CareerWishesRedirect, access: "protected" },
-  { path: "/car-quiz", component: CarQuiz, access: "protected" },
-  { path: "/code-of-conduct", component: CodeOfConduct, access: "protected" },
-  { path: "/time-stamp", component: TimeStamp, access: "role", positionPermission: "menu_time_stamp" },
-  { path: "/my-time-clock", component: redirectTo("/time-stamp"), access: "protected" },
+  { path: "/car-quiz", component: redirectTo("/my-profile?tab=kodeks"), access: "protected" },
+  { path: "/code-of-conduct", component: redirectTo("/my-profile?tab=kodeks"), access: "protected" },
+  { path: "/time-stamp", component: redirectTo("/vagter?tab=stempelur"), access: "protected" },
+  { path: "/my-time-clock", component: redirectTo("/vagter?tab=stempelur"), access: "protected" },
   { path: "/extra-work", component: redirectTo("/home"), access: "protected" },
   { path: "/messages", component: Messages, access: "role", positionPermission: "menu_messages_personal" },
-  { path: "/refer-a-friend", component: ReferAFriend, access: "role", positionPermission: "menu_refer_a_friend" },
-  { path: "/perks", component: EmployeePerks, access: "role", positionPermission: "menu_employee_perks" },
-  { path: "/immediate-payment-ase", component: ImmediatePaymentASE, access: "protected" },
-  { path: "/commission-league", component: CommissionLeague, access: "role", positionPermission: "menu_commission_league" },
+  { path: "/refer-a-friend", component: redirectTo("/my-profile?tab=anbefal"), access: "protected" },
+  { path: "/perks", component: redirectTo("/my-profile?tab=fordele"), access: "protected" },
+  { path: "/immediate-payment-ase", component: redirectTo("/registrer-salg?tab=straksbetaling"), access: "protected" },
+  { path: "/vagter", component: VagterSamleside, access: "protected" },
+  { path: "/registrer-salg", component: RegistrerSalgSamleside, access: "protected" },
+  { path: "/spil", component: SpilSamleside, access: "protected" },
+  { path: "/commission-league", component: redirectTo("/spil?tab=superligaen"), access: "protected" },
   
 
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
@@ -225,7 +228,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 
-  { path: "/vagt-flow/my-schedule", component: MyBookingSchedule, access: "role", positionPermission: "menu_fm_my_schedule" },
+  { path: "/vagt-flow/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
   { path: "/vagt-flow", component: VagtFlowIndex, access: "role", positionPermission: "menu_fm_overview" },
   {
     path: "/vagt-flow/booking",
@@ -244,19 +247,14 @@ export const routes: RouteConfig[] = [
   { path: "/vagt-flow/bookings", component: redirectTo("/vagt-flow/booking"), access: "protected" },
   { path: "/vagt-flow/vehicles", component: redirectTo("/vagt-flow"), access: "protected" },
   { path: "/vagt-flow/time-off", component: redirectTo("/shift-planning/absence"), access: "protected" },
-  {
-    path: "/vagt-flow/sales-registration",
-    component: VagtSalesRegistration,
-    access: "role",
-    positionPermission: "menu_fm_sales_registration",
-  },
+  { path: "/vagt-flow/sales-registration", component: redirectTo("/registrer-salg?tab=fm"), access: "protected" },
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/travel-expenses", component: redirectTo("/vagt-flow"), access: "protected" },
   { path: "/vagt-flow/edit-sales", component: VagtEditSalesRegistrations, access: "role", positionPermission: "menu_fm_edit_sales" },
   { path: "/vagt-flow/eesy-fm-deviations", component: VagtEesyFmDeviations, access: "role", positionPermission: "menu_fm_eesy_deviations" },
 
   { path: "/shift-planning", component: ShiftOverview, access: "role", positionPermission: "menu_shift_overview" },
-  { path: "/shift-planning/my-schedule", component: MySchedule, access: "protected" },
+  { path: "/shift-planning/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
   { path: "/shift-planning/absence", component: AbsenceManagement, access: "role", positionPermission: "menu_absence" },
   { path: "/shift-planning/time-tracking", component: redirectTo("/shift-planning"), access: "protected" },
 
@@ -408,7 +406,7 @@ export const routes: RouteConfig[] = [
     positionPermission: "menu_onboarding_admin",
   },
   { path: "/onboarding-program/kursus", component: redirectTo("/onboarding-program"), access: "protected" },
-  { path: "/my-feedback", component: MyFeedback, access: "role", positionPermission: "menu_my_feedback" },
+  { path: "/my-feedback", component: redirectTo("/my-profile?tab=feedback"), access: "protected" },
   { path: "/coaching-templates", component: CoachingTemplates, access: "role", positionPermission: "menu_onboarding_admin" },
   // Fareflag: adgangen haandhaeves i databasen og i selve siden (kun ledere)
   { path: "/opstartshold", component: RampTeam, access: "protected" },
@@ -521,7 +519,7 @@ export const routes: RouteConfig[] = [
   { path: "/admin/menu-editor", component: MenuEditor, access: "role", positionPermission: "menu_permissions" },
 
   // Manual sales entry (team United — enforced in the edge function)
-  { path: "/tast-selv-salg", component: TastSelvSalg, access: "protected" },
+  { path: "/tast-selv-salg", component: redirectTo("/registrer-salg?tab=salg"), access: "protected" },
 
   // IT (stab only — enforced by permission + staff flag in DB)
   { path: "/it/arbejdsstationer", component: ItWorkstations, access: "role", positionPermission: "menu_it_workstations" },
