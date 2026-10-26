@@ -12,6 +12,7 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface MissingShiftsAlertProps {
   weekStart: Date;
@@ -79,10 +80,10 @@ export function MissingShiftsAlert({
     queryKey: ["team-memberships-for-missing-shifts"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("team_memberships" as any)
+        .from("team_members")
         .select("employee_id, team_id");
       if (error) throw error;
-      return data as unknown as { employee_id: string; team_id: string }[];
+      return data satisfies Pick<Database["public"]["Tables"]["team_members"]["Row"], "employee_id" | "team_id">[];
     },
     staleTime: 5 * 60 * 1000,
   });
