@@ -17821,6 +17821,7 @@ export type Database = {
           push_link: string | null
           push_tekst: string | null
           push_titel: string | null
+          regel_ledere: boolean
           regel_noegle: string | null
           regel_roller: string[]
           regel_teams: string[]
@@ -17844,6 +17845,7 @@ export type Database = {
           push_link?: string | null
           push_tekst?: string | null
           push_titel?: string | null
+          regel_ledere?: boolean
           regel_noegle?: string | null
           regel_roller?: string[]
           regel_teams?: string[]
@@ -17867,6 +17869,7 @@ export type Database = {
           push_link?: string | null
           push_tekst?: string | null
           push_titel?: string | null
+          regel_ledere?: boolean
           regel_noegle?: string | null
           regel_roller?: string[]
           regel_teams?: string[]
