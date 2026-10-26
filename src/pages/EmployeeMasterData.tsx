@@ -1088,6 +1088,9 @@ export default function EmployeeMasterData() {
           <TabsContent value="permissions" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
+                <Link to="/admin?tab=rettigheder" className="mb-4 inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+                  Åbn under Administration › Rettigheder
+                </Link>
                 <PermissionsTab />
               </CardContent>
             </Card>
