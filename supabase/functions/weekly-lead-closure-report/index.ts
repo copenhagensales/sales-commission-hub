@@ -1227,6 +1227,7 @@ function buildMail(
         null,
       error: j.error ?? "ukendt fejl",
     })),
+    notice,
   });
 }
 
@@ -1839,6 +1840,11 @@ Deno.serve(async (req) => {
       accounts?: string[];
       /** Kun leveringsstatus (Tryg): ugetal, opkald og mail røres ikke. */
       flow_only?: boolean;
+      /** Gensendelse: kort linje øverst i mailen. */
+      notice?: string;
+      /** Låste uger, der må genskrives — kun med Kaspers udtrykkelige ordre (unlock_order). */
+      unlock_weeks?: string[];
+      unlock_order?: string;
     };
 
     if (body.action === "status") {
@@ -1962,6 +1968,8 @@ Deno.serve(async (req) => {
       const config = await loadConfig(svc);
       const summary = await taskSummary(svc, body.run_id);
       if (summary.pending > 0 || summary.running > 0) return json(409, { error: "Kørslen er ikke færdig" });
+      const testRecipient = safeString(body.test_recipient).toLowerCase() || undefined;
+      if (testRecipient && !testRecipient.endsWith(OUR_DOMAIN)) return json(400, { error: "Testmodtager skal være intern" });
       const state: RunState = {
         runId: body.run_id,
         weeks: [4, 3, 2, 1, 0].map((n) => addDays(body.week_start!, -7 * n)),
@@ -1969,9 +1977,12 @@ Deno.serve(async (req) => {
         forceMail: true,
         triggeredBy: "manuel",
         flowOnly: false,
+        notice: safeString(body.notice).slice(0, 300) || undefined,
+        testRecipient,
+        resend: true,
       };
       const finished = await finishAndMail(svc, config, state, summary.failed);
-      return json(200, { stage: "mail gensendt", recipients: config.recipients, ...finished });
+      return json(200, { stage: "mail gensendt", recipients: testRecipient ? [testRecipient] : config.recipients, ...finished });
     }
 
     if (body.action === "sync_campaign_names") {
@@ -2035,7 +2046,28 @@ Deno.serve(async (req) => {
       const onlyCampaigns = Array.isArray(body.campaign_ids) && body.campaign_ids.length > 0
         ? body.campaign_ids.map((c) => safeString(c))
         : null;
-      const tasks = await enqueueTasks(svc, config, runId, weeks, onlyAccounts, onlyCampaigns);
+      // Ugelås: kun uger, der ikke er låst, tælles. Mandagskørslen (cron) tæller
+      // kun den netop afsluttede uge; ældre uger læses fra de gemte, låste tal.
+      const unlockWeeks = (Array.isArray(body.unlock_weeks) ? body.unlock_weeks : [])
+        .map((w) => safeString(w)).filter((w) => /^\d{4}-\d{2}-\d{2}$/.test(w) && weeks.includes(w));
+      if (unlockWeeks.length > 0) {
+        const order = safeString(body.unlock_order).trim();
+        if (triggeredBy === "cron" || !order) {
+          throw new Error("unlock_weeks kræver unlock_order (Kaspers ordre) og en manuel kørsel");
+        }
+        const until = new Date(Date.now() + 3 * 3600_000).toISOString();
+        const { error: unlockError } = await svc.from("weekly_lead_closure_locks")
+          .update({ unlocked_until: until, unlocked_by_run: runId, unlock_order: order.slice(0, 500) })
+          .in("week_start", unlockWeeks);
+        if (unlockError) throw new Error(`Kunne ikke låse op: ${unlockError.message}`);
+        await svc.from("weekly_lead_closure_runs")
+          .update({ unlock_log: `låst op: ${unlockWeeks.join(", ")} – ordre: ${order.slice(0, 500)}` })
+          .eq("id", runId);
+      }
+      const locked = await lockedWeeks(svc, weeks);
+      const candidates = triggeredBy === "cron" ? weeks.slice(-1) : weeks;
+      const countWeeks = candidates.filter((w) => !locked.has(w));
+      const tasks = await enqueueTasks(svc, config, runId, countWeeks, onlyAccounts, onlyCampaigns);
       await chainNext(state);
       return json(200, { stage: "startet", runId, weeks, tasks });
     }
