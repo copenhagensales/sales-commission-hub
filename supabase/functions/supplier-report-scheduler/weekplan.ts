@@ -351,11 +351,15 @@ export async function runWeekPlans(
         });
         continue;
       }
-      await sendM365Mail({
-        to: [opts.testEmail],
-        subject: `[TEST] ${mail.subject}`,
-        html: mail.html,
+      const testStatus = await udsendFlere({
+        type: "supplier-report-scheduler", kanal: "mail", emne: `[TEST] ${mail.subject}`, afsenderfunktion: "supplier-report-scheduler",
+        modtagere: [{ modtager: opts.testEmail }],
+        send: async (tilladte) => { await sendM365Mail({ to: tilladte, subject: `[TEST] ${mail.subject}`, html: mail.html }); },
       });
+      if (testStatus !== "sendt") {
+        results.push({ ...base, locations, totalDays, action: "skipped_blocked", detail: `testmail sprunget over: ${testStatus}` });
+        continue;
+      }
       results.push({ ...base, locations, totalDays, action: "test_mail" });
       continue;
     }
@@ -389,6 +393,7 @@ export async function runWeekPlans(
 
     if (locations.length === 0) {
       const to = await internalAlertRecipient(svc, sub.approver_employee_id);
+      let warnStatus: string | null = null;
       if (to) {
         const warn = buildWeekPlanEmptyWarningEmail({
           clientName,
@@ -396,14 +401,18 @@ export async function runWeekPlans(
           weekStart,
           weekEnd,
         });
-        await sendM365Mail({ to: [to], subject: warn.subject, html: warn.html });
+        warnStatus = await udsendFlere({
+          type: "supplier-report-scheduler", kanal: "mail", emne: warn.subject, afsenderfunktion: "supplier-report-scheduler",
+          modtagere: [{ modtager: to }],
+          send: async (tilladte) => { await sendM365Mail({ to: tilladte, subject: warn.subject, html: warn.html }); },
+        });
       }
       results.push({
         ...base,
         locations,
         totalDays,
         action: "skipped_empty",
-        detail: to ? `intern advarsel sendt til ${to}` : "ingen intern modtager fundet",
+        detail: !to ? "ingen intern modtager fundet" : warnStatus === "sendt" ? `intern advarsel sendt til ${to}` : `intern advarsel sprunget over: ${warnStatus}`,
       });
       continue;
     }
