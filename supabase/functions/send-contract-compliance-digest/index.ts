@@ -210,13 +210,15 @@ const handler = async (req: Request): Promise<Response> => {
     await udsendFlere({
       type: "send-contract-compliance-digest", kanal: "mail", afsenderfunktion: "send-contract-compliance-digest", emne: `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
       modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
-      send: async (tilladte) => { await sendEmail(
-      accessToken,
-      tilladte, },
+      send: async (tilladte) => {
+        await sendEmail(
+          accessToken,
+          tilladte,
+          `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
+          htmlBody
+        );
+      },
     });
-      `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
-      htmlBody
-    );
 
     console.log(`Digest sent to ${recipients.length} recipient(s)`);
     return new Response(
