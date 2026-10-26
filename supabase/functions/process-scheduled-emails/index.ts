@@ -92,10 +92,13 @@ Deno.serve(async (req) => {
 
     // Udsendelsestype = template_key, hvis den findes som nøgle; ellers funktionens navn (fail-open).
     let kendteTyper = new Set<string>();
+    // Kun når typelisten er hentet, må en blokering annullere mails (ellers: bliv pending).
+    let typerHentet = false;
     try {
       const { data: typer, error: typeErr } = await supabase.from('udsendelsestyper').select('noegle');
       if (typeErr) throw typeErr;
       kendteTyper = new Set((typer ?? []).map((t: { noegle: string }) => t.noegle));
+      typerHentet = true;
     } catch (e) {
       console.error('udsend: kunne ikke hente udsendelsestyper', e);
     }
@@ -164,10 +167,13 @@ Deno.serve(async (req) => {
         };
         if (udsendStatus && blokeret[udsendStatus]) {
           // Blokeret i Udsendelser: annulleres, så den ikke fylder i næste batch.
-          await supabase
-            .from('scheduled_emails')
-            .update({ status: 'cancelled', error_message: blokeret[udsendStatus] })
-            .eq('id', email.id);
+          // Uden hentet typeliste (fallback-type) bliver den stående som pending.
+          if (typerHentet) {
+            await supabase
+              .from('scheduled_emails')
+              .update({ status: 'cancelled', error_message: blokeret[udsendStatus] })
+              .eq('id', email.id);
+          }
           continue;
         }
         if (!emailResponse) {
