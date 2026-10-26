@@ -38,8 +38,9 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   sendt: "default", sent: "default", fejl: "destructive", failed: "destructive", error: "destructive",
 };
 
-const regelTekst = (t: Pick<Udsendelsestype, "regel_roller" | "regel_teams" | "regel_noegle">) => {
+const regelTekst = (t: Pick<Udsendelsestype, "regel_roller" | "regel_teams" | "regel_noegle" | "regel_ledere">) => {
   const dele = [
+    t.regel_ledere ? "ledere" : null,
     t.regel_roller?.length ? t.regel_roller.join(", ") : null,
     t.regel_teams?.length ? `${t.regel_teams.length} ${t.regel_teams.length === 1 ? "team" : "teams"}` : null,
     t.regel_noegle || null,
@@ -76,15 +77,17 @@ function ModtagerDialog({ type, luk }: { type: Udsendelsestype | null; luk: () =
   const [roller, setRoller] = useState<string[]>([]);
   const [teams, setTeams] = useState<string[]>([]);
   const [noegle, setNoegle] = useState<string>(INGEN);
+  const [ledere, setLedere] = useState(false);
   const [aaben, setAaben] = useState<string | null>(null);
   if (type && aaben !== type.noegle) {
     setAaben(type.noegle);
     setRoller(type.regel_roller ?? []);
     setTeams(type.regel_teams ?? []);
     setNoegle(type.regel_noegle || INGEN);
+    setLedere(!!type.regel_ledere);
   }
   const gem = (lukBagefter: boolean) => type && opd.mutate(
-    { noegle: type.noegle, regel_roller: roller, regel_teams: teams, regel_noegle: noegle === INGEN ? null : noegle },
+    { noegle: type.noegle, regel_roller: roller, regel_teams: teams, regel_noegle: noegle === INGEN ? null : noegle, regel_ledere: ledere },
     { onSuccess: () => { toast.success("Modtagerregel gemt"); if (lukBagefter) { setAaben(null); luk(); } }, onError: () => toast.error("Kunne ikke gemme") },
   );
   return (
@@ -95,6 +98,10 @@ function ModtagerDialog({ type, luk }: { type: Udsendelsestype | null; luk: () =
           <DialogDescription>Tomme felter betyder alle. Ejere får altid udsendelsen.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
+            <Checkbox checked={ledere} onCheckedChange={(c) => setLedere(c === true)} />
+            Teamledere og assistenter
+          </label>
           <FlereValg titel="Roller" valgt={roller} saet={setRoller}
             valg={(valg.data?.roller ?? []).map((r) => ({ v: r.key, l: r.label }))} />
           <FlereValg titel="Teams" valgt={teams} saet={setTeams}

@@ -44,7 +44,7 @@ export function useUdsendelsestyper() {
 export function useOpdaterUdsendelsestype() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "push_titel" | "push_tekst" | "push_link" | "gruppe" | "til_medarbejdere">>) => {
+    mutationFn: async ({ noegle, ...ret }: { noegle: string } & Partial<Pick<Udsendelsestype, "aktiv" | "navn" | "modtagerregel" | "beskrivelse" | "stille_fra" | "stille_til" | "regel_roller" | "regel_teams" | "regel_noegle" | "regel_ledere" | "push_titel" | "push_tekst" | "push_link" | "gruppe" | "til_medarbejdere">>) => {
       const { error } = await supabase.from("udsendelsestyper").update({ ...ret, opdateret: new Date().toISOString() }).eq("noegle", noegle);
       if (error) throw error;
     },
