@@ -1,5 +1,5 @@
 import { ComponentType, ReactNode, Suspense, useEffect } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { RouteSkeleton } from "@/components/mobile";
@@ -10,14 +10,13 @@ export interface SamlesideFane {
   label: string;
   element: ReactNode;
   synlig: boolean;
-  /** Flere faner kan dele én plads i fanebjælken; de vælges med en undervælger. */
+  /** Flere faner kan dele én hovedfane; de vælges med en undervælger (?side=<id>). */
   gruppe?: { id: string; label: string };
 }
 
 interface SamlesideProps {
   titel: string;
   faner: SamlesideFane[];
-  standard?: string;
   /**
    * Fane, hvis side selv bruger ?tab= til egne underfaner (fx EmployeeMasterData).
    * Ukendte tab-værdier tilhører denne fane, og når den vælges, fjernes tab= fra adressen.
@@ -29,30 +28,37 @@ interface SamlesideProps {
   layout?: ComponentType<{ children: ReactNode }>;
 }
 
-/** Valgt fane: ?tab= → sidst valgte (localStorage) → standard → første synlige. */
-export function vaelgFane(synlige: string[], fraUrl: string | null, gemt: string | null, standard?: string): string | null {
-  for (const k of [fraUrl, gemt, standard ?? null]) if (k && synlige.includes(k)) return k;
-  return synlige[0] ?? null;
+const SIDE = "side";
+
+/**
+ * Valgt fane ud fra adressen. Uden gyldig værdi: første synlige (ingen hukommelse – forudsigeligt).
+ * tab=<hovedfane>&side=<id> vælger en underside; tab=<id> på en underside virker også (gamle links).
+ */
+export function vaelgFane(
+  synlige: { id: string; gruppe?: { id: string } }[],
+  tab: string | null,
+  side: string | null,
+): string | null {
+  if (tab) {
+    if (synlige.some((f) => f.id === tab && !f.gruppe)) return tab;
+    const iGruppe = synlige.filter((f) => f.gruppe?.id === tab);
+    if (iGruppe.length) return (iGruppe.find((f) => f.id === side) ?? iGruppe[0]).id;
+    if (synlige.some((f) => f.id === tab)) return tab;
+  }
+  return synlige[0]?.id ?? null;
 }
 
 /** Samler flere eksisterende sider som faner. Kun den aktive fane monteres. */
-export function Samleside({ titel, faner, standard, ejerAfTab, parameter = "tab", layout: Layout = MainLayout }: SamlesideProps) {
-  const { pathname } = useLocation();
+export function Samleside({ titel, faner, ejerAfTab, parameter = "tab", layout: Layout = MainLayout }: SamlesideProps) {
   const [params, setParams] = useSearchParams();
-  const noegle = `samleside:${pathname}`;
   const synlige = faner.filter((f) => f.synlig);
   const ids = synlige.map((f) => f.id);
+  const gruppeIds = synlige.flatMap((f) => (f.gruppe ? [f.gruppe.id] : []));
   const ejer = ejerAfTab && ids.includes(ejerAfTab) ? ejerAfTab : null;
-  let gemt: string | null = null;
-  try { gemt = localStorage.getItem(noegle); } catch { /* ingen lager */ }
   const urlTab = params.get(parameter);
-  const fraUrl = urlTab && !ids.includes(urlTab) && ejer ? ejer : urlTab;
-  const aktiv = vaelgFane(ids, fraUrl, gemt, standard);
-
-  useEffect(() => {
-    if (!aktiv) return;
-    try { localStorage.setItem(noegle, aktiv); } catch { /* ingen lager */ }
-  }, [aktiv, noegle]);
+  const kendt = !!urlTab && (ids.includes(urlTab) || gruppeIds.includes(urlTab));
+  const fraUrl = urlTab && !kendt && ejer ? ejer : urlTab;
+  const aktiv = vaelgFane(synlige, fraUrl, params.get(SIDE));
 
   // ?tab=<ejer> ville forvirre ejer-sidens egne faner: fjern det.
   useEffect(() => {
@@ -64,10 +70,12 @@ export function Samleside({ titel, faner, standard, ejerAfTab, parameter = "tab"
   }, [ejer, urlTab, params, setParams, parameter]);
 
   const skift = (id: string) => {
-    try { localStorage.setItem(noegle, id); } catch { /* ingen lager */ }
+    const f = synlige.find((x) => x.id === id);
     const next = new URLSearchParams(params);
     if (id === ejer) next.delete(parameter);
-    else next.set(parameter, id);
+    else next.set(parameter, f?.gruppe ? f.gruppe.id : id);
+    if (f?.gruppe) next.set(SIDE, id);
+    else next.delete(SIDE);
     setParams(next, { replace: true });
   };
 
@@ -98,7 +106,7 @@ export function Samleside({ titel, faner, standard, ejerAfTab, parameter = "tab"
             </TabsList>
           )}
           {iGruppe.length > 1 && (
-            <div role="group" aria-label={fane.gruppe!.label} className="mb-4 inline-flex rounded-lg bg-muted p-1">
+            <div role="group" aria-label={fane.gruppe!.label} className="mb-4 flex max-w-full flex-wrap gap-1 rounded-lg bg-muted p-1 md:inline-flex">
               {iGruppe.map((f) => (
                 <button key={f.id} type="button" onClick={() => skift(f.id)} aria-pressed={f.id === fane.id}
                   className={cn("min-h-11 rounded-md px-4 text-sm font-medium transition-colors active:scale-[0.98]",
