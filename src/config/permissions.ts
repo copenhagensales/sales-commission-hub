@@ -43,19 +43,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
-  // ==================== ØKONOMI ====================
-  {
-    key: "menu_economic",
-    label: "Økonomi menu",
-    icon: "💰",
-    permissions: [
-      { key: "menu_economic_dashboard", label: "Økonomi Dashboard", description: "Adgang til økonomi overblik", hasEditOption: false },
-      { key: "menu_economic_expenses", label: "Udgifter", description: "Adgang til udgiftsoversigt", hasEditOption: false },
-      { key: "menu_economic_budget", label: "Budget 2026", description: "Adgang til budget planlægning", hasEditOption: true },
-      { key: "menu_economic_mapping", label: "Økonomi Mapping", description: "Adgang til konto/kategori mapping", hasEditOption: true },
-      { key: "menu_economic_upload", label: "E-conomic Import", description: "Adgang til at importere e-conomic data", hasEditOption: false },
-    ],
-  },
 
   // ==================== MIT HJEM ====================
   {
@@ -120,44 +107,11 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
-  // ==================== EKSTRAARBEJDE MENU ====================
-  {
-    key: "menu_extra_work_group",
-    label: "Ekstraarbejde menu",
-    icon: "🛠️",
-    permissions: [
-      {
-        key: "menu_extra_work",
-        label: "Ekstra arbejde",
-        description: "Adgang til ekstra arbejde",
-        hasEditOption: true,
-        scopeKey: "scope_extra_work",
-      },
-      {
-        key: "menu_extra_work_admin",
-        label: "Ekstra arbejde admin",
-        description: "Adgang til ekstra arbejde administration",
-        hasEditOption: true,
-      },
-    ],
-  },
   {
     key: "tabs_extra_work",
     label: "Ekstra arbejde faner",
     icon: "📑",
     permissions: [
-      {
-        key: "tab_extra_work_my",
-        label: "Mit ekstra arbejde",
-        description: "Adgang til eget ekstra arbejde fane",
-        hasEditOption: false,
-      },
-      {
-        key: "tab_extra_work_history",
-        label: "Historik",
-        description: "Adgang til ekstra arbejde historik fane",
-        hasEditOption: true,
-      },
     ],
   },
 
@@ -290,15 +244,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: true,
         scopeKey: "scope_absence",
       },
-      {
-        key: "menu_time_tracking",
-        label: "Tidsregistrering",
-        description: "Adgang til tidsregistrering",
-        hasEditOption: true,
-        scopeKey: "scope_time_tracking",
-      },
       { key: "menu_time_stamp", label: "Stempelur", description: "Adgang til stempel ind/ud", hasEditOption: false },
-      { key: "menu_closing_shifts", label: "Påmindelser", description: "Adgang til påmindelser", hasEditOption: true },
     ],
   },
 
@@ -317,17 +263,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         scopeKey: "scope_fieldmarketing",
       },
       { key: "menu_fm_booking", label: "Booking Management", description: "Adgang til booking management side", hasEditOption: true },
-      { key: "menu_fm_book_week", label: "Book uge", description: "Adgang til book uge", hasEditOption: true },
-      { key: "menu_fm_bookings", label: "Bookinger", description: "Adgang til bookinger", hasEditOption: true },
       { key: "menu_fm_locations", label: "Lokationer", description: "Adgang til lokationer", hasEditOption: true },
-      { key: "menu_fm_vehicles", label: "Køretøjer", description: "Adgang til køretøjer", hasEditOption: true },
       { key: "menu_fm_billing", label: "Fakturering", description: "Adgang til fakturering", hasEditOption: true },
-      {
-        key: "menu_fm_time_off",
-        label: "Fraværsanmodninger",
-        description: "Adgang til fraværsanmodninger",
-        hasEditOption: true,
-      },
       {
         key: "menu_fm_sales_registration",
         label: "Salgsregistrering",
@@ -344,12 +281,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         key: "menu_fm_eesy_deviations",
         label: "Eesy FM afvigelser (Leder)",
         description: "Adgang til afstemning af automatiske Eesy FM salg",
-        hasEditOption: false,
-      },
-      {
-        key: "menu_fm_travel_expenses",
-        label: "Rejsekort og diæter",
-        description: "Adgang til rejsekort og diætregler",
         hasEditOption: false,
       },
     ],
@@ -770,12 +701,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: false,
       },
       {
-        key: "menu_reports_employee",
-        label: "Rapporter Medarbejder",
-        description: "Adgang til medarbejderrapporter",
-        hasEditOption: false,
-      },
-      {
         key: "menu_reports_revenue_by_client",
         label: "Omsætning per opgave",
         description: "Adgang til omsætningsrapport per kunde/opgave",
@@ -802,14 +727,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Hovedmenuer",
     icon: "📱",
     permissions: [
-      { key: "menu_dashboard", label: "Dashboard", description: "Adgang til dashboard oversigt", hasEditOption: false },
-      {
-        key: "menu_sales",
-        label: "Salg",
-        description: "Adgang til salgsdata",
-        hasEditOption: true,
-        scopeKey: "scope_sales",
-      },
       { key: "menu_logics", label: "Logikker", description: "Adgang til logikker", hasEditOption: true },
     ],
   },
