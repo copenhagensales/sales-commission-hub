@@ -267,6 +267,7 @@ export function useMarkMessageAsRead() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["chat-messages", result.conversationId] });
+      queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
     },
   });
 }

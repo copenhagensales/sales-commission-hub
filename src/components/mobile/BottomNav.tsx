@@ -3,7 +3,8 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { Home, Target, Calendar, Newspaper, User, Menu, Trophy, Gamepad2, Swords, BadgeCheck, type LucideIcon } from "lucide-react";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
-import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
+import { formatUnread } from "@/hooks/usePulsen";
+import { useStorkbookUnread } from "@/hooks/useStorkbookUnread";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
 import { HubSheet } from "./HubSheet";
@@ -90,8 +91,7 @@ function TabIcon({ icon: Icon, active, children }: { icon: LucideIcon; active: b
 
 /** Rødt tal på ikonet, når der er nyt i Storkbook (som notifikationer på Facebook). */
 function StorkbookBadge() {
-  const { data: employeeId } = useCurrentEmployeeId();
-  const { data: count = 0 } = usePulsenUnread(employeeId);
+  const count = useStorkbookUnread();
   if (count <= 0) return null;
   return (
     <span aria-label={`${count} nye i Storkbook`}

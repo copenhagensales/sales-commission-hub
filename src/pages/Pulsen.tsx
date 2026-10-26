@@ -1,7 +1,10 @@
 import { StickyOnPhone, useIsPhone } from "@/components/mobile";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Samleside } from "@/components/layout/Samleside";
+import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useStorkbookChatUnread } from "@/hooks/useStorkbookUnread";
 import { ChevronDown, Lock, Sun, Users } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -23,7 +26,7 @@ import {
 } from "@/hooks/useCompanyEvents";
 import { useFeedReactions } from "@/hooks/useFeedReactions";
 import {
-  milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, usePulsenMe,
+  formatUnread, milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, usePulsenMe,
   usePulsenMilestonesToday, usePulsenMutations,
   type PulsenPost, type PulsenScope,
 } from "@/hooks/usePulsen";
@@ -398,4 +401,47 @@ function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<unknown>) {
     };
   }, [enabled]);
   return { offset, refreshing };
+}
+
+const Beskeder = lazy(() => import("@/pages/Messages"));
+
+/** Begivenheder: kommende begivenheder (samme kort som Storkbooks sidekolonne). */
+function PulsenBegivenheder() {
+  const me = usePulsenMe();
+  const navigate = useNavigate();
+  return (
+    <div className="mx-auto w-full max-w-[680px] px-4 pb-16 md:px-0">
+      <PulsenSidebar employeeId={me.employeeId} onOpenQuestion={(id) => navigate(`/storkbook?post=${id}`)} />
+    </div>
+  );
+}
+
+/** Storkbook: Feed · Begivenheder · Beskeder (?tab=). Uden tab åbner Feed, så ?post=/?compose= virker. */
+export default function Storkbook() {
+  const { canViewMessagesPersonal } = usePermissions();
+  const chatUnread = useStorkbookChatUnread();
+  return (
+    <Samleside
+      titel="Storkbook"
+      faner={[
+        { id: "feed", label: "Feed", synlig: true, element: <PulsenFeed /> },
+        { id: "begivenheder", label: "Begivenheder", synlig: true, element: <PulsenBegivenheder /> },
+        {
+          id: "beskeder",
+          label: (
+            <span className="inline-flex items-center gap-1.5">
+              Beskeder
+              {chatUnread > 0 && (
+                <span aria-label={`${chatUnread} ulæste beskeder`} className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-black tabular-nums text-destructive-foreground">
+                  {formatUnread(chatUnread)}
+                </span>
+              )}
+            </span>
+          ),
+          synlig: !!canViewMessagesPersonal,
+          element: <Beskeder />,
+        },
+      ]}
+    />
+  );
 }
