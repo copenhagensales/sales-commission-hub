@@ -197,12 +197,18 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    await sendEmail(
-      accessToken,
-      recipientEmails,
-      "Ugentlig compliance-oversigt – GDPR påmindelse",
-      htmlBody
-    );
+    await udsendFlere({
+      type: "check-compliance-reviews", kanal: "mail", emne: "Ugentlig compliance-oversigt – GDPR påmindelse",
+      afsenderfunktion: "check-compliance-reviews", modtagere: recipientEmails.map((m: string) => ({ modtager: m })),
+      send: async (tilladte) => {
+        await sendEmail(
+          accessToken,
+          tilladte,
+          "Ugentlig compliance-oversigt – GDPR påmindelse",
+          htmlBody
+        );
+      },
+    });
 
     console.log(`Compliance email sent to ${recipientEmails.length} recipients`);
 
