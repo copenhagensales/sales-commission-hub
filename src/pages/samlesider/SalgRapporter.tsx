@@ -14,7 +14,7 @@ import {
 export function FieldmarketingSamleside() {
   const s = useSalgRapporterSynlighed().fieldmarketing;
   return (
-    <Samleside titel="Fieldmarketing" parameter="fane" faner={[
+    <Samleside titel="Fieldmarketing" parameter="fane" vedTab="booking" faner={[
       { id: "vagt-flow", label: "Overblik", element: <VagtFlowIndex />, synlig: s["vagt-flow"] },
       { id: "booking", label: "Booking", element: <VagtBookingManagement />, synlig: s.booking },
       { id: "billing", label: "Fakturering", element: <VagtBilling />, synlig: s.billing },
