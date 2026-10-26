@@ -253,6 +253,7 @@ serve(async (req) => {
     }
 
     // 4. Send email (if recipients found)
+    let mailStatus: string | null = null;
     if (recipientEmails.length > 0) {
       const accessToken = await getM365AccessToken();
 
