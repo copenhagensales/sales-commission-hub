@@ -458,17 +458,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Check if any Fieldmarketing items are visible. FM opt-in only opens Salgsregistrering.
   const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && (
-    (p.canView("menu_section_fieldmarketing") && 
-      (p.canViewFmMySchedule || p.canViewFmOverview ||
-       p.canViewFmLocations ||
-       p.canViewFmBilling || p.canViewFmSalesRegistration ||
-       false)) ||
-    canAccessFmSalesRegistration
+    // Min vagtplan og Salgsregistrering ligger nu under Mit Hjem → Vagter / Registrér salg (bundt b1).
+    p.canView("menu_section_fieldmarketing") && 
+      (p.canViewFmOverview || p.canViewFmLocations || p.canViewFmBilling ||
+       p.canViewFmBookWeek || p.canViewFmBookings || p.canViewFmEditSales || p.canViewFmEesyDeviations)
   );
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
-    (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeStamp);
+    (p.canViewShiftOverview || p.canViewAbsence);
   
   
   // Check if any Recruitment items are visible (requires section permission)
