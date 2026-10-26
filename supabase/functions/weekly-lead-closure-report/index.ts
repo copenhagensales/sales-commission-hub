@@ -1326,22 +1326,41 @@ async function chainNext(state: RunState): Promise<void> {
     triggered_by: state.triggeredBy,
     flow_only: state.flowOnly,
   });
-  try {
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      },
-      body,
-      signal: AbortSignal.timeout(3000),
-    });
-  } catch (e) {
-    // TimeoutError er forventet: kaldet er afsendt og kører videre selv.
-    if (!(e instanceof DOMException) && !(e instanceof Error && e.name === "TimeoutError")) {
-      console.error("[weekly-lead-closure-report] kæde fejlede", String(e));
+  // Platformen begrænser kald i samme kæde ("RateLimitError ... Retry after N ms").
+  // Uden genforsøg dør kæden stille — det var årsagen til de hængende kørsler.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body,
+        signal: AbortSignal.timeout(3000),
+      });
+      return;
+    } catch (e) {
+      // TimeoutError er forventet: kaldet er afsendt og kører videre selv.
+      if (e instanceof DOMException || (e instanceof Error && e.name === "TimeoutError")) return;
+      const text = String(e);
+      const wait = Number(/Retry after (\d+)ms/i.exec(text)?.[1] ?? 0);
+      console.error(`[weekly-lead-closure-report] kæde fejlede (forsøg ${attempt + 1})`, text);
+      if (!/rate ?limit/i.test(text) || attempt === 3) {
+        await getServiceSvc().from("weekly_lead_closure_runs")
+          .update({ error: `kæden kunne ikke kalde videre: ${text.slice(0, 200)} – vagthunden genstarter` })
+          .eq("id", state.runId).is("finished_at", null);
+        return;
+      }
+      await sleep(Math.min(Math.max(wait, 2000), 20000) + 500);
     }
   }
+}
+
+function getServiceSvc(): SupabaseClient {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 /** Fylder køen med én task pr. konto, kampagne og uge. */
