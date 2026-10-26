@@ -70,10 +70,10 @@ async function main(req: Request, svc: any) {
     if (!u2 || !p2) return json(500, { error: "Legitimation mangler" });
     const h2 = { Authorization: `Basic ${btoa(`${u2}:${p2}`)}`, "Content-Type": "application/json" };
     const g2 = async (path: string, base = BASE) => {
-      for (let a = 0; a < 4; a++) {
+      for (let a = 0; a < 7; a++) {
         apiCalls++;
         const r = await fetch(`${base}${path}`, { headers: h2 });
-        if (r.status === 429) { await new Promise((x) => setTimeout(x, 2000 * (a + 1))); continue; }
+        if (r.status === 429) { await r.body?.cancel(); await new Promise((x) => setTimeout(x, 4000 * (a + 1))); continue; }
         const t = await r.text(); let d: unknown = null; try { d = JSON.parse(t); } catch { d = null; }
         return { status: r.status, data: d, fejl: r.ok ? null : t.slice(0, 300) };
       }
@@ -83,7 +83,7 @@ async function main(req: Request, svc: any) {
     const sf = encodeURIComponent(JSON.stringify({ startTime: { $gt: f0, $lt: f1 } }));
     const cf = encodeURIComponent(JSON.stringify({ insertedTime: { $gt: f0, $lt: f1 } }));
     const probe: Record<string, unknown> = {};
-    for (const [navn, path, base] of [
+    if (url.searchParams.get("probe") !== "0") for (const [navn, path, base] of [
       ["GET /v1/sessions", `/sessions?filters=${sf}&page=1&pageSize=5`, BASE],
       ["GET /v1/cdr", `/cdr?filters=${cf}&page=1&pageSize=5`, BASE],
       ["GET /cdr (uden v1)", `/cdr?filters=${cf}&page=0&pageSize=5`, "https://api.adversus.io"],
@@ -98,7 +98,7 @@ async function main(req: Request, svc: any) {
     const cArr = (Array.isArray(cr.data) ? cr.data : (cr.data as Row)?.campaigns ?? []) as Row[];
     const kampagner: Record<string, string> = {};
     for (const k of cArr) kampagner[s(k.id)] = s((k.settings as Row)?.name ?? k.name);
-    if ((probe["GET /v1/sessions"] as Row).status !== 200) return json(200, { probe, kampagner, apiKald: apiCalls });
+    if (probe["GET /v1/sessions"] && (probe["GET /v1/sessions"] as Row).status !== 200) return json(200, { probe, kampagner, apiKald: apiCalls });
 
     const isoUge = (iso: string) => {
       const d = new Date(new Date(iso).toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
@@ -129,7 +129,8 @@ async function main(req: Request, svc: any) {
       return out;
     };
     const dage: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) dage.push(d);
-    const res = await Promise.all(dage.flatMap((d) => [hentDag(d, "sessions"), hentDag(d, "cdr")]));
+    const res: Row[][] = [];
+    for (const d of dage) { res.push(await hentDag(d, "sessions")); res.push(await hentDag(d, "cdr")); }
     res.forEach((arr, i) => {
       const kind = i % 2 === 0 ? "sessions" : "cdr";
       for (const x of arr) {
