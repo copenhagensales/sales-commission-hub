@@ -1,5 +1,5 @@
 import { clearPushSubscription } from "@/hooks/usePushNotifications";
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag, Upload } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, FileText, Crown, User, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, Inbox, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag, Upload } from "lucide-react";
 import { PulsenUnreadBadge } from "@/components/pulsen/PulsenUnreadBadge";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
@@ -32,7 +32,6 @@ import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
-import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
@@ -81,7 +80,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
-  const { data: hasActiveTimeClock } = useHasActiveTimeClock();
 
   // Menu config from database - controls sort_order and visibility
   const { data: menuConfig } = useSidebarMenuConfig();
@@ -145,9 +143,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const canViewCancellations = p.canView("menu_cancellations");
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith("/admin")
-  );
-  const [economicOpen, setEconomicOpen] = useState(
-    location.pathname.startsWith("/economic") || location.pathname === "/admin/economic-upload"
   );
   const [amoOpen, setAmoOpen] = useState(
     location.pathname.startsWith("/amo")
@@ -446,7 +441,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // This ensures the sidebar matches what the Permission Editor shows
   
   // Check if Ekstraarbejde menu should be visible (top-level standalone)
-  const showExtraWorkMenu = p.canViewExtraWork;
 
   // Check if any Personnel menu items are visible (requires section permission)
   const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
@@ -457,8 +451,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
   
   // Check if any MG menu items are visible (requires section permission)
-  const canViewMgDataImport = p.canView("menu_mg_data_import");
-  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && (p.canViewMgTest || canViewMgDataImport);
+  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
   
   const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
 
@@ -508,9 +501,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   ];
   const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
   
-  // Check if Economic menu should be visible (owner always has access)
   const isOwner = p.position?.name?.toLowerCase() === "ejer";
-  const showEconomicMenu = !isMenuHidden('section_economic') && (isOwner || p.canView("menu_section_economic"));
 
   // Check if Admin menu should be visible (KPI or owner for menu editor)
   const showAdminMenu = !isMenuHidden('section_admin') && (p.canViewKpiDefinitions || isOwner);
