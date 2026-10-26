@@ -186,7 +186,7 @@ export function useSendBesked() {
   });
 }
 
-/** Brugerens egne fravalg. Typerne kan kun læses af ejere (RLS); andre får en tom liste. */
+/** Brugerens aktive typer inden for modtagerreglen med eget til-/fravalg (ét kald, virker for alle brugere). */
 export function useMineUdsendelsespraeferencer() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -194,19 +194,11 @@ export function useMineUdsendelsespraeferencer() {
     queryKey: [KEY_PRAEF, user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const [t, p] = await Promise.all([
-        supabase.from("udsendelsestyper").select("noegle, navn, kanal").eq("aktiv", true).order("navn"),
-        supabase.from("udsendelsespraeferencer").select("type_noegle, kanal, aktiv").eq("user_id", user!.id),
-      ]);
-      if (t.error) throw t.error;
-      if (p.error) throw p.error;
-      const fra = new Set((p.data ?? []).filter((r) => r.aktiv === false).map((r) => `${r.type_noegle}|${r.kanal}`));
-      // Kun typer, brugeren er inden for modtagerreglen på (fejl i tjekket = vis typen).
-      const tilladt = await Promise.all((t.data ?? []).map(async (x) => {
-        const { data, error } = await supabase.rpc("udsendelse_tilladt", { p_user_id: user!.id, p_type: x.noegle });
-        return error ? true : data !== false;
-      }));
-      return (t.data ?? []).filter((_, i) => tilladt[i]).map((x) => ({ ...x, aktiv: !fra.has(`${x.noegle}|${x.kanal}`) }));
+      const { data, error } = await supabase.rpc("udsendelse_mine_typer");
+      if (error) throw error;
+      return (data ?? [])
+        .map((x) => ({ noegle: x.noegle, navn: x.navn, kanal: x.kanal, beskrivelse: x.beskrivelse, aktiv: x.aktiv !== false }))
+        .sort((a, b) => a.navn.localeCompare(b.navn, "da"));
     },
   });
   const saet = useMutation({
