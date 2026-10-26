@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { authUsersForEmails, sendPush } from "../_shared/push.ts";
+import { udsendFlere } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -265,12 +266,17 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const accessToken = await getM365AccessToken();
-    await sendEmail(accessToken, recipients, subject, htmlBody);
+    await udsendFlere({
+      type: "send-compliance-alert-mail", kanal: "mail", emne: subject, afsenderfunktion: "send-compliance-alert",
+      modtagere: recipients.map((r: string) => ({ modtager: r })),
+      send: async (tilladte) => { await sendEmail(accessToken, tilladte, subject, htmlBody); },
+    });
 
     console.log(`Compliance-mail sendt til ${recipients.length} modtager(e): ${subject}`);
     // Push som ekstra kanal (fejler aldrig mailen). Én pr. modtager pr. dag.
     await sendPush(supabase, await authUsersForEmails(supabase, recipients), "compliance", {
       dedupeKey: new Date().toISOString().slice(0, 10),
+      udsendType: "send-compliance-alert-push", afsenderfunktion: "send-compliance-alert",
     });
     return new Response(
       JSON.stringify({

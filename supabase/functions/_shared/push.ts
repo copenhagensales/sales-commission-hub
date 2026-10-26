@@ -6,6 +6,7 @@
  */
 import webpush from "npm:web-push@3.6.7";
 import { PUSH_TEXT, type PushType } from "./pushText.ts";
+import { udsend } from "./udsend.ts";
 
 export type { PushType };
 const PREF_COLUMN: Record<Exclude<PushType, "test">, string> = {
@@ -50,62 +51,71 @@ export async function sendPush(
   svc: any,
   userIds: string[],
   type: PushType,
-  opts: { dedupeKey?: string; url?: string } = {},
+  opts: { dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string } = {},
 ): Promise<number> {
   try {
     if (!userIds.length || !configure()) return 0;
     const msg = PUSH_TEXT[type];
     let sent = 0;
+    const udsendType = opts.udsendType ?? `push-${type}`;
+    const afsender = opts.afsenderfunktion ?? "push";
     for (const userId of [...new Set(userIds)]) {
       try {
-        if (type !== "test") {
-          const { data: pref } = await svc.from("push_preferences").select("*").eq("user_id", userId).maybeSingle();
-          if (pref && pref[PREF_COLUMN[type]] === false) {
-            await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "skipped_pref" });
-            continue;
-          }
-          if (opts.dedupeKey) {
-            const { count } = await svc.from("push_log").select("id", { count: "exact", head: true })
-              .eq("user_id", userId).eq("push_type", type).eq("dedupe_key", opts.dedupeKey).eq("status", "sent");
-            if ((count ?? 0) > 0) continue;
-          }
+        if (type !== "test" && opts.dedupeKey) {
+          const { count } = await svc.from("push_log").select("id", { count: "exact", head: true })
+            .eq("user_id", userId).eq("push_type", type).eq("dedupe_key", opts.dedupeKey).eq("status", "sent");
+          if ((count ?? 0) > 0) continue;
         }
-        const { data: subs } = await svc.from("push_subscriptions").select("id, endpoint, p256dh, auth")
-          .eq("user_id", userId).eq("is_active", true);
-        if (!subs?.length) {
-          await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "no_subscription" });
-          continue;
-        }
-        let ok = false;
-        let lastCode: number | null = null;
-        let lastError: string | null = null;
-        for (const s of subs) {
-          try {
-            const res: any = await webpush.sendNotification(
-              { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-              JSON.stringify({ title: msg.title, body: msg.body, url: opts.url ?? msg.url, tag: type }),
-              { TTL: 60 * 60 * 24, urgency: "high" },
-            );
-            ok = true;
-            lastCode = typeof res?.statusCode === "number" ? res.statusCode : lastCode;
-            await svc.from("push_subscriptions").update({ last_success_at: new Date().toISOString() }).eq("id", s.id);
-          } catch (e: any) {
-            const code = typeof e?.statusCode === "number" ? e.statusCode : null;
-            lastCode = code;
-            lastError = String(e?.body || e?.message || "unknown").slice(0, 200);
-            if (code === 404 || code === 410) {
-              await svc.from("push_subscriptions").update({ is_active: false, deactivated_at: new Date().toISOString() }).eq("id", s.id);
-              await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: code, error_text: lastError });
-            } else {
-              console.error("push send failed", code ?? "unknown");
+        const status = await udsend({
+          type: udsendType, kanal: "push", modtager: userId, modtagerUserId: userId,
+          emne: msg.title, afsenderfunktion: afsender, metadata: { push_type: type, dedupe_key: opts.dedupeKey ?? null },
+          send: async () => {
+            if (type !== "test") {
+              const { data: pref } = await svc.from("push_preferences").select("*").eq("user_id", userId).maybeSingle();
+              if (pref && pref[PREF_COLUMN[type]] === false) {
+                await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "skipped_pref" });
+                return { status: "fravalgt" as const };
+              }
             }
-          }
-        }
-        await svc.from("push_log").insert({
-          user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null,
-          status: ok ? "sent" : "failed", status_code: lastCode, error_text: ok ? null : lastError,
+            const { data: subs } = await svc.from("push_subscriptions").select("id, endpoint, p256dh, auth")
+              .eq("user_id", userId).eq("is_active", true);
+            if (!subs?.length) {
+              await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "no_subscription" });
+              return { status: "ingen_tilmelding" as const };
+            }
+            let ok = false;
+            let lastCode: number | null = null;
+            let lastError: string | null = null;
+            for (const s of subs) {
+              try {
+                const res: any = await webpush.sendNotification(
+                  { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                  JSON.stringify({ title: msg.title, body: msg.body, url: opts.url ?? msg.url, tag: type }),
+                  { TTL: 60 * 60 * 24, urgency: "high" },
+                );
+                ok = true;
+                lastCode = typeof res?.statusCode === "number" ? res.statusCode : lastCode;
+                await svc.from("push_subscriptions").update({ last_success_at: new Date().toISOString() }).eq("id", s.id);
+              } catch (e: any) {
+                const code = typeof e?.statusCode === "number" ? e.statusCode : null;
+                lastCode = code;
+                lastError = String(e?.body || e?.message || "unknown").slice(0, 200);
+                if (code === 404 || code === 410) {
+                  await svc.from("push_subscriptions").update({ is_active: false, deactivated_at: new Date().toISOString() }).eq("id", s.id);
+                  await svc.from("push_log").insert({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: code, error_text: lastError });
+                } else {
+                  console.error("push send failed", code ?? "unknown");
+                }
+              }
+            }
+            await svc.from("push_log").insert({
+              user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null,
+              status: ok ? "sent" : "failed", status_code: lastCode, error_text: ok ? null : lastError,
+            });
+            if (!ok) throw new Error(`push failed ${lastCode ?? "unknown"}: ${lastError ?? ""}`);
+          },
         });
-        if (ok) sent++;
+        if (status === "sendt") sent++;
       } catch (e) {
         console.error("push user failed", e instanceof Error ? e.message : "unknown");
       }
