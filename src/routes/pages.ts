@@ -248,3 +248,10 @@ export const ItWorkstations = lazyPage(() => import("@/pages/it/ItWorkstations")
 export const VagterSamleside = lazyPage(() => import("@/pages/samlesider/MitArbejde").then((m) => ({ default: m.VagterSamleside })));
 export const RegistrerSalgSamleside = lazyPage(() => import("@/pages/samlesider/MitArbejde").then((m) => ({ default: m.RegistrerSalgSamleside })));
 export const SpilSamleside = lazyPage(() => import("@/pages/samlesider/MitArbejde").then((m) => ({ default: m.SpilSamleside })));
+const tp = () => import("@/pages/samlesider/TeamPersonale");
+export const VagtplanSamleside = lazyPage(() => tp().then((m) => ({ default: m.VagtplanSamleside })));
+export const MitTeamSamleside = lazyPage(() => tp().then((m) => ({ default: m.MitTeamSamleside })));
+export const OnboardingSamleside = lazyPage(() => tp().then((m) => ({ default: m.OnboardingSamleside })));
+export const RekrutteringSamleside = lazyPage(() => tp().then((m) => ({ default: m.RekrutteringSamleside })));
+export const MedarbejdereSamleside = lazyPage(() => tp().then((m) => ({ default: m.MedarbejdereSamleside })));
+export const KontrakterSamleside = lazyPage(() => tp().then((m) => ({ default: m.KontrakterSamleside })));
