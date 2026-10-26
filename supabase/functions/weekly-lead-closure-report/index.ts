@@ -1151,6 +1151,7 @@ function buildMail(
   sellerNames: Map<string, string>,
   notScanned: FailedTask[],
   callRows: CallStatRow[],
+  notice?: string,
 ) {
   const statusKeys = [...config.closing].map((status) => ({
     status,
@@ -1508,14 +1509,15 @@ async function finishAndMail(
   }
 
   let mailQueued = false;
+  const recipients = state.testRecipient ? [state.testRecipient] : config.recipients;
   if (
     !blockReason &&
     state.sendMail &&
     !state.flowOnly &&
-    config.recipients.length > 0 &&
+    recipients.length > 0 &&
     (state.forceMail || !(await alreadyMailedToday(svc)))
   ) {
-    const mail = buildMail(
+    const built = buildMail(
       latest,
       latestRows,
       previous,
@@ -1523,20 +1525,30 @@ async function finishAndMail(
       await sellerNamesForAll(svc),
       failed,
       latestCalls,
+      state.notice,
     );
+    const mail = state.testRecipient ? { ...built, subject: `[TEST] ${built.subject}` } : built;
     const scheduledAt = new Date().toISOString();
     const { error } = await svc.from("scheduled_emails").insert(
-      config.recipients.map((recipient) => ({
+      recipients.map((recipient) => ({
         recipient_email: recipient,
         subject: mail.subject,
         content: mail.html,
-        template_key: "weekly_lead_closure_report",
+        template_key: state.testRecipient ? "weekly_lead_closure_report_test" : "weekly_lead_closure_report",
         scheduled_at: scheduledAt,
         status: "pending",
       })),
     );
     if (error) throw new Error(`Kunne ikke lægge mailen i køen: ${error.message}`);
     mailQueued = true;
+    if (state.resend) {
+      await flushMailQueue();
+      if (!state.testRecipient) {
+        await svc.from("weekly_lead_closure_locks")
+          .upsert({ week_start: latest, run_id: state.runId }, { onConflict: "week_start", ignoreDuplicates: true });
+      }
+      return { mailQueued, statusBreakdown: breakdown(latestRows) };
+    }
     // Leveringsstatus Tryg: SEPARAT intern mail, kun til interne modtagere
     // (flow_status, håndhævet @copenhagensales.dk i databasen). Aldrig til kunden.
     // Sendes kun, når feature-flaget er slået til (godkendt af Kasper).
