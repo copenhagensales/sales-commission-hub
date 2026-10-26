@@ -261,16 +261,22 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
 
   const cc = ((sub.cc_emails as string[] | null) ?? []).filter((e) => !!e?.trim());
 
+  let status: string;
+  let sentTo: string[] = [];
   try {
-    // Ingen bruger-id på modtagerne, så ingen fravalg kan fjerne nogen; to/cc bevares uændret.
-    await udsendFlere({
+    // To/CC bevares, men kun tilladte modtagere (modulet fjerner fravalgte/uden for regel).
+    status = await udsendFlere({
       type: "send-supplier-report", kanal: "mail", afsenderfunktion: "send-supplier-report",
       emne: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
       modtagere: [recipient, ...cc].map((m) => ({ modtager: m })),
-      send: async () => {
+      send: async (tilladte) => {
+        const ok = new Set(tilladte);
+        const ccOk = cc.filter((m) => ok.has(m));
+        const to = ok.has(recipient) ? [recipient] : ccOk.splice(0, 1);
+        sentTo = [...to, ...ccOk];
         await sendM365Mail({
-          to: [recipient],
-          cc,
+          to,
+          cc: ccOk,
           subject: `Leverandørrapport ${supplierDisplayName} - ${built.periodLabel}`,
           html: built.html,
           attachments: built.attachments,
@@ -286,7 +292,10 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
     return jsonResponse(500, { error: msg });
   }
 
-  const sentTo = [recipient, ...cc];
+  if (status !== "sendt") {
+    return jsonResponse(200, { success: true, skipped: true, status });
+  }
+
   await svc
     .from('supplier_report_dispatches')
     .update({
