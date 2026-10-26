@@ -34,6 +34,9 @@ import { VACATION_PAY_RATES, getPayrollPeriod } from "@/lib/calculations";
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 import { HandbookTabContent } from "@/components/profile/HandbookTabContent";
 import { RampCurveCard } from "@/components/ramp/RampCurveCard";
+import { Suspense } from "react";
+import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
+import { EmployeePerks, MyFeedback, CodeOfConduct, CarQuiz, ReferAFriend } from "@/routes/pages";
 
 import { logSensitiveAccess } from "@/hooks/useLogSensitiveAccess";
 
@@ -206,6 +209,7 @@ export default function MyProfile() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "stamdata";
+  const { profil: profilFaner } = useMitArbejdeSynlighed();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const { isPreviewMode, previewEmployee } = useRolePreview();
   const uploadMyAvatar = useUploadMyAvatar();
@@ -1225,6 +1229,10 @@ export default function MyProfile() {
               <BookOpen className="h-4 w-4 mr-2" />
               Håndbog
             </TabsTrigger>
+            {profilFaner.fordele && <TabsTrigger value="fordele">Fordele</TabsTrigger>}
+            {profilFaner.feedback && <TabsTrigger value="feedback">Feedback</TabsTrigger>}
+            {profilFaner.kodeks && <TabsTrigger value="kodeks">Kodeks og firmabil</TabsTrigger>}
+            {profilFaner.anbefal && <TabsTrigger value="anbefal">Anbefal en ven</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="stamdata" className="mt-6">
@@ -2297,6 +2305,23 @@ export default function MyProfile() {
               department={employee.department}
             />
           </TabsContent>
+          {/* Tidligere selvstændige sider, genbrugt uændret (bundt b1). Kun den aktive fane monteres. */}
+          {profilFaner.fordele && (
+            <TabsContent value="fordele" className="mt-6"><Suspense fallback={<RouteSkeleton />}><EmployeePerks /></Suspense></TabsContent>
+          )}
+          {profilFaner.feedback && (
+            <TabsContent value="feedback" className="mt-6"><Suspense fallback={<RouteSkeleton />}><MyFeedback /></Suspense></TabsContent>
+          )}
+          {profilFaner.kodeks && (
+            <TabsContent value="kodeks" className="mt-6">
+              <Suspense fallback={<RouteSkeleton />}>
+                <div className="space-y-8"><CodeOfConduct /><CarQuiz /></div>
+              </Suspense>
+            </TabsContent>
+          )}
+          {profilFaner.anbefal && (
+            <TabsContent value="anbefal" className="mt-6"><Suspense fallback={<RouteSkeleton />}><ReferAFriend /></Suspense></TabsContent>
+          )}
         </Tabs>
       </div>
     </MainLayout>

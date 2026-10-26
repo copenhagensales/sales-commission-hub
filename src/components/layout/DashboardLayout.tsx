@@ -11,6 +11,7 @@ import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { cn } from "@/lib/utils";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { isTvMode } from "@/utils/tvMode";
+import { LayoutNestingContext, useIsInsideLayout } from "./LayoutNesting";
 import { PageShell, DraftGuardNavigationListener, useBottomTabs, useIsPhone } from "@/components/mobile";
 
 interface DashboardLayoutProps {
@@ -23,11 +24,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const isPhone = useIsPhone();
   const { pathname } = useLocation();
   const tabs = useBottomTabs();
-  const isTabRoot = tabs.some((t) => t.to === pathname);
+  const isTabRoot = tabs.some((t) => t.to.split("?")[0] === pathname);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Detect TV mode - skip all auth-dependent components
   const tvMode = isTvMode();
+  const nested = useIsInsideLayout();
+
+  // Allerede inde i et layout (side brugt som fane i en samleside): kun indholdet.
+  if (nested) return <>{children}</>;
 
   // In TV mode, render only children without auth wrappers
   if (tvMode) {
@@ -39,6 +44,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
+   <LayoutNestingContext.Provider value={true}>
     <LockOverlays>
       <div className="min-h-[100dvh] bg-background">
         {/* Preview banner at very top */}
@@ -98,5 +104,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <SoftphoneWidget />
       </div>
     </LockOverlays>
+   </LayoutNestingContext.Provider>
   );
 }

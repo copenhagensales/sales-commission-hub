@@ -141,7 +141,7 @@ export default function MyGoals() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Wallet className="h-6 w-6" />
-              Løn & Mål
+              Mine tal
             </h1>
             <p className="text-muted-foreground mt-1">
               Sæt og følg dine salgsmål
@@ -179,7 +179,7 @@ export default function MyGoals() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Wallet className="h-6 w-6" />
-            {isViewingOther ? `${employee.first_name} ${employee.last_name}s Mål` : "Løn & Mål"}
+            {isViewingOther ? `${employee.first_name} ${employee.last_name}s Mål` : "Mine tal"}
           </h1>
           <p className="text-muted-foreground mt-1">
             {isViewingOther 

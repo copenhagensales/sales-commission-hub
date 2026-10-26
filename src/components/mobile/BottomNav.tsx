@@ -7,6 +7,7 @@ import { formatUnread, usePulsenUnread } from "@/hooks/usePulsen";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
 import { HubSheet } from "./HubSheet";
+import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
 
 export interface BottomTab {
   to: string;
@@ -29,33 +30,25 @@ export const PROFILE_PATH = "/my-profile";
 /** Alle destinationer bag bundbjælken (også dem i »Mig« og »Spil«), med samme rettighedstjek som AppSidebar. */
 export function useBottomTabs(): BottomTab[] {
   const p = usePermissions();
-  // »Vagter« peger på det første mål, brugeren har ret til (oversigt → egen FM-plan → egen TM-plan).
-  const shiftsTo = p.canViewFmOverview
-    ? "/vagt-flow"
-    : p.canViewFmMySchedule
-      ? "/vagt-flow/my-schedule"
-      : p.canViewMySchedule
-        ? "/shift-planning/my-schedule"
-        : null;
+  const m = useMitArbejdeSynlighed();
   return [
     { to: "/home", label: "Hjem", icon: Home, visible: !!p.canViewHome },
-    { to: "/vagt-flow/sales-registration", label: "Salgsregistrering", icon: BadgeCheck, visible: !!p.canViewFmSalesRegistration, hub: "me", hint: "Registrér dit salg" },
-    { to: shiftsTo ?? "/vagt-flow", label: "Vagter", icon: Calendar, visible: !!shiftsTo, hub: "me", hint: "Din vagtplan" },
-    { to: "/my-goals", label: "Tal", icon: Target, visible: !!p.canViewMyGoals, hub: "me", hint: "Dine tal og mål" },
+    { to: "/vagter", label: "Vagter", icon: Calendar, visible: m.harVagter, hub: "me", hint: "Vagtplan og stempelur" },
+    { to: "/my-goals", label: "Mine tal", icon: Target, visible: !!p.canViewMyGoals, hub: "me", hint: "Dine tal og mål" },
+    { to: "/registrer-salg", label: "Registrér salg", icon: BadgeCheck, visible: m.harSalg, hub: "me", hint: "Registrér dit salg" },
     { to: PROFILE_PATH, label: "Min profil", icon: User, visible: !!p.canViewMyProfile, hub: "me", hint: "Dine kontrakter og oplysninger" },
-    { to: "/commission-league", label: "Superligaen", icon: Trophy, visible: !!p.canViewCommissionLeague, hub: "games", hint: "Provisionsligaen" },
-    { to: "/head-to-head", label: "Head2Head", icon: Swords, visible: !!p.canViewH2h, hub: "games", hint: "1v1 og holdkampe" },
+    { to: "/spil?tab=superligaen", label: "Superligaen", icon: Trophy, visible: m.spil.superligaen, hub: "games", hint: "Provisionsligaen" },
+    { to: "/spil?tab=head2head", label: "Head2Head", icon: Swords, visible: m.spil.head2head, hub: "games", hint: "1v1 og holdkampe" },
     { to: "/storkbook", label: "Storkbook", icon: Newspaper, visible: !!p.canViewPulsen },
   ];
 }
 
-/** Området en destination dækker (Vagter med egen FM-plan dækker hele /vagt-flow). */
-function areaOf(t: BottomTab): string {
-  return t.to.startsWith("/vagt-flow") ? "/vagt-flow" : t.to;
-}
-function isOn(pathname: string, t: BottomTab): boolean {
-  const r = areaOf(t);
-  return pathname === r || pathname.startsWith(`${r}/`);
+function isOn(pathname: string, t: BottomTab, search = ""): boolean {
+  const [r, q] = t.to.split("?");
+  if (!(pathname === r || pathname.startsWith(`${r}/`))) return false;
+  // Fliser til samme samleside (fx /spil?tab=…) er kun aktive på deres egen fane, når fanen står i adressen.
+  if (q && search) return new URLSearchParams(search).get("tab") === new URLSearchParams(q).get("tab");
+  return true;
 }
 
 /** Faneroden for en sti (bruges af tilbage-pilen, når der ingen historik er). */
@@ -99,7 +92,7 @@ function StorkbookBadge() {
 /** Hjem · Mig · Spil · Storkbook · Menu på telefon. Mig/Spil åbner en samleskuffe; faner uden adgang vises ikke. */
 export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   const all = useBottomTabs().filter((t) => t.visible);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [hubOpen, setHubOpen] = useState<null | "me" | "games">(null);
   const home = all.find((t) => t.to === "/home");
   const storkbook = all.find((t) => t.to === "/storkbook");
@@ -108,7 +101,7 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   if (all.length === 0 && !onMenu) return null;
 
   const link = (t: BottomTab, label: string) => {
-    const active = isOn(pathname, t);
+    const active = isOn(pathname, t, search);
     return (
       <li key={t.to} className="min-w-0 flex-1">
         <NavLink to={t.to} aria-current={active ? "page" : undefined}
@@ -121,11 +114,11 @@ export function BottomNav({ onMenu, menuOpen }: BottomNavProps) {
   };
   const hubButton = (key: "me" | "games", label: string, icon: LucideIcon, items: BottomTab[]) => {
     if (items.length === 0) return null;
-    const active = hubOpen === key || items.some((t) => isOn(pathname, t));
+    const active = hubOpen === key || items.some((t) => isOn(pathname, t, search));
     return (
       <li className="min-w-0 flex-1">
         <button type="button" onClick={() => setHubOpen(key)} aria-haspopup="dialog" aria-expanded={hubOpen === key}
-          aria-current={items.some((t) => isOn(pathname, t)) ? "page" : undefined}
+          aria-current={items.some((t) => isOn(pathname, t, search)) ? "page" : undefined}
           className={cn(itemClass, active ? "font-bold text-[hsl(var(--cph-emerald))]" : "text-sidebar-foreground/70")}>
           <TabIcon icon={icon} active={active} />
           {label}

@@ -1,3 +1,4 @@
+import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
 import { clearPushSubscription } from "@/hooks/usePushNotifications";
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, FileText, Crown, User, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, Inbox, AlertTriangle, Menu as MenuIcon, MonitorSmartphone, Tag } from "lucide-react";
 import { PulsenUnreadBadge } from "@/components/pulsen/PulsenUnreadBadge";
@@ -72,6 +73,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
+  const mitArbejde = useMitArbejdeSynlighed();
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
@@ -456,17 +458,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Check if any Fieldmarketing items are visible. FM opt-in only opens Salgsregistrering.
   const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && (
-    (p.canView("menu_section_fieldmarketing") && 
-      (p.canViewFmMySchedule || p.canViewFmOverview ||
-       p.canViewFmLocations ||
-       p.canViewFmBilling || p.canViewFmSalesRegistration ||
-       false)) ||
-    canAccessFmSalesRegistration
+    // Min vagtplan og Salgsregistrering ligger nu under Mit Hjem → Vagter / Registrér salg (bundt b1).
+    p.canView("menu_section_fieldmarketing") && 
+      (p.canViewFmOverview || p.canViewFmLocations || p.canViewFmBilling ||
+       p.canViewFmBookWeek || p.canViewFmBookings || p.canViewFmEditSales || p.canViewFmEesyDeviations)
   );
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
-    (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeStamp);
+    (p.canViewShiftOverview || p.canViewAbsence);
   
   
   // Check if any Recruitment items are visible (requires section permission)
@@ -549,7 +549,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/vagter", "/registrer-salg", "/spil", "/my-goals"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -637,20 +637,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
               
-              {/* Min Feedback */}
-              {p.canViewMyFeedback && (
-                <NavLink
-                  to="/my-feedback"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/my-feedback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  Min Feedback
-                </NavLink>
-              )}
 
               {/* Pulsmåling */}
               {pulseSurvey.showMenuItem && (
@@ -670,7 +656,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
               
-              {/* Løn & Mål - kun for provision-ansatte */}
+              {/* Mine tal - kun for provision-ansatte */}
               {p.canViewMyGoals && (
                 <NavLink
                   to="/my-goals"
@@ -681,7 +667,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}
                 >
                   <Target className="h-4 w-4" />
-                  Løn & Mål
+                  Mine tal
                 </NavLink>
               )}
               
@@ -700,48 +686,39 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 </NavLink>
               )}
               
-              {/* Anbefal en ven */}
-              {p.canViewReferAFriend && (
-                <NavLink
-                  to="/refer-a-friend"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/refer-a-friend" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Gift className="h-4 w-4" />
-                  Anbefal en ven
+              {/* Samlesider (bundt b1): Vagter, Registrér salg, Spil */}
+              {mitArbejde.harVagter && (
+                <NavLink to="/vagter" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/vagter" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Calendar className="h-4 w-4" />
+                  Vagter
                 </NavLink>
               )}
-
-              {/* Fordele (rabataftaler) */}
-              {p.canViewEmployeePerks && (
-                <NavLink
-                  to="/perks"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/perks" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Tag className="h-4 w-4" />
-                  Fordele
+              {mitArbejde.harSalg && (
+                <NavLink to="/registrer-salg" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/registrer-salg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <ShoppingCart className="h-4 w-4" />
+                  Registrér salg
                 </NavLink>
               )}
-
-              {/* Straksbetaling (ASE) - shown dynamically based on qualifying sales */}
-              {hasImmediatePaymentSales && (
-                <NavLink
-                  to="/immediate-payment-ase"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/immediate-payment-ase" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              {mitArbejde.harSpil && (
+                <NavLink to="/spil" onClick={handleNavClick} className={cn(
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/spil" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-4 w-4" />
+                    Spil
+                  </div>
+                  {pendingH2hCount > 0 && (
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                      {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
+                    </Badge>
                   )}
-                >
-                  <CreditCard className="h-4 w-4" />
-                  Straksbetaling (ASE)
                 </NavLink>
               )}
 
@@ -789,79 +766,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Spil (Games) menu - H2H and Liga */}
-          {showSpilMenu && (
-            <Collapsible open={spilOpen} onOpenChange={setSpilOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/head-to-head", "/commission-league"].some(path => location.pathname === path || location.pathname.startsWith(path))
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-5 w-5" />
-                  Spil
-                </div>
-                <div className="flex items-center gap-1">
-                  {pendingH2hCount > 0 && (
-                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                      {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
-                    </Badge>
-                  )}
-                  {spilOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {/* Head to Head */}
-                {p.canViewH2h && (
-                  <NavLink
-                    to="/head-to-head"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/head-to-head" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Swords className="h-4 w-4" />
-                      Head to Head
-                    </div>
-                    {pendingH2hCount > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                        {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
-                      </Badge>
-                    )}
-                  </NavLink>
-                )}
-
-                {/* Cph Sales Ligaen */}
-                {p.canViewCommissionLeague && (
-                  <NavLink
-                    to="/commission-league"
-                    onClick={(e) => {
-                      handleNavClick(e);
-                      localStorage.setItem("league-sidebar-seen", "true");
-                    }}
-                    className={cn(
-                      "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/commission-league" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Trophy className="h-4 w-4" />
-                      Superligaen
-                    </div>
-                    {!localStorage.getItem("league-sidebar-seen") && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded animate-pulse">
-                        NY
-                      </span>
-                    )}
-                  </NavLink>
-                )}
-                
-              </CollapsibleContent>
-            </Collapsible>
-          )}
           
           {/* Main navigation items */}
           {mainNavigation.map((item) => {
@@ -1101,25 +1005,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </Collapsible>
           )}
 
-          {/* Firmabil menu item for Fieldmarketing employees */}
-          {isFieldmarketing && (
-            <NavLink
-              to="/car-quiz"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/car-quiz" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <Car className="h-5 w-5" />
-                {t("sidebar.companyCar")}
-              </div>
-              {!carQuizCompletion && (
-                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">!</Badge>
-              )}
-            </NavLink>
-          )}
 
 
           {/* Intern Vagtplan menu */}
@@ -1159,15 +1044,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     )}
                   </NavLink>
                 )}
-                {p.canViewTimeStamp && (
-                  <NavLink to="/time-stamp" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/time-stamp" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Clock className="h-4 w-4" />
-                    {t("sidebar.timeClock")}
-                  </NavLink>
-                )}
               </CollapsibleContent>
             </Collapsible>
           )}
@@ -1186,15 +1062,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewFmMySchedule && (
-                  <NavLink to="/vagt-flow/my-schedule" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/my-schedule" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <UserCheck className="h-4 w-4" />
-                    Min vagtplan
-                  </NavLink>
-                )}
                 {p.canViewFmOverview && (
                   <NavLink to="/vagt-flow" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1231,15 +1098,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                         </Tooltip>
                       </TooltipProvider>
                     )}
-                  </NavLink>
-                )}
-                {canAccessFmSalesRegistration && (
-                  <NavLink to="/vagt-flow/sales-registration" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/vagt-flow/sales-registration" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <ShoppingCart className="h-4 w-4" />
-                    {t("sidebar.salesRegistration")}
                   </NavLink>
                 )}
                 {p.canViewFmBilling && (
@@ -1308,25 +1166,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
           {/* Dashboards menu REMOVED - dashboards are now accessed via EnvironmentSwitcher in a separate environment */}
 
-          {/* Code of Conduct for Salgskonsulent */}
-          {isSalgskonsulent && (
-            <NavLink
-              to="/code-of-conduct"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/code-of-conduct" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <Shield className="h-5 w-5" />
-                {t("sidebar.codeOfConduct")}
-              </div>
-              {codeOfConductRequired && (
-                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">!</Badge>
-              )}
-            </NavLink>
-          )}
 
 
           {/* Rapporter menu */}
@@ -1619,20 +1458,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           )}
 
 
-          {/* Tast selv salg (team United) */}
-          {isUnitedMember && (
-            <NavLink
-              to="/tast-selv-salg"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/tast-selv-salg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <Pencil className="h-5 w-5" />
-              Tast selv salg
-            </NavLink>
-          )}
 
           {showSalaryMenu && (
             <Collapsible open={salaryOpen} onOpenChange={setSalaryOpen}>

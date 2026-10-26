@@ -17,6 +17,7 @@ import { PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { cn } from "@/lib/utils";
+import { LayoutNestingContext, useIsInsideLayout } from "./LayoutNesting";
 import { PageShell, DraftGuardNavigationListener, useBottomTabs, useIsPhone } from "@/components/mobile";
 
 // Context for sidebar state
@@ -46,16 +47,21 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isPhone = useIsPhone();
   const { pathname } = useLocation();
   const tabs = useBottomTabs();
-  const isTabRoot = tabs.some((t) => t.to === pathname) || pathname === "/";
+  const isTabRoot = tabs.some((t) => t.to.split("?")[0] === pathname) || pathname === "/";
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Choose sidebar based on preview mode
   const SidebarComponent = isPreviewMode ? PreviewSidebar : AppSidebar;
 
   const toggle = () => setIsCollapsed(prev => !prev);
+  const nested = useIsInsideLayout();
+
+  // Allerede inde i et layout (side brugt som fane i en samleside): kun indholdet.
+  if (nested) return <>{children}</>;
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed, toggle }}>
+     <LayoutNestingContext.Provider value={true}>
       <LockOverlays>
         <div className="min-h-[100dvh] bg-background">
           {/* Preview banner at very top */}
@@ -131,6 +137,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <SoftphoneWidget />
         </div>
       </LockOverlays>
+     </LayoutNestingContext.Provider>
     </SidebarContext.Provider>
   );
 }
