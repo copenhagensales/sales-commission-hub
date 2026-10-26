@@ -276,8 +276,8 @@ serve(async (req) => {
               workEmail,
               startDate: formatDanishDate(startDate),
             }),
+          });
           },
-        });
         });
         mailSent = true;
       } catch (err) {
