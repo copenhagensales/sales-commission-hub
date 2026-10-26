@@ -104,6 +104,8 @@ export interface WeeklyLeadClosureMailInput {
     campaignName: string | null;
     error: string | null;
   }[];
+  /** Valgfri kort linje øverst (fx ved opdateret udgave). */
+  notice?: string;
 }
 
 export function isoWeekNumber(dateIso: string): number {
@@ -411,6 +413,7 @@ export function buildWeeklyLeadClosureMail(input: WeeklyLeadClosureMailInput): {
       </td></tr>
     </table>
 
+    ${input.notice ? `<div style="font-size:15px;font-weight:700;color:${BRAND.text};line-height:1.6;margin:0 0 14px;">${escapeHtml(input.notice)}</div>` : ""}
     <div style="font-size:15px;color:${BRAND.text};line-height:1.7;margin:0 0 26px;">
       Her er ugens tal for mødebooking på Tryg pr. kampagne.
     </div>
