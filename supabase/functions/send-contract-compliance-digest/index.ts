@@ -207,7 +207,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const accessToken = await getM365AccessToken();
-    await udsendFlere({
+    const udsendStatus = await udsendFlere({
       type: "send-contract-compliance-digest", kanal: "mail", afsenderfunktion: "send-contract-compliance-digest", emne: `Kontrakt-status: ${missing.length} uden kontrakt, ${startedUnsigned.length} startet uden underskrift`,
       modtagere: (recipients as string[]).map((m) => ({ modtager: m })),
       send: async (tilladte) => {
@@ -223,7 +223,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Digest sent to ${recipients.length} recipient(s)`);
     return new Response(
       JSON.stringify({
-        sent: true,
+        sent: udsendStatus === "sendt",
+        skipped: udsendStatus === "sendt" ? 0 : recipients.length,
+        status: udsendStatus,
         recipients: recipients.length,
         missing: missing.length,
         started_unsigned: startedUnsigned.length,

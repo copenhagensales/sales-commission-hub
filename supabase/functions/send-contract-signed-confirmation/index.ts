@@ -364,7 +364,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending contract signed confirmation to ${employeeEmail} for contract ${contractId}`);
 
     // Send confirmation to employee
-    await udsend({
+    const udsendStatus = await udsend({
       type: "send-contract-signed-confirmation", kanal: "mail", modtager: employeeEmail, emne: `Bekræftelse: Du har underskrevet "${contractTitle}"`, afsenderfunktion: "send-contract-signed-confirmation",
       send: async () => {
         await sendEmail(accessToken, employeeEmail, `Bekræftelse: Du har underskrevet "${contractTitle}"`, htmlBody);
@@ -373,6 +373,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Contract signed confirmation sent successfully to ${employeeEmail}`);
 
     // Send copy to HR/job email (skip for confidential contracts)
+    let hrStatus: string | null = null;
     if (!isConfidential) {
       const hrEmail = "job@copenhagensales.dk";
       const hrSubject = `Ny kontrakt underskrevet: ${employeeName} - ${contractTitle}`;
@@ -417,7 +418,7 @@ const handler = async (req: Request): Promise<Response> => {
         </html>
       `;
 
-      await udsend({
+      hrStatus = await udsend({
         type: "send-contract-signed-confirmation", kanal: "mail", modtager: hrEmail, emne: hrSubject, afsenderfunktion: "send-contract-signed-confirmation",
         send: async () => {
           await sendEmail(accessToken, hrEmail, hrSubject, hrBody);
@@ -429,7 +430,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, sharePointUrl }),
+      JSON.stringify({ success: true, sharePointUrl, sent: udsendStatus === "sendt", status: udsendStatus, hrStatus, skipped: (udsendStatus === "sendt" ? 0 : 1) + (hrStatus && hrStatus !== "sendt" ? 1 : 0) }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {

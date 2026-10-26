@@ -171,7 +171,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending contract email to ${employeeEmail} for contract ${contractId}`);
 
     const accessToken = await getM365AccessToken();
-    await udsend({
+    const udsendStatus = await udsend({
       type: "send-contract-email", kanal: "mail", modtager: employeeEmail, emne: `Ny kontrakt til underskrift: ${contractTitle}`, afsenderfunktion: "send-contract-email",
       send: async () => {
         await sendEmail(accessToken, employeeEmail, `Ny kontrakt til underskrift: ${contractTitle}`, htmlBody);
@@ -181,7 +181,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Contract email sent successfully to ${employeeEmail}`);
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, sent: udsendStatus === "sendt", skipped: udsendStatus === "sendt" ? 0 : 1, status: udsendStatus }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {

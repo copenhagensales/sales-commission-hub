@@ -266,7 +266,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const accessToken = await getM365AccessToken();
-    await udsendFlere({
+    const udsendStatus = await udsendFlere({
       type: "send-compliance-alert-mail", kanal: "mail", emne: subject, afsenderfunktion: "send-compliance-alert",
       modtagere: recipients.map((r: string) => ({ modtager: r })),
       send: async (tilladte) => { await sendEmail(accessToken, tilladte, subject, htmlBody); },
@@ -280,7 +280,9 @@ const handler = async (req: Request): Promise<Response> => {
     });
     return new Response(
       JSON.stringify({
-        sent: true,
+        sent: udsendStatus === "sendt",
+        skipped: udsendStatus === "sendt" ? 0 : recipients.length,
+        status: udsendStatus,
         subject,
         grund,
         recipients: recipients.length,

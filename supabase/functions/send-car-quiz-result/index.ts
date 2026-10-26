@@ -137,7 +137,7 @@ const handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
-    await udsend({
+    const udsendStatus = await udsend({
       type: "send-car-quiz-result", kanal: "mail", modtager: employeeEmail, modtagerEmployeeId: employeeId, emne: `Bil-quiz Resultat: ${statusText} - ${employeeName}`, afsenderfunktion: "send-car-quiz-result",
       send: async () => {
       // Send email via Microsoft Graph
@@ -180,7 +180,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Quiz result email sent successfully to ${employeeEmail}`);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully" }),
+      JSON.stringify({ success: true, sent: udsendStatus === "sendt", skipped: udsendStatus === "sendt" ? 0 : 1, status: udsendStatus, message: udsendStatus === "sendt" ? "Email sent successfully" : `Email not sent (${udsendStatus})` }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },

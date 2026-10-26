@@ -171,8 +171,9 @@ Deno.serve(async (req) => {
     };
 
     let sendErrorText: string | null = null;
+    let udsendStatus = '';
     try {
-      await udsendFlere({
+      udsendStatus = await udsendFlere({
         type: 'notify-referral-received', kanal: 'mail', emne: emailPayload.message.subject,
         afsenderfunktion: 'notify-referral-received',
         modtagere: recipientEmails.map((email: string) => ({ modtager: email })),
@@ -204,7 +205,7 @@ Deno.serve(async (req) => {
     console.log('Referral notification email sent successfully');
 
     return new Response(
-      JSON.stringify({ success: true, recipientCount: recipientEmails.length }),
+      JSON.stringify({ success: true, sent: udsendStatus === 'sendt', skipped: udsendStatus === 'sendt' ? 0 : recipientEmails.length, status: udsendStatus, recipientCount: recipientEmails.length }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

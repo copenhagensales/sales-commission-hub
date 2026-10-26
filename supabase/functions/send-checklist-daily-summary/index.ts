@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
 
     // 5. Send email
     const accessToken = await getM365AccessToken();
-    await udsendFlere({
+    const udsendStatus = await udsendFlere({
       type: "send-checklist-daily-summary", kanal: "mail", afsenderfunktion: "send-checklist-daily-summary",
       emne: `FM Checkliste — ${DAY_NAMES[weekdayIndex]} — ${pct}% udført`,
       modtagere: recipientEmails.map((m: string) => ({ modtager: m })),
@@ -244,7 +244,10 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: "Email sent",
+        message: udsendStatus === "sendt" ? "Email sent" : "Email not sent",
+        sent: udsendStatus === "sendt",
+        skipped: udsendStatus === "sendt" ? 0 : recipientEmails.length,
+        status: udsendStatus,
         recipients: recipientEmails.length,
         tasks: totalCount,
         completed: doneCount,
