@@ -1,7 +1,7 @@
 // Ugeplan til kunder (report_type = 'client_week_plan').
 // Samme abonnement-/dispatch-tabel, samme mailskabelon og samme afsendelsesvej
 // som leverandørrapporten. Ingen godkendelse, ingen beløb, ingen sælgernavne.
-import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import type { AuthOk } from "../_shared/auth.ts";
 import { sendM365Mail } from "../_shared/m365-mail.ts";
 import { udsendFlere } from "../_shared/udsend.ts";
 import {
@@ -11,7 +11,7 @@ import {
   type WeekPlanLocation,
 } from "../_shared/supplier-report-mail.ts";
 
-type Svc = SupabaseClient;
+type Svc = AuthOk["svc"];
 
 interface BookingRow {
   id: string;

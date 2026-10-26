@@ -44,7 +44,7 @@ async function getM365AccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function sendNotificationEmail(inquiry: { name: string; company?: string; email?: string; phone?: string; message?: string }) {
+async function sendNotificationEmail(inquiry: { name: string; company?: string | null; email?: string | null; phone?: string | null; message?: string | null }) {
   const senderEmail = Deno.env.get("M365_SENDER_EMAIL");
   if (!senderEmail) { console.error("Missing M365_SENDER_EMAIL"); return; }
 
