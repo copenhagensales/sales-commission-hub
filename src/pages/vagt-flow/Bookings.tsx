@@ -1,0 +1,888 @@
+import { BottomSheet, useIsPhone } from "@/components/mobile";
+import { SlidersHorizontal } from "lucide-react";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
+import { format, addDays, getWeek } from "date-fns";
+import { getWeekStartDate, getWeekYear } from "@/lib/calculations";
+import { da } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
+import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
+
+export default function VagtBookings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const now = new Date();
+  
+  // Initialize from URL params or current date
+  const weekParam = searchParams.get("week");
+  const yearParam = searchParams.get("year");
+  const [selectedWeek, setSelectedWeek] = useState(
+    weekParam ? parseInt(weekParam) : getWeek(now, { weekStartsOn: 1 })
+  );
+  const [selectedYear, setSelectedYear] = useState(
+    yearParam ? parseInt(yearParam) : getWeekYear(now)
+  );
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
+  const [absenceExpanded, setAbsenceExpanded] = useState(true);
+  const [openAssignPopover, setOpenAssignPopover] = useState<string | null>(null);
+  const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
+  const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
+
+  // Update URL when week/year changes
+  useEffect(() => {
+    setSearchParams({ week: selectedWeek.toString(), year: selectedYear.toString() });
+  }, [selectedWeek, selectedYear, setSearchParams]);
+
+  const weekStart = getWeekStartDate(selectedYear, selectedWeek);
+  const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
+  const { data: bookings, isLoading } = useQuery({
+    queryKey: ["vagt-bookings-list", selectedWeek, selectedYear],
+    queryFn: async () => {
+      // First fetch bookings with assignments
+      const { data: bookingData, error } = await supabase
+        .from("booking")
+        .select(`
+          *,
+          location(name, address_city, type),
+          clients(id, name),
+          booking_assignment(id, date, employee_id)
+        `)
+        .eq("week_number", selectedWeek)
+        .eq("year", selectedYear)
+        .order("start_date");
+      if (error) throw error;
+      
+      // Get unique employee IDs from assignments
+      const employeeIds = [...new Set(
+        bookingData?.flatMap(b => b.booking_assignment?.map((a: any) => a.employee_id) || []) || []
+      )];
+      
+      // Fetch employee names from employee_master_data
+      let employeeMap = new Map<string, string>();
+      if (employeeIds.length > 0) {
+        const { data: empData } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name")
+          .in("id", employeeIds);
+        
+        employeeMap = new Map(empData?.map(e => [e.id, `${e.first_name} ${e.last_name}`]) || []);
+      }
+      
+      // Merge employee names into assignments
+      return bookingData?.map(booking => ({
+        ...booking,
+        booking_assignment: booking.booking_assignment?.map((a: any) => ({
+          ...a,
+          employee: { full_name: employeeMap.get(a.employee_id) || "Ukendt" }
+        }))
+      }));
+    },
+  });
+
+  // Fetch Fieldmarketing team and its assigned clients
+  const { data: fieldmarketingClients } = useQuery({
+    queryKey: ["fieldmarketing-team-clients"],
+    queryFn: async () => {
+      // Find Fieldmarketing team
+      const { data: team, error: teamError } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .maybeSingle();
+      
+      if (teamError || !team) return [];
+      
+      // Get clients assigned to Fieldmarketing team
+      const { data: teamClients, error: tcError } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+      
+      if (tcError) throw tcError;
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+  });
+
+  // Use fieldmarketingClients directly - no need to map to brands
+
+  // Fetch Fieldmarketing employee IDs first (job_title=Fieldmarketing OR opt-in via can_work_fm)
+  const { data: fieldmarketingEmployeeIds } = useQuery({
+    queryKey: ["fieldmarketing-employee-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .or("job_title.eq.Fieldmarketing,can_work_fm.eq.true")
+        .eq("is_active", true);
+      if (error) throw error;
+      return data?.map(e => e.id) || [];
+    },
+  });
+
+  const { data: absences } = useQuery({
+    queryKey: ["vagt-absences-week-v2", selectedWeek, selectedYear, fieldmarketingEmployeeIds],
+    queryFn: async () => {
+      if (!fieldmarketingEmployeeIds || fieldmarketingEmployeeIds.length === 0) return [];
+      
+      const weekEndDate = addDays(weekStart, 6);
+      // Get absences from absence_request_v2 for Fieldmarketing employees
+      const { data, error } = await supabase
+        .from("absence_request_v2")
+        .select(`
+          id,
+          employee_id,
+          start_date,
+          end_date,
+          type,
+          status,
+          comment
+        `)
+        .in("employee_id", fieldmarketingEmployeeIds)
+        .lte("start_date", format(weekEndDate, "yyyy-MM-dd"))
+        .gte("end_date", format(weekStart, "yyyy-MM-dd"))
+        .in("status", ["approved", "pending"]);
+      if (error) throw error;
+      
+      // Fetch employee names separately
+      const employeeIds = [...new Set(data?.map(a => a.employee_id) || [])];
+      if (employeeIds.length === 0) return [];
+      
+      const { data: employeeData } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, department")
+        .in("id", employeeIds);
+      
+      const employeeMap = new Map(employeeData?.map(e => [e.id, { 
+        full_name: `${e.first_name} ${e.last_name}`,
+        team: e.department 
+      }]));
+      
+      return data?.map(a => ({
+        ...a,
+        employee: employeeMap.get(a.employee_id),
+      })) || [];
+    },
+    enabled: !!fieldmarketingEmployeeIds && fieldmarketingEmployeeIds.length > 0,
+  });
+
+  const { data: vehicles } = useQuery({
+    queryKey: ["vagt-vehicles"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("vehicle").select("*").eq("is_active", true);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: vehicleMileage } = useQuery({
+    queryKey: ["vagt-vehicle-mileage", selectedWeek, selectedYear],
+    queryFn: async () => {
+      const weekEnd = addDays(weekStart, 6);
+      const { data, error } = await supabase
+        .from("vehicle_mileage")
+        .select(`*, vehicle:vehicle(name)`)
+        .gte("date", format(weekStart, "yyyy-MM-dd"))
+        .lte("date", format(weekEnd, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch Fieldmarketing employees (job_title=Fieldmarketing OR opt-in via can_work_fm)
+  const { data: employees } = useQuery({
+    queryKey: ["vagt-employees-active-master"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, department")
+        .or("job_title.eq.Fieldmarketing,can_work_fm.eq.true")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data?.map(e => ({
+        id: e.id,
+        full_name: `${e.first_name} ${e.last_name}`,
+        team: e.department,
+      })) || [];
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("booking").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Booking slettet" });
+      setDeleteBookingId(null);
+    },
+  });
+
+  const assignEmployeeMutation = useMutation({
+    mutationFn: async ({ bookingId, employeeId, date }: { bookingId: string; employeeId: string; date: string }) => {
+      const { error } = await supabase.from("booking_assignment").insert({
+        booking_id: bookingId,
+        employee_id: employeeId,
+        date: date,
+        start_time: "09:00",
+        end_time: "17:00",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      setOpenAssignPopover(null);
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke tildele medarbejder", variant: "destructive" });
+    },
+  });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
+      const inserts = assignments.flatMap(a => 
+        a.dates.map(date => ({
+          booking_id: a.bookingId,
+          employee_id: a.employeeId,
+          date,
+          start_time: "09:00",
+          end_time: "17:00",
+        }))
+      );
+      const { error } = await supabase.from("booking_assignment").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejdere tildelt" });
+      setAddEmployeeDialogBooking(null);
+    },
+    onError: (error: any) => {
+      const isUniqueViolation = error.message?.includes('unique') || 
+                                error.message?.includes('duplicate') ||
+                                error.code === '23505';
+      const message = isUniqueViolation 
+        ? "Medarbejder er allerede booket på en eller flere af de valgte dage"
+        : "Kunne ikke tildele medarbejdere";
+      toast({ title: message, variant: "destructive" });
+    },
+  });
+
+  const bulkVehicleAssignMutation = useMutation({
+    mutationFn: async ({ bookingId, vehicleId, dates }: { bookingId: string; vehicleId: string; dates: string[] }) => {
+      const inserts = dates.map(date => ({
+        booking_id: bookingId,
+        vehicle_id: vehicleId,
+        date,
+        start_mileage: 0,
+        end_mileage: 0,
+      }));
+      const { error } = await supabase.from("vehicle_mileage").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-vehicle-mileage"] });
+      toast({ title: "Bil tildelt" });
+      setAddVehicleDialogBooking(null);
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke tildele bil", variant: "destructive" });
+    },
+  });
+
+  const removeAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.from("booking_assignment").delete().eq("id", assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Tildeling fjernet" });
+    },
+  });
+
+  const filteredBookings = bookings?.filter((b: any) => {
+    if (clientFilter !== "all" && b.client_id !== clientFilter) return false;
+    return true;
+  });
+
+  // Group bookings by client
+  const bookingsByClient = filteredBookings?.reduce((acc: any, booking: any) => {
+    const clientId = booking.client_id || "unknown";
+    if (!acc[clientId]) {
+      acc[clientId] = {
+        client: booking.clients,
+        bookings: [],
+      };
+    }
+    acc[clientId].bookings.push(booking);
+    return acc;
+  }, {});
+
+  // First group absences by employee, then by team
+  const absencesByTeam = absences?.reduce((acc: any, absence: any) => {
+    const team = absence.employee?.team || "Uden team";
+    const employeeId = absence.employee_id;
+    const employeeName = absence.employee?.full_name || "Ukendt";
+    
+    if (!acc[team]) acc[team] = {};
+    if (!acc[team][employeeId]) {
+      acc[team][employeeId] = {
+        employeeId,
+        employeeName,
+        absenceDays: [] as number[],
+      };
+    }
+    
+    // Add all days from this absence record using string comparison
+    const startDate = absence.start_date;
+    const endDate = absence.end_date;
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const currentDayStr = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+      if (currentDayStr >= startDate && currentDayStr <= endDate) {
+        if (!acc[team][employeeId].absenceDays.includes(dayIndex)) {
+          acc[team][employeeId].absenceDays.push(dayIndex);
+        }
+      }
+    }
+    
+    return acc;
+  }, {});
+
+  // Get unique employee count
+  const uniqueEmployeeCount = absences ? new Set(absences.map((a: any) => a.employee_id)).size : 0;
+
+  const toggleWeek = (weekKey: string) => {
+    const newExpanded = new Set(expandedWeeks);
+    if (newExpanded.has(weekKey)) {
+      newExpanded.delete(weekKey);
+    } else {
+      newExpanded.add(weekKey);
+    }
+    setExpandedWeeks(newExpanded);
+  };
+
+  const expandAll = () => {
+    if (bookingsByClient) {
+      const allKeys = Object.keys(bookingsByClient).map((clientId) => `${selectedYear}-${selectedWeek}-${clientId}`);
+      setExpandedWeeks(new Set([`${selectedYear}-${selectedWeek}`, ...allKeys]));
+    }
+  };
+
+  const collapseAll = () => {
+    setExpandedWeeks(new Set());
+  };
+
+  const getAbsenceDays = (absence: any) => {
+    const days: number[] = [];
+    const start = new Date(absence.start_date);
+    const end = new Date(absence.end_date);
+    // Check each day of the current week
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const currentDay = addDays(weekStart, dayIndex);
+      if (currentDay >= start && currentDay <= end) {
+        days.push(dayIndex);
+      }
+    }
+    return days;
+  };
+
+  const getAssignmentsForDay = (booking: any, dayIndex: number) => {
+    const targetDate = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+    return booking.booking_assignment?.filter((a: any) => a.date === targetDate) || [];
+  };
+
+  const getVehicleForDay = (bookingId: string, dayIndex: number) => {
+    const targetDate = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+    return vehicleMileage?.find((vm: any) => vm.booking_id === bookingId && vm.date === targetDate);
+  };
+
+  const hasUnderstaffing = (booking: any) => {
+    const assignments = booking.booking_assignment?.length || 0;
+    const expected = booking.expected_staff_count || 2;
+    return assignments < expected;
+  };
+
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight italic">Vagtplan</h1>
+            <p className="text-muted-foreground">Overblik over alle vagter</p>
+          </div>
+          <Button 
+            className="bg-green-600 hover:bg-green-700"
+            onClick={() => navigate(`/vagt-flow/book-week?week=${selectedWeek}&year=${selectedYear}`)}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Book uge
+          </Button>
+        </div>
+
+        {/* Week selector and filters */}
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div>
+              <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Vælg uge</label>
+              <div className="flex items-center gap-2 max-md:flex-wrap">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedWeek((w) => w - 1)}
+                >
+                  ← Forrige uge
+                </Button>
+                <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-md bg-background max-md:order-first max-md:basis-full">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Uge {selectedWeek}, {selectedYear}</span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedWeek((w) => w + 1)}
+                >
+                  Næste uge →
+                </Button>
+              </div>
+            </div>
+
+            {isPhone ? (
+              <>
+                <Button variant="outline" className="min-h-11 w-full" onClick={() => setFiltersOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />Filtre{clientFilter !== "all" ? " (1)" : ""}
+                </Button>
+                <BottomSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Filtre">
+                  <div className="px-2 [&_button[role=combobox]]:min-h-11">
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Alle kunder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle kunder</SelectItem>
+                    {fieldmarketingClients?.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+                  </div>
+                </BottomSheet>
+              </>
+            ) : (
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Alle kunder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle kunder</SelectItem>
+                    {fieldmarketingClients?.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Absence section */}
+        {absences && absences.length > 0 && (
+          <Collapsible open={absenceExpanded} onOpenChange={setAbsenceExpanded}>
+            <Card className="overflow-hidden">
+              <CollapsibleTrigger className="w-full">
+                <CardContent className="py-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                      <Users className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Fravær uge {selectedWeek}</span>
+                      <span className="text-muted-foreground text-sm">({uniqueEmployeeCount} medarbejdere)</span>
+                    </div>
+                  </div>
+                  {absenceExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                </CardContent>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 pb-6 space-y-6">
+                  {Object.entries(absencesByTeam || {}).map(([team, teamEmployees]: [string, any]) => (
+                    <div key={team}>
+                      <p className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">
+                        Team {team}
+                      </p>
+                      <div className="space-y-2">
+                        {Object.values(teamEmployees).map((employee: any) => (
+                          <div key={employee.employeeId} className="flex items-center justify-between py-1">
+                            <span className="text-sm text-foreground/80 truncate max-w-[250px]">
+                              {employee.employeeName}
+                            </span>
+                            <div className="flex gap-1.5">
+                              {DAYS.map((day, idx) => {
+                                const isAbsent = employee.absenceDays.includes(idx);
+                                const dayLetter = day.charAt(0);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                                      isAbsent 
+                                        ? "bg-red-500 text-white shadow-sm" 
+                                        : "bg-green-500 text-white shadow-sm"
+                                    }`}
+                                  >
+                                    {dayLetter}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        )}
+
+        {/* Expand/Collapse buttons */}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={expandAll}>
+            <ChevronDown className="h-4 w-4 mr-1" /> Udvid alle uger
+          </Button>
+          <Button variant="outline" size="sm" onClick={collapseAll}>
+            <ChevronUp className="h-4 w-4 mr-1" /> Kollaps alle uger
+          </Button>
+        </div>
+
+        {/* Bookings by client */}
+        {isLoading ? (
+          <p>Indlæser...</p>
+        ) : bookingsByClient && Object.keys(bookingsByClient).length > 0 ? (
+          Object.entries(bookingsByClient).map(([clientId, data]: [string, any]) => {
+            const weekKey = `${selectedYear}-${selectedWeek}-${clientId}`;
+            const isExpanded = expandedWeeks.has(weekKey);
+            
+            return (
+              <Collapsible key={clientId} open={isExpanded} onOpenChange={() => toggleWeek(weekKey)}>
+                <Card>
+                  <CardContent className="pt-4 pb-4 flex items-center justify-between max-md:flex-wrap max-md:gap-3">
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center gap-3 cursor-pointer flex-1 max-md:flex-wrap max-md:min-h-11">
+                        <span className="font-bold text-lg">Uge {selectedWeek}, {selectedYear}</span>
+                        <Badge variant="outline">
+                          {data.client?.name || "Ukendt kunde"}
+                        </Badge>
+                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                          {data.bookings.length} booking{data.bookings.length !== 1 ? "s" : ""}
+                        </Badge>
+                        {isExpanded ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                      </div>
+                    </CollapsibleTrigger>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="text-primary border-primary">
+                        <FileText className="h-4 w-4 mr-1" /> Eksporter PDF
+                      </Button>
+                    </div>
+                  </CardContent>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0 space-y-6">
+                      {data.bookings.map((booking: any) => (
+                        <div key={booking.id} className="border rounded-lg p-4 space-y-4">
+                          {/* Booking header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline">
+                                {data.client?.name || "Ukendt kunde"}
+                              </Badge>
+                              <span className="font-medium">{booking.location?.name}</span>
+                              {hasUnderstaffing(booking) && (
+                                <Badge variant="outline" className="border-orange-500 text-orange-500 gap-1">
+                                  <AlertTriangle className="h-3 w-3" /> Underbemanding
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary"
+                                onClick={() => setAddEmployeeDialogBooking(booking)}
+                              >
+                                <Plus className="h-4 w-4 mr-1" /> Tilføj
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary"
+                                onClick={() => setAddVehicleDialogBooking(booking)}
+                              >
+                                <Car className="h-4 w-4 mr-1" /> Bil
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => setDeleteBookingId(booking.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Employee assignments */}
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Medarbejdere</p>
+                            <div className="grid grid-cols-7 gap-2">
+                              {DAYS.map((day, idx) => {
+                                const assignments = getAssignmentsForDay(booking, idx);
+                                const targetDate = format(addDays(weekStart, idx), "yyyy-MM-dd");
+                                // Compare dates as strings to avoid timezone issues
+                                // Use booked_days if available, otherwise fall back to date range
+                                const bookedDays = booking.booked_days as number[] | null;
+                                const isBooked = bookedDays 
+                                  ? bookedDays.includes(idx)
+                                  : (booking.start_date <= targetDate && booking.end_date >= targetDate);
+                                const popoverKey = `${booking.id}-${idx}`;
+                                const hasAssignments = assignments.length > 0;
+                                
+                                return (
+                                  <Popover
+                                    key={idx}
+                                    open={openAssignPopover === popoverKey}
+                                    onOpenChange={(open) => setOpenAssignPopover(open ? popoverKey : null)}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <div
+                                        className={`p-2 rounded-lg text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/50 min-h-[60px] ${
+                                          hasAssignments 
+                                            ? "bg-green-100 border-green-200 border" 
+                                            : isBooked 
+                                              ? "bg-red-50 border border-red-200 hover:bg-red-100"
+                                              : "bg-muted/30 hover:bg-muted/50"
+                                        }`}
+                                      >
+                                        <p className={`text-xs ${hasAssignments || isBooked ? "text-gray-600" : "text-muted-foreground"}`}>{day}</p>
+                                        {hasAssignments ? (
+                                          <div className="space-y-0.5">
+                                            {assignments.map((a: any) => (
+                                              <p key={a.id} className="text-xs font-medium truncate text-green-800">
+                                                {a.employee?.full_name?.split(" ")[0]}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className={`text-sm font-medium ${isBooked ? "text-red-700" : "text-foreground"}`}>-</p>
+                                        )}
+                                      </div>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2" align="start">
+                                      <div className="space-y-2">
+                                        <p className="text-sm font-medium px-2 py-1">
+                                          {hasAssignments ? "Administrer tildelinger" : "Tildel medarbejder"}
+                                        </p>
+                                        {assignments.map((a: any) => (
+                                          <div key={a.id} className="flex items-center justify-between px-2 py-1 bg-muted/50 rounded">
+                                            <span className="text-sm">{a.employee?.full_name}</span>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                              onClick={() => removeAssignmentMutation.mutate(a.id)}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                        <div className="border-t pt-2">
+                                          <p className="text-xs text-muted-foreground px-2 mb-1">Tilføj medarbejder:</p>
+                                          <div className="max-h-48 overflow-y-auto">
+                                            {employees?.filter(emp => !assignments.some((a: any) => a.employee_id === emp.id)).map((emp) => (
+                                              <Button
+                                                key={emp.id}
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-start"
+                                                onClick={() => {
+                                                  assignEmployeeMutation.mutate({
+                                                    bookingId: booking.id,
+                                                    employeeId: emp.id,
+                                                    date: targetDate,
+                                                  });
+                                                }}
+                                              >
+                                                <Users className="h-4 w-4 mr-2" />
+                                                {emp.full_name}
+                                                {emp.team && (
+                                                  <span className="ml-auto text-xs text-muted-foreground">{emp.team}</span>
+                                                )}
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Vehicle assignments */}
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Biler</p>
+                            <div className="grid grid-cols-7 gap-2">
+                              {DAYS.map((day, idx) => {
+                                const vehicle = getVehicleForDay(booking.id, idx);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`p-2 rounded-lg text-center ${
+                                      vehicle ? "bg-blue-100 border border-blue-200" : "bg-muted/30"
+                                    }`}
+                                  >
+                                    <p className={`text-xs ${vehicle ? "text-blue-600" : "text-muted-foreground"}`}>{day}</p>
+                                    <p className={`text-sm truncate flex items-center justify-center gap-1 ${vehicle ? "text-blue-800 font-medium" : "text-foreground"}`}>
+                                      {vehicle ? (
+                                        <>
+                                          <Car className="h-3 w-3" />
+                                          {vehicle.vehicle?.name}
+                                        </>
+                                      ) : "-"}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            );
+          })
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              Ingen bookinger i denne uge
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <AlertDialog open={!!deleteBookingId} onOpenChange={() => setDeleteBookingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slet booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil slette denne booking?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteBookingId && deleteMutation.mutate(deleteBookingId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Slet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AddEmployeeDialog
+        open={!!addEmployeeDialogBooking}
+        onOpenChange={(open) => !open && setAddEmployeeDialogBooking(null)}
+        booking={addEmployeeDialogBooking}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
+        employees={employees || []}
+        onAddAssignments={(assignments) => {
+          if (!addEmployeeDialogBooking) return;
+          bulkAssignMutation.mutate(
+            assignments.map(a => ({
+              bookingId: addEmployeeDialogBooking.id,
+              employeeId: a.employeeId,
+              dates: a.dates,
+            }))
+          );
+        }}
+      />
+
+      <AddVehicleDialog
+        open={!!addVehicleDialogBooking}
+        onOpenChange={(open) => !open && setAddVehicleDialogBooking(null)}
+        booking={addVehicleDialogBooking}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
+        vehicles={vehicles || []}
+        onAddAssignments={(assignment) => {
+          if (!addVehicleDialogBooking) return;
+          bulkVehicleAssignMutation.mutate({
+            bookingId: addVehicleDialogBooking.id,
+            vehicleId: assignment.vehicleId,
+            dates: assignment.dates,
+          });
+        }}
+      />
+    </MainLayout>
+  );
+}
