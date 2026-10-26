@@ -137,10 +137,9 @@ async function leaderRecipients(
   return Array.from(out.values());
 }
 
-/** Typer slået fra i Udsendelser (pr. kald). Fail-open: fejler opslaget, = aktiv. */
-// Nulstilles ved starten af hvert kald (se Deno.serve), så tænd/sluk aldrig huskes på tværs af kald.
-const typeCache = new Map<string, boolean>();
-async function typeSlaaetFra(db: Client, type: string): Promise<boolean> {
+/** Typer slået fra i Udsendelser. Cachen oprettes pr. kald i Deno.serve. Fail-open: fejler opslaget, = aktiv. */
+type TypeCache = Map<string, boolean>;
+async function typeSlaaetFra(db: Client, type: string, typeCache: TypeCache): Promise<boolean> {
   if (typeCache.has(type)) return typeCache.get(type)!;
   let fra = false;
   try {
@@ -157,6 +156,7 @@ async function typeSlaaetFra(db: Client, type: string): Promise<boolean> {
 /** Returnerer false, hvis typen er slået fra (intet lagt i kø). */
 async function queueMail(
   db: Client,
+  typeCache: TypeCache,
   args: {
     mailType: string;
     recipient: { email: string; name: string; employeeId?: string | null };
@@ -167,7 +167,7 @@ async function queueMail(
     teamId?: string | null;
   },
 ): Promise<boolean> {
-  if (await typeSlaaetFra(db, args.mailType)) return false;
+  if (await typeSlaaetFra(db, args.mailType, typeCache)) return false;
   const { error } = await db.from("scheduled_emails").insert({
     employee_id: args.recipient.employeeId ?? null,
     recipient_email: args.recipient.email,
@@ -195,7 +195,7 @@ async function queueMail(
   return true;
 }
 
-async function handleRejectedReview(db: Client, reviewId: string) {
+async function handleRejectedReview(db: Client, typeCache: TypeCache, reviewId: string) {
   const { data: review, error } = await db
     .from("quality_reviews")
     .select(
@@ -238,7 +238,7 @@ async function handleRejectedReview(db: Client, reviewId: string) {
 
   let queued = 0, skipped = 0;
   for (const recipient of recipients) {
-    if (await queueMail(db, {
+    if (await queueMail(db, typeCache, {
       mailType: "quality_rejected",
       recipient,
       subject,
@@ -256,7 +256,7 @@ async function handleRejectedReview(db: Client, reviewId: string) {
  * Feedback-mail på et godkendt salg. Sendes kun når kontrollen ikke er afvist,
  * så en feedback aldrig kan forveksles med en anmærkning.
  */
-async function handleFeedbackReview(db: Client, reviewId: string) {
+async function handleFeedbackReview(db: Client, typeCache: TypeCache, reviewId: string) {
   const { data: review, error } = await db
     .from("quality_reviews")
     .select(
@@ -290,7 +290,7 @@ async function handleFeedbackReview(db: Client, reviewId: string) {
 
   let queued = 0, skipped = 0;
   for (const recipient of recipients) {
-    if (await queueMail(db, {
+    if (await queueMail(db, typeCache, {
       mailType: "quality_feedback",
       recipient,
       subject,
@@ -315,6 +315,7 @@ const emptyCounters = (): Counters => ({ totalSales: 0, reviewed: 0, rejected: 0
 
 async function handleDailySummary(
   db: Client,
+  typeCache: TypeCache,
   date: string,
   reviewerEmployeeId: string | null,
 ) {
@@ -455,7 +456,7 @@ async function handleDailySummary(
     });
 
     for (const recipient of await leaderRecipients(db, teamId)) {
-      if (await queueMail(db, {
+      if (await queueMail(db, typeCache, {
         mailType: "quality_team_summary",
         recipient,
         subject,
@@ -519,7 +520,7 @@ async function handleDailySummary(
     const employee = (managementEmployees ?? []).find(
       (e) => (e.work_email ?? "").toLowerCase() === email,
     );
-    if (!(await queueMail(db, {
+    if (!(await queueMail(db, typeCache, {
       mailType: "quality_management_summary",
       recipient: {
         email,
@@ -554,7 +555,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    typeCache.clear();
+    const typeCache: TypeCache = new Map<string, boolean>();
     const db = svc();
     const caller = await resolveCaller(req, db);
     if (!caller) return json(403, { error: "Ingen adgang til kvalitetsmodulet" });
@@ -566,7 +567,7 @@ Deno.serve(async (req) => {
       if (typeof body.review_id !== "string") {
         return json(400, { error: "review_id mangler" });
       }
-      const result = await handleRejectedReview(db, body.review_id);
+      const result = await handleRejectedReview(db, typeCache, body.review_id);
       return json(200, { action, ...result });
     }
 
@@ -574,7 +575,7 @@ Deno.serve(async (req) => {
       if (typeof body.review_id !== "string") {
         return json(400, { error: "review_id mangler" });
       }
-      const result = await handleFeedbackReview(db, body.review_id);
+      const result = await handleFeedbackReview(db, typeCache, body.review_id);
       return json(200, { action, ...result });
     }
 
@@ -583,7 +584,7 @@ Deno.serve(async (req) => {
         typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
           ? body.date
           : new Date().toISOString().slice(0, 10);
-      const result = await handleDailySummary(db, date, caller.employeeId);
+      const result = await handleDailySummary(db, typeCache, date, caller.employeeId);
       return json(200, { action, date, ...result });
     }
 

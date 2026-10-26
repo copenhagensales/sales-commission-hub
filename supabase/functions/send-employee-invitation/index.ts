@@ -350,7 +350,13 @@ serve(async (req) => {
     } else {
       // Ikke sendt: den nye invitation kan aldrig bruges; den forrige gælder fortsat.
       const { error: expErr } = await supabase.from("employee_invitations").update({ status: "expired" }).eq("token", token);
-      if (expErr) console.error("Kunne ikke udløbe ny invitation:", expErr.message);
+      if (expErr) {
+        console.error("Kunne ikke udløbe ny invitation:", expErr.message);
+        return new Response(
+          JSON.stringify({ success: false, sent: false, status: udsendStatus, error: "Invitationen blev ikke sendt, og den kunne ikke udløbes – den står som pending" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     console.log(`Invitation sent for employee ${employeeId}`);
