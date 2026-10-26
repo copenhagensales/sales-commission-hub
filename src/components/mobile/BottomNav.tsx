@@ -43,10 +43,6 @@ export function useBottomTabs(): BottomTab[] {
   ];
 }
 
-/** Området en destination dækker (Vagter med egen FM-plan dækker hele /vagt-flow). */
-function areaOf(t: BottomTab): string {
-  return t.to.split("?")[0];
-}
 function isOn(pathname: string, t: BottomTab, search = ""): boolean {
   const [r, q] = t.to.split("?");
   if (!(pathname === r || pathname.startsWith(`${r}/`))) return false;
@@ -57,7 +53,7 @@ function isOn(pathname: string, t: BottomTab, search = ""): boolean {
 
 /** Faneroden for en sti (bruges af tilbage-pilen, når der ingen historik er). */
 export function tabRootFor(pathname: string, tabs: BottomTab[]): string | null {
-  const hit = tabs.find((t) => isOn(pathname, t, search));
+  const hit = tabs.find((t) => isOn(pathname, t));
   return hit ? hit.to : null;
 }
 
