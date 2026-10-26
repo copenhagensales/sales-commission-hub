@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { udsend } from "../_shared/udsend.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -112,19 +113,30 @@ serve(async (req) => {
     // Send SMS via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-sms-status`;
-    const twilioResponse = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
-        'Content-Type': 'application/x-www-form-urlencoded',
+    let twilioResponse: Response | undefined;
+    const twilioResponseStatus = await udsend({
+      type: "send-employee-sms", kanal: "sms", modtager: toNumber, modtagerEmployeeId: targetEmployee.id, afsenderfunktion: "send-employee-sms",
+      send: async () => {
+        twilioResponse = await fetch(twilioUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          From: fromNumber,
+          To: toNumber,
+          Body: message,
+          StatusCallback: statusCallbackUrl,
+        }),
+      });
+        if (!twilioResponse.ok) throw new Error(`HTTP ${twilioResponse.status}`);
       },
-      body: new URLSearchParams({
-        From: fromNumber,
-        To: toNumber,
-        Body: message,
-        StatusCallback: statusCallbackUrl,
-      }),
-    });
+    }).catch((e) => { if (!twilioResponse) throw e; return "fejl" as const; });
+    if (!twilioResponse) {
+      // Slået fra eller fravalgt i Udsendelser – intet sendt.
+      return new Response(JSON.stringify({ success: true, skipped: twilioResponseStatus }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const twilioResult = await twilioResponse.json();
 
