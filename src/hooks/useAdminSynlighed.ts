@@ -20,7 +20,10 @@ export function useAdminSynlighed() {
   const { user } = useAuth();
   const { data: hasItAccess = false } = useItAccess();
   // Gamle sektionsbetingelser (c2): ingen ser mere end før.
-  const amoSek = v("menu_section_amo"), led = v("menu_section_ledelse");
+  const led = v("menu_section_ledelse"), pers = v("menu_section_personale");
+  // Gammel AMO-sektion: sektionsnøgle OG mindst én af de fire kernesider.
+  const amoSek = v("menu_section_amo") &&
+    (!!p.canViewAmoDashboard || !!p.canViewAmoOrganisation || !!p.canViewAmoMeetings || !!p.canViewAmoApv);
   // Samme ejer-afgørelse som den gamle Admin-sektion (stillingsnavn), ikke en ny rolleregel.
   const isOwner = p.position?.name?.toLowerCase() === "ejer";
   const adminSek = !!p.canViewKpiDefinitions || isOwner;
@@ -45,13 +48,13 @@ export function useAdminSynlighed() {
     documents: amoSek && v("menu_amo_documents"), "audit-log": amoSek && v("menu_amo_audit_log"), settings: amoSek && v("menu_amo_settings"),
   };
   const admin = {
-    settings: adminSek && v("menu_settings"), types: loen && v("menu_salary_types"),
+    settings: v("menu_settings"), types: loen && v("menu_salary_types"),
     rettigheder: led && v("menu_permissions"),
     menu: isOwner,
     "kpi-definitioner": adminSek && v("menu_kpi_definitions"),
-    security: led && v("menu_security_dashboard"), "login-log": led && v("menu_login_log"),
+    security: led && v("menu_security_dashboard"), "login-log": pers && v("menu_login_log"),
     stabilitet: led && v("menu_security_dashboard"),
-    logikker: adminSek && v("menu_logics"),
+    logikker: v("menu_logics"),
     agenter: adminSek && v("menu_employees"),
     "tv-board-admin": adminSek && v("menu_settings"), "dashboards-settings": v("menu_dashboard_admin"),
   };
