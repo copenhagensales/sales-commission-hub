@@ -43,3 +43,22 @@ export function useRunHjerteforeningenExport() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tryg-report-exports"] }),
   });
 }
+
+/** Finansforbundet: afsluttede emner uge for uge (pr. sælger + pr. emne, hele året). */
+export function useRunFinansforbundetExport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("finansforbundet-closure-export", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as {
+        fileName: string;
+        signedUrl: string | null;
+        rows: number;
+        weekRows: { uge: string; stork: number; adversus: number }[];
+      };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tryg-report-exports"] }),
+  });
+}

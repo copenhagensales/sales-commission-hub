@@ -5,7 +5,12 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
-import { useDownloadTrygReportExport, useRunHjerteforeningenExport, useTrygReportExports } from "@/hooks/useTrygReportExports";
+import {
+  useDownloadTrygReportExport,
+  useRunFinansforbundetExport,
+  useRunHjerteforeningenExport,
+  useTrygReportExports,
+} from "@/hooks/useTrygReportExports";
 
 /** Udtræk (Excel) – vises kun for superadmin. */
 export function TrygReportExports() {
@@ -13,8 +18,10 @@ export function TrygReportExports() {
   const { data: files = [], isLoading } = useTrygReportExports(isSuperadmin);
   const download = useDownloadTrygReportExport();
   const run = useRunHjerteforeningenExport();
+  const runFf = useRunFinansforbundetExport();
   const [ids, setIds] = useState("");
   const [link, setLink] = useState<{ url: string; name: string; rows: number } | null>(null);
+  const [ffLink, setFfLink] = useState<{ url: string; name: string; rows: number; diffWeeks: number } | null>(null);
   if (!isSuperadmin) return null;
 
   return (
@@ -52,6 +59,35 @@ export function TrygReportExports() {
           {link && (
             <a className="block text-sm underline" href={link.url}>
               Hent {link.name} ({link.rows} rækker, link virker i 5 min.)
+            </a>
+          )}
+        </div>
+        <div className="space-y-2 rounded-lg border p-3">
+          <Button
+            className="max-w-full max-md:min-h-11 max-md:w-full"
+            size="sm"
+            disabled={runFf.isPending}
+            onClick={() =>
+              runFf.mutate(undefined, {
+                onSuccess: (d) => {
+                  const diffWeeks = d.weekRows.filter((w) => w.stork !== w.adversus).length;
+                  if (d.signedUrl) setFfLink({ url: d.signedUrl, name: d.fileName, rows: d.rows, diffWeeks });
+                  toast.success(`Udtræk klar: ${d.rows} emner`);
+                },
+                onError: (e) => toast.error(e instanceof Error ? e.message : "Udtræk fejlede"),
+              })
+            }
+          >
+            {runFf.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
+            <span className="truncate">Finansforbundet – afsluttede emner uge for uge</span>
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Pr. uge og sælger samt pr. emne. Ugyldig/ukvalificeret er markeret. Ingen kundeoplysninger.
+          </p>
+          {ffLink && (
+            <a className="block text-sm underline" href={ffLink.url}>
+              Hent {ffLink.name} ({ffLink.rows} emner, {ffLink.diffWeeks} uger med afvigelse – se fanen Afstemning; link
+              virker i 5 min.)
             </a>
           )}
         </div>
