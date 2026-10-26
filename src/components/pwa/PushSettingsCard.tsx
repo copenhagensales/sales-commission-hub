@@ -1,18 +1,31 @@
 import { toast } from "sonner";
+import { Bell, Mail, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePushNotifications, type PushPrefs } from "@/hooks/usePushNotifications";
 import { useInstallStork } from "@/hooks/useInstallStork";
-import { PUSH_PREF_TYPES } from "@/lib/push/pushText";
 import { useMineUdsendelsespraeferencer } from "@/hooks/useUdsendelser";
 
 const KANAL_NAVN: Record<string, string> = { push: "Push", mail: "Mail", sms: "SMS" };
+const KANAL_IKON: Record<string, typeof Mail> = { push: Bell, mail: Mail, sms: MessageSquare };
+/** De gamle push-felter samles i kontakten for deres gruppe. */
+const PUSH_GRUPPE: Record<string, (keyof PushPrefs)[]> = {
+  "Storkbook og Klub": ["klub"],
+  "Onboarding og ramp": ["opstart_flag", "missing_one_on_one"],
+  "Compliance": ["compliance"],
+};
 
 export function PushSettingsCard() {
   const { standalone, ios } = useInstallStork();
   const push = usePushNotifications();
   const praef = useMineUdsendelsespraeferencer();
+  const grupper: [string, NonNullable<typeof praef.data>][] = [];
+  for (const t of praef.data ?? []) {
+    const g = t.gruppe || "Øvrige";
+    const f = grupper.find(([n]) => n === g);
+    if (f) f[1].push(t); else grupper.push([g, [t]]);
+  }
 
   const status = !standalone
     ? "Notifikationer slås til i Stork-appen på telefonen: åbn Stork fra ikonet på hjemmeskærmen og kom tilbage hertil. Kontakterne nedenfor gælder alle dine enheder."
