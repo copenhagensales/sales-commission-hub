@@ -178,7 +178,7 @@ export function HeroPerformanceCard({
           </Link>
 
           {!isEnrolledInLeague && (
-            <Link to="/commission-league">
+            <Link to="/spil?tab=superligaen">
               <Button
                 variant="outline"
                 className="h-auto w-full gap-2 rounded-xl border-[hsl(var(--cph-emerald)/0.45)] bg-transparent px-[22px] py-[14px] text-[15px] font-extrabold text-[hsl(var(--cph-emerald))] hover:bg-[hsl(var(--cph-emerald)/0.1)] hover:text-[hsl(var(--cph-emerald))] sm:w-auto"

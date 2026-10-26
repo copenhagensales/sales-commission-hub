@@ -269,19 +269,19 @@ export default function AmoDashboard() {
 
       {/* Status Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatusCard title="Næste AMO-møde" status={meetingStatus} detail={meetingDetail} icon={<Calendar className="h-5 w-5" />} href="/amo/meetings" />
-        <StatusCard title="Årlig drøftelse" status={discussionStatus} detail={discussionDetail} icon={<Users className="h-5 w-5" />} href="/amo/annual-discussion" />
-        <StatusCard title="APV" status={apvStatus} detail={apvDetail} icon={<FileText className="h-5 w-5" />} href="/amo/apv" />
-        <StatusCard title="Kemi-APV" status={kemiStatus} detail={kemiDetail} icon={<Beaker className="h-5 w-5" />} href="/amo/kemi-apv" />
-        <StatusCard title="AMR-valg" status={electionStatus} detail={electionDetail} icon={<CheckCircle2 className="h-5 w-5" />} href="/amo/organisation" />
-        <StatusCard title="Uddannelseskrav" status={trainingStatus} detail={trainingDetail} icon={<GraduationCap className="h-5 w-5" />} href="/amo/training" />
-        <StatusCard title="Certifikater" status={certStatus} detail={certDetail} icon={<FolderOpen className="h-5 w-5" />} href="/amo/documents" />
+        <StatusCard title="Næste AMO-møde" status={meetingStatus} detail={meetingDetail} icon={<Calendar className="h-5 w-5" />} href="/amo?tab=moeder&side=meetings" />
+        <StatusCard title="Årlig drøftelse" status={discussionStatus} detail={discussionDetail} icon={<Users className="h-5 w-5" />} href="/amo?tab=moeder&side=annual-discussion" />
+        <StatusCard title="APV" status={apvStatus} detail={apvDetail} icon={<FileText className="h-5 w-5" />} href="/amo?tab=apv&side=apv" />
+        <StatusCard title="Kemi-APV" status={kemiStatus} detail={kemiDetail} icon={<Beaker className="h-5 w-5" />} href="/amo?tab=apv&side=kemi-apv" />
+        <StatusCard title="AMR-valg" status={electionStatus} detail={electionDetail} icon={<CheckCircle2 className="h-5 w-5" />} href="/amo?tab=organisation&side=organisation" />
+        <StatusCard title="Uddannelseskrav" status={trainingStatus} detail={trainingDetail} icon={<GraduationCap className="h-5 w-5" />} href="/amo?tab=organisation&side=training" />
+        <StatusCard title="Certifikater" status={certStatus} detail={certDetail} icon={<FolderOpen className="h-5 w-5" />} href="/amo?tab=dokumenter&side=documents" />
         <StatusCard
           title="Åbne opgaver"
           status={tasks && tasks.length > 0 ? (tasks.some(t => t.status === "overdue") ? "red" : "yellow") : "green"}
           detail={`${tasks?.length || 0} åbne opgaver`}
           icon={<ListChecks className="h-5 w-5" />}
-          href="/amo/tasks"
+          href="/amo?tab=opgaver"
         />
       </div>
 

@@ -23,11 +23,11 @@ export interface ComplianceReviewArea {
 }
 
 export const COMPLIANCE_REVIEW_AREAS: ComplianceReviewArea[] = [
-  { key: "processing-activities", title: "Behandlingsaktiviteter (art. 30)", href: "/compliance/processing-activities", reviewIntervalMonths: 12 },
-  { key: "dpia", title: "Konsekvensanalyse (DPIA)", href: "/compliance/dpia", reviewIntervalMonths: 12 },
-  { key: "retention-policies", title: "Sletningspolitikker", href: "/compliance/retention-policies", reviewIntervalMonths: 12 },
-  { key: "data-transfers", title: "Dataoverførsler til tredjeparter", href: "/compliance/data-transfers", reviewIntervalMonths: 12 },
-  { key: "ai-governance", title: "AI Governance", href: "/compliance/ai-governance", reviewIntervalMonths: 12 },
-  { key: "processes", title: "Interne processer og compliance", href: "/compliance/processes", reviewIntervalMonths: 12 },
-  { key: "awareness", title: "Medarbejder-awareness", href: "/compliance/awareness", reviewIntervalMonths: 12 },
+  { key: "processing-activities", title: "Behandlingsaktiviteter (art. 30)", href: "/compliance?tab=registre&side=processing-activities", reviewIntervalMonths: 12 },
+  { key: "dpia", title: "Konsekvensanalyse (DPIA)", href: "/compliance?tab=registre&side=dpia", reviewIntervalMonths: 12 },
+  { key: "retention-policies", title: "Sletningspolitikker", href: "/compliance?tab=registre&side=retention-policies", reviewIntervalMonths: 12 },
+  { key: "data-transfers", title: "Dataoverførsler til tredjeparter", href: "/compliance?tab=registre&side=data-transfers", reviewIntervalMonths: 12 },
+  { key: "ai-governance", title: "AI Governance", href: "/compliance?tab=procedurer&side=ai-governance", reviewIntervalMonths: 12 },
+  { key: "processes", title: "Interne processer og compliance", href: "/compliance?tab=procedurer&side=processes", reviewIntervalMonths: 12 },
+  { key: "awareness", title: "Medarbejder-awareness", href: "/compliance?tab=procedurer&side=awareness", reviewIntervalMonths: 12 },
 ];

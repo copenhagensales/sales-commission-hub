@@ -318,7 +318,7 @@ export default function BookingFlowEngagement() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/recruitment/booking-flow">
+              <Link to="/recruitment?tab=booking-flow">
                 <ArrowLeft className="h-4 w-4 mr-1" /> Booking Flow
               </Link>
             </Button>

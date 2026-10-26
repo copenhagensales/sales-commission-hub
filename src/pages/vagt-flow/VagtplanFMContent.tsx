@@ -688,7 +688,7 @@ export default function VagtplanFMContent() {
                           {/* Show booking with warning when employee has absence but is booked */}
                           {booking && (
                             <Link 
-                              to={`/vagt-flow/booking?tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
+                              to={`/vagt-flow?fane=booking&tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
                               className="flex items-center justify-center gap-1 text-[10px] text-red-600 font-semibold hover:underline"
                               title={`⚠️ Booket men har ${getAbsenceLabel(absence.type).toLowerCase()}`}
                             >
@@ -722,7 +722,7 @@ export default function VagtplanFMContent() {
                           {/* Booking location indicator */}
                           {booking && (
                             <Link 
-                              to={`/vagt-flow/booking?tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
+                              to={`/vagt-flow?fane=booking&tab=bookings&week=${(booking as any).booking?.week_number}&year=${(booking as any).booking?.year}`}
                               className={cn(
                                 "flex items-center justify-center gap-1 text-[10px] hover:underline",
                                 absence 

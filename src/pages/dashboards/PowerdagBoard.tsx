@@ -152,10 +152,10 @@ export default function PowerdagBoard() {
               {!tv && hasEditAccess && (
                 <div className="flex items-center gap-3 border-l border-white/10 pl-6">
                   <span className="pd-tvlink"><TvBoardQuickGenerator dashboardSlug="powerdag" /></span>
-                  <Link to="/dashboards/powerdag/input">
+                  <Link to="/dashboards/powerdag?tab=input">
                     <Button variant="outline" className="pd-btn-ghost"><Plus className="h-4 w-4 mr-1.5" />Indtast salg</Button>
                   </Link>
-                  <Link to="/dashboards/powerdag/admin">
+                  <Link to="/dashboards/powerdag?tab=admin">
                     <Button className="pd-btn-primary"><Play className="h-4 w-4 mr-1.5 fill-current" />Start nyt spil</Button>
                   </Link>
                 </div>

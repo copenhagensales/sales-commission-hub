@@ -119,7 +119,7 @@ export default function ProcessingRegistry() {
             Aftalegrundlag, links og arkiveringsstatus pr. leverandør fremgår af
             dokumentet{" "}
             <a
-              href="/compliance/documents/dpa-overview"
+              href="/compliance?tab=dokumenter&side=dpa-overview"
               className="text-primary underline"
             >
               Databehandleraftaler (DPA) — oversigt og status

@@ -8,6 +8,8 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { cn } from "@/lib/utils";
 import { HubSheet } from "./HubSheet";
 import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
+import { useSynligStruktur } from "@/components/layout/StrukturMenu";
+import { MIT_ARBEJDE } from "@/config/struktur";
 
 export interface BottomTab {
   to: string;
@@ -27,19 +29,29 @@ export const BOTTOM_NAV_HEIGHT = 64;
 /** Sti til profilen, som ligger øverst i »Menu«-skuffen i stedet for som egen fane. */
 export const PROFILE_PATH = "/my-profile";
 
-/** Alle destinationer bag bundbjælken (også dem i »Mig« og »Spil«), med samme rettighedstjek som AppSidebar. */
+const HINT: Record<string, string> = {
+  side_mine_tal: "Dine tal og mål",
+  side_vagter: "Vagtplan og stempelur",
+  side_registrer_salg: "Registrér dit salg",
+  side_min_profil: "Dine kontrakter og oplysninger",
+};
+/** Sider i Mit arbejde, der har egen plads i bundbjælken og derfor ikke står i »Mig«. */
+const EGEN_FANE = ["side_hjem", "side_storkbook", "side_spil"];
+
+/** Alle destinationer bag bundbjælken, fra `STRUKTUR` (samme synlighed som sidebaren). */
 export function useBottomTabs(): BottomTab[] {
-  const p = usePermissions();
   const m = useMitArbejdeSynlighed();
+  const mitArbejde = useSynligStruktur().find((o) => o.id === MIT_ARBEJDE)?.sider ?? [];
+  const has = (id: string) => mitArbejde.find((x) => x.id === id);
+  const home = has("side_hjem");
+  const stork = has("side_storkbook");
   return [
-    { to: "/home", label: "Hjem", icon: Home, visible: !!p.canViewHome },
-    { to: "/vagter", label: "Vagter", icon: Calendar, visible: m.harVagter, hub: "me", hint: "Vagtplan og stempelur" },
-    { to: "/my-goals", label: "Mine tal", icon: Target, visible: !!p.canViewMyGoals, hub: "me", hint: "Dine tal og mål" },
-    { to: "/registrer-salg", label: "Registrér salg", icon: BadgeCheck, visible: m.harSalg, hub: "me", hint: "Registrér dit salg" },
-    { to: PROFILE_PATH, label: "Min profil", icon: User, visible: !!p.canViewMyProfile, hub: "me", hint: "Dine kontrakter og oplysninger" },
-    { to: "/spil?tab=superligaen", label: "Superligaen", icon: Trophy, visible: m.spil.superligaen, hub: "games", hint: "Provisionsligaen" },
-    { to: "/spil?tab=head2head", label: "Head2Head", icon: Swords, visible: m.spil.head2head, hub: "games", hint: "1v1 og holdkampe" },
-    { to: "/storkbook", label: "Storkbook", icon: Newspaper, visible: !!p.canViewPulsen },
+    ...(home ? [{ to: home.rute, label: home.label, icon: home.ikon, visible: true }] : []),
+    ...mitArbejde.filter((x) => !EGEN_FANE.includes(x.id))
+      .map((x) => ({ to: x.rute, label: x.label, icon: x.ikon, visible: true, hub: "me" as const, hint: HINT[x.id] })),
+    { to: "/spil?tab=superligaen", label: "Superligaen", icon: Trophy, visible: m.spil.superligaen && !!has("side_spil"), hub: "games", hint: "Provisionsligaen" },
+    { to: "/spil?tab=head2head", label: "Head2Head", icon: Swords, visible: m.spil.head2head && !!has("side_spil"), hub: "games", hint: "1v1 og holdkampe" },
+    ...(stork ? [{ to: stork.rute, label: stork.label, icon: Newspaper, visible: true }] : []),
   ];
 }
 

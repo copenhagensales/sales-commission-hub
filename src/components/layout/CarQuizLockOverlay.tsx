@@ -27,7 +27,7 @@ export function CarQuizLockOverlay() {
           <Button 
             className="w-full" 
             size="lg"
-            onClick={() => navigate("/car-quiz")}
+            onClick={() => navigate("/my-profile?tab=kodeks")}
           >
             Gå til bil-quiz
           </Button>

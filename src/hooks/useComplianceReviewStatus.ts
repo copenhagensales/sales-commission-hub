@@ -81,7 +81,7 @@ export function useComplianceReviewStatus() {
           key: `dpa-${vendor}`,
           title: `Databehandleraftale mangler arkivering: ${vendor}`,
           detail: "Upload aftalen som fil i DPA-oversigten, så dokumentationen er på plads.",
-          href: "/compliance/documents/dpa-overview",
+          href: "/compliance?tab=dokumenter&side=dpa-overview",
           severity: "missing",
         });
       }

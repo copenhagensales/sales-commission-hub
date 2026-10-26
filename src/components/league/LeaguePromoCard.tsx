@@ -181,7 +181,7 @@ export function LeaguePromoCard() {
 
         {/* CTA */}
         <div className="pt-2">
-          <Link to="/commission-league">
+          <Link to="/spil?tab=superligaen">
             <Button className="w-full gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold">
               {isEnrolled ? (
                 <>
