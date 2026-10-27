@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarPlus, HandHeart, HelpCircle, ImagePlus, PenLine, X } from "lucide-react";
+import { BarChart3, CalendarPlus, Plus, HandHeart, HelpCircle, ImagePlus, PenLine, X } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useActiveColleagues, type NewPulsenPost } from "@/hooks/usePulsen";
+import { useActiveColleagues, useOpretAfstemning, type NewPulsenPost } from "@/hooks/usePulsen";
 import { PULSEN_IMAGE_MAX_BYTES, PULSEN_MAX_CHARS, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
 
-export type Mode = "post" | "praise" | "question";
+export type Mode = "post" | "praise" | "question" | "poll";
+
+const POLL_MAX_OPTIONS = 6;
+const POLL_OPTION_MAX = 80;
+const DURATIONS = [
+  { dage: 1, label: "1 dag" },
+  { dage: 3, label: "3 dage" },
+  { dage: 7, label: "1 uge" },
+  { dage: 14, label: "2 uger" },
+];
 
 interface Props {
   myEmployeeId: string;
@@ -29,6 +38,7 @@ const MODES: { key: Mode; label: string; icon: typeof PenLine }[] = [
   { key: "post", label: "Indlæg", icon: PenLine },
   { key: "praise", label: "Ros", icon: HandHeart },
   { key: "question", label: "Spørgsmål", icon: HelpCircle },
+  { key: "poll", label: "Afstemning", icon: BarChart3 },
 ];
 
 export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, defaultAudience, team, onSubmit, onOpenEvent, initialMode, initialBody, onOpenChange }: Props) {
@@ -42,6 +52,10 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
+  const [pollDage, setPollDage] = useState(7);
+  const [pollAnonymous, setPollAnonymous] = useState(false);
+  const opretAfstemning = useOpretAfstemning();
   useEffect(() => {
     if (initialMode === "image") fileRef.current?.click();
   }, [initialMode]);
@@ -63,11 +77,13 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
 
   const reset = () => {
     setBody(""); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
+    setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false);
   };
 
   const pickMode = (m: Mode) => {
     setOpen(true);
     setMode(m);
+    if (m === "poll") { setFile(null); setPreview(null); }
   };
 
   const onFile = (f: File | undefined) => {
@@ -83,16 +99,42 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     audiences.length > 0 &&
     !busy &&
     body.length <= PULSEN_MAX_CHARS &&
-    (mode === "question" ? body.trim().length > 0 : body.trim().length > 0 || !!file) &&
+    (mode === "question" || mode === "poll" ? body.trim().length > 0 : body.trim().length > 0 || !!file) &&
     (mode !== "praise" || praised.length > 0);
 
+  const sendPoll = async () => {
+    const options = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (!body.trim()) return toast.error("Skriv et spørgsmål");
+    if (options.length < 2) return toast.error("Udfyld mindst 2 svar");
+    if (options.length > POLL_MAX_OPTIONS) return toast.error(`Højst ${POLL_MAX_OPTIONS} svar`);
+    if (options.some((o) => o.length > POLL_OPTION_MAX)) return toast.error(`Et svar må højst være ${POLL_OPTION_MAX} tegn`);
+    setBusy(true);
+    try {
+      await opretAfstemning.mutateAsync({
+        audience,
+        teamId: audience === "team" ? team?.id ?? null : null,
+        body,
+        options,
+        anonymous: pollAnonymous,
+        dage: pollDage,
+      });
+      reset();
+    } catch (e) {
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "Prøv igen";
+      toast.error("Afstemningen blev ikke delt", { description: msg });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const send = async () => {
+    if (mode === "poll") return sendPoll();
     if (!canSend) return;
     setBusy(true);
     const input: NewPulsenPost = {
       audience,
       teamId: audience === "team" ? team?.id ?? null : null,
-      postType: mode,
+      postType: mode as Exclude<Mode, "poll">,
       body,
       praised: mode === "praise" ? praised : null,
       imageFile: file,
@@ -162,10 +204,61 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
             maxLength={PULSEN_MAX_CHARS}
             onChange={(e) => setBody(e.target.value)}
             rows={4}
-            placeholder={mode === "question" ? "Hvad vil du spørge huset om?" : mode === "praise" ? "Hvad har din kollega gjort godt?" : "Hvad vil du dele?"}
+            placeholder={mode === "poll" ? "Hvad vil du spørge om?" : mode === "question" ? "Hvad vil du spørge huset om?" : mode === "praise" ? "Hvad har din kollega gjort godt?" : "Hvad vil du dele?"}
             aria-label="Tekst"
             className="w-full resize-y rounded-[18px] bg-[hsl(var(--cph-light-blue))] px-4 py-3 text-[17px] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {mode === "poll" && (
+            <div className="mt-3 space-y-2">
+              {pollOptions.map((o, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={o}
+                    maxLength={POLL_OPTION_MAX}
+                    onChange={(e) => setPollOptions((l) => l.map((x, j) => (j === i ? e.target.value : x)))}
+                    placeholder={`Svar ${i + 1}`}
+                    aria-label={`Svar ${i + 1}, højst ${POLL_OPTION_MAX} tegn`}
+                    className="h-11 min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-4 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  {pollOptions.length > 2 && (
+                    <button type="button" aria-label={`Fjern svar ${i + 1}`} onClick={() => setPollOptions((l) => l.filter((_, j) => j !== i))} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {pollOptions.length < POLL_MAX_OPTIONS && (
+                <button type="button" onClick={() => setPollOptions((l) => [...l, ""])} className="flex min-h-[44px] items-center gap-2 rounded-full px-3 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Tilføj svar
+                </button>
+              )}
+              <div>
+                <p className="mb-1 text-[13px] font-extrabold text-muted-foreground">Varighed</p>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Varighed">
+                  {DURATIONS.map((d) => (
+                    <button key={d.dage} type="button" role="radio" aria-checked={pollDage === d.dage} onClick={() => setPollDage(d.dage)}
+                      className={cn("min-h-[44px] rounded-full px-4 text-[14px] font-extrabold", pollDage === d.dage ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "bg-[hsl(var(--cph-light-blue))] text-foreground")}>
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-[13px] font-extrabold text-muted-foreground">Stemmer</p>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Stemmer">
+                  {[{ v: false, label: "Med navne" }, { v: true, label: "Anonym" }].map((x) => (
+                    <button key={x.label} type="button" role="radio" aria-checked={pollAnonymous === x.v} onClick={() => setPollAnonymous(x.v)}
+                      className={cn("min-h-[44px] rounded-full px-4 text-[14px] font-extrabold", pollAnonymous === x.v ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "bg-[hsl(var(--cph-light-blue))] text-foreground")}>
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+                {pollAnonymous && (
+                  <p className="mt-2 text-[14px] text-muted-foreground">Ingen kan se, hvem der stemte hvad – heller ikke dig. Anonyme stemmer kan ikke ændres.</p>
+                )}
+              </div>
+            </div>
+          )}
           {preview && (
             <div className="relative mt-3">
               <img src={preview} alt="Valgt billede" className="max-h-[320px] w-full rounded-[18px] object-cover" />
@@ -176,7 +269,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           )}
           <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-muted-foreground">
             <span>Del aldrig kundeoplysninger</span>
-            {!preview && (
+            {!preview && mode !== "poll" && (
               <button type="button" aria-label="Vedhæft billede" onClick={() => fileRef.current?.click()} className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-full text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
                 <ImagePlus className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -224,7 +317,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           )}
           <div className="flex gap-2">
             <button type="button" onClick={reset} className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">Annullér</button>
-            <button type="button" onClick={send} disabled={!canSend} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:opacity-50">Del</button>
+            <button type="button" onClick={send} disabled={mode === "poll" ? busy || audiences.length === 0 : !canSend} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:opacity-50">Del</button>
           </div>
         </div>
       )}

@@ -13,7 +13,7 @@ import { PULSEN_MAX_CHARS, PULSEN_PAGE_SIZE } from "@/lib/pulsen/format";
 
 export const PULSEN_BUCKET = "pulsen-images";
 export type PulsenScope = { kind: "house" } | { kind: "team"; teamId: string };
-export type PulsenPostType = "post" | "praise" | "question" | "image" | "event";
+export type PulsenPostType = "post" | "praise" | "question" | "image" | "event" | "poll";
 
 interface PersonRef { id: string; first_name: string | null; last_name: string | null; job_title?: string | null }
 
@@ -183,7 +183,7 @@ export function useActiveColleagues(enabled: boolean) {
 export interface NewPulsenPost {
   audience: "house" | "team";
   teamId: string | null;
-  postType: Exclude<PulsenPostType, "event">;
+  postType: Exclude<PulsenPostType, "event" | "poll">;
   body: string;
   praised?: { id: string; first_name: string | null; last_name: string | null }[] | null;
   imageFile?: File | null;
@@ -552,3 +552,106 @@ export function useMarkPulsenSeen() {
 }
 
 export const formatUnread = (n: number) => (n > 9 ? "9+" : String(n));
+
+// ---------- S2: afstemninger ----------
+export interface NewPulsenPoll {
+  audience: "house" | "team";
+  teamId: string | null;
+  body: string;
+  options: string[];
+  anonymous: boolean;
+  dage: number;
+}
+
+/** Opretter en afstemning via RPC; feedet hentes igen bagefter (ingen optimistisk række). */
+export function useOpretAfstemning() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: NewPulsenPoll) => {
+      const { data, error } = await supabase.rpc("pulsen_opret_afstemning", {
+        p_audience: p.audience,
+        // null for Huset; typerne kender ikke nullable parametre
+        p_team_id: (p.audience === "team" ? p.teamId : null) as string,
+        p_body: p.body.trim(),
+        p_options: p.options,
+        p_anonymous: p.anonymous,
+        p_dage: p.dage,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["pulsen-feed"] });
+      qc.invalidateQueries({ queryKey: ["pulsen-latest-posts"] });
+    },
+  });
+}
+
+export interface PulsenPollData {
+  poll: { post_id: string; anonymous: boolean; closes_at: string; closed_at: string | null; created_by: string } | null;
+  options: { id: string; position: number; label: string }[];
+  votes: { id: string; option_id: string; employee_id: string | null }[];
+  hasVoted: boolean;
+  /** Eget valg (kun kendt ved navngivne afstemninger eller lige efter stemmen). */
+  myOptionId: string | null;
+}
+
+export function usePulsenPoll(postId: string, enabled: boolean) {
+  const qc = useQueryClient();
+  const { data: employeeId } = useCurrentEmployeeId();
+  const key = ["pulsen-poll", postId];
+  const query = useQuery({
+    queryKey: key,
+    queryFn: async (): Promise<PulsenPollData> => {
+      const [pollR, optR, voteR, ballotR] = await Promise.all([
+        supabase.from("pulsen_polls").select("post_id, anonymous, closes_at, closed_at, created_by").eq("post_id", postId).maybeSingle(),
+        supabase.from("pulsen_poll_options").select("id, position, label").eq("post_id", postId).order("position"),
+        supabase.from("pulsen_poll_votes").select("id, option_id, employee_id").eq("post_id", postId),
+        supabase.from("pulsen_poll_ballots").select("stemt").eq("post_id", postId).eq("employee_id", employeeId as string).maybeSingle(),
+      ]);
+      for (const r of [pollR, optR, voteR, ballotR]) if (r.error) throw r.error;
+      const votes = voteR.data ?? [];
+      return {
+        poll: pollR.data ?? null,
+        options: optR.data ?? [],
+        votes,
+        hasVoted: !!ballotR.data,
+        myOptionId: votes.find((v) => v.employee_id === employeeId)?.option_id ?? null,
+      };
+    },
+    enabled: enabled && !!employeeId,
+    refetchInterval: enabled ? 30000 : false,
+    staleTime: 15000,
+  });
+
+  const vote = useMutation({
+    mutationFn: async (optionId: string) => {
+      const { error } = await supabase.rpc("pulsen_stem", { p_post_id: postId, p_option_id: optionId });
+      if (error) throw error;
+    },
+    onMutate: async (optionId) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<PulsenPollData>(key);
+      if (prev) {
+        const without = prev.votes.filter((v) => !(prev.myOptionId && v.employee_id === employeeId) && v.id !== "optimistisk");
+        const mine = { id: "optimistisk", option_id: optionId, employee_id: prev.poll?.anonymous ? null : employeeId ?? null };
+        qc.setQueryData<PulsenPollData>(key, { ...prev, votes: [...without, mine], hasVoted: true, myOptionId: optionId });
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+
+  const close = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("pulsen_luk_afstemning", { p_post_id: postId });
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+
+  return { query, vote, close, employeeId: employeeId ?? null };
+}
