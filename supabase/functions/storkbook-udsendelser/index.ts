@@ -37,6 +37,9 @@ const ABSOLUT_FRIST_MS = 55_000;
 const AFSLUT_VINDUE_MS = 10_000;
 const GENVALIDERING_MS = 3_000;
 const LOG_MS = 3_000;
+const TRANSPORT_MS = 24_000;
+const SIDE = 1_000;
+const IN_MAKS = 100;
 const NUL_UUID = "00000000-0000-0000-0000-000000000000";
 
 const json = (b: unknown, status = 200) =>
@@ -50,21 +53,24 @@ function dkDele(d = new Date()) {
   const hh = p.hour === "24" ? "00" : p.hour;
   return { dato: `${p.year}-${p.month}-${p.day}`, hhmm: `${hh}:${p.minute}`, sek: Number(hh) * 3600 + Number(p.minute) * 60 + Number(p.second) };
 }
-/** Dansk lokal dato + klokkeslæt → UTC-tidspunkt. */
+/**
+ * Dansk vægur (dato + hh:mm) → UTC. Prøver offset +1 og +2 t og beholder dem, hvor dansk vægur
+ * (Intl, Europe/Copenhagen) giver præcis dato/klokkeslæt. Tvetydigt (efterår) eller ikke-eksisterende
+ * (forår) klokkeslæt → det senere tidspunkt.
+ */
 function dkTilUtc(dato: string, hhmm: string): Date {
   const [y, m, d] = dato.split("-").map(Number);
   const [h, mi] = hhmm.split(":").map(Number);
-  const gaet = Date.UTC(y, m - 1, d, h, mi);
-  const l = dkDele(new Date(gaet));
-  const [ly, lm, ld] = l.dato.split("-").map(Number);
-  const lokal = Date.UTC(ly, lm - 1, ld, Math.floor(l.sek / 3600), Math.floor((l.sek % 3600) / 60));
-  return new Date(gaet - (lokal - gaet));
+  const kandidater = [1, 2].map((o) => Date.UTC(y, m - 1, d, h, mi) - o * 3600_000);
+  const passer = kandidater.filter((t) => { const l = dkDele(new Date(t)); return l.dato === dato && l.hhmm === hhmm; });
+  return new Date(Math.max(...(passer.length ? passer : kandidater)));
 }
 function plusDage(dato: string, n: number): string {
   const [y, m, d] = dato.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
-const sekTilDagensSlut = () => Math.max(60, 86399 - dkDele().sek);
+/** Sekunder til 23:59:59 dansk tid (ingen nedre grænse). */
+const sekTilDagensSlut = () => 86399 - dkDele().sek;
 const omMin = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
 
 // ---------- hjælpere ----------
@@ -74,6 +80,27 @@ function mentionsAf(v: unknown): Mention[] {
   return v.filter((m): m is Mention => !!m && typeof m === "object" && (m.t === "e" || m.t === "t") && typeof m.id === "string");
 }
 const fornavn = (x: string | null | undefined) => (x ?? "").trim().split(/\s+/)[0]?.slice(0, 30) || "En kollega";
+
+/** Konstant-tid sammenligning af hex-strenge. */
+function ensKonstantTid(a: string, b: string): boolean {
+  const n = Math.max(a.length, b.length);
+  let d = a.length ^ b.length;
+  for (let i = 0; i < n; i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return d === 0;
+}
+
+/** Deterministisk paginering i blokke à 1.000 (kalderen ordner efter id), indtil en side er kortere. */
+async function alleSider<T>(lav: (fra: number, til: number) => PromiseLike<{ data: unknown; error: unknown }>, fejl: () => Error): Promise<T[]> {
+  const ud: T[] = [];
+  for (let fra = 0; ; fra += SIDE) {
+    const { data, error } = await lav(fra, fra + SIDE - 1);
+    if (error) throw fejl();
+    const rows = (data ?? []) as T[];
+    ud.push(...rows);
+    if (rows.length < SIDE) return ud;
+  }
+}
+const bidder = <T>(xs: T[], n = IN_MAKS): T[][] => { const ud: T[][] = []; for (let i = 0; i < xs.length; i += n) ud.push(xs.slice(i, i + n)); return ud; };
 
 async function sha256Hex(t: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
@@ -86,9 +113,11 @@ type KildeRapport = { kilde: string; raekker: number; kandidater: number; indsat
 async function teamMedlemmer(svc: Svc, teamIds: string[], signal: AbortSignal): Promise<Map<string, string[]>> {
   const m = new Map<string, string[]>();
   if (!teamIds.length) return m;
-  const { data, error } = await s(svc.from("team_members").select("team_id, employee_id").in("team_id", [...new Set(teamIds)]), signal);
-  if (error) throw new Error("udvidelse");
-  for (const r of (data ?? []) as { team_id: string; employee_id: string }[]) m.set(r.team_id, [...(m.get(r.team_id) ?? []), r.employee_id]);
+  for (const del of bidder([...new Set(teamIds)])) {
+    const rows = await alleSider<{ team_id: string; employee_id: string }>((fra, til) =>
+      s(svc.from("team_members").select("id, team_id, employee_id").in("team_id", del).order("id").range(fra, til), signal), () => new Error("udvidelse"));
+    for (const r of rows) m.set(r.team_id, [...(m.get(r.team_id) ?? []), r.employee_id]);
+  }
   return m;
 }
 
@@ -167,8 +196,10 @@ async function koerTidKilde(
   return rap;
 }
 
-async function fase1(svc: Svc, dry: boolean, start: number, signal: AbortSignal) {
+async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) {
   const frist = start + FASE1_MS;
+  // Hvert kald i fase 1 afbrydes senest ved sekund 15.
+  const signal = AbortSignal.any([hoved, AbortSignal.timeout(Math.max(1, frist - Date.now()))]);
   const tael: Record<string, number> = {};
   const t = (k: Kandidat[]) => { for (const c of k) tael[c.type_noegle] = (tael[c.type_noegle] ?? 0) + 1; };
   const rapporter: KildeRapport[] = [];
@@ -208,10 +239,13 @@ async function fase1(svc: Svc, dry: boolean, start: number, signal: AbortSignal)
 
   rapporter.push(await koerTidKilde(svc, "beskeder", "udsendelse_kilde_beskeder", dry, frist, signal, async (rows) => {
     const konv = [...new Set(rows.map((r) => String(r.conversation_id)))];
-    const { data, error } = await s(svc.from("chat_conversation_members").select("conversation_id, employee_id").in("conversation_id", konv), signal);
-    if (error) throw new Error("udvidelse");
     const med = new Map<string, string[]>();
-    for (const m of (data ?? []) as { conversation_id: string; employee_id: string }[]) med.set(m.conversation_id, [...(med.get(m.conversation_id) ?? []), m.employee_id]);
+    const alle: { conversation_id: string; employee_id: string }[] = [];
+    for (const del of bidder(konv)) {
+      alle.push(...await alleSider<{ conversation_id: string; employee_id: string }>((fra, til) =>
+        s(svc.from("chat_conversation_members").select("id, conversation_id, employee_id").in("conversation_id", del).order("id").range(fra, til), signal), () => new Error("udvidelse")));
+    }
+    for (const m of alle) med.set(m.conversation_id, [...(med.get(m.conversation_id) ?? []), m.employee_id]);
     const ud: Kandidat[] = [];
     for (const r of rows) {
       if (r.deleted_at) continue;
@@ -260,9 +294,8 @@ async function fase1(svc: Svc, dry: boolean, start: number, signal: AbortSignal)
   const nu = dkDele();
   if (nu.hhmm >= "17:00" && Date.now() < frist) {
     try {
-      const { data, error } = await s(svc.rpc("udsendelse_kilde_begivenheder", { p_dato: nu.dato }), signal);
-      if (error) throw new Error("kilde");
-      const rows = (data ?? []) as { event_id: string; event_date: string; employee_id: string }[];
+      const rows = await alleSider<{ event_id: string; event_date: string; employee_id: string }>((fra, til) =>
+        s(svc.rpc("udsendelse_kilde_begivenheder", { p_dato: nu.dato }).order("event_id").order("employee_id").range(fra, til), signal), () => new Error("kilde"));
       br.raekker = rows.length;
       const k = grupper(rows.map((r) => ({
         type_noegle: "storkbook_begivenhed", haendelse: `begivenhed:${r.event_id}:${r.event_date}`, kilde_type: "begivenhed", kilde_id: r.event_id,
@@ -354,13 +387,14 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
       if (aktivTil && new Date(aktivTil).getTime() > Date.now()) {
         return { status: "udskudt", aarsag: "aktiv", naeste: new Date(new Date(aktivTil).getTime() + 15_000).toISOString() };
       }
-      const { data: andre } = db(await s(svc.from("chat_messages").select("id").eq("conversation_id", msg.conversation_id).neq("sender_id", modtager).is("deleted_at", null).order("created_at", { ascending: false }).limit(500), signal));
-      const ids = ((andre ?? []) as { id: string }[]).map((x) => x.id);
-      let n = 1;
-      if (ids.length) {
-        const { data: kv } = db(await s(svc.from("chat_message_read_receipts").select("message_id").eq("employee_id", modtager).in("message_id", ids), signal));
-        n = Math.max(1, ids.length - new Set(((kv ?? []) as { message_id: string }[]).map((x) => x.message_id)).size);
-      }
+      // Ulæste = alle beskeder fra andre i samtalen \ modtagerens kvitteringer i samtalen (pagineret, ingen id-lister).
+      const dbFejl = () => new DbFejl("db");
+      const kvitteret = new Set((await alleSider<{ message_id: string }>((fra, til) =>
+        s(svc.from("chat_message_read_receipts").select("message_id, chat_messages!inner(conversation_id)").eq("employee_id", modtager)
+          .eq("chat_messages.conversation_id", msg.conversation_id).order("message_id").range(fra, til), signal), dbFejl)).map((x) => x.message_id));
+      const andre = await alleSider<{ id: string }>((fra, til) =>
+        s(svc.from("chat_messages").select("id").eq("conversation_id", msg.conversation_id).neq("sender_id", modtager).is("deleted_at", null).order("id").range(fra, til), signal), dbFejl);
+      const n = Math.max(1, andre.filter((x) => !kvitteret.has(x.id)).length);
       const body = n > 1 ? `${n} nye beskeder` : `${await navn(svc, msg.sender_id, signal)} har skrevet til dig`;
       return { title: "Ny besked", body, url: `/storkbook?tab=beskeder&samtale=${msg.conversation_id}`, tag: `samtale:${msg.conversation_id}`, ttl: 21600 };
     }
@@ -431,7 +465,9 @@ async function forbered(svc: Svc, r: Reservation, signal: AbortSignal): Promise<
   if (t && iStille(t.stille_fra, t.stille_til, nu.hhmm)) {
     const slut = t.stille_til!.slice(0, 5);
     const dato = slut > nu.hhmm ? nu.dato : plusDage(nu.dato, 1);
-    return { status: "udskudt", aarsag: "stille_timer", naeste: dkTilUtc(dato, slut).toISOString() };
+    const t2 = dkTilUtc(dato, slut);
+    // Aldrig udskudt til fortiden.
+    return { status: "udskudt", aarsag: "stille_timer", naeste: t2.getTime() > Date.now() ? t2.toISOString() : omMin(15) };
   }
   return { userId, ...v };
 }
@@ -450,8 +486,8 @@ function udfaldTilAfslut(u: Udfald, forsoeg: number): Afslut {
   if (fk && u.status !== "sendt" && u.status !== "allerede_sendt") meta.fejlkode = fk;
   switch (u.status) {
     case "sendt": case "allerede_sendt": return { status: "sendt", aarsag: u.status === "allerede_sendt" ? "allerede_sendt" : null, metadata: meta, transport: u.transportForsoegt };
-    case "ikke_sendt": return { status: "ikke_sendt", aarsag: fk ?? "ikke_sendt", naeste: omMin(2 ** (forsoeg + 1)), metadata: meta, transport: true };
-    case "ukendt": return { status: "ukendt", aarsag: fk ?? "ukendt", metadata: meta, transport: true };
+    case "ikke_sendt": return { status: "ikke_sendt", aarsag: fk ?? "ikke_sendt", naeste: omMin(2 ** (forsoeg + 1)), metadata: meta, transport: u.transportForsoegt };
+    case "ukendt": return { status: "ukendt", aarsag: fk ?? "ukendt", metadata: meta, transport: u.transportForsoegt };
     case "stille_timer": return { status: "udskudt", aarsag: "stille_timer", naeste: omMin(15), metadata: meta, transport: false };
     case "fejl": return { status: "ikke_sendt", aarsag: fk ?? "db", naeste: omMin(2), metadata: meta, transport: u.transportForsoegt };
     default: return { status: "sprunget_over", aarsag: u.status, metadata: meta, transport: u.transportForsoegt };
@@ -466,114 +502,148 @@ async function afslut(svc: Svc, id: string, token: string, a: Afslut, signal: Ab
   return true;
 }
 
+async function frigivRaekker(svc: Svc, token: string, ids: string[], signal: AbortSignal): Promise<boolean> {
+  if (!ids.length) return true;
+  const fr = await s(svc.rpc("udsendelse_frigiv_raekker", { p_token: token, p_ids: ids }), signal).then((x) => x, () => ({ error: "afbrudt" }));
+  if (fr.error) { console.error("storkbook-udsendelser: frigiv_raekker fejlede"); return false; }
+  return true;
+}
+
 // ---------- server ----------
+type Ejet = { transport: boolean; afslut?: Afslut };
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const start = Date.now();
+  // Absolut frist fra start – gælder alle kald, også token- og versionsopslag.
+  const hoved = new AbortController();
+  const hovedTimer = setTimeout(() => hoved.abort(), ABSOLUT_FRIST_MS);
   const svc = lavKlient();
   try {
     // Adgang: kun cron-token (også dry_run).
     const hdr = req.headers.get("x-pulsen-cron-token") ?? "";
     if (!hdr) return json({ error: "Ingen adgang" }, 403);
-    const { data: cfg, error: cfgErr } = await svc.from("pulsen_config").select("value").eq("key", "cron_token_sha256").maybeSingle();
+    const { data: cfg, error: cfgErr } = await s(svc.from("pulsen_config").select("value").eq("key", "cron_token_sha256"), hoved.signal).maybeSingle();
     if (cfgErr) return json({ error: "Konfiguration kunne ikke læses" }, 500);
     const forventet = (cfg as { value: unknown } | null)?.value;
-    if (typeof forventet !== "string" || (await sha256Hex(hdr)) !== forventet) return json({ error: "Ingen adgang" }, 403);
+    if (typeof forventet !== "string" || !ensKonstantTid(await sha256Hex(hdr), forventet)) return json({ error: "Ingen adgang" }, 403);
 
     // (1) body
     const body = await req.json().catch(() => ({}));
     const dry = body?.dry_run === true;
 
     // (2) 24c skal være installeret
-    const ver = await svc.rpc("udsendelse_version");
+    const ver = await s(svc.rpc("udsendelse_version"), hoved.signal);
     if (ver.error || ver.data !== "24c") return json({ error: "24c mangler" }, 503);
 
-    const hoved = new AbortController();
-    const hovedTimer = setTimeout(() => hoved.abort(), ABSOLUT_FRIST_MS);
-
     // (3) dry_run: skrivefri rapport
-    if (dry) {
-      try {
-        const f1 = await fase1(svc, true, start, hoved.signal);
-        return json({ dry_run: true, ...f1 });
-      } finally { clearTimeout(hovedTimer); }
-    }
+    if (dry) return json({ dry_run: true, ...(await fase1(svc, true, start, hoved.signal)) });
 
-    // (4) lås
+    // (4) lås – inde i try/finally, så frigiv(token) altid kaldes.
     const token = crypto.randomUUID();
-    const laas = await s(svc.rpc("udsendelse_laas", { p_token: token }), hoved.signal);
-    if (laas.error || laas.data !== true) { clearTimeout(hovedTimer); return json({ sprunget_over: "anden kørsel" }); }
-
     const rapport: Record<string, unknown> = {};
     const optalt: Record<string, number> = {};
-    const upaabegyndte: string[] = [];
-    let igang: { id: string; transport: boolean; afsluttet: boolean } | null = null;
+    // Lokalt ejerskab: overtagne rækker med transportflag, indtil afslut lykkes eller rækken er frigivet.
+    const ejede = new Map<string, Ejet>();
+    let fikLaas = false;
+    let frigivet = 0;
     try {
-      // (5) oprydning
-      const op = await s(svc.rpc("udsendelse_oprydning"), hoved.signal);
-      rapport.oprydning = op.error ? "fejl" : op.data;
-      // (6) fase 1
-      rapport.fase1 = await fase1(svc, false, start, hoved.signal);
-      // (7) fase 2
-      const frist2 = start + FASE2_FRIST_MS;
-      let stop = false;
-      while (!stop && frist2 - Date.now() >= NY_PORTION_MIN_MS && !hoved.signal.aborted) {
-        const { data, error } = await s(svc.rpc("udsendelse_overtag", { p_token: token, p_limit: 5 }), hoved.signal);
-        if (error) { rapport.overtag = "fejl"; break; }
-        const rows = (data ?? []) as Reservation[];
-        if (!rows.length) break;
-        upaabegyndte.push(...rows.map((r) => r.id));
-        for (const r of rows) {
-          if (frist2 - Date.now() < NY_RAEKKE_MIN_MS || hoved.signal.aborted) { stop = true; break; }
-          upaabegyndte.splice(upaabegyndte.indexOf(r.id), 1);
-          igang = { id: r.id, transport: false, afsluttet: false };
-          let a: Afslut;
-          const gv = AbortSignal.any([hoved.signal, AbortSignal.timeout(GENVALIDERING_MS)]);
-          let klar: Klar | null = null;
-          try {
-            const f = await forbered(svc, r, gv);
-            if (erAfslut(f)) a = f; else { klar = f; a = { status: "ukendt", aarsag: null }; }
-          } catch (e) {
-            if (hoved.signal.aborted) throw e;
-            a = { status: "ikke_sendt", aarsag: e instanceof DbFejl ? "db-fejl" : "db-timeout", naeste: omMin(2), transport: false };
+      const laas = await s(svc.rpc("udsendelse_laas", { p_token: token }), hoved.signal);
+      fikLaas = !laas.error && laas.data === true;
+      if (!fikLaas) rapport.sprunget_over = laas.error ? "lås-fejl" : "anden kørsel";
+      if (fikLaas) {
+        // (5) oprydning
+        const op = await s(svc.rpc("udsendelse_oprydning"), hoved.signal);
+        rapport.oprydning = op.error ? "fejl" : op.data;
+        // (6) fase 1
+        rapport.fase1 = await fase1(svc, false, start, hoved.signal);
+        // (7) fase 2
+        const frist2 = start + FASE2_FRIST_MS;
+        let stop = false;
+        while (!stop && frist2 - Date.now() >= NY_PORTION_MIN_MS && !hoved.signal.aborted) {
+          const { data, error } = await s(svc.rpc("udsendelse_overtag", { p_token: token, p_limit: 5 }), hoved.signal);
+          if (error) { rapport.overtag = "fejl"; break; }
+          const rows = (data ?? []) as Reservation[];
+          if (!rows.length) break;
+          for (const r of rows) ejede.set(r.id, { transport: false });
+          for (const r of rows) {
+            if (frist2 - Date.now() < NY_RAEKKE_MIN_MS || hoved.signal.aborted) { stop = true; break; }
+            const ejet = ejede.get(r.id)!;
+            // Budgetter pr. modtager: genvalidering + opslag ≤ 3 s, transport ≤ 24 s, logning + afslut ≤ 3 s.
+            const gv = AbortSignal.any([hoved.signal, AbortSignal.timeout(GENVALIDERING_MS)]);
+            let tSig: AbortSignal | null = null;
+            let lSig: AbortSignal | null = null;
+            const logSig = () => (lSig ??= AbortSignal.any([hoved.signal, AbortSignal.timeout(LOG_MS)]));
+            let a: Afslut = { status: "ukendt", aarsag: null };
+            let klar: Klar | null = null;
+            try {
+              const f = await forbered(svc, r, gv);
+              if (erAfslut(f)) a = f; else klar = f;
+            } catch (e) {
+              if (hoved.signal.aborted) throw e;
+              a = { status: "ikke_sendt", aarsag: e instanceof DbFejl ? "db-fejl" : "db-timeout", naeste: omMin(2), transport: false };
+            }
+            if (klar && r.type_noegle === "storkbook_begivenhed") {
+              // TTL til 23:59:59 dansk tid, beregnet umiddelbart før transport.
+              const ttl = sekTilDagensSlut();
+              if (ttl <= 0) { a = { status: "annulleret", aarsag: "udløbet", transport: false }; klar = null; }
+              else klar.ttl = ttl;
+            }
+            if (klar) {
+              const res = await sendPushUdfald(svc, [klar.userId], r.type_noegle, {
+                udsendType: r.type_noegle, tag: klar.tag, renotify: true, url: klar.url, tekst: { title: klar.title, body: klar.body },
+                ttlSekunder: klar.ttl, afsenderfunktion: "storkbook-udsendelser", dedupeKey: r.haendelse, signal: hoved.signal, maksAbonnementer: 3,
+                faser: {
+                  opslag: gv,
+                  transport: () => (tSig ??= AbortSignal.any([hoved.signal, AbortSignal.timeout(TRANSPORT_MS)])),
+                  log: logSig,
+                },
+                paaTransportStart: () => { ejet.transport = true; },
+              });
+              a = udfaldTilAfslut(res.udfald[klar.userId] ?? { status: "fejl", aarsag: "db", transportForsoegt: false, abonnementer: [] }, r.transportforsoeg ?? 0);
+            }
+            ejet.afslut = a;
+            if (hoved.signal.aborted) break;
+            const ok = await afslut(svc, r.id, token, a, logSig());
+            if (ok) {
+              ejede.delete(r.id);
+              optalt[a.status] = (optalt[a.status] ?? 0) + 1;
+            } else {
+              optalt.afslut_fejl = (optalt.afslut_fejl ?? 0) + 1;
+              // Uden transport frigives rækken straks; med transport forbliver den ejet (→ vindue / opgivet ved oprydning).
+              if (!ejet.transport && await frigivRaekker(svc, token, [r.id], logSig())) { ejede.delete(r.id); frigivet++; }
+            }
           }
-          if (klar) {
-            igang.transport = true;
-            const res = await sendPushUdfald(svc, [klar.userId], r.type_noegle, {
-              udsendType: r.type_noegle, tag: klar.tag, renotify: true, url: klar.url, tekst: { title: klar.title, body: klar.body },
-              ttlSekunder: klar.ttl, afsenderfunktion: "storkbook-udsendelser", dedupeKey: r.haendelse, signal: hoved.signal, maksAbonnementer: 3,
-            });
-            a = udfaldTilAfslut(res.udfald[klar.userId] ?? { status: "fejl", aarsag: "db", transportForsoegt: false, abonnementer: [] }, r.transportforsoeg ?? 0);
-          }
-          if (hoved.signal.aborted) break;
-          const ok = await afslut(svc, r.id, token, a, AbortSignal.any([hoved.signal, AbortSignal.timeout(LOG_MS)]));
-          if (ok || !hoved.signal.aborted) igang.afsluttet = true;
-          if (ok) optalt[a.status] = (optalt[a.status] ?? 0) + 1;
-          else optalt.afslut_fejl = (optalt.afslut_fejl ?? 0) + 1;
-          igang = null;
         }
       }
     } catch (e) {
       if (!hoved.signal.aborted) console.error("storkbook-udsendelser: kørsel fejlede", (e as Error)?.message ?? "fejl");
     } finally {
       clearTimeout(hovedTimer);
-      // Afslutningsvindue (≤ 10 s, egen controller).
+      // Afslutningsvindue (≤ 10 s, egen frist).
       const slut = AbortSignal.timeout(AFSLUT_VINDUE_MS);
-      const frigiv = [...upaabegyndte];
-      if (igang && !igang.afsluttet) {
-        if (igang.transport) {
-          await afslut(svc, igang.id, token, { status: "ukendt", aarsag: "frist", transport: true }, slut).catch(() => false);
-        } else frigiv.push(igang.id);
+      // Afstem ejede rækker mod DB (dækker tabt svar fra udsendelse_overtag); fejler opslaget, bruges lokal liste.
+      let ids = [...ejede.keys()];
+      const afst = await s(svc.from("udsendelse_reservationer").select("id, transportforsoeg").eq("worker_token", token).eq("status", "sender"), slut)
+        .then((x) => x, () => ({ data: null, error: "afbrudt" }));
+      if (!afst.error && Array.isArray(afst.data)) ids = (afst.data as { id: string }[]).map((x) => x.id);
+      else if (fikLaas) console.error("storkbook-udsendelser: afstemning fejlede");
+      const frigiv: string[] = [];
+      for (const id of ids) {
+        const e = ejede.get(id);
+        if (e?.transport) {
+          const a: Afslut = e.afslut && e.afslut.transport ? e.afslut : { status: "ukendt", aarsag: "frist", transport: true };
+          await afslut(svc, id, token, a, slut).catch(() => false);
+        } else frigiv.push(id);
       }
-      if (frigiv.length) {
-        const fr = await s(svc.rpc("udsendelse_frigiv_raekker", { p_token: token, p_ids: frigiv }), slut).then((x) => x, () => ({ error: "afbrudt" }));
-        if (fr.error) console.error("storkbook-udsendelser: frigiv_raekker fejlede");
-      }
+      if (frigiv.length && await frigivRaekker(svc, token, frigiv, slut)) frigivet += frigiv.length;
       const fl = await s(svc.rpc("udsendelse_frigiv", { p_token: token }), slut).then((x) => x, () => ({ error: "afbrudt" }));
       if (fl.error) console.error("storkbook-udsendelser: frigiv fejlede");
     }
-    return json({ ok: true, ...rapport, fase2: optalt, frigivet: upaabegyndte.length, varighed_ms: Date.now() - start });
+    return json({ ok: true, ...rapport, fase2: optalt, frigivet, varighed_ms: Date.now() - start });
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "Fejl" }, 500);
+    return json({ error: (e as Error)?.name === "AbortError" ? "frist" : e instanceof Error ? e.message : "Fejl" }, 500);
+  } finally {
+    clearTimeout(hovedTimer);
   }
 });

@@ -25,6 +25,8 @@ interface Faelles {
   metadata?: Record<string, unknown>;
   /** Afbryder alle databasekald (worker-frist). */
   signal?: AbortSignal;
+  /** Frist for logning efter afsendelse (worker). Ellers bruges `signal`. */
+  logSignal?: () => AbortSignal;
 }
 
 export interface Udsendelse extends Faelles, Modtager {
@@ -92,7 +94,7 @@ async function fravalgt(u: Faelles, userId?: string): Promise<boolean | "fejl"> 
 
 async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?: string; reference?: string; metadata?: Record<string, unknown> } = {}) {
   try {
-    const { error } = await sig(u, svc().from("udsendelser").insert({
+    const ins = svc().from("udsendelser").insert({
       kanal: u.kanal,
       type_noegle: u.type,
       modtager: m.modtager,
@@ -105,15 +107,17 @@ async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?
       reference: extra.reference ?? null,
       afsenderfunktion: u.afsenderfunktion,
       metadata: { ...(u.metadata ?? {}), ...(extra.metadata ?? {}) },
-    }));
+    });
+    const ls = u.logSignal?.() ?? u.signal;
+    const { error } = await (ls ? (ins as unknown as { abortSignal: (x: AbortSignal) => typeof ins }).abortSignal(ls) : ins);
     if (error) throw error;
   } catch (e) {
     console.error("udsend: logning fejlede", u.type, e instanceof Error ? e.message : e);
   }
 }
 
-/** Brugerens auth-id: kendt direkte eller slået op via medarbejder-id. Fail-open: null ved fejl. */
-async function brugerId(m: Modtager, u?: Faelles): Promise<string | undefined> {
+/** Brugerens auth-id: kendt direkte eller slået op via medarbejder-id. "fejl" ved opslagsfejl (push stopper; mail/SMS fail-open). */
+async function brugerId(m: Modtager, u?: Faelles): Promise<string | undefined | "fejl"> {
   if (m.modtagerUserId) return m.modtagerUserId;
   if (!m.modtagerEmployeeId) return undefined;
   try {
@@ -123,7 +127,7 @@ async function brugerId(m: Modtager, u?: Faelles): Promise<string | undefined> {
     return data?.auth_user_id ?? undefined;
   } catch (e) {
     console.error("udsend: kunne ikke slå bruger op", (e as Error)?.message ?? e);
-    return undefined;
+    return "fejl";
   }
 }
 
@@ -146,12 +150,16 @@ const fejltekst = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
   const gate = await typeGate(u);
   if (gate) { await log(u, u, gate); return gate; }
-  const uid = await brugerId(u, u);
+  const opslag = await brugerId(u, u);
+  if (opslag === "fejl" && u.kanal === "push") { await log(u, u, "fejl", { fejl: "db" }); return "fejl"; }
+  const uid = opslag === "fejl" ? undefined : opslag;
+  // Push uden bruger kan ikke leveres (status "ingen_tilmelding"; "sprunget_over" findes ikke i udsendelser).
+  if (!uid && u.kanal === "push") { await log(u, u, "ingen_tilmelding"); return "ingen_tilmelding"; }
   const regel = await udenforRegel(u, uid);
-  if (regel === "fejl") { await log(u, u, "fejl", { fejl: "regeltjek" }); return "fejl"; }
+  if (regel === "fejl") { await log(u, u, "fejl", { fejl: "db" }); return "fejl"; }
   if (regel) { await log(u, u, "udenfor_regel"); return "udenfor_regel"; }
   const fra = await fravalgt(u, uid);
-  if (fra === "fejl") { await log(u, u, "fejl", { fejl: "præferencefejl" }); return "fejl"; }
+  if (fra === "fejl") { await log(u, u, "fejl", { fejl: "db" }); return "fejl"; }
   if (fra) { await log(u, u, "fravalgt"); return "fravalgt"; }
   try {
     const r = await u.send();
@@ -177,7 +185,8 @@ export async function udsendFlere(
   const tilladte: Modtager[] = [];
   let udenfor = 0;
   for (const m of u.modtagere) {
-    const uid = await brugerId(m, u);
+    const b = await brugerId(m, u);
+    const uid = b === "fejl" ? undefined : b;
     if ((await udenforRegel(u, uid)) === true) { await log(u, m, "udenfor_regel"); udenfor++; }
     else if ((await fravalgt(u, uid)) === true) await log(u, m, "fravalgt");
     else tilladte.push(m);
