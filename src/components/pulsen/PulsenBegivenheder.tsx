@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, ImageOff } from "lucide-react";
@@ -48,6 +49,7 @@ export function PulsenBegivenheder() {
   const isGalleryLead = !!canGallery.data;
   const unlinked = useUnlinkedEventPhotos(isGalleryLead);
   const updatePhoto = useUpdateEventPhoto();
+  const [valg, setValg] = useState<Record<string, string>>({});
 
   const countFor = (id: string, status: AttendanceStatus) => attendees.filter((a) => a.event_id === id && a.status === status).length;
   const mine = (id: string) => attendees.find((a) => a.event_id === id && a.employee_id === me.employeeId)?.status as AttendanceStatus | undefined;
@@ -134,7 +136,15 @@ export function PulsenBegivenheder() {
                     : <div className="flex h-full items-center justify-center"><ImageOff className="h-6 w-6 text-muted-foreground" aria-hidden="true" /></div>}
                 </div>
                 <Select disabled={updatePhoto.isPending || pastList.length === 0}
-                  onValueChange={(eventId) => updatePhoto.mutate({ id: ph.id, eventId })}>
+                  value={valg[ph.id] ?? ""}
+                  onValueChange={(eventId) => {
+                    setValg((v) => ({ ...v, [ph.id]: eventId }));
+                    const ryd = () => setValg((v) => { const n = { ...v }; delete n[ph.id]; return n; });
+                    updatePhoto.mutate({ id: ph.id, eventId }, {
+                      onSuccess: ryd,
+                      onError: () => { ryd(); toast.error("Kunne ikke knytte fotoet", { description: "Prøv igen." }); },
+                    });
+                  }}>
                   <SelectTrigger className="min-h-[44px] rounded-xl text-[14px]" aria-label="Knyt til begivenhed">
                     <SelectValue placeholder="Knyt til begivenhed" />
                   </SelectTrigger>
