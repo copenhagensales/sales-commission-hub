@@ -163,7 +163,6 @@ export default function EmployeeMasterData() {
   const { canView, canEdit: canEditPermission } = useUnifiedPermissions();
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "all-employees";
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -760,6 +759,10 @@ export default function EmployeeMasterData() {
     return allSections.filter(section => canView(section.permissionKey));
   }, [t, activeCount, staffCount, canView]);
 
+  const allowed = visibleSections.map((s) => s.value);
+  const requested = searchParams.get("tab");
+  const activeTab = requested && allowed.includes(requested) ? requested : allowed[0];
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -802,6 +805,9 @@ export default function EmployeeMasterData() {
         />
 
         {/* Tab Navigation */}
+        {allowed.length === 0 ? (
+          <p className="text-muted-foreground">Du har ikke adgang til nogen faner her</p>
+        ) : (
         <Tabs
           value={activeTab}
           onValueChange={(value) => setSearchParams({ tab: value })}
@@ -828,6 +834,7 @@ export default function EmployeeMasterData() {
           </div>
 
           {/* All Employees Tab */}
+          {allowed.includes("all-employees") && (
           <TabsContent value="all-employees" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
@@ -1056,8 +1063,10 @@ export default function EmployeeMasterData() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Staff Employees Tab */}
+          {allowed.includes("staff-employees") && (
           <TabsContent value="staff-employees" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
@@ -1065,8 +1074,10 @@ export default function EmployeeMasterData() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Teams Tab */}
+          {allowed.includes("teams") && (
           <TabsContent value="teams" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
@@ -1074,8 +1085,10 @@ export default function EmployeeMasterData() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Positions Tab */}
+          {allowed.includes("positions") && (
           <TabsContent value="positions" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
@@ -1083,8 +1096,10 @@ export default function EmployeeMasterData() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Permissions Tab */}
+          {allowed.includes("permissions") && (
           <TabsContent value="permissions" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
@@ -1095,8 +1110,10 @@ export default function EmployeeMasterData() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Dialer Mapping Tab */}
+          {allowed.includes("dialer-mapping") && (
           <TabsContent value="dialer-mapping" className="mt-4">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0">
@@ -1104,12 +1121,16 @@ export default function EmployeeMasterData() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Deactivation notification settings */}
+          {allowed.includes("deactivation") && (
           <TabsContent value="deactivation" className="mt-4">
             <DeactivationSettingsTab canEdit={canEditPermission('tab_employees_deactivation')} />
           </TabsContent>
+          )}
         </Tabs>
+        )}
 
         {/* Delete confirmation dialog */}
         <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>
