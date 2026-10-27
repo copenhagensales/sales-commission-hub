@@ -219,6 +219,7 @@ export function useFeedReactions(targetKeys: string[]) {
   });
 
   const addComment = useMutation({
+    retry: 0,
     mutationFn: async ({
       targetType,
       targetKey,
@@ -244,6 +245,7 @@ export function useFeedReactions(targetKeys: string[]) {
   });
 
   const deleteComment = useMutation({
+    retry: 0,
     mutationFn: async (commentId: string) => {
       const { error } = await supabase
         .from("feed_comments")
