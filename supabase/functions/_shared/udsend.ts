@@ -109,7 +109,7 @@ async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?
       metadata: { ...(u.metadata ?? {}), ...(extra.metadata ?? {}) },
     });
     const ls = u.logSignal?.() ?? u.signal;
-    const { error } = await (ls ? (ins as any).abortSignal(ls) : ins);
+    const { error } = await (ls ? (ins as unknown as { abortSignal: (x: AbortSignal) => typeof ins }).abortSignal(ls) : ins);
     if (error) throw error;
   } catch (e) {
     console.error("udsend: logning fejlede", u.type, e instanceof Error ? e.message : e);

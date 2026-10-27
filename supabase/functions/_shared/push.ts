@@ -209,7 +209,7 @@ export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: P
       const status = await udsend({
         type: udsendType, kanal: "push", modtager: opts.navne?.[userId] ?? userId, modtagerUserId: userId,
         emne: msg.title, afsenderfunktion: afsender, metadata: { push_type: type, dedupe_key: opts.dedupeKey ?? null },
-        signal: sOpslag(), logSignal: opts.faser ? sLog : undefined,
+        signal: sOpslag(), logSignal: opts.faser ? () => opts.faser!.log() : undefined,
         send: async () => {
           if (type in PREF_COLUMN) {
             const { data: pref, error: pErr } = await med(svc.from("push_preferences").select("*").eq("user_id", userId), sOpslag()).maybeSingle();
