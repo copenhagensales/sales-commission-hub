@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
         case "streak": return `**${n}** har solgt **${c.level} dage i træk**`;
         case "team_day_sales": return `**${tn}** rundede **${c.level} salg** {dag}`;
         case "team_record": return `**${tn}** satte teamrekord {dag}: **${c.value} salg** (før ${c.previous})`;
-        case "house_record": return `Husrekord {dag}: **${c.value} salg** (før ${c.previous})`;
+        case "house_record": return c.level === 1 ? `Husrekord {dag}: **${kr(c.value)}** i provision (før ${kr(c.previous)})` : `Husrekord {dag}: **${c.value} salg** (før ${c.previous})`;
         default: return c.milestone_type;
       }
     };
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     // Eksisterende rækker i perioden tæller med i grænserne (ved gentagne kørsler bevares udvælgelsen).
     const { data: existing, error: exErr } = await service.from("pulsen_milestones")
       .select("milestone_type, subject_id, period_key, level, employee_id, team_id, shown_in_house, occurred_at")
-      .gte("occurred_at", `${from}T00:00:00+00:00`);
+      .gte("occurred_at", new Date(Date.parse(`${from}T00:00:00Z`) - 3 * 60 * 60 * 1000).toISOString());
     if (exErr) throw exErr;
     const dk = (ts: string) => new Date(ts).toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" });
     const keyOf = (c: { milestone_type: string; period_key: string; level: number }, subject: string) => `${c.milestone_type}|${subject}|${c.period_key}|${c.level}`;
