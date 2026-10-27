@@ -210,11 +210,11 @@ function PulsenFeed() {
           <AutoLoadSentinel active={!!feed.hasNextPage && !feed.isFetching} onVisible={() => { if (!feed.isFetching) feed.fetchNextPage(); }} />
           <button
             type="button"
-            onClick={() => feed.fetchNextPage()}
-            disabled={feed.isFetchingNextPage}
+            onClick={() => { if (!feed.isFetching) feed.fetchNextPage(); }}
+            disabled={feed.isFetching}
             className="mx-auto min-h-[44px] rounded-full bg-card px-6 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-onyx))] hover:text-[hsl(var(--cph-light-blue))] disabled:opacity-60"
           >
-            {feed.isFetchingNextPage ? "Henter …" : "Indlæs flere"}
+            {feed.isFetching ? "Henter …" : "Indlæs flere"}
           </button>
           </>
         ) : (
