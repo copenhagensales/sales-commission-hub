@@ -84,7 +84,13 @@ export default function BookingsContent() {
   // Update URL when week/year changes
   useEffect(() => {
     const currentTab = searchParams.get("tab") || "bookings";
-    setSearchParams({ tab: currentTab, week: selectedWeek.toString(), year: selectedYear.toString() });
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", currentTab);
+      next.set("week", String(selectedWeek));
+      next.set("year", String(selectedYear));
+      return next;
+    });
   }, [selectedWeek, selectedYear]);
 
   const weekStart = getWeekStartDate(selectedYear, selectedWeek);
