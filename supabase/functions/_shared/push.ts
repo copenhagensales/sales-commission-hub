@@ -5,6 +5,7 @@
  * eller kundedetaljer (se pushText.ts).
  */
 import webpush from "npm:web-push@3.6.7";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PUSH_TEXT, STORKBOOK_TYPER, type PushType } from "./pushText.ts";
 import { udsend } from "./udsend.ts";
 
@@ -71,9 +72,7 @@ export type PushOpts = {
 
 type RequestDetails = { endpoint: string; method?: string; headers: Record<string, string>; body: BodyInit | null };
 type Abfrage = { abortSignal: (s: AbortSignal) => unknown };
-// Minimal klienttype (service_role); resultater er utypede rækker.
-// deno-lint-ignore no-explicit-any
-type PushKlient = { from: (t: string) => any };
+type PushKlient = SupabaseClient;
 
 const STORKBOOK = new Set<string>(STORKBOOK_TYPER);
 const TRANSPORT_TIMEOUT_MS = 8000;
