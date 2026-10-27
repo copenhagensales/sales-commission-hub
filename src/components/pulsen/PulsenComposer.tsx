@@ -83,7 +83,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     audiences.length > 0 &&
     !busy &&
     body.length <= PULSEN_MAX_CHARS &&
-    (mode === "post" ? body.trim().length > 0 || !!file : mode === "question" ? body.trim().length > 0 : true) &&
+    (mode === "question" ? body.trim().length > 0 : body.trim().length > 0 || !!file) &&
     (mode !== "praise" || praised.length > 0);
 
   const send = async () => {
