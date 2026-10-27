@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useActiveColleagues, usePulsenPoll } from "@/hooks/usePulsen";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,16 @@ function closesIn(iso: string) {
 }
 
 export function PulsenPollCard({ postId }: { postId: string }) {
-  const { query, vote } = usePulsenPoll(postId, true);
+  const [visible, setVisible] = useState(false);
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!rootEl) return;
+    if (typeof IntersectionObserver === "undefined") { setVisible(true); return; }
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting));
+    io.observe(rootEl);
+    return () => io.disconnect();
+  }, [rootEl]);
+  const { query, vote, isClosed } = usePulsenPoll(postId, true, { poll: visible });
   const data = query.data;
   const named = !!data?.poll && !data.poll.anonymous;
   const colleagues = useActiveColleagues(named);
@@ -22,22 +32,22 @@ export function PulsenPollCard({ postId }: { postId: string }) {
   if (!data?.poll) return null;
 
   const { poll, options, votes, hasVoted, myOptionId } = data;
-  const closed = !!poll.closed_at || new Date(poll.closes_at).getTime() <= Date.now();
+  const closed = isClosed;
   const total = votes.length;
   const showResults = hasVoted || closed;
   const canSwitch = !closed && named;
   const nameById = new Map((colleagues.data ?? []).map((c) => [c.id, c.first_name ?? ""]));
 
   const onPick = (optionId: string) => {
-    if (closed || optionId === myOptionId) return;
+    if (vote.isPending || closed || optionId === myOptionId) return;
     if (hasVoted && !canSwitch) return;
     vote.mutate(optionId, {
-      onError: (e) => toast.error("Stemmen blev ikke gemt", { description: e instanceof Error ? e.message : "Prøv igen" }),
+      onError: (e) => toast.error("Stemmen blev ikke gemt", { description: e && typeof e === "object" && "message" in e ? String(e.message) : "Prøv igen" }),
     });
   };
 
   return (
-    <div className="mt-3">
+    <div ref={setRootEl} className="mt-3">
       {closed && <p className="mb-2 text-[14px] font-extrabold text-foreground">Afsluttet · {total} {total === 1 ? "stemme" : "stemmer"}</p>}
       <ul className="space-y-2">
         {options.map((o) => {
@@ -51,7 +61,7 @@ export function PulsenPollCard({ postId }: { postId: string }) {
               <button
                 type="button"
                 onClick={() => onPick(o.id)}
-                disabled={!clickable}
+                disabled={!clickable || vote.isPending}
                 aria-pressed={mine}
                 className={cn(
                   "relative flex min-h-[44px] w-full items-center gap-2 overflow-hidden rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-4 py-2 text-left text-[15px] text-foreground transition-opacity active:opacity-70 disabled:cursor-default disabled:active:opacity-100",

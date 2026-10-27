@@ -197,6 +197,7 @@ function Lead({ p }: { p: PulsenPost }) {
   }
   if (p.post_type === "question") return <><b className="font-extrabold">{name}</b> spørger</>;
   if (p.post_type === "image") return <><b className="font-extrabold">{name}</b> delte et billede</>;
+  if (p.post_type === "poll") return <><b className="font-extrabold">{name}</b> · Afstemning</>;
   return <b className="font-extrabold">{name}</b>;
 }
 

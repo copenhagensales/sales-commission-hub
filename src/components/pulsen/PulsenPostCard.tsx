@@ -67,13 +67,13 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
   const img = post.localImageUrl ?? imageUrl;
   const showMenu = !post.pending && (isMine || canModerate);
   const isPoll = post.post_type === "poll";
-  const pollState = usePulsenPoll(post.id, isPoll && showMenu);
+  const pollState = usePulsenPoll(post.id, isPoll && showMenu, { poll: false });
   const pollRow = pollState.query.data?.poll;
-  const pollOpen = !!pollRow && !pollRow.closed_at && new Date(pollRow.closes_at).getTime() > Date.now();
+  const pollOpen = !!pollRow && !pollState.isClosed;
   const [confirmClose, setConfirmClose] = useState(false);
   const closePoll = () => {
     pollState.close.mutate(undefined, {
-      onError: (e) => toast.error("Afstemningen blev ikke lukket", { description: e instanceof Error ? e.message : "Prøv igen" }),
+      onError: (e) => toast.error("Afstemningen blev ikke lukket", { description: e && typeof e === "object" && "message" in e ? String(e.message) : "Prøv igen" }),
     });
   };
 
