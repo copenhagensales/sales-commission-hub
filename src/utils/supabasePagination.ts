@@ -38,6 +38,8 @@ export async function fetchAllRows<T = unknown>(
   const allData: T[] = [];
   let offset = 0;
   let hasMore = true;
+  const MIN_PAGE_SIZE = 50;
+  let currentPageSize = pageSize;
 
   while (hasMore) {
     // Check if we've hit the optional max rows limit
@@ -79,7 +81,7 @@ export async function fetchAllRows<T = unknown>(
     if (data && data.length > 0) {
       allData.push(...(data as T[]));
       offset += data.length;
-      hasMore = data.length === pageSize;
+      hasMore = data.length === currentPageSize;
     } else {
       hasMore = false;
     }
