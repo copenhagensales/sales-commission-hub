@@ -221,21 +221,14 @@ export function usePulsenMutations(author: PersonRef | null) {
       qc.setQueryData(key, data ? fn(data) : data);
     });
   };
-  const snapshot = (id: string) => {
-    const postKey = ["pulsen-post", id];
-    const postData = qc.getQueryData<PulsenPost | null>(postKey);
-    return {
-      feed: qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] }),
-      post: postData !== undefined ? { key: postKey, data: postData } : null,
-    };
-  };
-  const restore = (snap: ReturnType<typeof snapshot>) => {
-    snap.feed.forEach(([k, d]) => qc.setQueryData(k, d));
-    if (snap.post) qc.setQueryData(snap.post.key, snap.post.data);
-  };
   const cancelFor = async (id: string) => {
     await qc.cancelQueries({ queryKey: ["pulsen-post", id] });
     await qc.cancelQueries({ queryKey: ["pulsen-feed"] });
+  };
+  // Serveren er sandheden: hent feed og opslag igen efter fejl og afslutning.
+  const refresh = (id: string) => {
+    qc.invalidateQueries({ queryKey: ["pulsen-feed"] });
+    qc.invalidateQueries({ queryKey: ["pulsen-post", id] });
   };
 
   const create = useMutation({
@@ -317,12 +310,10 @@ export function usePulsenMutations(author: PersonRef | null) {
     },
     onMutate: async ({ id, body }) => {
       await cancelFor(id);
-      const snap = snapshot(id);
       patchEverywhere((p) => (p.id === id ? { ...p, body: body.trim(), edited_at: new Date().toISOString() } : p));
-      return { snap };
     },
-    onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
-    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
+    onError: (_e, v) => refresh(v.id),
+    onSettled: (_d, _e, v) => refresh(v.id),
   });
 
   const remove = useMutation({
@@ -334,13 +325,11 @@ export function usePulsenMutations(author: PersonRef | null) {
     },
     onMutate: async (post) => {
       await cancelFor(post.id);
-      const snap = snapshot(post.id);
       patchEverywhere((p) => (p.id === post.id ? null : p));
-      return { snap };
     },
-    onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onError: (_e, v) => refresh(v.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pulsen-unanswered"] }),
-    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
+    onSettled: (_d, _e, v) => refresh(v.id),
   });
 
   const setHidden = useMutation({
@@ -353,12 +342,10 @@ export function usePulsenMutations(author: PersonRef | null) {
     },
     onMutate: async ({ id, hidden }) => {
       await cancelFor(id);
-      const snap = snapshot(id);
       patchEverywhere((p) => (p.id === id ? { ...p, hidden_at: hidden ? new Date().toISOString() : null } : p));
-      return { snap };
     },
-    onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
-    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
+    onError: (_e, v) => refresh(v.id),
+    onSettled: (_d, _e, v) => refresh(v.id),
   });
 
   const setBestAnswer = useMutation({
@@ -368,12 +355,10 @@ export function usePulsenMutations(author: PersonRef | null) {
     },
     onMutate: async ({ id, commentId }) => {
       await cancelFor(id);
-      const snap = snapshot(id);
       patchEverywhere((p) => (p.id === id ? { ...p, best_answer_comment_id: commentId } : p));
-      return { snap };
     },
-    onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
-    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
+    onError: (_e, v) => refresh(v.id),
+    onSettled: (_d, _e, v) => refresh(v.id),
   });
 
   return { create, edit, remove, setHidden, setBestAnswer };
