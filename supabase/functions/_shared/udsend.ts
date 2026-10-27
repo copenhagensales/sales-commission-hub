@@ -1,13 +1,14 @@
 // deno-lint-ignore-file no-explicit-any
 /**
  * Fælles port for alt, Stork sender ud (mail, SMS, push).
- * FAIL-OPEN: fejler opslag eller logning, sendes alligevel (fejl til konsollen).
+ * FAIL-OPEN for mail/SMS: fejler opslag eller logning, sendes alligevel (fejl til konsollen).
+ * Push er FAIL-CLOSED i forgates: type-, regel- og præferencefejl samt ukendt type giver "fejl".
  * Kun eksplicit `aktiv = false` på typen eller eksplicit fravalg stopper.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export type Kanal = "mail" | "sms" | "push";
-export type UdsendStatus = "sendt" | "fejl" | "slaaet_fra" | "fravalgt" | "stille_timer" | "ingen_tilmelding" | "udenfor_regel";
+export type UdsendStatus = "sendt" | "fejl" | "slaaet_fra" | "fravalgt" | "stille_timer" | "ingen_tilmelding" | "udenfor_regel" | "ukendt" | "ikke_sendt" | "allerede_sendt";
 
 export interface Modtager {
   modtager: string;
@@ -22,11 +23,13 @@ interface Faelles {
   emne?: string;
   afsenderfunktion: string;
   metadata?: Record<string, unknown>;
+  /** Afbryder alle databasekald (worker-frist). */
+  signal?: AbortSignal;
 }
 
 export interface Udsendelse extends Faelles, Modtager {
   /** Selve afsendelsen. Må returnere status "ingen_tilmelding"/"fravalgt" (push), så det logges. */
-  send: () => Promise<{ reference?: string; status?: "ingen_tilmelding" | "fravalgt" } | void>;
+  send: () => Promise<{ reference?: string; status?: UdsendStatus; metadata?: Record<string, unknown>; fejl?: string } | void>;
 }
 
 let client: any = null;
@@ -34,6 +37,8 @@ function svc(): any {
   if (!client) client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   return client;
 }
+
+const sig = <T>(u: Faelles, q: T): T => (u.signal ? (q as any).abortSignal(u.signal) : q);
 
 function nuDansk(): string {
   return new Intl.DateTimeFormat("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit", hour12: false })
@@ -48,11 +53,13 @@ function iStilleTimer(fra: string | null, til: string | null): boolean {
 }
 
 /** Afgør om en type/kanal må sende nu. Returnerer null = send. */
-async function typeGate(u: Faelles): Promise<"slaaet_fra" | "stille_timer" | null> {
+async function typeGate(u: Faelles): Promise<"slaaet_fra" | "stille_timer" | "fejl" | null> {
   try {
-    const { data, error } = await svc().from("udsendelsestyper")
-      .select("aktiv, stille_fra, stille_til").eq("noegle", u.type).maybeSingle();
+    const { data, error } = await sig(u, svc().from("udsendelsestyper")
+      .select("aktiv, stille_fra, stille_til").eq("noegle", u.type)).maybeSingle();
     if (error) throw error;
+    // Push er fail-closed: ukendt type oprettes ikke og sendes ikke.
+    if (!data && u.kanal === "push") return "fejl";
     if (!data) {
       const { error: insErr } = await svc().from("udsendelsestyper").upsert(
         { noegle: u.type, navn: u.type, kanal: u.kanal, udloeser: "handling", afsenderfunktion: u.afsenderfunktion },
@@ -66,26 +73,26 @@ async function typeGate(u: Faelles): Promise<"slaaet_fra" | "stille_timer" | nul
     return null;
   } catch (e) {
     console.error("udsend: typeopslag fejlede", u.type, e instanceof Error ? e.message : e);
-    return null;
+    return u.kanal === "push" ? "fejl" : null;
   }
 }
 
-async function fravalgt(u: Faelles, userId?: string): Promise<boolean> {
+async function fravalgt(u: Faelles, userId?: string): Promise<boolean | "fejl"> {
   if (!userId) return false;
   try {
-    const { data, error } = await svc().from("udsendelsespraeferencer")
-      .select("aktiv").eq("user_id", userId).eq("type_noegle", u.type).eq("kanal", u.kanal).maybeSingle();
+    const { data, error } = await sig(u, svc().from("udsendelsespraeferencer")
+      .select("aktiv").eq("user_id", userId).eq("type_noegle", u.type).eq("kanal", u.kanal)).maybeSingle();
     if (error) throw error;
     return data?.aktiv === false;
   } catch (e) {
     console.error("udsend: præferenceopslag fejlede", u.type, e instanceof Error ? e.message : e);
-    return false;
+    return u.kanal === "push" ? "fejl" : false;
   }
 }
 
-async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?: string; reference?: string } = {}) {
+async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?: string; reference?: string; metadata?: Record<string, unknown> } = {}) {
   try {
-    const { error } = await svc().from("udsendelser").insert({
+    const { error } = await sig(u, svc().from("udsendelser").insert({
       kanal: u.kanal,
       type_noegle: u.type,
       modtager: m.modtager,
@@ -97,8 +104,8 @@ async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?
       fejl: extra.fejl ? extra.fejl.slice(0, 1000) : null,
       reference: extra.reference ?? null,
       afsenderfunktion: u.afsenderfunktion,
-      metadata: u.metadata ?? {},
-    });
+      metadata: { ...(u.metadata ?? {}), ...(extra.metadata ?? {}) },
+    }));
     if (error) throw error;
   } catch (e) {
     console.error("udsend: logning fejlede", u.type, e instanceof Error ? e.message : e);
@@ -106,12 +113,12 @@ async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?
 }
 
 /** Brugerens auth-id: kendt direkte eller slået op via medarbejder-id. Fail-open: null ved fejl. */
-async function brugerId(m: Modtager): Promise<string | undefined> {
+async function brugerId(m: Modtager, u?: Faelles): Promise<string | undefined> {
   if (m.modtagerUserId) return m.modtagerUserId;
   if (!m.modtagerEmployeeId) return undefined;
   try {
-    const { data, error } = await svc().from("employee_master_data")
-      .select("auth_user_id").eq("id", m.modtagerEmployeeId).maybeSingle();
+    const q = svc().from("employee_master_data").select("auth_user_id").eq("id", m.modtagerEmployeeId);
+    const { data, error } = await (u ? sig(u, q) : q).maybeSingle();
     if (error) throw error;
     return data?.auth_user_id ?? undefined;
   } catch (e) {
@@ -121,15 +128,15 @@ async function brugerId(m: Modtager): Promise<string | undefined> {
 }
 
 /** Modtagerregel (roller/teams/rettighed). Kun et eksplicit false stopper; ukendt bruger eller fejl = send. */
-async function udenforRegel(u: Faelles, userId?: string): Promise<boolean> {
+async function udenforRegel(u: Faelles, userId?: string): Promise<boolean | "fejl"> {
   if (!userId) return false;
   try {
-    const { data, error } = await svc().rpc("udsendelse_tilladt", { p_user_id: userId, p_type: u.type });
+    const { data, error } = await sig(u, svc().rpc("udsendelse_tilladt", { p_user_id: userId, p_type: u.type }));
     if (error) throw error;
     return data === false;
   } catch (e) {
     console.error("udsend: regeltjek fejlede", u.type, (e as Error)?.message ?? e);
-    return false;
+    return u.kanal === "push" ? "fejl" : false;
   }
 }
 
@@ -139,13 +146,18 @@ const fejltekst = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
   const gate = await typeGate(u);
   if (gate) { await log(u, u, gate); return gate; }
-  const uid = await brugerId(u);
-  if (await udenforRegel(u, uid)) { await log(u, u, "udenfor_regel"); return "udenfor_regel"; }
-  if (await fravalgt(u, uid)) { await log(u, u, "fravalgt"); return "fravalgt"; }
+  const uid = await brugerId(u, u);
+  const regel = await udenforRegel(u, uid);
+  if (regel === "fejl") { await log(u, u, "fejl", { fejl: "regeltjek" }); return "fejl"; }
+  if (regel) { await log(u, u, "udenfor_regel"); return "udenfor_regel"; }
+  const fra = await fravalgt(u, uid);
+  if (fra === "fejl") { await log(u, u, "fejl", { fejl: "præferencefejl" }); return "fejl"; }
+  if (fra) { await log(u, u, "fravalgt"); return "fravalgt"; }
   try {
     const r = await u.send();
     const status: UdsendStatus = (r && r.status) || "sendt";
-    await log(u, u, status, { reference: r?.reference });
+    // Logfejl ændrer aldrig et afgjort udfald (log() kaster ikke).
+    await log(u, u, status, { reference: r?.reference, metadata: r?.metadata, fejl: r?.fejl });
     return status;
   } catch (e) {
     await log(u, u, "fejl", { fejl: fejltekst(e) });
@@ -165,9 +177,9 @@ export async function udsendFlere(
   const tilladte: Modtager[] = [];
   let udenfor = 0;
   for (const m of u.modtagere) {
-    const uid = await brugerId(m);
-    if (await udenforRegel(u, uid)) { await log(u, m, "udenfor_regel"); udenfor++; }
-    else if (await fravalgt(u, uid)) await log(u, m, "fravalgt");
+    const uid = await brugerId(m, u);
+    if ((await udenforRegel(u, uid)) === true) { await log(u, m, "udenfor_regel"); udenfor++; }
+    else if ((await fravalgt(u, uid)) === true) await log(u, m, "fravalgt");
     else tilladte.push(m);
   }
   if (!tilladte.length && u.modtagere.length) return udenfor === u.modtagere.length ? "udenfor_regel" : "fravalgt";

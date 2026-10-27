@@ -60,10 +60,10 @@ const STORKBOOK = new Set<string>(STORKBOOK_TYPER);
 const TRANSPORT_TIMEOUT_MS = 8000;
 
 /** Klassifikation pr. abonnement (whitelist; resten ukendt). */
-export function klassificer(kode: number | null): "sendt" | "ikke_sendt" | "ukendt" | "doedt" {
-  if (kode === 200 || kode === 201) return "sendt";
-  if (kode === 404 || kode === 410) return "doedt";
-  if (kode === 400 || kode === 401 || kode === 403 || kode === 413 || kode === 429) return "ikke_sendt";
+export function klassificer(code: number | null): "sendt" | "ikke_sendt" | "ukendt" | "doedt" {
+  if (code === 200 || code === 201) return "sendt";
+  if (code === 404 || code === 410) return "doedt";
+  if (code === 400 || code === 401 || code === 403 || code === 413 || code === 429) return "ikke_sendt";
   return "ukendt";
 }
 
