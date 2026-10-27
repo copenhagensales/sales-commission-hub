@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead } from "@/hooks/useChat";
+import { Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, erSynligMedFokus } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
