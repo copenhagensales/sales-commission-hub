@@ -38,6 +38,8 @@ export async function fetchAllRows<T = unknown>(
   const allData: T[] = [];
   let offset = 0;
   let hasMore = true;
+  const MIN_PAGE_SIZE = 50;
+  let currentPageSize = pageSize;
 
   while (hasMore) {
     // Check if we've hit the optional max rows limit
@@ -50,7 +52,7 @@ export async function fetchAllRows<T = unknown>(
       .from(table)
       .select(select)
       .order(orderBy, { ascending })
-      .range(offset, offset + pageSize - 1);
+      .range(offset, offset + currentPageSize - 1);
 
     // Apply custom filters if provided
     if (filters) {
@@ -60,14 +62,26 @@ export async function fetchAllRows<T = unknown>(
     const { data, error } = await query;
 
     if (error) {
+      const msg = String(error.message ?? "").toLowerCase();
+      const isTimeout =
+        error.code === "57014" ||
+        msg.includes("statement timeout") ||
+        msg.includes("canceling statement");
+      if (isTimeout && currentPageSize > MIN_PAGE_SIZE) {
+        const next = Math.max(MIN_PAGE_SIZE, Math.floor(currentPageSize / 2));
+        console.warn(`[fetchAllRows] Timeout on ${table} at offset ${offset}; retrying with pageSize ${next}`);
+        currentPageSize = next;
+        continue;
+      }
       console.error(`[fetchAllRows] Error on ${table} at offset ${offset}:`, error);
       throw error;
     }
 
+
     if (data && data.length > 0) {
       allData.push(...(data as T[]));
       offset += data.length;
-      hasMore = data.length === pageSize;
+      hasMore = data.length === currentPageSize;
     } else {
       hasMore = false;
     }

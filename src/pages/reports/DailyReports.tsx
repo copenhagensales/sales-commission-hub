@@ -670,14 +670,13 @@ export default function DailyReports() {
         const joinType = selectedClients.length > 0 ? "!inner" : "";
         const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`;
 
-        const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
-
         // Fejl maa ikke sluges: et delvist resultat skal ikke kunne vises som et rigtigt tal.
+        // Praecist match (agent_email er lowercase i sales) saa idx_sales_agent_email bruges.
         return fetchAllRows<any>(
           "sales", selectClause,
           (q) => {
             let query = q
-              .or(emailOrFilter)
+              .in("agent_email", emailIdentifiers)
               .neq("source", "fieldmarketing")
               .gte("sale_datetime", `${startStr}T00:00:00`)
               .lte("sale_datetime", `${endStr}T23:59:59`);
