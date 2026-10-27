@@ -648,12 +648,13 @@ Deno.serve(async (req) => {
       // Afslutningsvindue: hvert trin har egen frist, så intet trin kan spærre de næste.
       // (0) Afstem ejede rækker mod DB (≤ 2 s; dækker tabt svar fra udsendelse_overtag); fejler opslaget, bruges lokal liste.
       let ids = [...ejede.keys()];
-      if (fikLaas) {
+      {
+        // Køres altid (også ved tabt lås-svar).
         const afst = await s(svc.from("udsendelse_reservationer").select("id").eq("worker_token", token).eq("status", "sender"), AbortSignal.timeout(AFSTEM_MS))
           .then((x) => x as { data: unknown; error: unknown }, () => ({ data: null, error: "afbrudt" }));
         if (!afst.error && Array.isArray(afst.data)) { ids = (afst.data as { id: string }[]).map((x) => x.id); trin.afstemning = "ok"; }
         else { fejlT.afstemning_fejl++; trin.afstemning = "fejl"; console.error("storkbook-udsendelser: afstemning fejlede"); }
-      } else trin.afstemning = "ingen lås";
+      }
       const transporteret = ids.filter((id) => ejede.get(id)?.transport);
       const frigiv = ids.filter((id) => !ejede.get(id)?.transport);
       // (1) Afslut transporterede rækker (≤ 3 s, eget signal).
@@ -673,11 +674,11 @@ Deno.serve(async (req) => {
         if (n === null) { fejlT.frigiv_fejl++; trin.frigiv_raekker = "fejl"; } else { frigivet += n; trin.frigiv_raekker = `${n}/${frigiv.length}`; }
       } else trin.frigiv_raekker = "ingen";
       // (3) Frigiv låsen (≤ 2 s, eget signal).
-      if (fikLaas) {
+      {
         const fl = await s(svc.rpc("udsendelse_frigiv", { p_token: token }), AbortSignal.timeout(FRIGIV_MS))
           .then((x) => x as { data: unknown; error: unknown }, () => ({ data: null, error: "afbrudt" }));
         if (fl.error) { fejlT.laas_fejl++; trin.frigiv = "fejl"; console.error("storkbook-udsendelser: frigiv fejlede"); } else trin.frigiv = "ok";
-      } else trin.frigiv = "ingen lås";
+      }
     }
     const ok = Object.values(fejlT).every((n) => n === 0);
     return json({ ok, ...rapport, fase2: optalt, ...fejlT, frigivet, afslutning: trin, varighed_ms: Date.now() - start });
