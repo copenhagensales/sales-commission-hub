@@ -8590,6 +8590,7 @@ export type Database = {
         Row: {
           created_at: string
           event_date: string | null
+          event_id: string | null
           id: string
           sort_order: number
           storage_path: string
@@ -8599,6 +8600,7 @@ export type Database = {
         Insert: {
           created_at?: string
           event_date?: string | null
+          event_id?: string | null
           id?: string
           sort_order?: number
           storage_path: string
@@ -8608,13 +8610,22 @@ export type Database = {
         Update: {
           created_at?: string
           event_date?: string | null
+          event_id?: string | null
           id?: string
           sort_order?: number
           storage_path?: string
           title?: string | null
           uploaded_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "event_gallery_photos_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "company_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       event_invitation_views: {
         Row: {

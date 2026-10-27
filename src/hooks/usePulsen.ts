@@ -146,6 +146,21 @@ export function usePulsenFeed(scope: PulsenScope, enabled: boolean) {
   });
 }
 
+/** Ét opslag (samme select som feedet). null = findes ikke eller ingen adgang (RLS). */
+export function usePulsenPost(id: string | undefined) {
+  return useQuery({
+    queryKey: ["pulsen-post", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("pulsen_posts").select(POST_SELECT).eq("id", id as string).is("deleted_at", null).maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return (await attachPraised([data as unknown as PulsenPost]))[0];
+    },
+    enabled: !!id,
+    staleTime: 30000,
+  });
+}
+
 /** Signerede adresser (1 time) til billeder, som brugeren må se. */
 export function usePulsenImageUrls(paths: string[]) {
   const sorted = useMemo(() => Array.from(new Set(paths)).sort(), [paths]);

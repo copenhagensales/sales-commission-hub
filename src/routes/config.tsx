@@ -13,6 +13,8 @@ import {
   Auth,
   Home,
   Pulsen,
+  StorkbookIndlaeg,
+  StorkbookBegivenhed,
   TdcErhvervDashboard,
   RelatelDashboard,
   NotFound,
@@ -76,6 +78,8 @@ export const routes: RouteConfig[] = [
 
   { path: "/home", component: Home, access: "role", positionPermission: "menu_home" },
   { path: "/storkbook", component: Pulsen, access: "role", positionPermission: "menu_pulsen" },
+  { path: "/storkbook/indlaeg/:id", component: StorkbookIndlaeg, access: "role", positionPermission: "menu_pulsen" },
+  { path: "/storkbook/begivenhed/:id", component: StorkbookBegivenhed, access: "role", positionPermission: "menu_pulsen" },
   { path: "/storkbook/demo", component: redirectTo("/storkbook"), access: "protected" },
   { path: "/pulsen", component: PulsenRedirect, access: "protected" },
   { path: "/pulsen/demo", component: redirectTo("/storkbook"), access: "protected" },

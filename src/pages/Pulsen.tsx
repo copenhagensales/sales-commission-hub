@@ -18,6 +18,7 @@ import { AddEventDialog } from "@/components/home/AddEventDialog";
 import { PulsenComposer, type Mode as ComposeMode } from "@/components/pulsen/PulsenComposer";
 import { PulsenPostCard } from "@/components/pulsen/PulsenPostCard";
 import { PulsenSidebar } from "@/components/pulsen/PulsenSidebar";
+import { PulsenBegivenheder } from "@/components/pulsen/PulsenBegivenheder";
 import { ReactButton } from "@/components/home/FeedReactionRow";
 import { PulsenEmpty, PulsenError, PulsenPostSkeleton } from "@/components/pulsen/PulsenStates";
 import { useCelebrations } from "@/hooks/useCelebrations";
@@ -63,17 +64,24 @@ function PulsenFeed() {
   const isPhone = useIsPhone();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const pull = usePullToRefresh(isPhone, () => feed.refetch());
-  // Link fra forsiden: /storkbook?post=<id> ruller til indlægget, når det er indlæst.
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const composeParam = searchParams.get("compose");
   const initialCompose = (["post", "praise", "question", "image"].includes(composeParam ?? "") ? composeParam : null) as ComposeMode | "image" | null;
+  // Gamle links /storkbook?post=<id> sendes videre til opslagets egen side.
   const deepPostId = searchParams.get("post");
-  const deepDone = useRef(false);
   useEffect(() => {
-    if (!deepPostId || deepDone.current || !posts.some((p) => p.id === deepPostId)) return;
-    deepDone.current = true;
-    requestAnimationFrame(() => document.getElementById(`pulsen-post-${deepPostId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-  }, [deepPostId, posts]);
+    if (deepPostId) navigate(`/storkbook/indlaeg/${deepPostId}`, { replace: true });
+  }, [deepPostId, navigate]);
+  // ?team=<id> (fx tilbage fra et teamopslag) vælger Team-fanen.
+  const teamParam = searchParams.get("team");
+  const teamParamDone = useRef(false);
+  useEffect(() => {
+    if (!teamParam || teamParamDone.current || !me.teams.some((t) => t.id === teamParam)) return;
+    teamParamDone.current = true;
+    setTeamId(teamParam);
+    setTab("team");
+  }, [teamParam, me.teams]);
   const images = usePulsenImageUrls(posts.filter((p) => p.image_path && !p.localImageUrl).map((p) => p.image_path as string));
 
   const mut = usePulsenMutations(me.self);
@@ -119,10 +127,7 @@ function PulsenFeed() {
   const myStatus = (id: string) => (attendees.find((a) => a.event_id === id && a.employee_id === me.employeeId)?.status ?? null) as AttendanceStatus | null;
   const detailEvent = events.find((e) => e.id === detailEventId);
 
-  const scrollToPost = (id: string) => {
-    setTab("house");
-    requestAnimationFrame(() => document.getElementById(`pulsen-post-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-  };
+  const openPost = (id: string) => navigate(`/storkbook/indlaeg/${id}`);
 
   const contextFor = (p: PulsenPost) => {
     if (p.audience === "team") return [p.author?.job_title, me.teams.find((t) => t.id === p.team_id)?.name].filter(Boolean).join(" / ") || null;
@@ -333,7 +338,7 @@ function PulsenFeed() {
 
             {renderBody()}
 
-            <PulsenSidebar className="lg:hidden" showUnanswered={isHouse} employeeId={me.employeeId} onOpenQuestion={scrollToPost} />
+            <PulsenSidebar className="lg:hidden" showUnanswered={isHouse} employeeId={me.employeeId} onOpenQuestion={openPost} />
           </div>
 
           <div className="hidden lg:block">
@@ -341,7 +346,7 @@ function PulsenFeed() {
               className="sticky top-6"
               showUnanswered={isHouse}
               employeeId={me.employeeId}
-              onOpenQuestion={scrollToPost}
+              onOpenQuestion={openPost}
               top={me.employeeId ? <TodayMilestonesCard layout="card" isHouse={isHouse} teamId={team?.id ?? null} teamName={team?.name ?? null} enabled /> : null}
             />
           </div>
@@ -407,17 +412,6 @@ function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<unknown>) {
 }
 
 const Beskeder = lazy(() => import("@/pages/Messages"));
-
-/** Begivenheder: kommende begivenheder (samme kort som Storkbooks sidekolonne). */
-function PulsenBegivenheder() {
-  const me = usePulsenMe();
-  const navigate = useNavigate();
-  return (
-    <div className="mx-auto w-full max-w-[680px] px-4 pb-16 md:px-0">
-      <PulsenSidebar showUnanswered={false} employeeId={me.employeeId} onOpenQuestion={(id) => navigate(`/storkbook?post=${id}`)} />
-    </div>
-  );
-}
 
 /** Storkbook: Feed · Begivenheder · Beskeder (?tab=). Uden tab åbner Feed, så ?post=/?compose= virker. */
 export default function Storkbook() {
