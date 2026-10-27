@@ -210,15 +210,18 @@ export function usePulsenMutations(author: PersonRef | null) {
   const qc = useQueryClient();
 
   const patchEverywhere = (fn: (p: PulsenPost) => PulsenPost | null) => {
+    // Skriv kun caches, der faktisk ændres, så en tidligere invalidering ikke ophæves.
     qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] }).forEach(([key, data]) => {
       if (!data) return;
-      qc.setQueryData<FeedData>(key, {
-        ...data,
-        pages: data.pages.map((page) => page.map(fn).filter((p): p is PulsenPost => !!p)),
+      const pages = data.pages.map((page) => {
+        const p2 = page.map(fn).filter((p): p is PulsenPost => !!p);
+        return p2.length === page.length && p2.every((p, i) => p === page[i]) ? page : p2;
       });
+      if (pages.some((pg, i) => pg !== data.pages[i])) qc.setQueryData<FeedData>(key, { ...data, pages });
     });
     qc.getQueriesData<PulsenPost | null>({ queryKey: ["pulsen-post"] }).forEach(([key, data]) => {
-      qc.setQueryData(key, data ? fn(data) : data);
+      const next = data ? fn(data) : data;
+      if (next !== data) qc.setQueryData(key, next);
     });
   };
   const cancelFor = async (id: string) => {

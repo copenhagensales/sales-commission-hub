@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, SearchX } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -58,9 +59,9 @@ export default function StorkbookIndlaeg() {
           onDeleteComment: (cid) => fr.deleteComment.mutateAsync(cid),
         }}
         onEdit={(b) => mut.edit.mutateAsync({ id: post.id, body: b }).then(() => postQ.refetch())}
-        onDelete={() => mut.remove.mutate(post, { onSuccess: () => navigate(backTo, { replace: true }) })}
-        onHide={(hidden) => mut.setHidden.mutate({ id: post.id, hidden }, { onSettled: () => postQ.refetch() })}
-        onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: post.id, commentId }, { onSettled: () => postQ.refetch() })}
+        onDelete={() => mut.remove.mutate(post, { onSuccess: () => navigate(backTo, { replace: true }), onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
+        onHide={(hidden) => mut.setHidden.mutate({ id: post.id, hidden }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
+        onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: post.id, commentId }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}
       />
     );
   };
