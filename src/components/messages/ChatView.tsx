@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, Message } from "@/hooks/useChat";
+import { useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv, erSynligMedFokus, Message } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
@@ -71,11 +71,19 @@ export function ChatView({ conversationId }: ChatViewProps) {
     queryFn: fetchCurrentEmployee,
   });
 
-  // Mark as read when opening conversation
+  useChatAktiv(conversationId);
+
+  // Kvitter samtalen ved åbning – kun når vinduet er synligt og har fokus; ellers når fokus vender tilbage.
   useEffect(() => {
-    if (conversationId) {
-      markAsRead.mutate(conversationId);
-    }
+    if (!conversationId) return;
+    const kvitter = () => { if (erSynligMedFokus()) markAsRead.mutate(conversationId); };
+    kvitter();
+    window.addEventListener("focus", kvitter);
+    document.addEventListener("visibilitychange", kvitter);
+    return () => {
+      window.removeEventListener("focus", kvitter);
+      document.removeEventListener("visibilitychange", kvitter);
+    };
   }, [conversationId]);
 
   // Rul til nyeste besked ved åbning, ved ny besked og ved afsendelse.
