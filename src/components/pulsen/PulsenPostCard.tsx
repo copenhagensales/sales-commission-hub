@@ -72,8 +72,10 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
   const pollOpen = !!pollRow && !pollState.isClosed;
   const [confirmClose, setConfirmClose] = useState(false);
   const closePoll = () => {
+    if (pollState.close.isPending) return;
     pollState.close.mutate(undefined, {
       onError: (e) => toast.error("Afstemningen blev ikke lukket", { description: e && typeof e === "object" && "message" in e ? String(e.message) : "Prøv igen" }),
+      onSettled: () => setConfirmClose(false),
     });
   };
 
@@ -120,7 +122,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl">
               {isPoll && pollOpen && (isMine || canModerate) && (
-                <DropdownMenuItem onSelect={() => setConfirmClose(true)}>
+                <DropdownMenuItem disabled={pollState.close.isPending} onSelect={() => setConfirmClose(true)}>
                   <Lock className="mr-2 h-4 w-4" aria-hidden="true" /> Luk nu
                 </DropdownMenuItem>
               )}
@@ -173,7 +175,16 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-[44px]">Annullér</AlertDialogCancel>
-            <AlertDialogAction className="min-h-[44px]" onClick={closePoll}>Luk nu</AlertDialogAction>
+            <AlertDialogAction
+              className="min-h-[44px]"
+              disabled={pollState.close.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                closePoll();
+              }}
+            >
+              {pollState.close.isPending ? "Lukker …" : "Luk nu"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
