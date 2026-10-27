@@ -313,6 +313,7 @@ export function usePulsenMutations(author: PersonRef | null) {
       return { snap };
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   const remove = useMutation({
@@ -329,6 +330,7 @@ export function usePulsenMutations(author: PersonRef | null) {
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pulsen-unanswered"] }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   const setHidden = useMutation({
@@ -345,6 +347,7 @@ export function usePulsenMutations(author: PersonRef | null) {
       return { snap };
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   const setBestAnswer = useMutation({
@@ -358,6 +361,7 @@ export function usePulsenMutations(author: PersonRef | null) {
       return { snap };
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   return { create, edit, remove, setHidden, setBestAnswer };
