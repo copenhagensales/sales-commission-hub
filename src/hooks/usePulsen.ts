@@ -217,9 +217,18 @@ export function usePulsenMutations(author: PersonRef | null) {
         pages: data.pages.map((page) => page.map(fn).filter((p): p is PulsenPost => !!p)),
       });
     });
+    qc.getQueriesData<PulsenPost | null>({ queryKey: ["pulsen-post"] }).forEach(([key, data]) => {
+      qc.setQueryData(key, data ? fn(data) : data);
+    });
   };
-  const snapshot = () => qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] });
-  const restore = (snap: ReturnType<typeof snapshot>) => snap.forEach(([k, d]) => qc.setQueryData(k, d));
+  const snapshot = () => ({
+    feed: qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] }),
+    posts: qc.getQueriesData<PulsenPost | null>({ queryKey: ["pulsen-post"] }),
+  });
+  const restore = (snap: ReturnType<typeof snapshot>) => {
+    snap.feed.forEach(([k, d]) => qc.setQueryData(k, d));
+    snap.posts.forEach(([k, d]) => qc.setQueryData(k, d));
+  };
 
   const create = useMutation({
     mutationFn: async ({ input, id }: { input: NewPulsenPost; id: string; localUrl?: string }) => {
