@@ -116,8 +116,21 @@ export function useFeedReactions(targetKeys: string[]) {
     enabled,
   });
 
-  const invalidate = () => {
+  // Én samlet tæller for alle afventende reaktionsmutationer; genhentning af ["feed-reactions"]
+  // udskydes, til ingen er afventende, så optimistiske rækker på andre mål ikke forsvinder.
+  const pendingTotalRef = useRef(0);
+  const invalidateAfterRef = useRef(false);
+  const invalidateReactions = () => {
+    if (pendingTotalRef.current > 0) {
+      invalidateAfterRef.current = true;
+      return;
+    }
+    invalidateAfterRef.current = false;
     queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
+  };
+
+  const invalidate = () => {
+    invalidateReactions();
     queryClient.invalidateQueries({ queryKey: ["feed-comments"] });
   };
 
@@ -127,13 +140,18 @@ export function useFeedReactions(targetKeys: string[]) {
   const intentRef = useRef(new WeakMap<ReactionVars, "set" | "remove">());
   // Skrivninger pr. mål udføres i rækkefølge; sidste handling vinder.
   const chainRef = useRef(new Map<string, Promise<unknown>>());
-  const pendingCountRef = useRef(new Map<string, number>());
+  // Løbenummer pr. mål: kun den nyeste handling på et mål må rulle cachen tilbage ved fejl.
+  const seqRef = useRef(new Map<string, number>());
 
   /** Sætter brugerens ene reaktion. Samme reaktion igen = fjern. Anden reaktion = skift. Optimistisk med tilbagerulning. */
   const setReaction = useMutation({
+    // Ingen genforsøg: et genforsøg ville køre uden for sin plads i køen pr. mål.
+    retry: 0,
     onMutate: async (vars: ReactionVars) => {
       const qk = ["feed-reactions", keys];
-      pendingCountRef.current.set(vars.targetKey, (pendingCountRef.current.get(vars.targetKey) ?? 0) + 1);
+      pendingTotalRef.current += 1;
+      const seq = (seqRef.current.get(vars.targetKey) ?? 0) + 1;
+      seqRef.current.set(vars.targetKey, seq);
       await queryClient.cancelQueries({ queryKey: qk });
       const rows = queryClient.getQueryData<ReactionRow[]>(qk) ?? [];
       const isMine = (r: ReactionRow) => r.target_key === vars.targetKey && r.user_id === myUserId;
@@ -148,7 +166,7 @@ export function useFeedReactions(targetKeys: string[]) {
         }
         queryClient.setQueryData<ReactionRow[]>(qk, next);
       }
-      return { previousMine, qk };
+      return { previousMine, qk, seq };
     },
     mutationFn: async (vars: ReactionVars) => {
       const { targetType, targetKey, reaction } = vars;
@@ -182,7 +200,7 @@ export function useFeedReactions(targetKeys: string[]) {
       }
     },
     onError: (_e, vars, ctx) => {
-      if (ctx) {
+      if (ctx && ctx.seq === seqRef.current.get(vars.targetKey)) {
         const rows = queryClient.getQueryData<ReactionRow[]>(ctx.qk) ?? [];
         const others = rows.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
         queryClient.setQueryData<ReactionRow[]>(ctx.qk, [...others, ...ctx.previousMine]);
@@ -191,17 +209,17 @@ export function useFeedReactions(targetKeys: string[]) {
     },
     onSettled: (_d, _e, vars) => {
       intentRef.current.delete(vars);
-      const left = (pendingCountRef.current.get(vars.targetKey) ?? 1) - 1;
-      if (left > 0) {
-        pendingCountRef.current.set(vars.targetKey, left);
+      pendingTotalRef.current = Math.max(0, pendingTotalRef.current - 1);
+      if (pendingTotalRef.current === 0) {
+        invalidateReactions();
       } else {
-        pendingCountRef.current.delete(vars.targetKey);
-        queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
+        invalidateAfterRef.current = true;
       }
     },
   });
 
   const addComment = useMutation({
+    retry: 0,
     mutationFn: async ({
       targetType,
       targetKey,
@@ -227,6 +245,7 @@ export function useFeedReactions(targetKeys: string[]) {
   });
 
   const deleteComment = useMutation({
+    retry: 0,
     mutationFn: async (commentId: string) => {
       const { error } = await supabase
         .from("feed_comments")
