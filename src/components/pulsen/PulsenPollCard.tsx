@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useActiveColleagues, usePulsenPoll } from "@/hooks/usePulsen";
 import { cn } from "@/lib/utils";
@@ -14,15 +14,15 @@ function closesIn(iso: string) {
 }
 
 export function PulsenPollCard({ postId }: { postId: string }) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = rootRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") { setVisible(true); return; }
+    if (!rootEl) return;
+    if (typeof IntersectionObserver === "undefined") { setVisible(true); return; }
     const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting));
-    io.observe(el);
+    io.observe(rootEl);
     return () => io.disconnect();
-  }, [query_ready_placeholder]);
+  }, [rootEl]);
   const { query, vote, isClosed } = usePulsenPoll(postId, true, { poll: visible });
   const data = query.data;
   const named = !!data?.poll && !data.poll.anonymous;
@@ -47,7 +47,7 @@ export function PulsenPollCard({ postId }: { postId: string }) {
   };
 
   return (
-    <div ref={rootRef} className="mt-3">
+    <div ref={setRootEl} className="mt-3">
       {closed && <p className="mb-2 text-[14px] font-extrabold text-foreground">Afsluttet · {total} {total === 1 ? "stemme" : "stemmer"}</p>}
       <ul className="space-y-2">
         {options.map((o) => {
