@@ -3207,6 +3207,7 @@ export type Database = {
       }
       chat_conversation_members: {
         Row: {
+          aktiv_til: string | null
           conversation_id: string
           employee_id: string
           id: string
@@ -3214,6 +3215,7 @@ export type Database = {
           last_read_at: string | null
         }
         Insert: {
+          aktiv_til?: string | null
           conversation_id: string
           employee_id: string
           id?: string
@@ -3221,6 +3223,7 @@ export type Database = {
           last_read_at?: string | null
         }
         Update: {
+          aktiv_til?: string | null
           conversation_id?: string
           employee_id?: string
           id?: string
@@ -8765,7 +8768,9 @@ export type Database = {
         Row: {
           body: string
           created_at: string
+          edited_at: string | null
           id: string
+          mentions: Json
           target_key: string
           target_type: string
           user_id: string
@@ -8773,7 +8778,9 @@ export type Database = {
         Insert: {
           body: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          mentions?: Json
           target_key: string
           target_type: string
           user_id: string
@@ -8781,7 +8788,9 @@ export type Database = {
         Update: {
           body?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          mentions?: Json
           target_key?: string
           target_type?: string
           user_id?: string
@@ -13950,6 +13959,7 @@ export type Database = {
           hidden_by: string | null
           id: string
           image_path: string | null
+          mentions: Json
           post_type: string
           praised_employee_id: string | null
           praised_employee_ids: string[]
@@ -13969,6 +13979,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           image_path?: string | null
+          mentions?: Json
           post_type: string
           praised_employee_id?: string | null
           praised_employee_ids?: string[]
@@ -13988,6 +13999,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           image_path?: string | null
+          mentions?: Json
           post_type?: string
           praised_employee_id?: string | null
           praised_employee_ids?: string[]
@@ -17918,6 +17930,135 @@ export type Database = {
         }
         Relationships: []
       }
+      udsendelse_reservationer: {
+        Row: {
+          aarsag: string | null
+          afsender_employee_id: string | null
+          afsluttet: string | null
+          blok: string | null
+          conversation_id: string | null
+          event_id: string | null
+          haendelse: string
+          id: string
+          kilde_id: string
+          kilde_type: string
+          metadata: Json
+          modtager_employee_id: string
+          modtager_user_id: string | null
+          naeste_forsoeg: string | null
+          omtaledag: string | null
+          oprettet: string
+          overtagelser: number
+          post_id: string | null
+          prioritet: number
+          reservationsdag: string
+          status: string
+          taget: string | null
+          transportforsoeg: number
+          type_noegle: string
+          worker_token: string | null
+        }
+        Insert: {
+          aarsag?: string | null
+          afsender_employee_id?: string | null
+          afsluttet?: string | null
+          blok?: string | null
+          conversation_id?: string | null
+          event_id?: string | null
+          haendelse: string
+          id?: string
+          kilde_id: string
+          kilde_type: string
+          metadata?: Json
+          modtager_employee_id: string
+          modtager_user_id?: string | null
+          naeste_forsoeg?: string | null
+          omtaledag?: string | null
+          oprettet?: string
+          overtagelser?: number
+          post_id?: string | null
+          prioritet: number
+          reservationsdag: string
+          status?: string
+          taget?: string | null
+          transportforsoeg?: number
+          type_noegle: string
+          worker_token?: string | null
+        }
+        Update: {
+          aarsag?: string | null
+          afsender_employee_id?: string | null
+          afsluttet?: string | null
+          blok?: string | null
+          conversation_id?: string | null
+          event_id?: string | null
+          haendelse?: string
+          id?: string
+          kilde_id?: string
+          kilde_type?: string
+          metadata?: Json
+          modtager_employee_id?: string
+          modtager_user_id?: string | null
+          naeste_forsoeg?: string | null
+          omtaledag?: string | null
+          oprettet?: string
+          overtagelser?: number
+          post_id?: string | null
+          prioritet?: number
+          reservationsdag?: string
+          status?: string
+          taget?: string | null
+          transportforsoeg?: number
+          type_noegle?: string
+          worker_token?: string | null
+        }
+        Relationships: []
+      }
+      udsendelse_vandmaerker: {
+        Row: {
+          blok: string | null
+          id: string | null
+          kilde: string
+          opdateret: string
+          post_id: string | null
+          tid: string | null
+        }
+        Insert: {
+          blok?: string | null
+          id?: string | null
+          kilde: string
+          opdateret?: string
+          post_id?: string | null
+          tid?: string | null
+        }
+        Update: {
+          blok?: string | null
+          id?: string | null
+          kilde?: string
+          opdateret?: string
+          post_id?: string | null
+          tid?: string | null
+        }
+        Relationships: []
+      }
+      udsendelse_worker_laas: {
+        Row: {
+          id: number
+          token: string | null
+          udloeber: string | null
+        }
+        Insert: {
+          id: number
+          token?: string | null
+          udloeber?: string | null
+        }
+        Update: {
+          id?: number
+          token?: string | null
+          udloeber?: string | null
+        }
+        Relationships: []
+      }
       udsendelser: {
         Row: {
           afsenderfunktion: string
@@ -19034,6 +19175,17 @@ export type Database = {
         Args: { _sale_id: string; _user_id: string }
         Returns: boolean
       }
+      chat_marker_aktiv: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      chat_ulaeste_pr_samtale: {
+        Args: never
+        Returns: {
+          antal: number
+          conversation_id: string
+        }[]
+      }
       check_rls_self_reference: {
         Args: never
         Returns: {
@@ -19960,13 +20112,37 @@ export type Database = {
         Args: { _audience: string; _team_id: string }
         Returns: boolean
       }
+      pulsen_er_ejer_for: { Args: { p_employee: string }; Returns: boolean }
       pulsen_house_target_ok: {
         Args: { _target_key: string; _target_type: string }
         Returns: boolean
       }
+      pulsen_kan_moderere_for: {
+        Args: { p_audience: string; p_employee: string; p_team_id: string }
+        Returns: boolean
+      }
+      pulsen_kan_se_opslag: {
+        Args: {
+          p_audience: string
+          p_author: string
+          p_deleted_at: string
+          p_employee: string
+          p_hidden_at: string
+          p_team_id: string
+        }
+        Returns: boolean
+      }
       pulsen_led_team_ids: { Args: never; Returns: string[] }
+      pulsen_led_team_ids_for: {
+        Args: { p_employee: string }
+        Returns: string[]
+      }
       pulsen_luk_afstemning: { Args: { p_post_id: string }; Returns: undefined }
       pulsen_member_team_ids: { Args: never; Returns: string[] }
+      pulsen_member_team_ids_for: {
+        Args: { p_employee: string }
+        Returns: string[]
+      }
       pulsen_milestone_candidates: {
         Args: { p_from: string; p_to: string; p_types: string[] }
         Returns: {
@@ -19995,6 +20171,7 @@ export type Database = {
           value: number
         }[]
       }
+      pulsen_omtaler_gyldige: { Args: { p: Json }; Returns: boolean }
       pulsen_opret_afstemning: {
         Args: {
           p_anonymous: boolean
@@ -20009,6 +20186,7 @@ export type Database = {
       pulsen_poll_aaben: { Args: { _post_id: string }; Returns: boolean }
       pulsen_poll_laas: { Args: { _post_id: string }; Returns: undefined }
       pulsen_poll_synlig: { Args: { _post_id: string }; Returns: boolean }
+      pulsen_roller_for: { Args: { p_employee: string }; Returns: string[] }
       pulsen_stem: {
         Args: { p_option_id: string; p_post_id: string }
         Returns: undefined
@@ -20294,6 +20472,86 @@ export type Database = {
       trigger_kpi_calculation: { Args: never; Returns: undefined }
       trigger_kpi_incremental: { Args: never; Returns: undefined }
       trigger_leaderboard_calculation: { Args: never; Returns: undefined }
+      udsendelse_afslut: {
+        Args: {
+          p_aarsag: string
+          p_id: string
+          p_metadata: Json
+          p_naeste: string
+          p_status: string
+          p_token: string
+          p_transport_forsoeg: boolean
+        }
+        Returns: boolean
+      }
+      udsendelse_frigiv: { Args: { p_token: string }; Returns: boolean }
+      udsendelse_frigiv_raekker: {
+        Args: { p_ids: string[]; p_token: string }
+        Returns: number
+      }
+      udsendelse_kilde_begivenheder: {
+        Args: { p_dato: string }
+        Returns: {
+          employee_id: string
+          event_date: string
+          event_id: string
+          event_time: string
+          status: string
+        }[]
+      }
+      udsendelse_kilde_beskeder: {
+        Args: { p_id: string; p_limit: number; p_tid: string }
+        Returns: {
+          conversation_id: string
+          deleted_at: string
+          id: string
+          sender_id: string
+          tid: string
+        }[]
+      }
+      udsendelse_kilde_kommentarer: {
+        Args: { p_id: string; p_limit: number; p_tid: string }
+        Returns: {
+          audience: string
+          id: string
+          kommentator_employee_id: string
+          mentions: Json
+          post_author: string
+          post_deleted_at: string
+          post_hidden_at: string
+          post_id: string
+          post_type: string
+          team_id: string
+          tid: string
+        }[]
+      }
+      udsendelse_kilde_opslag: {
+        Args: { p_id: string; p_limit: number; p_tid: string }
+        Returns: {
+          audience: string
+          author_employee_id: string
+          deleted_at: string
+          hidden_at: string
+          id: string
+          mentions: Json
+          post_type: string
+          praised_employee_ids: string[]
+          team_id: string
+          tid: string
+        }[]
+      }
+      udsendelse_kilde_reaktioner: {
+        Args: { p_blok: string; p_limit: number; p_post_id: string }
+        Returns: {
+          antal: number
+          author_employee_id: string
+          blok: string
+          foerste_reaktor: string
+          post_id: string
+          reaktorer: string[]
+        }[]
+      }
+      udsendelse_laas: { Args: { p_token: string }; Returns: boolean }
       udsendelse_mine_typer: {
         Args: never
         Returns: {
@@ -20312,10 +20570,66 @@ export type Database = {
           employee_id: string
         }[]
       }
+      udsendelse_oprydning: { Args: never; Returns: number }
+      udsendelse_overtag: {
+        Args: { p_limit: number; p_token: string }
+        Returns: {
+          aarsag: string | null
+          afsender_employee_id: string | null
+          afsluttet: string | null
+          blok: string | null
+          conversation_id: string | null
+          event_id: string | null
+          haendelse: string
+          id: string
+          kilde_id: string
+          kilde_type: string
+          metadata: Json
+          modtager_employee_id: string
+          modtager_user_id: string | null
+          naeste_forsoeg: string | null
+          omtaledag: string | null
+          oprettet: string
+          overtagelser: number
+          post_id: string | null
+          prioritet: number
+          reservationsdag: string
+          status: string
+          taget: string | null
+          transportforsoeg: number
+          type_noegle: string
+          worker_token: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "udsendelse_reservationer"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      udsendelse_reserver: {
+        Args: { p_rows: Json }
+        Returns: {
+          afvist_loft: number
+          indsat: number
+          opgraderet: number
+        }[]
+      }
       udsendelse_tilladt: {
         Args: { p_type: string; p_user_id: string }
         Returns: boolean
       }
+      udsendelse_vandmaerke_flyt: {
+        Args: {
+          p_blok: string
+          p_id: string
+          p_kilde: string
+          p_post_id: string
+          p_tid: string
+        }
+        Returns: boolean
+      }
+      udsendelse_version: { Args: never; Returns: string }
       udsendelser_overblik: { Args: never; Returns: Json }
       update_checklist_email_cron: {
         Args: { new_time: string }
