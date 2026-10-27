@@ -639,9 +639,8 @@ export function usePulsenPoll(postId: string, enabled: boolean) {
       }
       return { prev };
     },
-    onError: (e, _v, ctx) => {
+    onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
-      throw e;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: key }),
   });
