@@ -252,3 +252,6 @@ verify_jwt = false
 
 [functions.send-udsendelser]
 verify_jwt = true
+
+[functions.storkbook-udsendelser]
+verify_jwt = false

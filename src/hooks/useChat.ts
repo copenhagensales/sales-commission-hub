@@ -93,33 +93,12 @@ export function useConversations() {
 
       if (error) throw error;
       
-      // Calculate unread count for each conversation
+      // Ulæst = besked fra andre, ikke slettet, uden min læsekvittering (én definition: chat_ulaeste_pr_samtale).
+      const { data: ulaeste, error: uErr } = await supabase.rpc("chat_ulaeste_pr_samtale");
+      if (uErr) throw uErr;
+      const ulaestMap = new Map((ulaeste ?? []).map((u) => [u.conversation_id, Number(u.antal) || 0]));
       const conversations = await Promise.all((data || []).map(async (conv: any) => {
-        const myMembership = conv.members?.find((m: any) => m.employee_id === currentEmployeeId);
-        const lastReadAt = myMembership?.last_read_at;
-        
-        // Count messages after last_read_at
-        let unreadCount = 0;
-        if (lastReadAt) {
-          const { count } = await supabase
-            .from("chat_messages")
-            .select("*", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .neq("sender_id", currentEmployeeId)
-            .gt("created_at", lastReadAt)
-            .is("deleted_at", null) as any;
-          unreadCount = count || 0;
-        } else {
-          // If never read, count all messages from others
-          const { count } = await supabase
-            .from("chat_messages")
-            .select("*", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .neq("sender_id", currentEmployeeId)
-            .is("deleted_at", null) as any;
-          unreadCount = count || 0;
-        }
-        
+        const unreadCount = ulaestMap.get(conv.id) ?? 0;
         return {
           ...conv,
           unread_count: unreadCount,
@@ -254,20 +233,29 @@ export function useMarkMessageAsRead() {
     mutationFn: async ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
       const employeeId = await getCurrentEmployeeId();
       
-      // Upsert read receipt
-      await supabase
+      // Idempotent kvittering
+      const { error } = await supabase
         .from("chat_message_read_receipts")
         .upsert({ 
           message_id: messageId, 
           employee_id: employeeId,
           read_at: new Date().toISOString()
-        }, { onConflict: 'message_id,employee_id' });
+        }, { onConflict: 'message_id,employee_id', ignoreDuplicates: true });
+      if (error) throw error;
       
       return { conversationId };
     },
+    retry: 2,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["chat-messages", result.conversationId] });
       queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+    onError: (e, vars) => {
+      console.error("Kunne ikke kvittere besked", e instanceof Error ? e.message : e);
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", vars.conversationId] });
+      queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
 }
@@ -401,16 +389,40 @@ export function useMarkAsRead() {
     mutationFn: async (conversationId: string) => {
       const employeeId = await getCurrentEmployeeId();
       
-      await supabase
-        .from("chat_conversation_members")
-        .update({ last_read_at: new Date().toISOString() })
+      // Kvitterer kun, når vinduet er synligt og har fokus (aldrig massekvittering i baggrunden).
+      if (!erSynligMedFokus() || !employeeId) return conversationId;
+      const { data: ulaeste, error: mErr } = await supabase
+        .from("chat_messages")
+        .select("id, chat_message_read_receipts!left(employee_id)")
         .eq("conversation_id", conversationId)
-        .eq("employee_id", employeeId);
-      
+        .neq("sender_id", employeeId)
+        .is("deleted_at", null)
+        .eq("chat_message_read_receipts.employee_id", employeeId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (mErr) throw mErr;
+      const ids = (ulaeste ?? [])
+        .filter((m) => !(m.chat_message_read_receipts as { employee_id: string }[] | null)?.length)
+        .map((m) => m.id);
+      if (ids.length) {
+        const nu = new Date().toISOString();
+        const { error } = await supabase
+          .from("chat_message_read_receipts")
+          .upsert(ids.map((id) => ({ message_id: id, employee_id: employeeId, read_at: nu })), { onConflict: "message_id,employee_id", ignoreDuplicates: true });
+        if (error) throw error;
+      }
       return conversationId;
     },
-    onSuccess: () => {
+    retry: 2,
+    onSuccess: (conversationId) => {
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+    },
+    onError: (e) => {
+      console.error("Kunne ikke kvittere samtalen", e instanceof Error ? e.message : e);
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
     },
   });
 }
@@ -695,11 +707,15 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
 
   useEffect(() => {
     if (!on) return;
-    const invalidate = () => queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    };
     const channel = supabase
       .channel(`chat-unread-${employeeId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, invalidate)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_message_read_receipts", filter: `employee_id=eq.${employeeId}` }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_conversation_members" }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [on, employeeId, queryClient]);
@@ -709,22 +725,48 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
     enabled: on,
     staleTime: 60000,
     queryFn: async () => {
-      const me = employeeId as string;
-      const { data: members, error: mErr } = await supabase
-        .from("chat_conversation_members").select("conversation_id").eq("employee_id", me);
-      if (mErr) throw mErr;
-      const ids = (members ?? []).map((m) => m.conversation_id);
-      if (!ids.length) return 0;
-      const [all, read] = await Promise.all([
-        supabase.from("chat_messages").select("id", { count: "exact", head: true })
-          .in("conversation_id", ids).neq("sender_id", me).is("deleted_at", null),
-        supabase.from("chat_message_read_receipts").select("id, chat_messages!inner(id)", { count: "exact", head: true })
-          .eq("employee_id", me).in("chat_messages.conversation_id", ids)
-          .neq("chat_messages.sender_id", me).is("chat_messages.deleted_at", null),
-      ]);
-      if (all.error) throw all.error;
-      if (read.error) throw read.error;
-      return Math.max(0, (all.count ?? 0) - (read.count ?? 0));
+      const { data, error } = await supabase.rpc("chat_ulaeste_pr_samtale");
+      if (error) throw error;
+      return (data ?? []).reduce((sum, r) => sum + (Number(r.antal) || 0), 0);
     },
   });
+}
+
+/** Vinduet er synligt og har fokus – betingelsen for kvitteringer og aktivitet. */
+export function erSynligMedFokus(): boolean {
+  return typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+}
+
+/**
+ * Markerer brugeren som aktiv i samtalen (chat_marker_aktiv) ved åbning og hvert 30. s,
+ * kun mens vinduet er synligt og har fokus. Stopper ved blur, faneskift og afmontering.
+ */
+export function useChatAktiv(conversationId: string | null | undefined) {
+  useEffect(() => {
+    if (!conversationId) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let stoppet = false;
+    const marker = async () => {
+      const { data, error } = await supabase.rpc("chat_marker_aktiv", { p_conversation_id: conversationId });
+      if (!stoppet && (error || data === false)) console.warn("chat_marker_aktiv afvist");
+    };
+    const start = () => {
+      if (timer || !erSynligMedFokus()) return;
+      void marker();
+      timer = setInterval(() => { if (erSynligMedFokus()) void marker(); else stop(); }, 30000);
+    };
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    const skift = () => (erSynligMedFokus() ? start() : stop());
+    start();
+    window.addEventListener("focus", skift);
+    window.addEventListener("blur", stop);
+    document.addEventListener("visibilitychange", skift);
+    return () => {
+      stoppet = true;
+      stop();
+      window.removeEventListener("focus", skift);
+      window.removeEventListener("blur", stop);
+      document.removeEventListener("visibilitychange", skift);
+    };
+  }, [conversationId]);
 }

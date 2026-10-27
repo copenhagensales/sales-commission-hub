@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+import { useConversations } from "@/hooks/useChat";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ConversationList } from "@/components/messages/ConversationList";
 import { ChatView } from "@/components/messages/ChatView";
@@ -13,7 +16,28 @@ import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
 import { Badge } from "@/components/ui/badge";
 
 export default function Messages() {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  // Valgt samtale ligger i adressen (?samtale=<id>), så push-links og tilbage-pil virker. Øvrige parametre bevares.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedConversationId = searchParams.get("samtale");
+  const { data: samtaler, isSuccess: samtalerHentet } = useConversations();
+  const setSelectedConversationId = useCallback((id: string | null) => {
+    setSearchParams((prev) => {
+      const n = new URLSearchParams(prev);
+      if (id) n.set("samtale", id); else n.delete("samtale");
+      return n;
+    });
+  }, [setSearchParams]);
+  useEffect(() => {
+    if (!selectedConversationId || !samtalerHentet) return;
+    if (!(samtaler ?? []).some((c: { id: string }) => c.id === selectedConversationId)) {
+      toast.error("Samtalen kunne ikke åbnes");
+      setSearchParams((prev) => {
+        const n = new URLSearchParams(prev);
+        n.delete("samtale");
+        return n;
+      }, { replace: true });
+    }
+  }, [selectedConversationId, samtalerHentet, samtaler, setSearchParams]);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const { canSendEmployeeSms } = usePermissions();
   const { data: smsUnreadCount = 0 } = useEmployeeSmsUnreadCount();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead } from "@/hooks/useChat";
+import { Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, erSynligMedFokus } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -32,14 +32,21 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
   const markAsRead = useMarkMessageAsRead();
 
   // Mark message as read when viewed (only for messages from others)
+  const hasRead = !!message.read_receipts?.some(r => r.employee_id === currentEmployeeId);
   useEffect(() => {
-    if (!isOwn && currentEmployeeId) {
-      const hasRead = message.read_receipts?.some(r => r.employee_id === currentEmployeeId);
-      if (!hasRead) {
-        markAsRead.mutate({ messageId: message.id, conversationId });
-      }
-    }
-  }, [message.id, isOwn, currentEmployeeId]);
+    if (isOwn || !currentEmployeeId || hasRead) return;
+    // Kvitter kun når vinduet er synligt og har fokus; ellers når fokus vender tilbage.
+    const kvitter = () => {
+      if (erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ messageId: message.id, conversationId });
+    };
+    kvitter();
+    window.addEventListener("focus", kvitter);
+    document.addEventListener("visibilitychange", kvitter);
+    return () => {
+      window.removeEventListener("focus", kvitter);
+      document.removeEventListener("visibilitychange", kvitter);
+    };
+  }, [message.id, isOwn, currentEmployeeId, hasRead]);
 
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
