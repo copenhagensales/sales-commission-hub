@@ -202,7 +202,7 @@ export async function udsendFlere(
   }
   if (!tilladte.length && u.modtagere.length) {
     if (fejl) return "fejl";
-    return udenfor === u.modtagere.length ? "udenfor_regel" : push ? "ingen_tilmelding" : "fravalgt";
+    return udenfor === u.modtagere.length ? "udenfor_regel" : "fravalgt";
   }
   try {
     const r = await u.send(tilladte.map((m) => m.modtager));
