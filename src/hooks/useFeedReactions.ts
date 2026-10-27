@@ -5,9 +5,9 @@
  *   anniversary:<employee_id>:<år>
  *   league_round:<season_id>:<employee_id>
  */
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { REACTIONS, reactionKeyForEmoji, reactionOption, type ReactionKey } from "@/lib/feedReactions";
@@ -72,6 +72,36 @@ function useUserNameLookup() {
     (userId: string) => data?.get(userId) ?? "Kollega",
     [data]
   );
+}
+
+type ReactionRow = { id: string; target_key: string; user_id: string; emoji: string; created_at: string };
+type ReactionVars = { targetType: FeedTargetType; targetKey: string; reaction: ReactionKey };
+
+// Koordinering på modulniveau, delt af alle instanser af hooken (forside, Storkbook m.fl.).
+// Skrivninger pr. bruger+mål udføres i rækkefølge; sidste handling vinder.
+const chainByTarget = new Map<string, Promise<unknown>>();
+// Løbenummer pr. bruger+mål: kun den nyeste handling må rulle cachen tilbage ved fejl.
+const seqByTarget = new Map<string, number>();
+// Hensigt fundet i onMutate (sæt eller fjern), så mutationFn ikke læser den optimistisk ændrede cache.
+const intentByVars = new WeakMap<ReactionVars, "set" | "remove">();
+// Samlet tæller for alle afventende reaktioner; genhentning udskydes, til ingen er afventende.
+let pendingTotal = 0;
+let invalidateAfter = false;
+
+function invalidateReactions(queryClient: QueryClient) {
+  if (pendingTotal > 0) {
+    invalidateAfter = true;
+    return;
+  }
+  invalidateAfter = false;
+  queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
+}
+
+/** Alle reaktions-caches (alle instanser), hvis målliste indeholder targetKey. */
+function reactionCachesFor(queryClient: QueryClient, targetKey: string) {
+  return queryClient
+    .getQueriesData<ReactionRow[]>({ queryKey: ["feed-reactions"] })
+    .filter(([qk]) => Array.isArray(qk[1]) && (qk[1] as unknown[]).includes(targetKey));
 }
 
 export function useFeedReactions(targetKeys: string[]) {
