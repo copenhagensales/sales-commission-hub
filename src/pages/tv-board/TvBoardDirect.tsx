@@ -1,3 +1,4 @@
+import { TvKeepAwake } from "@/components/tv/TvKeepAwake";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -347,6 +348,7 @@ export default function TvBoardDirect() {
 
   return (
     <div className="tv-board-wrapper min-h-screen h-screen max-h-screen overflow-hidden relative bg-slate-900">
+      <TvKeepAwake />
       <style>{`
         html, body {
           overflow: hidden !important;
