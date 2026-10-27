@@ -200,7 +200,13 @@ function PulsenFeed() {
                 onDelete={() => mut.remove.mutate(p, { onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
                 onHide={(hidden) => mut.setHidden.mutate({ id: p.id, hidden }, { onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
                 onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: p.id, commentId }, { onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}
-...
+              />
+            </div>
+          );
+        })}
+
+        {feed.hasNextPage ? (
+          <>
           <AutoLoadSentinel active={!!feed.hasNextPage && !feed.isFetchingNextPage} onVisible={() => { if (!feed.isFetchingNextPage) feed.fetchNextPage(); }} />
           <button
             type="button"
