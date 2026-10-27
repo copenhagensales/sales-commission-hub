@@ -128,6 +128,25 @@ export interface ReadReceipt {
   };
 }
 
+/** Henter rækker for en id-liste i blokke à 100 id'er, hver pagineret i blokke à 1.000. Fejl → tom blok (som før). */
+async function iBlokke<T = Record<string, unknown>>(
+  ids: string[],
+  hent: (del: string[], fra: number, til: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const ud: T[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const del = ids.slice(i, i + 100);
+    for (let fra = 0; ; fra += 1000) {
+      const { data, error } = await hent(del, fra, fra + 999);
+      if (error) break;
+      const rows = (data ?? []) as T[];
+      ud.push(...rows);
+      if (rows.length < 1000) break;
+    }
+  }
+  return ud;
+}
+
 export function useMessages(conversationId: string | null) {
   return useQuery({
     queryKey: ["chat-messages", conversationId],
@@ -150,25 +169,24 @@ export function useMessages(conversationId: string | null) {
       // Fetch reactions for all messages
       const messageIds = (data || []).map((m: any) => m.id);
       
-      const { data: reactions } = await supabase
+      // Aldrig in() over 100 id'er: blokke à 100, hver pagineret i blokke à 1.000 ordnet efter id.
+      const reactions = await iBlokke(messageIds, (del, fra, til) => supabase
         .from("chat_message_reactions")
         .select(`*, employee:employee_basic_info(id, first_name, last_name)`)
-        .in("message_id", messageIds) as any;
+        .in("message_id", del).order("id").range(fra, til));
       
       // Fetch read receipts for all messages
-      const { data: readReceipts } = await supabase
+      const readReceipts = await iBlokke(messageIds, (del, fra, til) => supabase
         .from("chat_message_read_receipts")
         .select(`*, employee:employee_basic_info(id, first_name, last_name)`)
-        .in("message_id", messageIds) as any;
+        .in("message_id", del).order("id").range(fra, til));
       
       // Fetch reply_to messages
-      const replyToIds = (data || []).filter((m: any) => m.reply_to_id).map((m: any) => m.reply_to_id);
-      const { data: replyMessages } = replyToIds.length > 0 
-        ? await supabase
-            .from("chat_messages")
-            .select(`*, sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name)`)
-            .in("id", replyToIds) as any
-        : { data: [] };
+      const replyToIds: string[] = [...new Set<string>((data || []).filter((m: any) => m.reply_to_id).map((m: any) => m.reply_to_id))];
+      const replyMessages = await iBlokke(replyToIds, (del, fra, til) => supabase
+        .from("chat_messages")
+        .select(`*, sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name)`)
+        .in("id", del).order("id").range(fra, til));
       
       const replyMap = new Map((replyMessages || []).map((m: any) => [m.id, m]));
       const reactionsMap = new Map<string, any[]>();
