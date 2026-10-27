@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useConversations } from "@/hooks/useChat";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -19,14 +19,31 @@ export default function Messages() {
   // Valgt samtale ligger i adressen (?samtale=<id>), så push-links og tilbage-pil virker. Øvrige parametre bevares.
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedConversationId = searchParams.get("samtale");
-  const { data: samtaler, isSuccess: samtalerHentet } = useConversations();
+  const { data: samtaler, isSuccess: samtalerHentet, refetch: hentSamtaler } = useConversations();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Valg fra listen = ny historikpost med state.fraListe, så Tilbage går til listen.
   const setSelectedConversationId = useCallback((id: string | null) => {
     setSearchParams((prev) => {
       const n = new URLSearchParams(prev);
       if (id) n.set("samtale", id); else n.delete("samtale");
       return n;
-    });
+    }, id ? { state: { fraListe: true } } : undefined);
   }, [setSearchParams]);
+  // Tilbage-pilen: intern navigation → navigate(-1); direkte deep link → replace til listen uden samtale.
+  const tilbage = useCallback(() => {
+    if ((location.state as { fraListe?: boolean } | null)?.fraListe) { navigate(-1); return; }
+    setSearchParams((prev) => {
+      const n = new URLSearchParams(prev);
+      n.delete("samtale");
+      return n;
+    }, { replace: true });
+  }, [location.state, navigate, setSearchParams]);
+  // Nyoprettet samtale: afvent ny samtaleliste før valg, så valideringen ikke afviser den.
+  const vaelgOprettet = useCallback(async (id: string) => {
+    await hentSamtaler();
+    setSelectedConversationId(id);
+  }, [hentSamtaler, setSelectedConversationId]);
   useEffect(() => {
     if (!selectedConversationId || !samtalerHentet) return;
     if (!(samtaler ?? []).some((c: { id: string }) => c.id === selectedConversationId)) {
@@ -80,6 +97,7 @@ export default function Messages() {
               <ChatTabContent 
                 selectedConversationId={selectedConversationId}
                 setSelectedConversationId={setSelectedConversationId}
+                onTilbage={tilbage}
                 showNewDialog={showNewDialog}
                 setShowNewDialog={setShowNewDialog}
               />
@@ -98,8 +116,8 @@ export default function Messages() {
           open={showNewDialog}
           onOpenChange={setShowNewDialog}
           onCreated={(id) => {
-            setSelectedConversationId(id);
             setShowNewDialog(false);
+            void vaelgOprettet(id);
           }}
         />
       </MainLayout>
@@ -162,7 +180,7 @@ export default function Messages() {
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => setSelectedConversationId(null)}
+                    onClick={tilbage}
                     className="gap-2 min-h-11"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -200,8 +218,8 @@ export default function Messages() {
         open={showNewDialog}
         onOpenChange={setShowNewDialog}
         onCreated={(id) => {
-          setSelectedConversationId(id);
           setShowNewDialog(false);
+          void vaelgOprettet(id);
         }}
       />
     </MainLayout>
@@ -212,6 +230,7 @@ export default function Messages() {
 interface ChatTabContentProps {
   selectedConversationId: string | null;
   setSelectedConversationId: (id: string | null) => void;
+  onTilbage: () => void;
   showNewDialog: boolean;
   setShowNewDialog: (show: boolean) => void;
 }
@@ -219,6 +238,7 @@ interface ChatTabContentProps {
 function ChatTabContent({ 
   selectedConversationId, 
   setSelectedConversationId,
+  onTilbage,
   showNewDialog,
   setShowNewDialog 
 }: ChatTabContentProps) {
@@ -260,7 +280,7 @@ function ChatTabContent({
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => setSelectedConversationId(null)}
+                onClick={onTilbage}
                 className="gap-2 min-h-11"
               >
                 <ArrowLeft className="h-4 w-4" />
