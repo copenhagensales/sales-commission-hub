@@ -221,13 +221,21 @@ export function usePulsenMutations(author: PersonRef | null) {
       qc.setQueryData(key, data ? fn(data) : data);
     });
   };
-  const snapshot = () => ({
-    feed: qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] }),
-    posts: qc.getQueriesData<PulsenPost | null>({ queryKey: ["pulsen-post"] }),
-  });
+  const snapshot = (id: string) => {
+    const postKey = ["pulsen-post", id];
+    const postData = qc.getQueryData<PulsenPost | null>(postKey);
+    return {
+      feed: qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] }),
+      post: postData !== undefined ? { key: postKey, data: postData } : null,
+    };
+  };
   const restore = (snap: ReturnType<typeof snapshot>) => {
     snap.feed.forEach(([k, d]) => qc.setQueryData(k, d));
-    snap.posts.forEach(([k, d]) => qc.setQueryData(k, d));
+    if (snap.post) qc.setQueryData(snap.post.key, snap.post.data);
+  };
+  const cancelFor = async (id: string) => {
+    await qc.cancelQueries({ queryKey: ["pulsen-post", id] });
+    await qc.cancelQueries({ queryKey: ["pulsen-feed"] });
   };
 
   const create = useMutation({
@@ -307,8 +315,9 @@ export function usePulsenMutations(author: PersonRef | null) {
       const { error } = await supabase.from("pulsen_posts").update({ body: body.trim().slice(0, PULSEN_MAX_CHARS) }).eq("id", id);
       if (error) throw error;
     },
-    onMutate: ({ id, body }) => {
-      const snap = snapshot();
+    onMutate: async ({ id, body }) => {
+      await cancelFor(id);
+      const snap = snapshot(id);
       patchEverywhere((p) => (p.id === id ? { ...p, body: body.trim(), edited_at: new Date().toISOString() } : p));
       return { snap };
     },
@@ -323,8 +332,9 @@ export function usePulsenMutations(author: PersonRef | null) {
       // Billedet slettes sammen med indlægget (forfatterens egen mappe).
       if (post.image_path) await supabase.storage.from(PULSEN_BUCKET).remove([post.image_path]);
     },
-    onMutate: (post) => {
-      const snap = snapshot();
+    onMutate: async (post) => {
+      await cancelFor(post.id);
+      const snap = snapshot(post.id);
       patchEverywhere((p) => (p.id === post.id ? null : p));
       return { snap };
     },
@@ -341,8 +351,9 @@ export function usePulsenMutations(author: PersonRef | null) {
         .eq("id", id);
       if (error) throw error;
     },
-    onMutate: ({ id, hidden }) => {
-      const snap = snapshot();
+    onMutate: async ({ id, hidden }) => {
+      await cancelFor(id);
+      const snap = snapshot(id);
       patchEverywhere((p) => (p.id === id ? { ...p, hidden_at: hidden ? new Date().toISOString() : null } : p));
       return { snap };
     },
@@ -355,8 +366,9 @@ export function usePulsenMutations(author: PersonRef | null) {
       const { error } = await supabase.from("pulsen_posts").update({ best_answer_comment_id: commentId }).eq("id", id);
       if (error) throw error;
     },
-    onMutate: ({ id, commentId }) => {
-      const snap = snapshot();
+    onMutate: async ({ id, commentId }) => {
+      await cancelFor(id);
+      const snap = snapshot(id);
       patchEverywhere((p) => (p.id === id ? { ...p, best_answer_comment_id: commentId } : p));
       return { snap };
     },
