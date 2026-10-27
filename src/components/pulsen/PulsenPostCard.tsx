@@ -35,7 +35,7 @@ interface Props {
   canModerate: boolean;
   contextLabel?: string | null;
   imageUrl?: string | null;
-  /** Kun Huset-indlæg har reaktioner og kommentarer. */
+  /** Reaktioner og kommentarer i både Huset og team. */
   interactions?: PostInteractions;
   onEdit: (body: string) => Promise<unknown>;
   onDelete: () => void;

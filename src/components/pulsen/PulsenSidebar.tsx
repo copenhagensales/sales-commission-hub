@@ -14,12 +14,12 @@ function SideCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-export function PulsenSidebar({ employeeId, onOpenQuestion, top, className }: { employeeId: string | null; onOpenQuestion: (id: string) => void; top?: React.ReactNode; className?: string }) {
+export function PulsenSidebar({ employeeId, onOpenQuestion, top, className, showUnanswered = true }: { showUnanswered?: boolean; employeeId: string | null; onOpenQuestion: (id: string) => void; top?: React.ReactNode; className?: string }) {
   const { data: events = [], isLoading } = useUpcomingCompanyEvents();
   const next = events.slice(0, 3);
   const { data: attendees = [] } = useEventAttendees(events.map((e) => e.id));
   const toggle = useToggleEventAttendance(employeeId);
-  const unanswered = usePulsenUnanswered(true);
+  const unanswered = usePulsenUnanswered(showUnanswered);
   const myStatus = (id: string) => attendees.find((a) => a.event_id === id && a.employee_id === employeeId)?.status as AttendanceStatus | undefined;
 
   return (
@@ -65,6 +65,7 @@ export function PulsenSidebar({ employeeId, onOpenQuestion, top, className }: { 
         )}
       </SideCard>
 
+      {showUnanswered && (
       <SideCard title="Ubesvarede spørgsmål">
         {unanswered.isLoading ? (
           <p className="text-[14px] text-muted-foreground">Henter …</p>
