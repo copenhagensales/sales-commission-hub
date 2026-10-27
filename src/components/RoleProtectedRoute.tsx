@@ -55,6 +55,8 @@ export function RoleProtectedRoute({
     window.location.reload();
   };
   
+  if (!authLoading && !user) return <Navigate to="/auth" replace />;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
@@ -197,6 +199,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [isError, isRetrying, isOffline]);
   
+  if (!authLoading && !user) return <Navigate to="/auth" replace />;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
