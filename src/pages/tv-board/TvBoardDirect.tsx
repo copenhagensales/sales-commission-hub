@@ -295,6 +295,7 @@ export default function TvBoardDirect() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <TvKeepAwake />
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <p className="text-slate-400">Verificerer adgang...</p>
@@ -318,6 +319,7 @@ export default function TvBoardDirect() {
     };
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <TvKeepAwake />
         <div className="text-center text-white max-w-md px-6">
           <h1 className="text-2xl font-bold mb-2">{errorTitles[hardError.reason] || "Adgang nægtet"}</h1>
           <p className="text-slate-400">{errorDescriptions[hardError.reason] || hardError.message}</p>
@@ -333,6 +335,7 @@ export default function TvBoardDirect() {
   if (!DashboardComponent) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <TvKeepAwake />
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-2">Dashboard ikke fundet</h1>
           <p className="text-slate-400">Dashboardet "{currentSlug}" findes ikke.</p>

@@ -91,6 +91,7 @@ export default function TvBoardView() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <TvKeepAwake />
         <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
       </div>
     );
@@ -101,6 +102,7 @@ export default function TvBoardView() {
   if (!DashboardComponent) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <TvKeepAwake />
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-2">Dashboard ikke fundet</h1>
           <p className="text-slate-400">"{slug}" findes ikke.</p>

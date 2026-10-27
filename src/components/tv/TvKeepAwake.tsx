@@ -47,7 +47,7 @@ export function TvKeepAwake() {
   return (
     <video
       ref={videoRef}
-      src="/tv/keep-awake.mp4"
+      src="/tv/keep-awake.mp4?v=2"
       muted
       loop
       autoPlay
