@@ -64,6 +64,67 @@ export function useCanManageEventGallery() {
   });
 }
 
+async function withSignedUrls<T extends { storage_path: string }>(rows: T[]): Promise<(T & { url: string | null })[]> {
+  if (rows.length === 0) return [];
+  const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(rows.map((r) => r.storage_path), 60 * 60);
+  return rows.map((row, index) => ({ ...row, url: signed?.[index]?.signedUrl ?? null }));
+}
+
+/** Fotos knyttet til én begivenhed (sort_order). */
+export function useEventGalleryForEvent(eventId: string | undefined) {
+  return useQuery({
+    queryKey: ["event-gallery-photos", "event", eventId],
+    queryFn: async (): Promise<EventGalleryPhoto[]> => {
+      const { data, error } = await supabase
+        .from("event_gallery_photos")
+        .select("id, storage_path, title, event_date, sort_order, created_at")
+        .eq("event_id", eventId as string)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return withSignedUrls(data || []);
+    },
+    enabled: !!eventId,
+    staleTime: 300000,
+  });
+}
+
+/** Antal fotos pr. begivenhed. */
+export function useEventPhotoCounts(eventIds: string[]) {
+  const key = [...eventIds].sort().join(",");
+  return useQuery({
+    queryKey: ["event-gallery-photos", "counts", key],
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase.from("event_gallery_photos").select("event_id").in("event_id", eventIds);
+      if (error) throw error;
+      const out: Record<string, number> = {};
+      for (const r of data || []) if (r.event_id) out[r.event_id] = (out[r.event_id] ?? 0) + 1;
+      return out;
+    },
+    enabled: eventIds.length > 0,
+    staleTime: 300000,
+  });
+}
+
+/** Fotos uden begivenhed (kun til ledere). */
+export function useUnlinkedEventPhotos(enabled: boolean) {
+  return useQuery({
+    queryKey: ["event-gallery-photos", "unlinked"],
+    queryFn: async (): Promise<EventGalleryPhoto[]> => {
+      const { data, error } = await supabase
+        .from("event_gallery_photos")
+        .select("id, storage_path, title, event_date, sort_order, created_at")
+        .is("event_id", null)
+        .order("created_at", { ascending: false })
+        .limit(60);
+      if (error) throw error;
+      return withSignedUrls(data || []);
+    },
+    enabled,
+    staleTime: 300000,
+  });
+}
+
 export function useUploadEventPhotos() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -73,10 +134,12 @@ export function useUploadEventPhotos() {
       files,
       title,
       eventDate,
+      eventId,
     }: {
       files: File[];
       title?: string;
       eventDate?: string;
+      eventId?: string;
     }) => {
       for (const file of files) {
         const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -94,6 +157,7 @@ export function useUploadEventPhotos() {
             title: title?.trim() || null,
             event_date: eventDate || null,
             uploaded_by: user?.id ?? null,
+            ...(eventId ? { event_id: eventId } : {}),
           });
         if (insertError) throw insertError;
       }
@@ -112,17 +176,21 @@ export function useUpdateEventPhoto() {
       id,
       title,
       eventDate,
+      eventId,
     }: {
       id: string;
-      title: string;
-      eventDate: string;
+      title?: string;
+      eventDate?: string;
+      /** Knyt fotoet til en begivenhed (kun dette felt ændres, hvis title/eventDate udelades). */
+      eventId?: string | null;
     }) => {
+      const patch: { title?: string | null; event_date?: string | null; event_id?: string | null } = {};
+      if (title !== undefined) patch.title = title.trim() || null;
+      if (eventDate !== undefined) patch.event_date = eventDate || null;
+      if (eventId !== undefined) patch.event_id = eventId;
       const { error } = await supabase
         .from("event_gallery_photos")
-        .update({
-          title: title.trim() || null,
-          event_date: eventDate || null,
-        })
+        .update(patch)
         .eq("id", id);
       if (error) throw error;
     },

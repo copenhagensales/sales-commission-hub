@@ -31,10 +31,11 @@ export const EMPTY_NEW_EVENT: NewCompanyEvent = {
   invited_teams: [],
 };
 
-/** Kommende begivenheder (de næste 5) – samme visning som forsiden altid har haft. */
-export function useUpcomingCompanyEvents() {
+/** Kommende begivenheder (standard de næste 5) – samme visning som forsiden altid har haft. */
+export function useUpcomingCompanyEvents(limit = 5) {
   return useQuery({
-    queryKey: ["home-company-events"],
+    // Alle nøgler starter med "home-company-events", så eksisterende invalidering også rammer dem.
+    queryKey: limit === 5 ? ["home-company-events"] : ["home-company-events", "upcoming", limit],
     queryFn: async () => {
       const today = new Date().toISOString().split("T")[0];
       const { data } = await supabase
@@ -42,9 +43,42 @@ export function useUpcomingCompanyEvents() {
         .select("*")
         .gte("event_date", today)
         .order("event_date", { ascending: true })
-        .limit(5);
+        .limit(limit);
       return data || [];
     },
+    staleTime: 60000,
+  });
+}
+
+/** Afholdte begivenheder (event_date før i dag), nyeste først. */
+export function usePastCompanyEvents(limit = 20) {
+  return useQuery({
+    queryKey: ["home-company-events", "past", limit],
+    queryFn: async () => {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("company_events")
+        .select("*")
+        .lt("event_date", today)
+        .order("event_date", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60000,
+  });
+}
+
+/** Én begivenhed. null = findes ikke (eller ingen adgang). */
+export function useCompanyEvent(id: string | undefined) {
+  return useQuery({
+    queryKey: ["home-company-events", "one", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("company_events").select("*").eq("id", id as string).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
     staleTime: 60000,
   });
 }
