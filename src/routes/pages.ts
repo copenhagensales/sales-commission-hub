@@ -9,6 +9,8 @@ const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
 export const Auth = lazyPage(() => import("@/pages/Auth"));
 export const Pulsen = lazyPage(() => import("@/pages/Pulsen"));
+export const StorkbookIndlaeg = lazyPage(() => import("@/pages/StorkbookIndlaeg"));
+export const StorkbookBegivenhed = lazyPage(() => import("@/pages/StorkbookBegivenhed"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
 
