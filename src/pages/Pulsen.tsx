@@ -1,5 +1,6 @@
 import { StickyOnPhone, useIsPhone } from "@/components/mobile";
 import { lazy, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Samleside } from "@/components/layout/Samleside";
@@ -196,17 +197,11 @@ function PulsenFeed() {
                   onDeleteComment: (id) => fr.deleteComment.mutateAsync(id),
                 } : undefined}
                 onEdit={(body) => mut.edit.mutateAsync({ id: p.id, body })}
-                onDelete={() => mut.remove.mutate(p)}
-                onHide={(hidden) => mut.setHidden.mutate({ id: p.id, hidden })}
-                onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: p.id, commentId })}
-              />
-            </div>
-          );
-        })}
-
-        {feed.hasNextPage ? (
-          <>
-          <AutoLoadSentinel onVisible={() => { if (!feed.isFetchingNextPage) feed.fetchNextPage(); }} />
+                onDelete={() => mut.remove.mutate(p, { onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
+                onHide={(hidden) => mut.setHidden.mutate({ id: p.id, hidden }, { onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
+                onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: p.id, commentId }, { onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}
+...
+          <AutoLoadSentinel active={!!feed.hasNextPage && !feed.isFetchingNextPage} onVisible={() => { if (!feed.isFetchingNextPage) feed.fetchNextPage(); }} />
           <button
             type="button"
             onClick={() => feed.fetchNextPage()}
@@ -358,17 +353,22 @@ function PulsenFeed() {
 
 
 /** Henter næste side, når bunden af feedet nærmer sig skærmen (uendelig rulning; knappen bliver som reserve). */
-function AutoLoadSentinel({ onVisible }: { onVisible: () => void }) {
+function AutoLoadSentinel({ onVisible, active }: { onVisible: () => void; active: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cb = useRef(onVisible);
   cb.current = onVisible;
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) cb.current(); }, { rootMargin: "600px 0px" });
+    const io = new IntersectionObserver((entries) => setVisible(entries.some((e) => e.isIntersecting)), { rootMargin: "600px 0px" });
     io.observe(el);
     return () => io.disconnect();
   }, []);
+  // Genoptager også en afbrudt hentning, når sentinel'en stadig er i syne.
+  useEffect(() => {
+    if (visible && active) cb.current();
+  }, [visible, active]);
   return <div ref={ref} aria-hidden="true" className="h-px" />;
 }
 
