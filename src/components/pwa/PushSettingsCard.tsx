@@ -26,7 +26,8 @@ function StorkbookToggles() {
   const koe = useRef<Promise<void>>(Promise.resolve());
   const seq = useRef<Record<string, number>>({});
   // Lokale overrides nulstilles ved brugerskift.
-  useEffect(() => { setLokalt({}); seq.current = {}; }, [user?.id]);
+  const brugerRef = useRef(user?.id);
+  useEffect(() => { brugerRef.current = user?.id; setLokalt({}); seq.current = {}; }, [user?.id]);
   if (praef.isError) {
     return (
       <div className="space-y-2">
@@ -51,14 +52,10 @@ function StorkbookToggles() {
       let fejl = false;
       try { await saetFlere.mutateAsync([{ noegle, kanal: "push", aktiv: v }]); } catch { fejl = true; }
       if (fejl) toast.error("Kunne ikke gemme indstillingen", { description: "Prøv igen." });
-      // Rollback/oprydning kun for denne type og kun, hvis intet nyere valg er lavet (og samme bruger).
-      if (bruger !== user?.id || seq.current[noegle] !== mitSeq) return;
-      setLokalt((p) => {
-        const n = { ...p };
-        if (fejl) n[noegle] = !v; else delete n[noegle];
-        return n;
-      });
-      if (fejl) setTimeout(() => setLokalt((p) => { if (seq.current[noegle] !== mitSeq) return p; const n = { ...p }; delete n[noegle]; return n; }), 0);
+      // Rollback/oprydning kun for denne type, kun hvis intet nyere valg er lavet og samme bruger.
+      // Override fjernes, så kontakten viser den gemte værdi (ved fejl: værdien før dette valg).
+      if (bruger !== brugerRef.current || seq.current[noegle] !== mitSeq) return;
+      setLokalt((p) => { const n = { ...p }; delete n[noegle]; return n; });
     });
   };
   return (
