@@ -53,7 +53,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
     setText("");
     try {
       await mut.create.mutateAsync({ input: { audience: "house", teamId: null, postType: "post", body }, id });
-      toast.success("Delt i Storkbook", { action: { label: "Se det", onClick: () => navigate(`/storkbook?post=${id}`) } });
+      toast.success("Delt i Storkbook", { action: { label: "Se det", onClick: () => navigate(`/storkbook/indlaeg/${id}`) } });
     } catch (e) {
       setText(body);
       toast.error("Indlægget blev ikke delt", { description: e instanceof Error ? e.message : "Prøv igen" });
@@ -130,7 +130,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
                 </div>
                 {isNew(first) && <span className="rounded-full bg-[hsl(var(--cph-emerald))] px-2.5 py-1 text-[11px] font-black text-[hsl(var(--cph-onyx))]">NYT</span>}
               </div>
-              <Link to={`/storkbook?post=${first.id}`} className="mt-3 block">
+              <Link to={`/storkbook/indlaeg/${first.id}`} className="mt-3 block">
                 <p className="line-clamp-3 whitespace-pre-line text-[15px] leading-[1.5]">{first.body}</p>
                 {first.image_path && images.data?.get(first.image_path) && (
                   <img src={images.data.get(first.image_path)} alt="" className="mt-3 h-[132px] w-full rounded-[18px] object-cover" />
@@ -140,7 +140,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
                 <div className="mt-3 flex items-center gap-1">
                   <ReactButton compact summary={fr.getReactions(postTargetKey(first.id))} disabled={!fr.canInteract}
                     onSet={(reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: postTargetKey(first.id), reaction })} />
-                  <Link to={`/storkbook?post=${first.id}`} className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-[13px] font-extrabold text-muted-foreground hover:bg-card">
+                  <Link to={`/storkbook/indlaeg/${first.id}`} className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-[13px] font-extrabold text-muted-foreground hover:bg-card">
                     <MessageCircle className="h-4 w-4" aria-hidden="true" /> Kommentér · {fr.getComments(postTargetKey(first.id)).length}
                   </Link>
                 </div>
@@ -159,7 +159,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
                   const n = fr.getComments(postTargetKey(p.id)).length;
                   return (
                     <li key={p.id}>
-                      <Link to={`/storkbook?post=${p.id}`} className="flex gap-3 py-3 hover:opacity-80">
+                      <Link to={`/storkbook/indlaeg/${p.id}`} className="flex gap-3 py-3 hover:opacity-80">
                         <PulsenAvatar employeeId={p.author_employee_id} name={shortName(p.author?.first_name, p.author?.last_name)} size={32} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[14px]"><Lead p={p} /></p>
