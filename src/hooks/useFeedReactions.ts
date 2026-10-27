@@ -180,6 +180,7 @@ export function useFeedReactions(targetKeys: string[]) {
           if (optimistic) next.push(optimistic);
           queryClient.setQueryData<ReactionRow[]>(qk, next);
         });
+        if (!own) queryClient.setQueryData<ReactionRow[]>(ownKey, optimistic ? [optimistic] : []);
       }
       return { previousMine, seq, coordKey };
     },
@@ -222,6 +223,8 @@ export function useFeedReactions(targetKeys: string[]) {
           const others = data.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
           queryClient.setQueryData<ReactionRow[]>(qk, [...others, ...ctx.previousMine]);
         });
+        const ownKey = ["feed-reactions", keys];
+        if (!queryClient.getQueryData<ReactionRow[]>(ownKey)) queryClient.setQueryData<ReactionRow[]>(ownKey, ctx.previousMine);
       }
       toast.error("Reaktionen blev ikke gemt");
     },
@@ -328,6 +331,6 @@ export function useFeedReactions(targetKeys: string[]) {
     addComment,
     deleteComment,
     isLoading: reactionsQuery.isLoading || commentsQuery.isLoading,
-    canInteract: !!myUserId,
+    canInteract: !!myUserId && !reactionsQuery.isLoading,
   };
 }
