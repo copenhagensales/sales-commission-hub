@@ -109,7 +109,7 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
   let msg: { title: string; body: string; url: string } = PUSH_TEXT[type];
   try {
     // Tekst fra udsendelsestyper, hvis alle tre felter er udfyldt; ellers PUSH_TEXT (fail-open). opts.tekst vinder.
-    if (opts.udsendType && !opts.tekst) {
+    if (opts.udsendType) {
       try {
         const { data: t, error } = await sig(svc.from("udsendelsestyper").select("push_titel, push_tekst, push_link")
           .eq("noegle", opts.udsendType)).maybeSingle();
