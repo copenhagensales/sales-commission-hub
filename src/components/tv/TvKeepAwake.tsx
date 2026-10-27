@@ -26,6 +26,7 @@ export function TvKeepAwake() {
       if (!wl || document.visibilityState !== "visible") return;
       wl.request("screen").then((l) => {
         if (cancelled) { l.release().catch(() => undefined); return; }
+        if (lock && lock !== l) lock.release().catch(() => undefined);
         lock = l;
       }).catch(() => undefined);
     };
