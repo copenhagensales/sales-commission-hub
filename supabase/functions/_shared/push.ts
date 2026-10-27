@@ -50,11 +50,30 @@ export type Udfald = {
   abonnementer: { id: string; kode: number | null; status: "sendt" | "ikke_sendt" | "ukendt" | "doedt" }[];
 };
 
+/** Frister pr. fase (worker). Uden faser bruges `signal` til alt. */
+export type PushFaser = {
+  /** Tekst-, dedupe-, gate-, præference- og abonnementsopslag. */
+  opslag: AbortSignal;
+  /** Selve transporten og abonnementsopdateringer (oprettes ved transportstart). */
+  transport: () => AbortSignal;
+  /** push_log- og udsendelser-logning efter transport. */
+  log: () => AbortSignal;
+};
+
 export type PushOpts = {
   dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string;
   tekst?: { title: string; body: string }; navne?: Record<string, string>;
   tag?: string; renotify?: boolean; ttlSekunder?: number; signal?: AbortSignal; maksAbonnementer?: number;
+  faser?: PushFaser;
+  /** Kaldes én gang, umiddelbart før første fetch til et abonnement. */
+  paaTransportStart?: () => void;
 };
+
+type RequestDetails = { endpoint: string; method?: string; headers: Record<string, string>; body: BodyInit | null };
+type Abfrage = { abortSignal: (s: AbortSignal) => unknown };
+// Minimal klienttype (service_role); resultater er utypede rækker.
+// deno-lint-ignore no-explicit-any
+type PushKlient = { from: (t: string) => any };
 
 const STORKBOOK = new Set<string>(STORKBOOK_TYPER);
 const TRANSPORT_TIMEOUT_MS = 8000;
@@ -67,18 +86,37 @@ export function klassificer(code: number | null): "sendt" | "ikke_sendt" | "uken
   return "ukendt";
 }
 
-/** Sender ét abonnement via fetch (afbrydes af signal og 8 s timeout). Stub ved PUSH_STUB=1 (kun testkopi). */
-async function transport(sub: { id: string; endpoint: string; p256dh: string; auth: string }, payload: string, ttl: number, signal?: AbortSignal): Promise<number | null> {
-  if (Deno.env.get("PUSH_STUB") === "1") {
-    let koder: Record<string, number | null> = {};
-    try { koder = JSON.parse(Deno.env.get("PUSH_STUB_KODER") ?? "{}"); } catch { koder = {}; }
+/** PUSH_STUB virker kun mod en lokal testkopi. */
+function stubAktiv(): boolean {
+  if (Deno.env.get("PUSH_STUB") !== "1") return false;
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const lokal = ["http://127.0.0.1:", "http://localhost:", "http://host.docker.internal:"].some((p) => url.startsWith(p));
+  if (!lokal) { console.error("PUSH_STUB ignoreret uden for testkopi"); return false; }
+  return true;
+}
+
+/** Fejl før selve fetch – tæller ikke som transportforsøg. */
+class ForFetchFejl extends Error {}
+
+/** Sender ét abonnement via fetch (afbrydes af signal og 8 s timeout). `foerFetch` kaldes umiddelbart før fetch. */
+async function transport(sub: { id: string; endpoint: string; p256dh: string; auth: string }, payload: string, ttl: number, foerFetch: () => void, signal?: AbortSignal): Promise<number | null> {
+  if (stubAktiv()) {
+    // Ugyldig PUSH_STUB_KODER kaster (ingen stille fallback).
+    const koder = JSON.parse(Deno.env.get("PUSH_STUB_KODER") ?? "{}") as Record<string, number | null>;
     const k = sub.id in koder ? koder[sub.id] : Number(Deno.env.get("PUSH_STUB_KODE") ?? "201");
+    foerFetch();
     if (k === null) throw new Error("stub netværk");
     return k;
   }
-  const det: any = webpush.generateRequestDetails({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: ttl, urgency: "high" });
+  let det: RequestDetails;
+  try {
+    det = webpush.generateRequestDetails({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: ttl, urgency: "high" }) as unknown as RequestDetails;
+  } catch {
+    throw new ForFetchFejl("payload");
+  }
   const t = AbortSignal.timeout(TRANSPORT_TIMEOUT_MS);
   const sig = signal ? AbortSignal.any([signal, t]) : t;
+  foerFetch();
   const res = await fetch(det.endpoint, { method: det.method ?? "POST", headers: det.headers, body: det.body, signal: sig });
   await res.body?.cancel().catch(() => {});
   return res.status;
@@ -93,15 +131,18 @@ function fejlkode(kode: number | null, e?: unknown): string {
 /**
  * Sender én type push og returnerer udfald pr. bruger. Kaster ALDRIG.
  */
-export async function sendPushUdfald(svc: any, userIds: string[], type: PushType, opts: PushOpts = {}): Promise<{ sendt: number; udfald: Record<string, Udfald> }> {
+export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: PushType, opts: PushOpts = {}): Promise<{ sendt: number; udfald: Record<string, Udfald> }> {
   const udfald: Record<string, Udfald> = {};
   let sendt = 0;
   const sb = STORKBOOK.has(type);
-  const sig = <T>(q: T): T => (opts.signal ? (q as any).abortSignal(opts.signal) : q);
+  const med = <T>(q: T, s?: AbortSignal): T => (s ? (q as unknown as Abfrage).abortSignal(s) as T : q);
+  const sOpslag = () => opts.faser?.opslag ?? opts.signal;
+  const sTransport = () => opts.faser?.transport() ?? opts.signal;
+  const sLog = () => opts.faser?.log() ?? opts.signal;
   const users = [...new Set(userIds)];
   if (!users.length) return { sendt, udfald };
   let vapid = false;
-  try { vapid = configure() || Deno.env.get("PUSH_STUB") === "1"; } catch { vapid = false; }
+  try { vapid = configure() || stubAktiv(); } catch { vapid = false; }
   if (!vapid) {
     for (const u of users) udfald[u] = { status: "fejl", aarsag: "vapid_mangler", transportForsoegt: false, abonnementer: [] };
     return { sendt, udfald };
@@ -111,8 +152,8 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
     // Tekst fra udsendelsestyper, hvis alle tre felter er udfyldt; ellers PUSH_TEXT (fail-open). opts.tekst vinder.
     if (opts.udsendType) {
       try {
-        const { data: t, error } = await sig(svc.from("udsendelsestyper").select("push_titel, push_tekst, push_link")
-          .eq("noegle", opts.udsendType)).maybeSingle();
+        const { data: t, error } = await med(svc.from("udsendelsestyper").select("push_titel, push_tekst, push_link")
+          .eq("noegle", opts.udsendType), sOpslag()).maybeSingle();
         if (error) throw error;
         if (t?.push_titel && t?.push_tekst && t?.push_link) msg = { title: t.push_titel, body: t.push_tekst, url: t.push_link };
       } catch (e) {
@@ -124,8 +165,24 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
   const udsendType = opts.udsendType ?? `push-${type}`;
   const afsender = opts.afsenderfunktion ?? "push";
   const ttl = opts.ttlSekunder ?? 60 * 60 * 24;
-  const logPush = async (row: Record<string, unknown>) => {
-    try { await sig(svc.from("push_log").insert(row)); } catch { /* logfejl ændrer intet */ }
+  let transportStartet = false;
+  const foerFetch = () => {
+    if (transportStartet) return;
+    transportStartet = true;
+    try { opts.paaTransportStart?.(); } catch { /* ignorer */ }
+  };
+  // Logfejl ændrer aldrig et afgjort udfald, men logges med fast kode.
+  const logPush = async (row: Record<string, unknown>, s: AbortSignal | undefined) => {
+    try {
+      const { error } = await med(svc.from("push_log").insert(row), s);
+      if (error) console.error("push_log skrivning fejlede");
+    } catch { console.error("push_log skrivning fejlede"); }
+  };
+  const opdaterAbonnement = async (id: string, felter: Record<string, unknown>) => {
+    try {
+      const { error } = await med(svc.from("push_subscriptions").update(felter).eq("id", id), sTransport());
+      if (error) console.error("push_subscriptions opdatering fejlede");
+    } catch { console.error("push_subscriptions opdatering fejlede"); }
   };
 
   for (const userId of users) {
@@ -133,13 +190,13 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
     udfald[userId] = res;
     try {
       if (type !== "test" && opts.dedupeKey) {
-        const { count, error } = await sig(svc.from("push_log").select("id", { count: "exact", head: true })
-          .eq("user_id", userId).eq("push_type", type).eq("dedupe_key", opts.dedupeKey).eq("status", "sent"));
+        const { count, error } = await med(svc.from("push_log").select("id", { count: "exact", head: true })
+          .eq("user_id", userId).eq("push_type", type).eq("dedupe_key", opts.dedupeKey).eq("status", "sent"), sOpslag());
         if (error) {
           if (sb) { res.aarsag = "db"; continue; }
         } else if ((count ?? 0) > 0) {
           res.status = "allerede_sendt";
-          if (sb) await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey, status: "already_sent" });
+          if (sb) await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey, status: "already_sent" }, sLog());
           continue;
         }
       }
@@ -153,13 +210,13 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
       const status = await udsend({
         type: udsendType, kanal: "push", modtager: opts.navne?.[userId] ?? userId, modtagerUserId: userId,
         emne: msg.title, afsenderfunktion: afsender, metadata: { push_type: type, dedupe_key: opts.dedupeKey ?? null },
-        signal: opts.signal,
+        signal: sOpslag(), logSignal: opts.faser ? sLog : undefined,
         send: async () => {
           if (type in PREF_COLUMN) {
-            const { data: pref, error: pErr } = await sig(svc.from("push_preferences").select("*").eq("user_id", userId)).maybeSingle();
+            const { data: pref, error: pErr } = await med(svc.from("push_preferences").select("*").eq("user_id", userId), sOpslag()).maybeSingle();
             if (pErr && sb) return { status: "fejl" as const, fejl: "db" };
             if (pref && pref[PREF_COLUMN[type as keyof typeof PREF_COLUMN]] === false) {
-              await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "skipped_pref" });
+              await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "skipped_pref" }, sLog());
               return { status: "fravalgt" as const };
             }
           }
@@ -167,46 +224,56 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
             .eq("user_id", userId).eq("is_active", true)
             .order("last_success_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
           if (opts.maksAbonnementer) q = q.limit(opts.maksAbonnementer);
-          const { data: subs, error: sErr } = await sig(q);
+          const { data: subs, error: sErr } = await med(q, sOpslag());
           if (sErr) {
             if (sb) return { status: "fejl" as const, fejl: "db" };
             throw sErr;
           }
           if (!subs?.length) {
-            await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "no_subscription" });
+            await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "no_subscription" }, sLog());
             return { status: "ingen_tilmelding" as const };
           }
           let lastCode: number | null = null;
           let lastError: string | null = null;
-          for (const s of subs) {
+          let forFetch: string | null = null;
+          for (const s of subs as { id?: string; endpoint?: string; p256dh?: string; auth?: string }[]) {
             if (!s?.id || !s.endpoint || !s.p256dh || !s.auth) {
               res.abonnementer.push({ id: String(s?.id ?? ""), kode: null, status: "ikke_sendt" });
               continue;
             }
             let kode: number | null = null;
             let fejl: unknown = undefined;
-            res.transportForsoegt = true;
             try {
-              kode = await transport(s, payload, ttl, opts.signal);
+              kode = await transport({ id: s.id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }, payload, ttl, () => { res.transportForsoegt = true; foerFetch(); }, sTransport());
             } catch (e) {
               fejl = e;
+            }
+            if (fejl instanceof ForFetchFejl) {
+              // Ingen fetch: ikke et transportforsøg.
+              forFetch = fejl.message;
+              res.abonnementer.push({ id: s.id, kode: null, status: "ikke_sendt" });
+              continue;
             }
             const st = fejl === undefined ? klassificer(kode) : "ukendt";
             res.abonnementer.push({ id: s.id, kode, status: st });
             lastCode = kode;
             if (st === "sendt") {
-              try { await sig(svc.from("push_subscriptions").update({ last_success_at: new Date().toISOString() }).eq("id", s.id)); } catch { /* ignorer */ }
+              await opdaterAbonnement(s.id, { last_success_at: new Date().toISOString() });
             } else {
               lastError = sb ? fejlkode(kode, fejl) : String((fejl as Error)?.message ?? `http ${kode}`).slice(0, 200);
               if (st === "doedt") {
-                try {
-                  await sig(svc.from("push_subscriptions").update({ is_active: false, deactivated_at: new Date().toISOString() }).eq("id", s.id));
-                } catch { /* ignorer */ }
-                await logPush({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: kode, error_text: lastError });
+                await opdaterAbonnement(s.id, { is_active: false, deactivated_at: new Date().toISOString() });
+                await logPush({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: kode, error_text: lastError }, sLog());
               } else {
                 console.error("push send failed", kode ?? "unknown");
               }
             }
+          }
+          if (!res.transportForsoegt && forFetch) {
+            res.aarsag = forFetch;
+            await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: sb ? "not_sent" : "failed", status_code: null, error_text: forFetch }, sLog());
+            if (!sb) throw new Error(`push failed: ${forFetch}`);
+            return { status: "fejl" as const, fejl: forFetch };
           }
           const a = res.abonnementer;
           const samlet: "sendt" | "ukendt" | "ikke_sendt" | "ingen_tilmelding" =
@@ -217,7 +284,7 @@ export async function sendPushUdfald(svc: any, userIds: string[], type: PushType
           await logPush({
             user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null,
             status: logStatus, status_code: lastCode, error_text: samlet === "sendt" ? null : lastError,
-          });
+          }, sLog());
           if (!sb && samlet !== "sendt" && samlet !== "ingen_tilmelding") throw new Error(`push failed ${lastCode ?? "unknown"}: ${lastError ?? ""}`);
           return { status: samlet, metadata: { abonnementer: a }, fejl: samlet === "sendt" ? undefined : lastError ?? undefined };
         },
@@ -247,7 +314,7 @@ export async function sendPush(
   opts: { dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string; tekst?: { title: string; body: string }; navne?: Record<string, string> } = {},
 ): Promise<number> {
   try {
-    const r = await sendPushUdfald(svc, userIds, type, opts);
+    const r = await sendPushUdfald(svc as PushKlient, userIds, type, opts);
     return r.sendt;
   } catch (e) {
     console.error("push failed", e instanceof Error ? e.message : "unknown");
