@@ -207,7 +207,7 @@ function PulsenFeed() {
 
         {feed.hasNextPage ? (
           <>
-          <AutoLoadSentinel active={!!feed.hasNextPage && !feed.isFetchingNextPage} onVisible={() => { if (!feed.isFetchingNextPage) feed.fetchNextPage(); }} />
+          <AutoLoadSentinel active={!!feed.hasNextPage && !feed.isFetching} onVisible={() => { if (!feed.isFetching) feed.fetchNextPage(); }} />
           <button
             type="button"
             onClick={() => feed.fetchNextPage()}
