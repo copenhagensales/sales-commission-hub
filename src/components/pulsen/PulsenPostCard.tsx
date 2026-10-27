@@ -1,11 +1,16 @@
 import { useState } from "react";
-import { EyeOff, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
+import { EyeOff, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { usePulsenPoll } from "@/hooks/usePulsen";
+import { PulsenPollCard } from "./PulsenPollCard";
 import { ReactButton, ReactionSummaryLine } from "@/components/home/FeedReactionRow";
 import type { FeedCommentView, FeedReactionSummary } from "@/hooks/useFeedReactions";
 import type { ReactionKey } from "@/lib/feedReactions";
@@ -18,6 +23,7 @@ const TYPE_PILL: Partial<Record<PulsenPost["post_type"], { label: string; cls: s
   praise: { label: "Ros", cls: "bg-[hsl(var(--cph-praise))] text-[hsl(var(--cph-praise-foreground))]" },
   question: { label: "Spørgsmål", cls: "bg-[hsl(var(--cph-light-blue))] text-foreground" },
   event: { label: "Begivenhed", cls: "bg-[hsl(var(--cph-light-blue))] text-foreground" },
+  poll: { label: "Afstemning", cls: "bg-[hsl(var(--cph-light-blue))] text-foreground" },
 };
 
 export interface PostInteractions {
@@ -60,6 +66,16 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
   const meta = [contextLabel ?? post.author?.job_title, pulsenRelativeTime(post.created_at)].filter(Boolean).join(" · ");
   const img = post.localImageUrl ?? imageUrl;
   const showMenu = !post.pending && (isMine || canModerate);
+  const isPoll = post.post_type === "poll";
+  const pollState = usePulsenPoll(post.id, isPoll && showMenu);
+  const pollRow = pollState.query.data?.poll;
+  const pollOpen = !!pollRow && !pollRow.closed_at && new Date(pollRow.closes_at).getTime() > Date.now();
+  const [confirmClose, setConfirmClose] = useState(false);
+  const closePoll = () => {
+    pollState.close.mutate(undefined, {
+      onError: (e) => toast.error("Afstemningen blev ikke lukket", { description: e instanceof Error ? e.message : "Prøv igen" }),
+    });
+  };
 
   const saveEdit = async () => {
     try {
@@ -103,7 +119,12 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl">
-              {isMine && (
+              {isPoll && pollOpen && (isMine || canModerate) && (
+                <DropdownMenuItem onSelect={() => setConfirmClose(true)}>
+                  <Lock className="mr-2 h-4 w-4" aria-hidden="true" /> Luk nu
+                </DropdownMenuItem>
+              )}
+              {isMine && !isPoll && (
                 <DropdownMenuItem onSelect={() => { setDraft(post.body); setEditing(true); }}>
                   <Pencil className="mr-2 h-4 w-4" aria-hidden="true" /> Redigér
                 </DropdownMenuItem>
@@ -141,6 +162,21 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
       ) : (
         post.body && <p className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-[1.5] text-foreground">{post.body}</p>
       )}
+
+      {isPoll && !post.pending && <PulsenPollCard postId={post.id} />}
+
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Luk afstemningen nu?</AlertDialogTitle>
+            <AlertDialogDescription>Der kan ikke stemmes mere, og resultatet står som afsluttet.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-[44px]">Annullér</AlertDialogCancel>
+            <AlertDialogAction className="min-h-[44px]" onClick={closePoll}>Luk nu</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {img && (
         <>
