@@ -15,7 +15,6 @@ import { da } from "date-fns/locale";
 const BookWeekContent = lazy(() => import("./BookWeekContent"));
 const LocationsContent = lazy(() => import("./LocationsContent"));
 const BookingsContent = lazy(() => import("./BookingsContent"));
-const BookingsEditable = lazy(() => import("./Bookings"));
 const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 const HotelsContent = lazy(() => import("./HotelsContent"));
@@ -40,7 +39,7 @@ const allTabs = [
 export default function BookingManagement() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canView, canEdit, isLoading, isReady, position, permissions } = usePermissions();
+  const { canView, isLoading, isReady, position, permissions } = usePermissions();
   const { conflicts, count: conflictCount } = useFmBookingConflicts();
   
   // Filter tabs based on permissions
@@ -151,7 +150,7 @@ export default function BookingManagement() {
           {visibleTabs.some(t => t.value === "bookings") && (
             <TabsContent value="bookings" className="mt-6">
               <Suspense fallback={<SkeletonList />}>
-                {canEdit("tab_fm_bookings") ? <BookingsEditable /> : <BookingsContent />}
+                <BookingsContent />
               </Suspense>
             </TabsContent>
           )}
