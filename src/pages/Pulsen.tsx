@@ -11,6 +11,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CelebrationLines } from "@/components/pulsen/CelebrationLine";
 import { TodayMilestonesCard, milestoneNumber, milestoneUnit } from "@/components/pulsen/TodayMilestones";
+import { fillMilestoneDay } from "@/lib/pulsen/format";
 import { MilestoneHeroCard } from "@/components/pulsen/MilestoneHeroCard";
 import { EventRsvpCard } from "@/components/home/EventRsvpCard";
 import { EventDetailDialog } from "@/components/home/EventDetailDialog";
@@ -328,7 +329,7 @@ function PulsenFeed() {
                 value={milestoneNumber(highlight)}
                 unit={milestoneUnit(highlight)}
                 eyebrow={`Dagens højdepunkt · ${highlight.milestone_type === "house_record" ? "Husrekord" : "Teamrekord"}`}
-                title={highlight.milestone_type === "house_record" ? (highlight.level === 1 ? "Ny husrekord i provision" : "Ny husrekord på én dag") : (highlight.payload?.text ?? "Ny teamrekord").replace(/\*\*/g, "").replace(/:.*$/, "")}
+                title={highlight.milestone_type === "house_record" ? (highlight.level === 1 ? "Ny husrekord i provision" : "Ny husrekord på én dag") : fillMilestoneDay(highlight.payload?.text ?? "Ny teamrekord", highlight.payload?.day).replace(/\*\*/g, "").replace(/:.*$/, "")}
                 subtitle={highlight.payload?.previous != null ? `Før: ${Math.round(Number(highlight.payload.previous)).toLocaleString("da-DK")} ${milestoneUnit(highlight)}` : undefined}
                 footer={isHouse && highlight.shown_in_house ? (
                   <ReactButton compact summary={fr.getReactions(milestoneTargetKey(highlight.id))} disabled={!fr.canInteract}
