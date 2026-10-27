@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { EyeOff, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
+import { EyeOff, Link2, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -65,9 +65,11 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
   const pill = TYPE_PILL[post.post_type];
   const meta = [contextLabel ?? post.author?.job_title, pulsenRelativeTime(post.created_at)].filter(Boolean).join(" · ");
   const img = post.localImageUrl ?? imageUrl;
-  const showMenu = !post.pending && (isMine || canModerate);
+  // Menuen findes på alle gemte opslag (»Kopiér link«); øvrige punkter kræver forfatter/moderator.
+  const showMenu = !post.pending;
+  const canManagePost = isMine || canModerate;
   const isPoll = post.post_type === "poll";
-  const pollState = usePulsenPoll(post.id, isPoll && showMenu, { poll: false });
+  const pollState = usePulsenPoll(post.id, isPoll && showMenu && canManagePost, { poll: false });
   const pollRow = pollState.query.data?.poll;
   const pollOpen = !!pollRow && !pollState.isClosed;
   const [confirmClose, setConfirmClose] = useState(false);
@@ -121,6 +123,12 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuItem onSelect={() => {
+                navigator.clipboard.writeText(`${location.origin}/storkbook/indlaeg/${post.id}`)
+                  .then(() => toast.success("Link kopieret"), () => toast.error("Linket kunne ikke kopieres"));
+              }}>
+                <Link2 className="mr-2 h-4 w-4" aria-hidden="true" /> Kopiér link
+              </DropdownMenuItem>
               {isPoll && pollOpen && (isMine || canModerate) && (
                 <DropdownMenuItem disabled={pollState.close.isPending} onSelect={() => setConfirmClose(true)}>
                   <Lock className="mr-2 h-4 w-4" aria-hidden="true" /> Luk nu
