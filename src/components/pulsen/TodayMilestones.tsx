@@ -23,11 +23,15 @@ const EMERALD = new Set<PulsenMilestoneType>(["streak", "first_sale"]);
 
 /** Navnet er første fed del af jobbets tekst ("**Aslak L.** …"). */
 export function milestoneName(m: PulsenMilestone): string {
+  if (m.milestone_type === "house_record") return "Huset";
   const text = fillMilestoneDay(m.payload?.text ?? "", m.payload?.day);
-  return text.match(/\*\*([^*]+)\*\*/)?.[1] ?? (m.milestone_type === "house_record" ? "Huset" : "Kollega");
+  return text.match(/\*\*([^*]+)\*\*/)?.[1] ?? "Kollega";
 }
-export const milestoneValue = (m: PulsenMilestone) => `${Math.round(Number(m.value ?? 0)).toLocaleString("da-DK")} ${UNIT[m.milestone_type]}`;
-export const milestoneUnit = (m: PulsenMilestone) => UNIT[m.milestone_type];
+/** Husrekord level 1 måles i provision (kr); level 0 er historiske salgsrekorder. */
+export const milestoneUnit = (m: PulsenMilestone) =>
+  m.milestone_type === "house_record" && m.level === 1 ? "kr" : UNIT[m.milestone_type];
+export const milestoneNumber = (m: PulsenMilestone) => Math.round(Number(m.value ?? 0)).toLocaleString("da-DK");
+export const milestoneValue = (m: PulsenMilestone) => `${milestoneNumber(m)} ${milestoneUnit(m)}`;
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" });
 
 type Reactions = ReturnType<typeof useFeedReactions>;

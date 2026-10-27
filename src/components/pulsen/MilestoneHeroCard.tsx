@@ -14,8 +14,8 @@ export function MilestoneHeroCard({ value, unit, eyebrow, title, subtitle, foote
   return (
     <div className="rounded-[24px] bg-[hsl(var(--cph-onyx))] p-5 text-[hsl(var(--cph-light-blue))]">
       <div className="flex items-center gap-4">
-        <div className="flex h-[88px] w-[88px] flex-none flex-col items-center justify-center rounded-[22px] bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]">
-          <span className="text-[30px] font-black leading-none tabular-nums tracking-[-0.03em]">{value}</span>
+        <div className="flex h-[88px] min-w-[88px] px-3 flex-none flex-col items-center justify-center rounded-[22px] bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]">
+          <span className={`${value.length > 6 ? "text-[24px]" : "text-[30px]"} whitespace-nowrap font-black leading-none tabular-nums tracking-[-0.03em]`}>{value}</span>
           {unit && <span className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.12em]">{unit}</span>}
         </div>
         <div className="min-w-0">
