@@ -217,9 +217,18 @@ export function usePulsenMutations(author: PersonRef | null) {
         pages: data.pages.map((page) => page.map(fn).filter((p): p is PulsenPost => !!p)),
       });
     });
+    qc.getQueriesData<PulsenPost | null>({ queryKey: ["pulsen-post"] }).forEach(([key, data]) => {
+      qc.setQueryData(key, data ? fn(data) : data);
+    });
   };
-  const snapshot = () => qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] });
-  const restore = (snap: ReturnType<typeof snapshot>) => snap.forEach(([k, d]) => qc.setQueryData(k, d));
+  const snapshot = () => ({
+    feed: qc.getQueriesData<FeedData>({ queryKey: ["pulsen-feed"] }),
+    posts: qc.getQueriesData<PulsenPost | null>({ queryKey: ["pulsen-post"] }),
+  });
+  const restore = (snap: ReturnType<typeof snapshot>) => {
+    snap.feed.forEach(([k, d]) => qc.setQueryData(k, d));
+    snap.posts.forEach(([k, d]) => qc.setQueryData(k, d));
+  };
 
   const create = useMutation({
     mutationFn: async ({ input, id }: { input: NewPulsenPost; id: string; localUrl?: string }) => {
@@ -304,6 +313,7 @@ export function usePulsenMutations(author: PersonRef | null) {
       return { snap };
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   const remove = useMutation({
@@ -320,6 +330,7 @@ export function usePulsenMutations(author: PersonRef | null) {
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pulsen-unanswered"] }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   const setHidden = useMutation({
@@ -336,6 +347,7 @@ export function usePulsenMutations(author: PersonRef | null) {
       return { snap };
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   const setBestAnswer = useMutation({
@@ -349,6 +361,7 @@ export function usePulsenMutations(author: PersonRef | null) {
       return { snap };
     },
     onError: (_e, _v, ctx) => ctx && restore(ctx.snap),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["pulsen-post", v.id] }),
   });
 
   return { create, edit, remove, setHidden, setBestAnswer };
