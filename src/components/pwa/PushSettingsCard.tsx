@@ -46,16 +46,16 @@ function StorkbookToggles() {
     const mitSeq = (seq.current[noegle] ?? 0) + 1;
     seq.current[noegle] = mitSeq;
     const bruger = user?.id;
+    const foer = aktiv(noegle);
     setLokalt((p) => ({ ...p, [noegle]: v }));
     const saetFlere = praef.saetFlere;
     koe.current = koe.current.then(async () => {
       let fejl = false;
       try { await saetFlere.mutateAsync([{ noegle, kanal: "push", aktiv: v }]); } catch { fejl = true; }
       if (fejl) toast.error("Kunne ikke gemme indstillingen", { description: "Prøv igen." });
-      // Rollback/oprydning kun for denne type, kun hvis intet nyere valg er lavet og samme bruger.
-      // Override fjernes, så kontakten viser den gemte værdi (ved fejl: værdien før dette valg).
-      if (bruger !== brugerRef.current || seq.current[noegle] !== mitSeq) return;
-      setLokalt((p) => { const n = { ...p }; delete n[noegle]; return n; });
+      // Rollback kun for denne type og kun, hvis intet nyere valg er lavet for typen (samme bruger).
+      if (!fejl || bruger !== brugerRef.current || seq.current[noegle] !== mitSeq) return;
+      setLokalt((p) => ({ ...p, [noegle]: foer }));
     });
   };
   return (
