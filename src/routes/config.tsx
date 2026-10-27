@@ -252,7 +252,7 @@ export const routes: RouteConfig[] = [
   { path: "/tv-board-admin", component: redirectTo("/admin?tab=tv-tavler&side=tv-board-admin"), access: "protected" },
 
   // Live Stats (hidden from sidebar, accessible via URL only)
-  { path: "/live-stats", component: LiveStats, access: "protected" },
+  { path: "/live-stats", component: LiveStats, access: "role", positionPermission: "menu_live_stats" },
 
   // Reports
   { path: "/reports/admin", component: RapporterSamleside, access: "protected" },
