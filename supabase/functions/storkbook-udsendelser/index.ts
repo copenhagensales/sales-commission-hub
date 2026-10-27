@@ -7,7 +7,8 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { sendPushUdfald, type Udfald } from "../_shared/push.ts";
 import type { StorkbookType } from "../_shared/pushText.ts";
 
-type Svc = ReturnType<typeof createClient>;
+const lavKlient = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+type Svc = ReturnType<typeof lavKlient>;
 type Mention = { t: "e" | "t"; id: string };
 type Kandidat = {
   type_noegle: StorkbookType; haendelse: string; kilde_type: "opslag" | "kommentar" | "besked" | "reaktion" | "begivenhed";
@@ -469,7 +470,7 @@ async function afslut(svc: Svc, id: string, token: string, a: Afslut, signal: Ab
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const start = Date.now();
-  const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const svc = lavKlient();
   try {
     // Adgang: kun cron-token (også dry_run).
     const hdr = req.headers.get("x-pulsen-cron-token") ?? "";
