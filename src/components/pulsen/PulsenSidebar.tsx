@@ -84,6 +84,7 @@ export function PulsenSidebar({ employeeId, onOpenQuestion, top, className, show
           </ul>
         )}
       </SideCard>
+      )}
     </aside>
   );
 }

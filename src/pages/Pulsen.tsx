@@ -46,6 +46,7 @@ function PulsenFeed() {
   const [tab, setTab] = useState<"house" | "team">("house");
   const [teamId, setTeamId] = useState<string | null>(null);
   const [addEventOpen, setAddEventOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [detailEventId, setDetailEventId] = useState<string | null>(null);
   const [editEventId, setEditEventId] = useState<string | null>(null);
 
@@ -65,7 +66,7 @@ function PulsenFeed() {
   // Link fra forsiden: /storkbook?post=<id> ruller til indlægget, når det er indlæst.
   const [searchParams] = useSearchParams();
   const composeParam = searchParams.get("compose");
-  const initialCompose = (["post", "praise", "question", "image"].includes(composeParam ?? "") ? composeParam : null) as ComposeMode | null;
+  const initialCompose = (["post", "praise", "question", "image"].includes(composeParam ?? "") ? composeParam : null) as ComposeMode | "image" | null;
   const deepPostId = searchParams.get("post");
   const deepDone = useRef(false);
   useEffect(() => {
