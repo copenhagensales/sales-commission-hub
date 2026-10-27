@@ -1,3 +1,4 @@
+import { TvKeepAwake } from "@/components/tv/TvKeepAwake";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -112,6 +113,7 @@ export default function TvBoardView() {
     <div className="tv-board-wrapper min-h-screen">
       <style>{`.tv-board-wrapper { cursor: none; } .tv-board-wrapper:hover { cursor: default; }`}</style>
       <DashboardComponent />
+      <TvKeepAwake />
     </div>
   );
 }
