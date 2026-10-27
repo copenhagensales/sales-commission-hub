@@ -2,7 +2,7 @@
  * Pulsen: feed, teams, skrive/redigere/slette/skjule, billeder og sidekolonne.
  * Synlighed håndhæves af databasen (RLS på pulsen_posts og storage). Ingen salg/provision/løn.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { startOfDay, subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
