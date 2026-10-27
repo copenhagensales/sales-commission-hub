@@ -46,6 +46,7 @@ function PulsenFeed() {
   const [tab, setTab] = useState<"house" | "team">("house");
   const [teamId, setTeamId] = useState<string | null>(null);
   const [addEventOpen, setAddEventOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [detailEventId, setDetailEventId] = useState<string | null>(null);
   const [editEventId, setEditEventId] = useState<string | null>(null);
 
@@ -65,7 +66,7 @@ function PulsenFeed() {
   // Link fra forsiden: /storkbook?post=<id> ruller til indlægget, når det er indlæst.
   const [searchParams] = useSearchParams();
   const composeParam = searchParams.get("compose");
-  const initialCompose = (["post", "praise", "question", "image"].includes(composeParam ?? "") ? composeParam : null) as ComposeMode | null;
+  const initialCompose = (["post", "praise", "question", "image"].includes(composeParam ?? "") ? composeParam : null) as ComposeMode | "image" | null;
   const deepPostId = searchParams.get("post");
   const deepDone = useRef(false);
   useEffect(() => {
@@ -81,11 +82,11 @@ function PulsenFeed() {
   const today = usePulsenMilestonesToday(scope, !!me.employeeId);
   const highlight = (today.data?.items ?? []).find((m) => m.milestone_type === "house_record" || m.milestone_type === "team_record") ?? null;
   // Indlæg har reaktioner i både Huset og team; milepæle kun i Huset.
-  const houseKeys = [
+  const reactionKeys = [
     ...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)),
     ...(isHouse && highlight ? [milestoneTargetKey(highlight.id)] : []),
   ];
-  const fr = useFeedReactions(houseKeys);
+  const fr = useFeedReactions(reactionKeys);
 
   const { data: celebrations = [] } = useCelebrations();
   const todayCelebrations = celebrations.filter((c) => c.isToday);
@@ -294,10 +295,11 @@ function PulsenFeed() {
                 onSubmit={(input, localUrl) => mut.create.mutateAsync({ input, id: crypto.randomUUID(), localUrl: localUrl ?? undefined })}
                 onOpenEvent={() => setAddEventOpen(true)}
                 initialMode={initialCompose}
+                onOpenChange={setComposerOpen}
               />
               </div>
             )}
-            {me.employeeId && isPhone && (
+            {me.employeeId && isPhone && !composerOpen && (
               <StickyOnPhone>
                 <button type="button" onClick={() => {
                     composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -331,12 +333,13 @@ function PulsenFeed() {
 
             {renderBody()}
 
-            <PulsenSidebar className="lg:hidden" employeeId={me.employeeId} onOpenQuestion={scrollToPost} />
+            <PulsenSidebar className="lg:hidden" showUnanswered={isHouse} employeeId={me.employeeId} onOpenQuestion={scrollToPost} />
           </div>
 
           <div className="hidden lg:block">
             <PulsenSidebar
               className="sticky top-6"
+              showUnanswered={isHouse}
               employeeId={me.employeeId}
               onOpenQuestion={scrollToPost}
               top={me.employeeId ? <TodayMilestonesCard layout="card" isHouse={isHouse} teamId={team?.id ?? null} teamName={team?.name ?? null} enabled /> : null}
@@ -411,7 +414,7 @@ function PulsenBegivenheder() {
   const navigate = useNavigate();
   return (
     <div className="mx-auto w-full max-w-[680px] px-4 pb-16 md:px-0">
-      <PulsenSidebar employeeId={me.employeeId} onOpenQuestion={(id) => navigate(`/storkbook?post=${id}`)} />
+      <PulsenSidebar showUnanswered={false} employeeId={me.employeeId} onOpenQuestion={(id) => navigate(`/storkbook?post=${id}`)} />
     </div>
   );
 }

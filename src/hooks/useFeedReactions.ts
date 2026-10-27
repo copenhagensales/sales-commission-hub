@@ -5,7 +5,8 @@
  *   anniversary:<employee_id>:<år>
  *   league_round:<season_id>:<employee_id>
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -120,24 +121,37 @@ export function useFeedReactions(targetKeys: string[]) {
     queryClient.invalidateQueries({ queryKey: ["feed-comments"] });
   };
 
-  /** Sætter brugerens ene reaktion. Samme reaktion igen = fjern. Anden reaktion = skift. */
+  type ReactionRow = { id: string; target_key: string; user_id: string; emoji: string; created_at: string };
+  type ReactionVars = { targetType: FeedTargetType; targetKey: string; reaction: ReactionKey };
+  // Hvad onMutate så før den optimistiske ændring (så hurtige gentagne tryk ikke læser den ændrede cache).
+  const pendingRef = useRef(new WeakMap<ReactionVars, { current: ReactionKey | null; mineIds: string[] }>());
+
+  /** Sætter brugerens ene reaktion. Samme reaktion igen = fjern. Anden reaktion = skift. Optimistisk med tilbagerulning. */
   const setReaction = useMutation({
-    mutationFn: async ({
-      targetType,
-      targetKey,
-      reaction,
-    }: {
-      targetType: FeedTargetType;
-      targetKey: string;
-      reaction: ReactionKey;
-    }) => {
-      if (!myUserId) throw new Error("Du skal være logget ind");
-      const mine = (reactionsQuery.data || [])
-        .filter((r) => r.target_key === targetKey && r.user_id === myUserId)
+    onMutate: async (vars: ReactionVars) => {
+      const qk = ["feed-reactions", keys];
+      await queryClient.cancelQueries({ queryKey: qk });
+      const previous = queryClient.getQueryData<ReactionRow[]>(qk);
+      const rows = previous ?? [];
+      const mine = rows
+        .filter((r) => r.target_key === vars.targetKey && r.user_id === myUserId)
         .sort((x, y) => y.created_at.localeCompare(x.created_at));
       const current = mine[0] ? reactionKeyForEmoji(mine[0].emoji) : null;
-
-      if (current !== reaction) {
+      pendingRef.current.set(vars, { current, mineIds: mine.map((r) => r.id).filter((id) => !id.startsWith("optimistisk-")) });
+      if (myUserId) {
+        const next = rows.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
+        if (current !== vars.reaction) {
+          next.push({ id: "optimistisk-" + crypto.randomUUID(), target_key: vars.targetKey, user_id: myUserId, emoji: reactionOption(vars.reaction).emoji, created_at: new Date().toISOString() });
+        }
+        queryClient.setQueryData<ReactionRow[]>(qk, next);
+      }
+      return { previous, qk };
+    },
+    mutationFn: async (vars: ReactionVars) => {
+      const { targetType, targetKey, reaction } = vars;
+      if (!myUserId) throw new Error("Du skal være logget ind");
+      const seen = pendingRef.current.get(vars) ?? { current: null, mineIds: [] };
+      if (seen.current !== reaction) {
         const { error } = await supabase.from("feed_reactions").insert({
           target_type: targetType,
           target_key: targetKey,
@@ -147,15 +161,19 @@ export function useFeedReactions(targetKeys: string[]) {
         if (error) throw error;
       }
       // Fjern brugerens egne tidligere reaktioner på samme mål.
-      if (mine.length > 0) {
-        const { error } = await supabase
-          .from("feed_reactions")
-          .delete()
-          .in("id", mine.map((r) => r.id));
+      if (seen.mineIds.length > 0) {
+        const { error } = await supabase.from("feed_reactions").delete().in("id", seen.mineIds);
         if (error) throw error;
       }
     },
-    onSuccess: invalidate,
+    onError: (_e, _vars, ctx) => {
+      if (ctx) queryClient.setQueryData(ctx.qk, ctx.previous);
+      toast.error("Reaktionen blev ikke gemt");
+    },
+    onSettled: (_d, _e, vars) => {
+      pendingRef.current.delete(vars);
+      queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
+    },
   });
 
   const addComment = useMutation({

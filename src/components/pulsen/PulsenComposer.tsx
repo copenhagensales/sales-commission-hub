@@ -7,7 +7,7 @@ import { useActiveColleagues, type NewPulsenPost } from "@/hooks/usePulsen";
 import { PULSEN_IMAGE_MAX_BYTES, PULSEN_MAX_CHARS, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
 
-export type Mode = "post" | "praise" | "question" | "image";
+export type Mode = "post" | "praise" | "question";
 
 interface Props {
   myEmployeeId: string;
@@ -19,20 +19,21 @@ interface Props {
   onSubmit: (input: NewPulsenPost, localPreviewUrl: string | null) => Promise<unknown>;
   onOpenEvent: () => void;
   /** Åbner composeren i en bestemt tilstand (fx fra forsiden: ?compose=praise). */
-  initialMode?: Mode | null;
+  initialMode?: Mode | "image" | null;
   initialBody?: string;
+  /** Kaldes når feltet åbnes/lukkes. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 const MODES: { key: Mode; label: string; icon: typeof PenLine }[] = [
   { key: "post", label: "Indlæg", icon: PenLine },
   { key: "praise", label: "Ros", icon: HandHeart },
   { key: "question", label: "Spørgsmål", icon: HelpCircle },
-  { key: "image", label: "Billede", icon: ImagePlus },
 ];
 
-export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, defaultAudience, team, onSubmit, onOpenEvent, initialMode, initialBody }: Props) {
+export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, defaultAudience, team, onSubmit, onOpenEvent, initialMode, initialBody, onOpenChange }: Props) {
   const [open, setOpen] = useState(!!initialMode);
-  const [mode, setMode] = useState<Mode>(initialMode ?? "post");
+  const [mode, setMode] = useState<Mode>(initialMode && initialMode !== "image" ? initialMode : "post");
   const [body, setBody] = useState(initialBody ?? "");
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
   const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
@@ -44,6 +45,10 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   useEffect(() => {
     if (initialMode === "image") fileRef.current?.click();
   }, [initialMode]);
+  useEffect(() => {
+    onOpenChange?.(open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const colleagues = useActiveColleagues(open && mode === "praise");
 
   const audiences: { key: "house" | "team"; label: string }[] = [
@@ -63,7 +68,6 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const pickMode = (m: Mode) => {
     setOpen(true);
     setMode(m);
-    if (m === "image") fileRef.current?.click();
   };
 
   const onFile = (f: File | undefined) => {
@@ -72,7 +76,6 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     if (f.size > PULSEN_IMAGE_MAX_BYTES) return toast.error("Billedet må højst fylde 10 MB");
     setFile(f);
     setPreview(URL.createObjectURL(f));
-    setMode((m) => (m === "praise" ? "praise" : "image"));
     setOpen(true);
   };
 
@@ -80,7 +83,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     audiences.length > 0 &&
     !busy &&
     body.length <= PULSEN_MAX_CHARS &&
-    (mode === "image" ? !!file : body.trim().length > 0) &&
+    (mode === "post" ? body.trim().length > 0 || !!file : mode === "question" ? body.trim().length > 0 : true) &&
     (mode !== "praise" || praised.length > 0);
 
   const send = async () => {
@@ -92,7 +95,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
       postType: mode,
       body,
       praised: mode === "praise" ? praised : null,
-      imageFile: mode === "image" || mode === "praise" ? file : null,
+      imageFile: file,
     };
     const localUrl = preview;
     reset();
@@ -151,11 +154,6 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
                   </PopoverContent>
                 </Popover>
               )}
-              {!preview && (
-                <button type="button" onClick={() => fileRef.current?.click()} className="flex min-h-[40px] items-center gap-2 rounded-full px-3 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
-                  <ImagePlus className="h-4 w-4" aria-hidden="true" /> Vedhæft billede
-                </button>
-              )}
             </div>
           )}
           <textarea
@@ -171,13 +169,18 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           {preview && (
             <div className="relative mt-3">
               <img src={preview} alt="Valgt billede" className="max-h-[320px] w-full rounded-[18px] object-cover" />
-              <button type="button" aria-label="Fjern billede" onClick={() => { setFile(null); setPreview(null); if (mode === "image") setMode("post"); }} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground">
+              <button type="button" aria-label="Fjern billede" onClick={() => { setFile(null); setPreview(null); }} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground">
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
           )}
           <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-muted-foreground">
             <span>Del aldrig kundeoplysninger</span>
+            {!preview && (
+              <button type="button" aria-label="Vedhæft billede" onClick={() => fileRef.current?.click()} className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-full text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+                <ImagePlus className="h-5 w-5" aria-hidden="true" />
+              </button>
+            )}
             {showCharCounter(body.length) && <span className="tabular-nums">{body.length}/{PULSEN_MAX_CHARS}</span>}
           </div>
         </div>
@@ -207,20 +210,18 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
 
       {open && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-          <div role="radiogroup" aria-label="Målgruppe" className="flex rounded-full bg-[hsl(var(--cph-light-blue))] p-1">
-            {audiences.map((a) => (
-              <button
-                key={a.key}
-                type="button"
-                role="radio"
-                aria-checked={audience === a.key}
-                onClick={() => setAudience(a.key)}
-                className={cn("min-h-[40px] rounded-full px-4 text-[13px] font-extrabold", audience === a.key ? "bg-card text-foreground" : "text-muted-foreground")}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
+          {audiences.length > 1 ? (
+            <button
+              type="button"
+              aria-label="Skift målgruppe"
+              onClick={() => { const i = audiences.findIndex((a) => a.key === audience); setAudience(audiences[(i + 1) % audiences.length].key); }}
+              className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[14px] font-extrabold text-foreground"
+            >
+              Til: {audiences.find((a) => a.key === audience)?.label ?? audiences[0].label}
+            </button>
+          ) : (
+            <span className="px-1 text-[14px] font-extrabold text-foreground">Til: {audiences[0].label}</span>
+          )}
           <div className="flex gap-2">
             <button type="button" onClick={reset} className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">Annullér</button>
             <button type="button" onClick={send} disabled={!canSend} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:opacity-50">Del</button>
