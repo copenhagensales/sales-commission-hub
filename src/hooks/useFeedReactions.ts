@@ -116,62 +116,48 @@ export function useFeedReactions(targetKeys: string[]) {
     enabled,
   });
 
-  // Én samlet tæller for alle afventende reaktionsmutationer; genhentning af ["feed-reactions"]
-  // udskydes, til ingen er afventende, så optimistiske rækker på andre mål ikke forsvinder.
-  const pendingTotalRef = useRef(0);
-  const invalidateAfterRef = useRef(false);
-  const invalidateReactions = () => {
-    if (pendingTotalRef.current > 0) {
-      invalidateAfterRef.current = true;
-      return;
-    }
-    invalidateAfterRef.current = false;
-    queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
-  };
-
   const invalidate = () => {
-    invalidateReactions();
+    invalidateReactions(queryClient);
     queryClient.invalidateQueries({ queryKey: ["feed-comments"] });
   };
-
-  type ReactionRow = { id: string; target_key: string; user_id: string; emoji: string; created_at: string };
-  type ReactionVars = { targetType: FeedTargetType; targetKey: string; reaction: ReactionKey };
-  // Hensigt fundet i onMutate (sæt eller fjern), så mutationFn ikke læser den optimistisk ændrede cache.
-  const intentRef = useRef(new WeakMap<ReactionVars, "set" | "remove">());
-  // Skrivninger pr. mål udføres i rækkefølge; sidste handling vinder.
-  const chainRef = useRef(new Map<string, Promise<unknown>>());
-  // Løbenummer pr. mål: kun den nyeste handling på et mål må rulle cachen tilbage ved fejl.
-  const seqRef = useRef(new Map<string, number>());
 
   /** Sætter brugerens ene reaktion. Samme reaktion igen = fjern. Anden reaktion = skift. Optimistisk med tilbagerulning. */
   const setReaction = useMutation({
     // Ingen genforsøg: et genforsøg ville køre uden for sin plads i køen pr. mål.
     retry: 0,
     onMutate: async (vars: ReactionVars) => {
-      const qk = ["feed-reactions", keys];
-      pendingTotalRef.current += 1;
-      const seq = (seqRef.current.get(vars.targetKey) ?? 0) + 1;
-      seqRef.current.set(vars.targetKey, seq);
-      await queryClient.cancelQueries({ queryKey: qk });
-      const rows = queryClient.getQueryData<ReactionRow[]>(qk) ?? [];
+      const ownKey = ["feed-reactions", keys];
+      const coordKey = `${myUserId ?? ""}:${vars.targetKey}`;
+      pendingTotal += 1;
+      const seq = (seqByTarget.get(coordKey) ?? 0) + 1;
+      seqByTarget.set(coordKey, seq);
+      await queryClient.cancelQueries({ queryKey: ["feed-reactions"] });
       const isMine = (r: ReactionRow) => r.target_key === vars.targetKey && r.user_id === myUserId;
-      const previousMine = rows.filter(isMine);
+      const targets = reactionCachesFor(queryClient, vars.targetKey);
+      const own = queryClient.getQueryData<ReactionRow[]>(ownKey);
+      const base = own ?? targets.find(([, d]) => d)?.[1] ?? [];
+      const previousMine = base.filter(isMine);
       const latest = [...previousMine].sort((x, y) => y.created_at.localeCompare(x.created_at))[0];
       const current = latest ? reactionKeyForEmoji(latest.emoji) : null;
-      intentRef.current.set(vars, current === vars.reaction ? "remove" : "set");
+      intentByVars.set(vars, current === vars.reaction ? "remove" : "set");
       if (myUserId) {
-        const next = rows.filter((r) => !isMine(r));
-        if (current !== vars.reaction) {
-          next.push({ id: "optimistisk-" + crypto.randomUUID(), target_key: vars.targetKey, user_id: myUserId, emoji: reactionOption(vars.reaction).emoji, created_at: new Date().toISOString() });
-        }
-        queryClient.setQueryData<ReactionRow[]>(qk, next);
+        const optimistic: ReactionRow | null = current !== vars.reaction
+          ? { id: "optimistisk-" + crypto.randomUUID(), target_key: vars.targetKey, user_id: myUserId, emoji: reactionOption(vars.reaction).emoji, created_at: new Date().toISOString() }
+          : null;
+        targets.forEach(([qk, data]) => {
+          if (!data) return;
+          const next = data.filter((r) => !isMine(r));
+          if (optimistic) next.push(optimistic);
+          queryClient.setQueryData<ReactionRow[]>(qk, next);
+        });
       }
-      return { previousMine, qk, seq };
+      return { previousMine, seq, coordKey };
     },
     mutationFn: async (vars: ReactionVars) => {
       const { targetType, targetKey, reaction } = vars;
-      const intent = intentRef.current.get(vars) ?? "set";
-      const previous = chainRef.current.get(targetKey) ?? Promise.resolve();
+      const intent = intentByVars.get(vars) ?? "set";
+      const coordKey = `${myUserId ?? ""}:${targetKey}`;
+      const previous = chainByTarget.get(coordKey) ?? Promise.resolve();
       const run = (async () => {
         await previous.catch(() => {});
         if (!myUserId) throw new Error("Du skal være logget ind");
@@ -192,31 +178,34 @@ export function useFeedReactions(targetKeys: string[]) {
           .eq("target_key", targetKey).eq("user_id", myUserId).neq("id", data.id);
         if (delError) throw delError;
       })();
-      chainRef.current.set(targetKey, run);
+      chainByTarget.set(coordKey, run);
       try {
         await run;
       } finally {
-        if (chainRef.current.get(targetKey) === run) chainRef.current.delete(targetKey);
+        if (chainByTarget.get(coordKey) === run) chainByTarget.delete(coordKey);
       }
     },
     onError: (_e, vars, ctx) => {
-      if (ctx && ctx.seq === seqRef.current.get(vars.targetKey)) {
-        const rows = queryClient.getQueryData<ReactionRow[]>(ctx.qk) ?? [];
-        const others = rows.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
-        queryClient.setQueryData<ReactionRow[]>(ctx.qk, [...others, ...ctx.previousMine]);
+      if (ctx && ctx.seq === seqByTarget.get(ctx.coordKey)) {
+        reactionCachesFor(queryClient, vars.targetKey).forEach(([qk, data]) => {
+          if (!data) return;
+          const others = data.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
+          queryClient.setQueryData<ReactionRow[]>(qk, [...others, ...ctx.previousMine]);
+        });
       }
       toast.error("Reaktionen blev ikke gemt");
     },
     onSettled: (_d, _e, vars) => {
-      intentRef.current.delete(vars);
-      pendingTotalRef.current = Math.max(0, pendingTotalRef.current - 1);
-      if (pendingTotalRef.current === 0) {
-        invalidateReactions();
+      intentByVars.delete(vars);
+      pendingTotal = Math.max(0, pendingTotal - 1);
+      if (pendingTotal === 0) {
+        invalidateReactions(queryClient);
       } else {
-        invalidateAfterRef.current = true;
+        invalidateAfter = true;
       }
     },
   });
+
 
   const addComment = useMutation({
     retry: 0,
