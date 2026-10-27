@@ -45,7 +45,7 @@ export async function authUsersForEmails(svc: any, emails: string[]): Promise<st
 }
 
 export type Udfald = {
-  status: "sendt" | "ikke_sendt" | "ukendt" | "fravalgt" | "ingen_tilmelding" | "stille_timer" | "slaaet_fra" | "udenfor_regel" | "fejl" | "allerede_sendt";
+  status: "sendt" | "ikke_sendt" | "ukendt" | "fravalgt" | "ingen_tilmelding" | "stille_timer" | "slaaet_fra" | "udenfor_regel" | "fejl" | "allerede_sendt" | "sprunget_over";
   aarsag?: string;
   transportForsoegt: boolean;
   abonnementer: { id: string; kode: number | null; status: "sendt" | "ikke_sendt" | "ukendt" | "doedt" }[];
@@ -55,9 +55,9 @@ export type Udfald = {
 export type PushFaser = {
   /** Tekst-, dedupe-, gate-, præference- og abonnementsopslag. */
   opslag: AbortSignal;
-  /** Selve transporten og abonnementsopdateringer (oprettes ved transportstart). */
+  /** Selve transporten: alle abonnementers fetch (oprettes ved transportstart). */
   transport: () => AbortSignal;
-  /** push_log- og udsendelser-logning efter transport. */
+  /** Logfasen efter sidste transport: push_log, abonnementsopdateringer, udsendelser (og kalderens afslut). */
   log: () => AbortSignal;
 };
 
@@ -65,6 +65,8 @@ export type PushOpts = {
   dedupeKey?: string; url?: string; udsendType?: string; afsenderfunktion?: string;
   tekst?: { title: string; body: string }; navne?: Record<string, string>;
   tag?: string; renotify?: boolean; ttlSekunder?: number; signal?: AbortSignal; maksAbonnementer?: number;
+  /** Fast udløbstidspunkt (epoch ms). TTL beregnes umiddelbart før hvert fetch; ≤ 0 → ingen transport. */
+  udloeberKl?: number;
   faser?: PushFaser;
   /** Kaldes én gang, umiddelbart før første fetch til et abonnement. */
   paaTransportStart?: () => void;
@@ -86,12 +88,27 @@ export function klassificer(code: number | null): "sendt" | "ikke_sendt" | "uken
 }
 
 /** PUSH_STUB virker kun mod en lokal testkopi. */
+const LOKALE_VAERTER = new Set(["127.0.0.1", "localhost", "host.docker.internal"]);
 function stubAktiv(): boolean {
   if (Deno.env.get("PUSH_STUB") !== "1") return false;
-  const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const lokal = ["http://127.0.0.1:", "http://localhost:", "http://host.docker.internal:"].some((p) => url.startsWith(p));
+  let lokal = false;
+  try {
+    const u = new URL(Deno.env.get("SUPABASE_URL") ?? "");
+    lokal = u.protocol === "http:" && LOKALE_VAERTER.has(u.hostname) && !u.username && !u.password;
+  } catch { lokal = false; }
   if (!lokal) { console.error("PUSH_STUB ignoreret uden for testkopi"); return false; }
   return true;
+}
+
+/** PUSH_STUB_KODER: JSON-objekt abonnement-id → HTTP-kode eller null. Ugyldig → ForFetchFejl("payload"). */
+function stubKoder(): Record<string, number | null> {
+  let v: unknown;
+  try { v = JSON.parse(Deno.env.get("PUSH_STUB_KODER") ?? "{}"); } catch { throw new ForFetchFejl("payload"); }
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new ForFetchFejl("payload");
+  for (const k of Object.values(v as Record<string, unknown>)) {
+    if (k !== null && !(typeof k === "number" && Number.isInteger(k))) throw new ForFetchFejl("payload");
+  }
+  return v as Record<string, number | null>;
 }
 
 /** Fejl før selve fetch – tæller ikke som transportforsøg. */
@@ -100,9 +117,11 @@ class ForFetchFejl extends Error {}
 /** Sender ét abonnement via fetch (afbrydes af signal og 8 s timeout). `foerFetch` kaldes umiddelbart før fetch. */
 async function transport(sub: { id: string; endpoint: string; p256dh: string; auth: string }, payload: string, ttl: number, foerFetch: () => void, signal?: AbortSignal): Promise<number | null> {
   if (stubAktiv()) {
-    // Ugyldig PUSH_STUB_KODER kaster (ingen stille fallback).
-    const koder = JSON.parse(Deno.env.get("PUSH_STUB_KODER") ?? "{}") as Record<string, number | null>;
-    const k = sub.id in koder ? koder[sub.id] : Number(Deno.env.get("PUSH_STUB_KODE") ?? "201");
+    // Ugyldig PUSH_STUB_KODER/PUSH_STUB_KODE → payload-fejl før fetch (ingen stille fallback).
+    const koder = stubKoder();
+    const std = Number(Deno.env.get("PUSH_STUB_KODE") ?? "201");
+    if (!Number.isInteger(std)) throw new ForFetchFejl("payload");
+    const k = sub.id in koder ? koder[sub.id] : std;
     foerFetch();
     if (k === null) throw new Error("stub netværk");
     return k;
@@ -177,9 +196,10 @@ export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: P
       if (error) console.error("push_log skrivning fejlede");
     } catch { console.error("push_log skrivning fejlede"); }
   };
+  // Abonnementsopdateringer hører til logfasen (efter sidste transport).
   const opdaterAbonnement = async (id: string, felter: Record<string, unknown>) => {
     try {
-      const { error } = await med(svc.from("push_subscriptions").update(felter).eq("id", id), sTransport());
+      const { error } = await med(svc.from("push_subscriptions").update(felter).eq("id", id), sLog());
       if (error) console.error("push_subscriptions opdatering fejlede");
     } catch { console.error("push_subscriptions opdatering fejlede"); }
   };
@@ -235,15 +255,22 @@ export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: P
           let lastCode: number | null = null;
           let lastError: string | null = null;
           let forFetch: string | null = null;
+          let udloebet = false;
+          // Logfasen samles og køres først efter sidste abonnements transport.
+          const efterTransport: (() => Promise<void>)[] = [];
           for (const s of subs as { id?: string; endpoint?: string; p256dh?: string; auth?: string }[]) {
             if (!s?.id || !s.endpoint || !s.p256dh || !s.auth) {
+              forFetch = "payload";
               res.abonnementer.push({ id: String(s?.id ?? ""), kode: null, status: "ikke_sendt" });
               continue;
             }
+            // Resterende TTL beregnes umiddelbart før hvert fetch.
+            const ttlNu = opts.udloeberKl !== undefined ? Math.floor((opts.udloeberKl - Date.now()) / 1000) : ttl;
+            if (ttlNu <= 0) { udloebet = true; break; }
             let kode: number | null = null;
             let fejl: unknown = undefined;
             try {
-              kode = await transport({ id: s.id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }, payload, ttl, () => { res.transportForsoegt = true; foerFetch(); }, sTransport());
+              kode = await transport({ id: s.id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }, payload, ttlNu, () => { res.transportForsoegt = true; foerFetch(); }, sTransport());
             } catch (e) {
               fejl = e;
             }
@@ -256,17 +283,28 @@ export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: P
             const st = fejl === undefined ? klassificer(kode) : "ukendt";
             res.abonnementer.push({ id: s.id, kode, status: st });
             lastCode = kode;
+            const subId = s.id;
             if (st === "sendt") {
-              await opdaterAbonnement(s.id, { last_success_at: new Date().toISOString() });
+              const tid = new Date().toISOString();
+              efterTransport.push(() => opdaterAbonnement(subId, { last_success_at: tid }));
             } else {
               lastError = sb ? fejlkode(kode, fejl) : String((fejl as Error)?.message ?? `http ${kode}`).slice(0, 200);
               if (st === "doedt") {
-                await opdaterAbonnement(s.id, { is_active: false, deactivated_at: new Date().toISOString() });
-                await logPush({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: kode, error_text: lastError }, sLog());
+                const tid = new Date().toISOString();
+                const fejlTekst = lastError;
+                efterTransport.push(() => opdaterAbonnement(subId, { is_active: false, deactivated_at: tid }));
+                efterTransport.push(() => logPush({ user_id: userId, push_type: type, dedupe_key: null, status: "deactivated", status_code: kode, error_text: fejlTekst }, sLog()));
               } else {
                 console.error("push send failed", kode ?? "unknown");
               }
             }
+          }
+          for (const op of efterTransport) await op();
+          if (!res.transportForsoegt && udloebet) {
+            // Udløbet før første fetch: ingen levering (fx begivenhed efter 23:59:59).
+            res.aarsag = "udløbet";
+            await logPush({ user_id: userId, push_type: type, dedupe_key: opts.dedupeKey ?? null, status: "not_sent", status_code: null, error_text: "udloebet" }, sLog());
+            return { status: "ikke_sendt" as const, fejl: "udloebet" };
           }
           if (!res.transportForsoegt && forFetch) {
             res.aarsag = forFetch;
@@ -289,6 +327,7 @@ export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: P
         },
       });
       res.status = status === "sendt" ? "sendt" : status;
+      if (res.aarsag === "udløbet" && !res.transportForsoegt) res.status = "sprunget_over";
       if (status === "fejl" && !res.aarsag) res.aarsag = res.transportForsoegt ? undefined : "db";
       if (status === "sendt") sendt++;
     } catch (e) {
