@@ -596,10 +596,11 @@ export interface PulsenPollData {
   myOptionId: string | null;
 }
 
-export function usePulsenPoll(postId: string, enabled: boolean) {
+export function usePulsenPoll(postId: string, enabled: boolean, opts: { poll?: boolean } = {}) {
   const qc = useQueryClient();
   const { data: employeeId } = useCurrentEmployeeId();
   const key = ["pulsen-poll", postId];
+  const shouldPoll = enabled && (opts.poll ?? true);
   const query = useQuery({
     queryKey: key,
     queryFn: async (): Promise<PulsenPollData> => {
@@ -620,11 +621,26 @@ export function usePulsenPoll(postId: string, enabled: boolean) {
       };
     },
     enabled: enabled && !!employeeId,
-    refetchInterval: enabled ? 30000 : false,
+    refetchInterval: shouldPoll ? 30000 : false,
+    refetchIntervalInBackground: false,
     staleTime: 15000,
   });
 
+  // Udløb: render igen præcis ved closes_at (højst 24 t frem).
+  const [tick, setTick] = useState(0);
+  const closesAt = query.data?.poll?.closes_at ?? null;
+  const closedAt = query.data?.poll?.closed_at ?? null;
+  useEffect(() => {
+    if (!closesAt || closedAt) return;
+    const ms = new Date(closesAt).getTime() - Date.now();
+    if (ms <= 0) return;
+    const t = setTimeout(() => setTick((n) => n + 1), Math.min(ms + 50, 24 * 3600000));
+    return () => clearTimeout(t);
+  }, [closesAt, closedAt, tick]);
+  const isClosed = !!closedAt || (!!closesAt && new Date(closesAt).getTime() <= Date.now());
+
   const vote = useMutation({
+    retry: 0,
     mutationFn: async (optionId: string) => {
       const { error } = await supabase.rpc("pulsen_stem", { p_post_id: postId, p_option_id: optionId });
       if (error) throw error;
@@ -646,6 +662,7 @@ export function usePulsenPoll(postId: string, enabled: boolean) {
   });
 
   const close = useMutation({
+    retry: 0,
     mutationFn: async () => {
       const { error } = await supabase.rpc("pulsen_luk_afstemning", { p_post_id: postId });
       if (error) throw error;
@@ -653,5 +670,5 @@ export function usePulsenPoll(postId: string, enabled: boolean) {
     onSettled: () => qc.invalidateQueries({ queryKey: key }),
   });
 
-  return { query, vote, close, employeeId: employeeId ?? null };
+  return { query, vote, close, isClosed, employeeId: employeeId ?? null };
 }
