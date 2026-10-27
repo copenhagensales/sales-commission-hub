@@ -22,14 +22,16 @@ export default function Messages() {
   const { data: samtaler, isSuccess: samtalerHentet, refetch: hentSamtaler } = useConversations();
   const location = useLocation();
   const navigate = useNavigate();
-  // Valg fra listen = ny historikpost med state.fraListe, så Tilbage går til listen.
+  // Kun valg fra listevisningen uden allerede valgt samtale = ny historikpost med state.fraListe.
+  // Skift mellem samtaler (A → B, også på bred skærm) erstatter posten og bevarer dens state, så Tilbage altid går til listen.
   const setSelectedConversationId = useCallback((id: string | null) => {
+    const fraListevisning = !!id && !selectedConversationId;
     setSearchParams((prev) => {
       const n = new URLSearchParams(prev);
       if (id) n.set("samtale", id); else n.delete("samtale");
       return n;
-    }, id ? { state: { fraListe: true } } : undefined);
-  }, [setSearchParams]);
+    }, fraListevisning ? { state: { fraListe: true } } : { replace: true, state: location.state });
+  }, [setSearchParams, selectedConversationId, location.state]);
   // Tilbage-pilen: intern navigation → navigate(-1); direkte deep link → replace til listen uden samtale.
   const tilbage = useCallback(() => {
     if ((location.state as { fraListe?: boolean } | null)?.fraListe) { navigate(-1); return; }

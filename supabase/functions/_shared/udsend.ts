@@ -184,14 +184,26 @@ export async function udsendFlere(
   if (gate) { for (const m of u.modtagere) await log(u, m, gate); return gate; }
   const tilladte: Modtager[] = [];
   let udenfor = 0;
+  let fejl = 0;
+  const push = u.kanal === "push";
   for (const m of u.modtagere) {
+    // Push er fail-closed som i udsend(): bruger-, regel- og præferencefejl stopper modtageren med "fejl".
     const b = await brugerId(m, u);
+    if (b === "fejl" && push) { await log(u, m, "fejl", { fejl: "db" }); fejl++; continue; }
     const uid = b === "fejl" ? undefined : b;
-    if ((await udenforRegel(u, uid)) === true) { await log(u, m, "udenfor_regel"); udenfor++; }
-    else if ((await fravalgt(u, uid)) === true) await log(u, m, "fravalgt");
-    else tilladte.push(m);
+    if (!uid && push) { await log(u, m, "ingen_tilmelding"); continue; }
+    const regel = await udenforRegel(u, uid);
+    if (regel === "fejl") { await log(u, m, "fejl", { fejl: "db" }); fejl++; continue; }
+    if (regel) { await log(u, m, "udenfor_regel"); udenfor++; continue; }
+    const fra = await fravalgt(u, uid);
+    if (fra === "fejl") { await log(u, m, "fejl", { fejl: "db" }); fejl++; continue; }
+    if (fra) { await log(u, m, "fravalgt"); continue; }
+    tilladte.push(m);
   }
-  if (!tilladte.length && u.modtagere.length) return udenfor === u.modtagere.length ? "udenfor_regel" : "fravalgt";
+  if (!tilladte.length && u.modtagere.length) {
+    if (fejl) return "fejl";
+    return udenfor === u.modtagere.length ? "udenfor_regel" : "fravalgt";
+  }
   try {
     const r = await u.send(tilladte.map((m) => m.modtager));
     for (const m of tilladte) await log(u, m, "sendt", { reference: r?.reference });

@@ -34,7 +34,11 @@ const FASE2_FRIST_MS = 35_000;
 const NY_PORTION_MIN_MS = 15_000;
 const NY_RAEKKE_MIN_MS = 5_000;
 const ABSOLUT_FRIST_MS = 55_000;
-const AFSLUT_VINDUE_MS = 10_000;
+// Afslutningsvindue (i alt ≤ 10 s): afstemning ≤ 2 s, afslut ≤ 3 s, frigiv_raekker ≤ 3 s, frigiv ≤ 2 s – hver med egen frist.
+const AFSTEM_MS = 2_000;
+const AFSLUT_REST_MS = 3_000;
+const FRIGIV_RAEKKER_MS = 3_000;
+const FRIGIV_MS = 2_000;
 const GENVALIDERING_MS = 3_000;
 const LOG_MS = 3_000;
 const TRANSPORT_MS = 24_000;
@@ -71,6 +75,8 @@ function plusDage(dato: string, n: number): string {
 }
 /** Sekunder til 23:59:59 dansk tid (ingen nedre grænse). */
 const sekTilDagensSlut = () => 86399 - dkDele().sek;
+/** Dagens dansk 23:59:59 som epoch (ms). */
+const dagensSlutEpoch = () => dkTilUtc(dkDele().dato, "23:59").getTime() + 59_000;
 const omMin = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
 
 // ---------- hjælpere ----------
@@ -326,8 +332,11 @@ async function omtaleGrundlag(svc: Svc, mentions: Mention[], modtager: string, s
   if (mentions.some((m) => m.t === "e" && m.id === modtager)) return "dig";
   const teams = mentions.filter((m) => m.t === "t").map((m) => m.id);
   if (!teams.length) return null;
-  const { count } = db(await s(svc.from("team_members").select("id", { count: "exact", head: true }).eq("employee_id", modtager).in("team_id", teams), signal));
-  return (count ?? 0) > 0 ? "team" : null;
+  for (const del of bidder([...new Set(teams)])) {
+    const { count } = db(await s(svc.from("team_members").select("id", { count: "exact", head: true }).eq("employee_id", modtager).in("team_id", del), signal));
+    if ((count ?? 0) > 0) return "team";
+  }
+  return null;
 }
 
 type Post = { id: string; author_employee_id: string; audience: string; team_id: string | null; deleted_at: string | null; hidden_at: string | null; praised_employee_ids: string[] | null; mentions: unknown; post_type: string };
@@ -405,13 +414,19 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
       if (!r.blok) return { status: "annulleret", aarsag: "kilde væk" };
       const fra = new Date(`${r.blok}:00:00Z`);
       const til = new Date(fra.getTime() + 3600_000);
-      const { data: re } = db(await s(svc.from("feed_reactions").select("user_id, created_at").eq("target_type", "pulsen_post").eq("target_key", `pulsen_post:${postId}`)
-        .gte("created_at", fra.toISOString()).lt("created_at", til.toISOString()).order("created_at", { ascending: true }), signal));
-      const users = [...new Set(((re ?? []) as { user_id: string }[]).map((x) => x.user_id))];
+      // Pagineret (blokke à 1.000, ordnet efter id); første reaktor = tidligste created_at.
+      const re = await alleSider<{ id: string; user_id: string; created_at: string }>((a, b) =>
+        s(svc.from("feed_reactions").select("id, user_id, created_at").eq("target_type", "pulsen_post").eq("target_key", `pulsen_post:${postId}`)
+          .gte("created_at", fra.toISOString()).lt("created_at", til.toISOString()).order("id").range(a, b), signal), () => new DbFejl("db"));
+      re.sort((x, y) => x.created_at < y.created_at ? -1 : x.created_at > y.created_at ? 1 : x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
+      const users = [...new Set(re.map((x) => x.user_id))];
       let reaktorer: string[] = [];
       if (users.length) {
-        const { data: em } = db(await s(svc.from("employee_master_data").select("id, auth_user_id").in("auth_user_id", users), signal));
-        const map = new Map(((em ?? []) as { id: string; auth_user_id: string }[]).map((x) => [x.auth_user_id, x.id]));
+        const map = new Map<string, string>();
+        for (const del of bidder(users)) {
+          const { data: em } = db(await s(svc.from("employee_master_data").select("id, auth_user_id").in("auth_user_id", del), signal));
+          for (const x of (em ?? []) as { id: string; auth_user_id: string }[]) map.set(x.auth_user_id, x.id);
+        }
         reaktorer = users.map((u) => map.get(u)).filter((x): x is string => !!x && x !== modtager);
         reaktorer = [...new Set(reaktorer)];
       }
@@ -430,11 +445,16 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
       const { data: att } = db(await s(svc.from("event_attendees").select("status").eq("event_id", eventId).eq("employee_id", modtager), signal).maybeSingle());
       const st = (att as { status: string } | null)?.status;
       if (st !== "attending" && st !== "maybe") return { status: "annulleret", aarsag: "ikke deltager" };
-      const { data: inv } = db(await s(svc.from("event_team_invitations").select("team_id").eq("event_id", eventId), signal));
-      const teams = ((inv ?? []) as { team_id: string }[]).map((x) => x.team_id);
+      const inv = await alleSider<{ id: string; team_id: string }>((a, b) =>
+        s(svc.from("event_team_invitations").select("id, team_id").eq("event_id", eventId).order("id").range(a, b), signal), () => new DbFejl("db"));
+      const teams = [...new Set(inv.map((x) => x.team_id))];
       if (teams.length) {
-        const { count } = db(await s(svc.from("team_members").select("id", { count: "exact", head: true }).eq("employee_id", modtager).in("team_id", teams), signal));
-        if (!(count ?? 0)) return { status: "annulleret", aarsag: "ikke inviteret" };
+        let inviteret = false;
+        for (const del of bidder(teams)) {
+          const { count } = db(await s(svc.from("team_members").select("id", { count: "exact", head: true }).eq("employee_id", modtager).in("team_id", del), signal));
+          if ((count ?? 0) > 0) { inviteret = true; break; }
+        }
+        if (!inviteret) return { status: "annulleret", aarsag: "ikke inviteret" };
       }
       const kl = e.event_time ? e.event_time.slice(0, 5) : null;
       return { title: "Begivenhed i morgen", body: kl ? `Begivenhed i morgen kl. ${kl}` : "Begivenhed i morgen", url: `/storkbook/begivenhed/${eventId}`, tag: `begivenhed:${eventId}`, ttl: sekTilDagensSlut() };
@@ -490,6 +510,7 @@ function udfaldTilAfslut(u: Udfald, forsoeg: number): Afslut {
     case "ukendt": return { status: "ukendt", aarsag: fk ?? "ukendt", metadata: meta, transport: u.transportForsoegt };
     case "stille_timer": return { status: "udskudt", aarsag: "stille_timer", naeste: omMin(15), metadata: meta, transport: false };
     case "fejl": return { status: "ikke_sendt", aarsag: fk ?? "db", naeste: omMin(2), metadata: meta, transport: u.transportForsoegt };
+    case "sprunget_over": return { status: "sprunget_over", aarsag: u.aarsag ?? "sprunget_over", metadata: meta, transport: u.transportForsoegt };
     default: return { status: "sprunget_over", aarsag: u.status, metadata: meta, transport: u.transportForsoegt };
   }
 }
@@ -502,11 +523,13 @@ async function afslut(svc: Svc, id: string, token: string, a: Afslut, signal: Ab
   return true;
 }
 
-async function frigivRaekker(svc: Svc, token: string, ids: string[], signal: AbortSignal): Promise<boolean> {
-  if (!ids.length) return true;
-  const fr = await s(svc.rpc("udsendelse_frigiv_raekker", { p_token: token, p_ids: ids }), signal).then((x) => x, () => ({ error: "afbrudt" }));
-  if (fr.error) { console.error("storkbook-udsendelser: frigiv_raekker fejlede"); return false; }
-  return true;
+/** Returnerer RPC'ens antal frigivne rækker, eller null ved fejl. */
+async function frigivRaekker(svc: Svc, token: string, ids: string[], signal: AbortSignal): Promise<number | null> {
+  if (!ids.length) return 0;
+  const fr = await s(svc.rpc("udsendelse_frigiv_raekker", { p_token: token, p_ids: ids }), signal)
+    .then((x) => x as { data: unknown; error: unknown }, () => ({ data: null, error: "afbrudt" }));
+  if (fr.error || typeof fr.data !== "number") { console.error("storkbook-udsendelser: frigiv_raekker fejlede"); return null; }
+  return fr.data;
 }
 
 // ---------- server ----------
@@ -547,10 +570,13 @@ Deno.serve(async (req) => {
     const ejede = new Map<string, Ejet>();
     let fikLaas = false;
     let frigivet = 0;
+    const fejlT = { afslut_fejl: 0, frigiv_fejl: 0, laas_fejl: 0, afstemning_fejl: 0 };
+    const trin: Record<string, string> = {};
     try {
       const laas = await s(svc.rpc("udsendelse_laas", { p_token: token }), hoved.signal);
       fikLaas = !laas.error && laas.data === true;
       if (!fikLaas) rapport.sprunget_over = laas.error ? "lås-fejl" : "anden kørsel";
+      if (laas.error) fejlT.laas_fejl++;
       if (fikLaas) {
         // (5) oprydning
         const op = await s(svc.rpc("udsendelse_oprydning"), hoved.signal);
@@ -583,16 +609,12 @@ Deno.serve(async (req) => {
               if (hoved.signal.aborted) throw e;
               a = { status: "ikke_sendt", aarsag: e instanceof DbFejl ? "db-fejl" : "db-timeout", naeste: omMin(2), transport: false };
             }
-            if (klar && r.type_noegle === "storkbook_begivenhed") {
-              // TTL til 23:59:59 dansk tid, beregnet umiddelbart før transport.
-              const ttl = sekTilDagensSlut();
-              if (ttl <= 0) { a = { status: "annulleret", aarsag: "udløbet", transport: false }; klar = null; }
-              else klar.ttl = ttl;
-            }
+            // Begivenhed: fast udløb dansk 23:59:59; resterende TTL beregnes i sendPushUdfald før hvert fetch.
+            const udloeberKl = r.type_noegle === "storkbook_begivenhed" ? dagensSlutEpoch() : undefined;
             if (klar) {
               const res = await sendPushUdfald(svc, [klar.userId], r.type_noegle, {
                 udsendType: r.type_noegle, tag: klar.tag, renotify: true, url: klar.url, tekst: { title: klar.title, body: klar.body },
-                ttlSekunder: klar.ttl, afsenderfunktion: "storkbook-udsendelser", dedupeKey: r.haendelse, signal: hoved.signal, maksAbonnementer: 3,
+                ttlSekunder: klar.ttl, udloeberKl, afsenderfunktion: "storkbook-udsendelser", dedupeKey: r.haendelse, signal: hoved.signal, maksAbonnementer: 3,
                 faser: {
                   opslag: gv,
                   transport: () => (tSig ??= AbortSignal.any([hoved.signal, AbortSignal.timeout(TRANSPORT_MS)])),
@@ -609,9 +631,12 @@ Deno.serve(async (req) => {
               ejede.delete(r.id);
               optalt[a.status] = (optalt[a.status] ?? 0) + 1;
             } else {
-              optalt.afslut_fejl = (optalt.afslut_fejl ?? 0) + 1;
+              fejlT.afslut_fejl++;
               // Uden transport frigives rækken straks; med transport forbliver den ejet (→ vindue / opgivet ved oprydning).
-              if (!ejet.transport && await frigivRaekker(svc, token, [r.id], logSig())) { ejede.delete(r.id); frigivet++; }
+              if (!ejet.transport) {
+                const n = await frigivRaekker(svc, token, [r.id], logSig());
+                if (n === null) fejlT.frigiv_fejl++; else { ejede.delete(r.id); frigivet += n; }
+              }
             }
           }
         }
@@ -620,27 +645,43 @@ Deno.serve(async (req) => {
       if (!hoved.signal.aborted) console.error("storkbook-udsendelser: kørsel fejlede", (e as Error)?.message ?? "fejl");
     } finally {
       clearTimeout(hovedTimer);
-      // Afslutningsvindue (≤ 10 s, egen frist).
-      const slut = AbortSignal.timeout(AFSLUT_VINDUE_MS);
-      // Afstem ejede rækker mod DB (dækker tabt svar fra udsendelse_overtag); fejler opslaget, bruges lokal liste.
+      // Afslutningsvindue: hvert trin har egen frist, så intet trin kan spærre de næste.
+      // (0) Afstem ejede rækker mod DB (≤ 2 s; dækker tabt svar fra udsendelse_overtag); fejler opslaget, bruges lokal liste.
       let ids = [...ejede.keys()];
-      const afst = await s(svc.from("udsendelse_reservationer").select("id, transportforsoeg").eq("worker_token", token).eq("status", "sender"), slut)
-        .then((x) => x, () => ({ data: null, error: "afbrudt" }));
-      if (!afst.error && Array.isArray(afst.data)) ids = (afst.data as { id: string }[]).map((x) => x.id);
-      else if (fikLaas) console.error("storkbook-udsendelser: afstemning fejlede");
-      const frigiv: string[] = [];
-      for (const id of ids) {
-        const e = ejede.get(id);
-        if (e?.transport) {
-          const a: Afslut = e.afslut && e.afslut.transport ? e.afslut : { status: "ukendt", aarsag: "frist", transport: true };
-          await afslut(svc, id, token, a, slut).catch(() => false);
-        } else frigiv.push(id);
+      {
+        // Køres altid (også ved tabt lås-svar).
+        const afst = await s(svc.from("udsendelse_reservationer").select("id").eq("worker_token", token).eq("status", "sender"), AbortSignal.timeout(AFSTEM_MS))
+          .then((x) => x as { data: unknown; error: unknown }, () => ({ data: null, error: "afbrudt" }));
+        if (!afst.error && Array.isArray(afst.data)) { ids = (afst.data as { id: string }[]).map((x) => x.id); trin.afstemning = "ok"; }
+        else { fejlT.afstemning_fejl++; trin.afstemning = "fejl"; console.error("storkbook-udsendelser: afstemning fejlede"); }
       }
-      if (frigiv.length && await frigivRaekker(svc, token, frigiv, slut)) frigivet += frigiv.length;
-      const fl = await s(svc.rpc("udsendelse_frigiv", { p_token: token }), slut).then((x) => x, () => ({ error: "afbrudt" }));
-      if (fl.error) console.error("storkbook-udsendelser: frigiv fejlede");
+      const transporteret = ids.filter((id) => ejede.get(id)?.transport);
+      const frigiv = ids.filter((id) => !ejede.get(id)?.transport);
+      // (1) Afslut transporterede rækker (≤ 3 s, eget signal).
+      if (transporteret.length) {
+        const sig1 = AbortSignal.timeout(AFSLUT_REST_MS);
+        let ok1 = 0;
+        for (const id of transporteret) {
+          const e = ejede.get(id)!;
+          const a: Afslut = e.afslut && e.afslut.transport ? e.afslut : { status: "ukendt", aarsag: "frist", transport: true };
+          if (await afslut(svc, id, token, a, sig1).catch(() => false)) ok1++; else fejlT.afslut_fejl++;
+        }
+        trin.afslut = `${ok1}/${transporteret.length}`;
+      } else trin.afslut = "ingen";
+      // (2) Frigiv upåbegyndte rækker (≤ 3 s, eget signal).
+      if (frigiv.length) {
+        const n = await frigivRaekker(svc, token, frigiv, AbortSignal.timeout(FRIGIV_RAEKKER_MS));
+        if (n === null) { fejlT.frigiv_fejl++; trin.frigiv_raekker = "fejl"; } else { frigivet += n; trin.frigiv_raekker = `${n}/${frigiv.length}`; }
+      } else trin.frigiv_raekker = "ingen";
+      // (3) Frigiv låsen (≤ 2 s, eget signal).
+      {
+        const fl = await s(svc.rpc("udsendelse_frigiv", { p_token: token }), AbortSignal.timeout(FRIGIV_MS))
+          .then((x) => x as { data: unknown; error: unknown }, () => ({ data: null, error: "afbrudt" }));
+        if (fl.error) { fejlT.laas_fejl++; trin.frigiv = "fejl"; console.error("storkbook-udsendelser: frigiv fejlede"); } else trin.frigiv = "ok";
+      }
     }
-    return json({ ok: true, ...rapport, fase2: optalt, frigivet, varighed_ms: Date.now() - start });
+    const ok = Object.values(fejlT).every((n) => n === 0);
+    return json({ ok, ...rapport, fase2: optalt, ...fejlT, frigivet, afslutning: trin, varighed_ms: Date.now() - start });
   } catch (e) {
     return json({ error: (e as Error)?.name === "AbortError" ? "frist" : e instanceof Error ? e.message : "Fejl" }, 500);
   } finally {

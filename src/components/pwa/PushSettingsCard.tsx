@@ -25,9 +25,14 @@ function StorkbookToggles() {
   // Gem serialiseres: næste gem starter først, når forrige er afsluttet. Hvert gem håndteres for sig.
   const koe = useRef<Promise<void>>(Promise.resolve());
   const seq = useRef<Record<string, number>>({});
-  // Lokale overrides nulstilles ved brugerskift.
+  // Senest BEKRÆFTEDE serverværdi pr. type (RPC-værdi eller lykket gem) – rollback går hertil.
+  const bekraeftet = useRef<Record<string, boolean>>({});
   const brugerRef = useRef(user?.id);
-  useEffect(() => { brugerRef.current = user?.id; setLokalt({}); seq.current = {}; }, [user?.id]);
+  // Brugerskift: nulstil alt; køelementer bundet til den gamle bruger annulleres (tjekkes før kald).
+  useEffect(() => { brugerRef.current = user?.id; setLokalt({}); seq.current = {}; bekraeftet.current = {}; }, [user?.id]);
+  // Kun Storkbook-typer, som RPC'en faktisk returnerer for push.
+  const raekker = (praef.data ?? []).filter((x) => x.kanal === "push");
+  for (const r of raekker) if (!(r.noegle in bekraeftet.current)) bekraeftet.current[r.noegle] = r.aktiv !== false;
   if (praef.isError) {
     return (
       <div className="space-y-2">
@@ -37,36 +42,46 @@ function StorkbookToggles() {
     );
   }
   if (praef.isLoading) return <p className="text-sm text-muted-foreground">Henter indstillinger …</p>;
-  const aktiv = (noegle: string) => {
-    if (noegle in lokalt) return lokalt[noegle];
-    const r = (praef.data ?? []).find((x) => x.noegle === noegle && x.kanal === "push");
-    return r ? r.aktiv !== false : true;
-  };
+  const synlige = STORKBOOK_TYPER.flatMap((t) => {
+    const r = raekker.find((x) => x.noegle === t.noegle);
+    return r ? [{ ...t, server: r.aktiv !== false }] : [];
+  });
+  if (!synlige.length) return null;
   const skift = (noegle: string, v: boolean) => {
+    const bruger = user?.id;
+    if (!bruger) return;
     const mitSeq = (seq.current[noegle] ?? 0) + 1;
     seq.current[noegle] = mitSeq;
-    const bruger = user?.id;
-    const foer = aktiv(noegle);
     setLokalt((p) => ({ ...p, [noegle]: v }));
     const saetFlere = praef.saetFlere;
     koe.current = koe.current.then(async () => {
+      // Elementet er bundet til brugeren ved oprettelse; skiftet bruger → annulleret, intet skrives.
+      if (bruger !== brugerRef.current) return;
       let fejl = false;
       try { await saetFlere.mutateAsync([{ noegle, kanal: "push", aktiv: v }]); } catch { fejl = true; }
-      if (fejl) toast.error("Kunne ikke gemme indstillingen", { description: "Prøv igen." });
-      // Rollback kun for denne type og kun, hvis intet nyere valg er lavet for typen (samme bruger).
-      if (!fejl || bruger !== brugerRef.current || seq.current[noegle] !== mitSeq) return;
-      setLokalt((p) => ({ ...p, [noegle]: foer }));
+      if (bruger !== brugerRef.current) return;
+      if (!fejl) bekraeftet.current[noegle] = v;
+      else toast.error("Kunne ikke gemme indstillingen", { description: "Prøv igen." });
+      // Kun hvis intet nyere valg er lavet for typen.
+      if (seq.current[noegle] !== mitSeq) return;
+      if (!fejl) {
+        // Succes: fjern override, så friske RPC-værdier vises (listen er gen-hentet i onSuccess).
+        setLokalt((p) => { const n = { ...p }; delete n[noegle]; return n; });
+      } else {
+        const b = bekraeftet.current[noegle];
+        setLokalt((p) => { const n = { ...p }; if (b === undefined) delete n[noegle]; else n[noegle] = b; return n; });
+      }
     });
   };
   return (
     <div className="space-y-1">
       <p className="text-sm font-medium">Storkbook</p>
       <ul className="divide-y">
-        {STORKBOOK_TYPER.map((t) => (
+        {synlige.map((t) => (
           <li key={t.noegle}>
             <label className="flex min-h-11 items-center justify-between gap-3 py-1">
               <span className="text-sm">{t.navn}</span>
-              <Switch checked={aktiv(t.noegle)} onCheckedChange={(v) => skift(t.noegle, v)} aria-label={t.navn} />
+              <Switch checked={t.noegle in lokalt ? lokalt[t.noegle] : t.server} onCheckedChange={(v) => skift(t.noegle, v)} aria-label={t.navn} />
             </label>
           </li>
         ))}
