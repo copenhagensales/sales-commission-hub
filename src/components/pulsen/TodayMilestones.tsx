@@ -29,7 +29,7 @@ export function milestoneName(m: PulsenMilestone): string {
 }
 /** Husrekord level 1 måles i provision (kr); level 0 er historiske salgsrekorder. */
 export const milestoneUnit = (m: PulsenMilestone) =>
-  m.milestone_type === "house_record" && m.level === 1 ? "kr" : UNIT[m.milestone_type];
+  (m.milestone_type === "house_record" || m.milestone_type === "team_record") && m.level === 1 ? "kr" : UNIT[m.milestone_type];
 export const milestoneNumber = (m: PulsenMilestone) => Math.round(Number(m.value ?? 0)).toLocaleString("da-DK");
 export const milestoneValue = (m: PulsenMilestone) => `${milestoneNumber(m)} ${milestoneUnit(m)}`;
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" });

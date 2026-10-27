@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
         case "club": return `**${n}** nåede Klub ${c.level / 1000} – **${kr(c.value)}** i provision denne lønperiode`;
         case "streak": return `**${n}** har solgt **${c.level} dage i træk**`;
         case "team_day_sales": return `**${tn}** rundede **${c.level} salg** {dag}`;
-        case "team_record": return `**${tn}** satte teamrekord {dag}: **${c.value} salg** (før ${c.previous})`;
+        case "team_record": return c.level === 1 ? `**${tn}** satte teamrekord {dag}: **${kr(c.value)}** i provision (før ${kr(c.previous)})` : `**${tn}** satte teamrekord {dag}: **${c.value} salg** (før ${c.previous})`;
         case "house_record": return c.level === 1 ? `Husrekord {dag}: **${kr(c.value)}** i provision (før ${kr(c.previous)})` : `Husrekord {dag}: **${c.value} salg** (før ${c.previous})`;
         default: return c.milestone_type;
       }
