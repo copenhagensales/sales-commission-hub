@@ -14,12 +14,16 @@ export function TvKeepAwake() {
     };
 
     let lock: { release: () => Promise<void> } | null = null;
+    let cancelled = false;
     const requestLock = () => {
       const wl = (navigator as Navigator & {
         wakeLock?: { request: (t: "screen") => Promise<{ release: () => Promise<void> }> };
       }).wakeLock;
       if (!wl || document.visibilityState !== "visible") return;
-      wl.request("screen").then((l) => { lock = l; }).catch(() => undefined);
+      wl.request("screen").then((l) => {
+        if (cancelled) { l.release().catch(() => undefined); return; }
+        lock = l;
+      }).catch(() => undefined);
     };
 
     const onVisible = () => {
@@ -37,6 +41,7 @@ export function TvKeepAwake() {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      cancelled = true;
       window.clearInterval(interval);
       events.forEach((e) => window.removeEventListener(e, tryPlay));
       document.removeEventListener("visibilitychange", onVisible);
