@@ -13733,6 +13733,198 @@ export type Database = {
         }
         Relationships: []
       }
+      pulsen_poll_ballots: {
+        Row: {
+          created_at: string
+          employee_id: string
+          post_id: string
+          stemt: boolean
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          post_id: string
+          stemt?: boolean
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          post_id?: string
+          stemt?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulsen_poll_ballots_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_ballots_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_ballots_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_ballots_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "pulsen_polls"
+            referencedColumns: ["post_id"]
+          },
+        ]
+      }
+      pulsen_poll_options: {
+        Row: {
+          id: string
+          label: string
+          position: number
+          post_id: string
+        }
+        Insert: {
+          id?: string
+          label: string
+          position: number
+          post_id: string
+        }
+        Update: {
+          id?: string
+          label?: string
+          position?: number
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulsen_poll_options_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "pulsen_polls"
+            referencedColumns: ["post_id"]
+          },
+        ]
+      }
+      pulsen_poll_votes: {
+        Row: {
+          employee_id: string | null
+          id: string
+          option_id: string
+          post_id: string
+        }
+        Insert: {
+          employee_id?: string | null
+          id?: string
+          option_id: string
+          post_id: string
+        }
+        Update: {
+          employee_id?: string | null
+          id?: string
+          option_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulsen_poll_votes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_votes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_votes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_votes_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "pulsen_poll_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_poll_votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "pulsen_polls"
+            referencedColumns: ["post_id"]
+          },
+        ]
+      }
+      pulsen_polls: {
+        Row: {
+          anonymous: boolean
+          closed_at: string | null
+          closes_at: string
+          created_at: string
+          created_by: string
+          post_id: string
+        }
+        Insert: {
+          anonymous: boolean
+          closed_at?: string | null
+          closes_at: string
+          created_at?: string
+          created_by: string
+          post_id: string
+        }
+        Update: {
+          anonymous?: boolean
+          closed_at?: string | null
+          closes_at?: string
+          created_at?: string
+          created_by?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulsen_polls_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_polls_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_polls_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulsen_polls_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "pulsen_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pulsen_posts: {
         Row: {
           audience: string
@@ -19762,6 +19954,7 @@ export type Database = {
         Returns: boolean
       }
       pulsen_led_team_ids: { Args: never; Returns: string[] }
+      pulsen_luk_afstemning: { Args: { p_post_id: string }; Returns: undefined }
       pulsen_member_team_ids: { Args: never; Returns: string[] }
       pulsen_milestone_candidates: {
         Args: { p_from: string; p_to: string; p_types: string[] }
@@ -19790,6 +19983,24 @@ export type Database = {
           tier: number
           value: number
         }[]
+      }
+      pulsen_opret_afstemning: {
+        Args: {
+          p_anonymous: boolean
+          p_audience: string
+          p_body: string
+          p_dage: number
+          p_options: string[]
+          p_team_id: string
+        }
+        Returns: string
+      }
+      pulsen_poll_aaben: { Args: { _post_id: string }; Returns: boolean }
+      pulsen_poll_laas: { Args: { _post_id: string }; Returns: undefined }
+      pulsen_poll_synlig: { Args: { _post_id: string }; Returns: boolean }
+      pulsen_stem: {
+        Args: { p_option_id: string; p_post_id: string }
+        Returns: undefined
       }
       pulsen_topline: {
         Args: never

@@ -123,56 +123,81 @@ export function useFeedReactions(targetKeys: string[]) {
 
   type ReactionRow = { id: string; target_key: string; user_id: string; emoji: string; created_at: string };
   type ReactionVars = { targetType: FeedTargetType; targetKey: string; reaction: ReactionKey };
-  // Hvad onMutate så før den optimistiske ændring (så hurtige gentagne tryk ikke læser den ændrede cache).
-  const pendingRef = useRef(new WeakMap<ReactionVars, { current: ReactionKey | null; mineIds: string[] }>());
+  // Hensigt fundet i onMutate (sæt eller fjern), så mutationFn ikke læser den optimistisk ændrede cache.
+  const intentRef = useRef(new WeakMap<ReactionVars, "set" | "remove">());
+  // Skrivninger pr. mål udføres i rækkefølge; sidste handling vinder.
+  const chainRef = useRef(new Map<string, Promise<unknown>>());
+  const pendingCountRef = useRef(new Map<string, number>());
 
   /** Sætter brugerens ene reaktion. Samme reaktion igen = fjern. Anden reaktion = skift. Optimistisk med tilbagerulning. */
   const setReaction = useMutation({
     onMutate: async (vars: ReactionVars) => {
       const qk = ["feed-reactions", keys];
+      pendingCountRef.current.set(vars.targetKey, (pendingCountRef.current.get(vars.targetKey) ?? 0) + 1);
       await queryClient.cancelQueries({ queryKey: qk });
-      const previous = queryClient.getQueryData<ReactionRow[]>(qk);
-      const rows = previous ?? [];
-      const mine = rows
-        .filter((r) => r.target_key === vars.targetKey && r.user_id === myUserId)
-        .sort((x, y) => y.created_at.localeCompare(x.created_at));
-      const current = mine[0] ? reactionKeyForEmoji(mine[0].emoji) : null;
-      pendingRef.current.set(vars, { current, mineIds: mine.map((r) => r.id).filter((id) => !id.startsWith("optimistisk-")) });
+      const rows = queryClient.getQueryData<ReactionRow[]>(qk) ?? [];
+      const isMine = (r: ReactionRow) => r.target_key === vars.targetKey && r.user_id === myUserId;
+      const previousMine = rows.filter(isMine);
+      const latest = [...previousMine].sort((x, y) => y.created_at.localeCompare(x.created_at))[0];
+      const current = latest ? reactionKeyForEmoji(latest.emoji) : null;
+      intentRef.current.set(vars, current === vars.reaction ? "remove" : "set");
       if (myUserId) {
-        const next = rows.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
+        const next = rows.filter((r) => !isMine(r));
         if (current !== vars.reaction) {
           next.push({ id: "optimistisk-" + crypto.randomUUID(), target_key: vars.targetKey, user_id: myUserId, emoji: reactionOption(vars.reaction).emoji, created_at: new Date().toISOString() });
         }
         queryClient.setQueryData<ReactionRow[]>(qk, next);
       }
-      return { previous, qk };
+      return { previousMine, qk };
     },
     mutationFn: async (vars: ReactionVars) => {
       const { targetType, targetKey, reaction } = vars;
-      if (!myUserId) throw new Error("Du skal være logget ind");
-      const seen = pendingRef.current.get(vars) ?? { current: null, mineIds: [] };
-      if (seen.current !== reaction) {
-        const { error } = await supabase.from("feed_reactions").insert({
+      const intent = intentRef.current.get(vars) ?? "set";
+      const previous = chainRef.current.get(targetKey) ?? Promise.resolve();
+      const run = (async () => {
+        await previous.catch(() => {});
+        if (!myUserId) throw new Error("Du skal være logget ind");
+        if (intent === "remove") {
+          const { error } = await supabase.from("feed_reactions").delete()
+            .eq("target_key", targetKey).eq("user_id", myUserId);
+          if (error) throw error;
+          return;
+        }
+        const { data, error } = await supabase.from("feed_reactions").insert({
           target_type: targetType,
           target_key: targetKey,
           user_id: myUserId,
           emoji: reactionOption(reaction).emoji,
-        });
+        }).select("id").single();
         if (error) throw error;
-      }
-      // Fjern brugerens egne tidligere reaktioner på samme mål.
-      if (seen.mineIds.length > 0) {
-        const { error } = await supabase.from("feed_reactions").delete().in("id", seen.mineIds);
-        if (error) throw error;
+        const { error: delError } = await supabase.from("feed_reactions").delete()
+          .eq("target_key", targetKey).eq("user_id", myUserId).neq("id", data.id);
+        if (delError) throw delError;
+      })();
+      chainRef.current.set(targetKey, run);
+      try {
+        await run;
+      } finally {
+        if (chainRef.current.get(targetKey) === run) chainRef.current.delete(targetKey);
       }
     },
-    onError: (_e, _vars, ctx) => {
-      if (ctx) queryClient.setQueryData(ctx.qk, ctx.previous);
+    onError: (_e, vars, ctx) => {
+      if (ctx) {
+        const rows = queryClient.getQueryData<ReactionRow[]>(ctx.qk) ?? [];
+        const others = rows.filter((r) => !(r.target_key === vars.targetKey && r.user_id === myUserId));
+        queryClient.setQueryData<ReactionRow[]>(ctx.qk, [...others, ...ctx.previousMine]);
+      }
       toast.error("Reaktionen blev ikke gemt");
     },
     onSettled: (_d, _e, vars) => {
-      pendingRef.current.delete(vars);
-      queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
+      intentRef.current.delete(vars);
+      const left = (pendingCountRef.current.get(vars.targetKey) ?? 1) - 1;
+      if (left > 0) {
+        pendingCountRef.current.set(vars.targetKey, left);
+      } else {
+        pendingCountRef.current.delete(vars.targetKey);
+        queryClient.invalidateQueries({ queryKey: ["feed-reactions"] });
+      }
     },
   });
 
