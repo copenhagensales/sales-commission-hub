@@ -232,7 +232,8 @@ export function useMarkMessageAsRead() {
   return useMutation({
     mutationFn: async ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
       const employeeId = await getCurrentEmployeeId();
-      
+      // Fokus kontrolleres umiddelbart før skrivning (også ved retry); ellers afbrydes uden skrivning.
+      if (!erSynligMedFokus()) return { conversationId };
       // Idempotent kvittering
       const { error } = await supabase
         .from("chat_message_read_receipts")
@@ -391,24 +392,31 @@ export function useMarkAsRead() {
       
       // Kvitterer kun, når vinduet er synligt og har fokus (aldrig massekvittering i baggrunden).
       if (!erSynligMedFokus() || !employeeId) return conversationId;
-      const { data: ulaeste, error: mErr } = await supabase
-        .from("chat_messages")
-        .select("id, chat_message_read_receipts!left(employee_id)")
-        .eq("conversation_id", conversationId)
-        .neq("sender_id", employeeId)
-        .is("deleted_at", null)
-        .eq("chat_message_read_receipts.employee_id", employeeId)
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (mErr) throw mErr;
-      const ids = (ulaeste ?? [])
-        .filter((m) => !(m.chat_message_read_receipts as { employee_id: string }[] | null)?.length)
-        .map((m) => m.id);
-      if (ids.length) {
-        const nu = new Date().toISOString();
+      // Alle ulæste fra andre (pagineret i blokke à 1.000, ordnet efter id) – ikke kun de seneste.
+      const ids: string[] = [];
+      for (let fra = 0; ; fra += 1000) {
+        const { data: side, error: mErr } = await supabase
+          .from("chat_messages")
+          .select("id, chat_message_read_receipts!left(employee_id)")
+          .eq("conversation_id", conversationId)
+          .neq("sender_id", employeeId)
+          .is("deleted_at", null)
+          .eq("chat_message_read_receipts.employee_id", employeeId)
+          .order("id")
+          .range(fra, fra + 999);
+        if (mErr) throw mErr;
+        for (const m of side ?? []) {
+          if (!(m.chat_message_read_receipts as { employee_id: string }[] | null)?.length) ids.push(m.id);
+        }
+        if ((side ?? []).length < 1000) break;
+      }
+      const nu = new Date().toISOString();
+      for (let i = 0; i < ids.length; i += 500) {
+        // Fokus kontrolleres før hver skrivning; falder det, afbrydes uden yderligere skrivning.
+        if (!erSynligMedFokus()) break;
         const { error } = await supabase
           .from("chat_message_read_receipts")
-          .upsert(ids.map((id) => ({ message_id: id, employee_id: employeeId, read_at: nu })), { onConflict: "message_id,employee_id", ignoreDuplicates: true });
+          .upsert(ids.slice(i, i + 500).map((id) => ({ message_id: id, employee_id: employeeId, read_at: nu })), { onConflict: "message_id,employee_id", ignoreDuplicates: true });
         if (error) throw error;
       }
       return conversationId;
@@ -698,6 +706,18 @@ export function useTeamMembers(teamId: string | null) {
 export const CHAT_UNREAD_KEY = ["chat-unread-total"] as const;
 
 /**
+ * Sand, hvis en UPDATE på chat_conversation_members kun ændrer aktiv_til/last_read_at (heartbeat).
+ * Tabellen har REPLICA IDENTITY DEFAULT, så `old` indeholder typisk kun id; de øvrige kolonner
+ * (conversation_id, employee_id, joined_at) ændres ikke ved opdatering, så en UPDATE uden sammenlignelige
+ * gamle værdier behandles som heartbeat. Ulæsttal bygger på kvitteringer, ikke på disse kolonner.
+ */
+function kunAktivitet(old: Record<string, unknown> | null | undefined, ny: Record<string, unknown> | null | undefined): boolean {
+  const ignorer = new Set(["aktiv_til", "last_read_at"]);
+  const noegler = Object.keys(ny ?? {}).filter((k) => !ignorer.has(k) && k !== "id" && old && k in old);
+  return noegler.every((k) => JSON.stringify(old?.[k]) === JSON.stringify(ny?.[k]));
+}
+
+/**
  * Ulæste chatbeskeder i alt: beskeder i samtaler, brugeren er medlem af, fra andre, ikke slettet,
  * og uden læsekvittering fra brugeren i chat_message_read_receipts. Opdateres via realtime.
  */
@@ -715,7 +735,10 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
       .channel(`chat-unread-${employeeId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, invalidate)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_message_read_receipts", filter: `employee_id=eq.${employeeId}` }, invalidate)
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_conversation_members" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_conversation_members" }, (p) => {
+        if (p.eventType === "UPDATE" && kunAktivitet(p.old as Record<string, unknown>, p.new as Record<string, unknown>)) return;
+        invalidate();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [on, employeeId, queryClient]);

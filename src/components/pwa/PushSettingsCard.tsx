@@ -5,7 +5,8 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useInstallStork } from "@/hooks/useInstallStork";
 import { useMineUdsendelsespraeferencer } from "@/hooks/useUdsendelser";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const STORKBOOK_TYPER: { noegle: string; navn: string }[] = [
   { noegle: "storkbook_besked", navn: "Beskeder" },
@@ -19,7 +20,13 @@ const STORKBOOK_TYPER: { noegle: string; navn: string }[] = [
 
 function StorkbookToggles() {
   const praef = useMineUdsendelsespraeferencer();
+  const { user } = useAuth();
   const [lokalt, setLokalt] = useState<Record<string, boolean>>({});
+  // Gem serialiseres: næste gem starter først, når forrige er afsluttet. Hvert gem håndteres for sig.
+  const koe = useRef<Promise<void>>(Promise.resolve());
+  const seq = useRef<Record<string, number>>({});
+  // Lokale overrides nulstilles ved brugerskift.
+  useEffect(() => { setLokalt({}); seq.current = {}; }, [user?.id]);
   if (praef.isError) {
     return (
       <div className="space-y-2">
@@ -35,13 +42,23 @@ function StorkbookToggles() {
     return r ? r.aktiv !== false : true;
   };
   const skift = (noegle: string, v: boolean) => {
+    const mitSeq = (seq.current[noegle] ?? 0) + 1;
+    seq.current[noegle] = mitSeq;
+    const bruger = user?.id;
     setLokalt((p) => ({ ...p, [noegle]: v }));
-    praef.saetFlere.mutate([{ noegle, kanal: "push", aktiv: v }], {
-      onError: () => {
-        setLokalt((p) => ({ ...p, [noegle]: !v }));
-        toast.error("Kunne ikke gemme indstillingen", { description: "Prøv igen." });
-      },
-      onSettled: () => setLokalt((p) => { const n = { ...p }; delete n[noegle]; return n; }),
+    const saetFlere = praef.saetFlere;
+    koe.current = koe.current.then(async () => {
+      let fejl = false;
+      try { await saetFlere.mutateAsync([{ noegle, kanal: "push", aktiv: v }]); } catch { fejl = true; }
+      if (fejl) toast.error("Kunne ikke gemme indstillingen", { description: "Prøv igen." });
+      // Rollback/oprydning kun for denne type og kun, hvis intet nyere valg er lavet (og samme bruger).
+      if (bruger !== user?.id || seq.current[noegle] !== mitSeq) return;
+      setLokalt((p) => {
+        const n = { ...p };
+        if (fejl) n[noegle] = !v; else delete n[noegle];
+        return n;
+      });
+      if (fejl) setTimeout(() => setLokalt((p) => { if (seq.current[noegle] !== mitSeq) return p; const n = { ...p }; delete n[noegle]; return n; }), 0);
     });
   };
   return (
@@ -93,7 +110,6 @@ export function PushSettingsCard() {
         )}
         <StorkbookToggles />
         <p className="text-sm text-muted-foreground">Notifikationer viser aldrig beskedtekst eller kundeoplysninger – kun afsenderens fornavn og et antal.</p>
-        <p className="text-sm text-muted-foreground">Du får de beskeder, der hører til din rolle og dit team. Beskeder indeholder aldrig beløb, navne eller kundeoplysninger.</p>
       </CardContent>
     </Card>
   );
