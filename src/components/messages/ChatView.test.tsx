@@ -741,6 +741,8 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     await svarFor("A1", { id: "A1" });
     await fremad(0);
     expect(hentAfsendelser("e", "A")).toEqual([]);
+    // Efterbehandlingens statusopslag (ikke afstemning) afsluttes også.
+    for (const x of [...ventende]) await svarFor(x.id, { status: "leveret", revision: 1 });
     await fremad(60000);
     expect(ventende).toEqual([]);
     expect(afstemningsKapacitet().aktive).toBe(0);
