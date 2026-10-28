@@ -3,22 +3,34 @@ import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fastholdEjer, rydAlleKladder } from "@/lib/sbKladder";
+import { fastholdEjer, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
+
+/** c3 §7: rigtige auth-callbacks (registreret én gang i modulet). */
+const auth = (e: string, bruger: string | null) => {
+  registrerKladdeOprydning();
+  const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+  cb(e, bruger ? { user: { id: bruger } } : null);
+};
 
 // Kø af svar pr. tabel for maybeSingle(); insert har egen kø. Ingen netværk.
 const svar: Record<string, Array<{ data: unknown; error: unknown } | Error | Promise<{ data: unknown; error: unknown }>>> = {};
 const insert = vi.fn();
 const kald: string[] = [];
+/** c3 §8: valgfri dynamisk svarfunktion pr. tabel (fælles netværksmodel); filtre fra .eq(). */
+const dyn: Record<string, ((f: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>) | undefined> = {};
+const dynInsert: { fn?: (tabel: string, r: unknown) => Promise<{ error: unknown }> } = {};
 function builder(tabel: string) {
+  const filtre: Record<string, unknown> = {};
   const b = {
     select: () => b,
-    eq: () => b,
-    insert: (r: unknown) => { kald.push(`insert:${tabel}`); return insert(r); },
+    eq: (k: string, v: unknown) => { filtre[k] = v; return b; },
+    insert: (r: unknown) => { kald.push(`insert:${tabel}`); return dynInsert.fn ? dynInsert.fn(tabel, r) : insert(r); },
     update: () => { kald.push(`update:${tabel}`); return b; },
     delete: () => { kald.push(`delete:${tabel}`); return b; },
     upsert: () => { kald.push(`upsert:${tabel}`); return b; },
     maybeSingle: () => {
       kald.push(`select:${tabel}`);
+      if (dyn[tabel]) return dyn[tabel]!(filtre);
       const r = svar[tabel]?.shift() ?? { data: null, error: null };
       return r instanceof Error ? Promise.reject(r) : r instanceof Promise ? r : Promise.resolve(r);
     },
@@ -52,6 +64,8 @@ beforeEach(() => {
   insert.mockReset();
   kald.length = 0;
   for (const k of Object.keys(svar)) delete svar[k];
+  for (const k of Object.keys(dyn)) delete dyn[k];
+  dynInsert.fn = undefined;
 });
 
 describe("sendBesked – stabilt id og afstemning", () => {
@@ -267,8 +281,10 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const foer = kontrol<{ data: unknown; error: unknown }>();
     svar.chat_messages = [foer.p];
+    auth("SIGNED_IN", "u");
     const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
-    rydAlleKladder(); // logud/brugerskift
+    await vi.waitFor(() => expect(kald).toContain("select:chat_messages")); // forhåndsopslaget er startet
+    auth("SIGNED_OUT", null); // faktisk logud
     foer.res(msg(null));
     expect((await p)?.indsat).toBe(false);
     expect(insert).not.toHaveBeenCalled();
@@ -279,8 +295,10 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result } = opsaet();
     const foer = kontrol<{ data: unknown; error: unknown }>();
     svar.chat_messages = [foer.p];
+    auth("SIGNED_IN", "u");
     const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
-    rydAlleKladder(); // SIGNED_OUT → ny generation; genlogin som "e" giver ikke den gamle generation tilbage
+    await vi.waitFor(() => expect(kald).toContain("select:chat_messages")); // forhåndsopslaget er startet
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u"); // genlogin som samme bruger giver ikke den gamle generation tilbage
     foer.res(msg(null));
     await p;
     expect(insert).not.toHaveBeenCalled();
@@ -543,5 +561,70 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     await new Promise((x) => setTimeout(x, 0));
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
     expect(inv.mock.calls.length).toBe(foer);
+  });
+});
+
+describe("c3 §7 – logud under tjek-genforsøgets ventetid", () => {
+  it("transportfejl → 2 s ventetid → faktisk logud → intet nyt tjek-kald, ingen cacheeffekt", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      auth("SIGNED_IN", "u");
+      const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+      const inv = vi.spyOn(qc, "invalidateQueries");
+      const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+      const { result, unmount } = renderHook(() => useSendMessage(), { wrapper });
+      svar.chat_messages = [msg(null), msg({ status: "tjekkes", revision: 1 })];
+      insert.mockResolvedValueOnce({ error: null });
+      vi.mocked(supabase.functions.invoke).mockClear();
+      vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } } as never);
+      await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(supabase.functions.invoke).toHaveBeenCalledTimes(1); // første tjek er sendt; ventetiden løber
+      const foer = inv.mock.calls.length;
+      auth("SIGNED_OUT", null);
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
+      expect(inv.mock.calls.length).toBe(foer);
+      auth("SIGNED_IN", "u");
+      unmount(); qc.clear();
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+describe("c3 §8 – to isolerede klientforløb med samme id mod fælles netværksmodel (antagelse, ikke SQL)", () => {
+  it("atomisk binding + primærnøglekonflikt: én række, én binding; taberen rapporteres som allerede gemt, ikke ny besked", async () => {
+    auth("SIGNED_IN", "u");
+    // Fælles model: rækker og stibindinger; INSERT er atomisk (binding sker kun ved vellykket INSERT).
+    const rækker = new Map<string, Record<string, unknown>>();
+    const bindinger = new Map<string, string>();
+    const forsinket: Array<() => void> = [];
+    let holdFoerste = true;
+    dyn.chat_messages = async (f) => ({ data: rækker.has(String(f.id)) ? { id: f.id, status: "leveret", revision: 1 } : null, error: null });
+    dyn.sb_stier = async () => ({ data: { bucket: "chat-attachments", sti: "c/e/x.png", besked_id: bindinger.get("c/e/x.png") ?? null, status: bindinger.has("c/e/x.png") ? "bundet" : "uploadet", samtale_id: "c", ejer_employee_id: "e" }, error: null });
+    dynInsert.fn = (_t, r) => {
+      const row = r as { id: string; attachment_path: string | null };
+      const udfoer = () => {
+        if (rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } };
+        rækker.set(row.id, row);
+        if (row.attachment_path) bindinger.set(row.attachment_path, row.id);
+        return { error: null };
+      };
+      if (holdFoerste) { holdFoerste = false; return new Promise((res) => forsinket.push(() => res(udfoer()))); }
+      return Promise.resolve(udfoer());
+    };
+    const lav = () => {
+      const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+      const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+      return { qc, ...renderHook(() => useSendMessage(), { wrapper }) };
+    };
+    const fane1 = lav(), fane2 = lav();
+    const p1 = fane1.result.current.mutateAsync({ ...vf, ejer: fastholdEjer("e", "c", "u")! });
+    await vi.waitFor(() => expect(forsinket).toHaveLength(1)); // fane 1's INSERT er sendt og venter (sent gammelt INSERT)
+    await fane2.result.current.mutateAsync({ ...vf, ejer: fastholdEjer("e", "c", "u")! }); // fane 2 vinder
+    forsinket[0](); // fane 1's sene INSERT taber på primærnøglen
+    await p1; // afstemt som allerede gemt (samme id), ikke en ny række
+    expect(rækker.size).toBe(1);
+    expect([...bindinger.entries()]).toEqual([["c/e/x.png", vf.id]]);
+    fane1.unmount(); fane2.unmount(); fane1.qc.clear(); fane2.qc.clear();
   });
 });
