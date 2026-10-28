@@ -10,7 +10,7 @@ import { ChevronDown, Lock, Sun, Users } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CelebrationLines } from "@/components/pulsen/CelebrationLine";
-import { TodayMilestonesCard, milestoneNumber, milestoneUnit } from "@/components/pulsen/TodayMilestones";
+import { TodayMilestonesCard, isHeroMilestone, milestoneNumber, milestoneUnit } from "@/components/pulsen/TodayMilestones";
 import { fillMilestoneDay } from "@/lib/pulsen/format";
 import { MilestoneHeroCard } from "@/components/pulsen/MilestoneHeroCard";
 import { EventRsvpCard } from "@/components/home/EventRsvpCard";
