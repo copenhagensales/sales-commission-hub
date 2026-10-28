@@ -598,7 +598,7 @@ export function useCreateConversation() {
       const mig = await getCurrentEmployeeId();
       const andre = [...new Set(memberIds)].filter((x) => x && x !== mig);
       const v = validerSamtale(andre.length, name, isGroup);
-      if (!v.ok) throw Object.assign(new Error(v.fejl), { code: "P0001" });
+      if ("fejl" in v) throw Object.assign(new Error(v.fejl), { code: "P0001" });
       const { data: id, error } = isGroup
         ? await supabase.rpc("sb_chat_start_gruppe", { p_navn: (name ?? "").trim(), p_medlemmer: andre })
         : await supabase.rpc("sb_chat_start_direkte", { p_anden: andre[0] });

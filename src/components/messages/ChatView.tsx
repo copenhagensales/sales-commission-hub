@@ -220,7 +220,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     e.target.value = "";
     if (!file) return;
     const v = validerFil(file);
-    if (!v.ok) { setFilFejl(v.fejl); return; }
+    if ("fejl" in v) { setFilFejl(v.fejl); return; }
     setFilFejl(null);
     setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
     const previewUrl = v.type.startsWith("image/") ? URL.createObjectURL(file) : null;

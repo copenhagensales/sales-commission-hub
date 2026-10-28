@@ -93,7 +93,7 @@ export function NewConversationDialog({
   const handleCreate = async () => {
     if (createConversation.isPending) return;
     const v = validerSamtale(deltagere.length, groupName, isGroup);
-    if (!v.ok) { toast.error(v.fejl); return; }
+    if ("fejl" in v) { toast.error(v.fejl); return; }
     try {
       const conversation = await createConversation.mutateAsync({
         name: isGroup ? groupName.trim() : undefined,
