@@ -668,7 +668,7 @@ test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet bli
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
     assertEquals(b.ok, false); assertEquals(b.slettet, 0); assert(b.fejl.includes("koe_afslut"));
-    assertEquals(afslutKald().length + kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 1);
+    assertEquals(kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 1);
     assertEquals(kaldTil((k) => k.metode === "DELETE").length, 1);
   } finally { time.restore(); }
 });
