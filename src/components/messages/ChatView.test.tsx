@@ -1139,3 +1139,94 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
   });
 });
+
+// ---------- B2a-d2 §4: manglende integrationsforløb gennem rigtig ChatView (netværk ved grænsen) ----------
+describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
+  let auth!: (e: string, s: unknown) => void;
+  let fetchSpy: ReturnType<typeof vi.spyOn> | null = null;
+  beforeEach(async () => {
+    beskeder.ægteSend = true;
+    const { supabase } = await import("@/integrations/supabase/client");
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
+    auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+  });
+  afterEach(() => { fetchSpy?.mockRestore(); fetchSpy = null; });
+
+  it("auth-skift mellem Send og mutationens faktiske start (ventepunkt: kapacitet) → mutationen starter aldrig", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { afstemningsKapacitet } = await import("./ChatView");
+    const hold = new Map<string, (s: Svar) => void>();
+    net.vent = (id) => new Promise<Svar>((res) => hold.set(id, res));
+    for (const id of ["P0", "P1", "P2"]) tilfoejAfsendelse("e", "A", { id, tekst: id, svarId: null, fil: null, tilstand: "afstemmer", fejl: null, tidligereUkendt: true, oprettet: 1 });
+    const r = await klar();
+    await waitFor(() => expect(hold.size).toBe(3)); // kapaciteten er optaget af tre startede opslag
+    skriv("hej"); await act(async () => { fireEvent.click(send()); });
+    expect(afstemningsKapacitet().ventende).toBe(1); // ventepunktet er nået: Send accepteret, mutationen ikke startet
+    const foer = net.kald.filter((k) => k === "select:chat_messages").length;
+    act(() => { auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } }); });
+    expect(afstemningsKapacitet().ventende).toBe(0);
+    await act(async () => { for (const [id, res] of hold) res({ data: { id }, error: null }); hold.clear(); await new Promise((x) => setTimeout(x, 0)); });
+    await tick();
+    for (const [id, res] of hold) res({ data: { id }, error: null }); // eventuelle detached opslag afsluttes
+    await tick();
+    expect(net.kald.filter((k) => k === "select:chat_messages").length).toBe(foer); // ingen forhåndsopslag fra den gamle Send
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0 });
+    r.unmount();
+  });
+
+  it("A–B–A med lagringsfejl: skrivekladde, valgt svar, filmetadata, åben redigering med startrevision og fejlstatus for begge", async () => {
+    const { gemRetKladde } = await import("@/lib/sbKladder");
+    const { supabase } = await import("@/integrations/supabase/client");
+    beskeder.liste = [fremmed("svar-A", "besked A"), fremmed("m1", "original", { sender_id: "e", revision: 3 })];
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "min rettelse", revision: 3 });
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockResolvedValueOnce(undefined);
+    const r = await klar();
+    const editor = () => screen.getAllByRole("textbox").find((x) => x.getAttribute("aria-label") !== "besked") as HTMLTextAreaElement;
+    await waitFor(() => expect(editor().value).toBe("min rettelse"));
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
+    try {
+      fireEvent.click(within(screen.getByText("besked A").closest(".group") as HTMLElement).getByRole("button", { name: "Svar" }));
+      skriv("kladdetekst");
+      await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+      await waitFor(() => expect(send()).not.toBeDisabled());
+      fireEvent.change(editor(), { target: { value: "min rettelse 2" } });
+      await tick();
+      expect(set).toHaveBeenCalled(); // lagringen fejlede faktisk
+      await navigér(r, "B"); await navigér(r, "A");
+      expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("kladdetekst");
+      expect(screen.getByText("Svarer på:").parentElement).toHaveTextContent("besked A");
+      expect(screen.getByText("x.txt")).toBeInTheDocument();
+      expect(editor().value).toBe("min rettelse 2");
+      expect(screen.getAllByText(LAGER_TEKST)).toHaveLength(2); // komponist og redigering
+    } finally { set.mockRestore(); }
+    vi.mocked(supabase.rpc).mockClear();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    expect(vi.mocked(supabase.rpc)).toHaveBeenCalledWith("sb_ret", expect.objectContaining({ p_id: "m1", p_revision: 3, p_tekst: "min rettelse 2" }));
+    r.unmount();
+  });
+
+  it("sessionsskift under allerede startet rigtig Storage-upload → sent svar starter intet trin eller INSERT", async () => {
+    beskeder.ægteFil = true;
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ sti: "c/e/x.txt", token: "k" }), { status: 200 }));
+    const up = kontrol<{ error: unknown }>();
+    const upFn = vi.fn(() => up.p);
+    lagerUpload.fn = upFn;
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(upFn).toHaveBeenCalledTimes(1)); // uploadens netværkstrin er startet
+    act(() => { auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } }); });
+    await act(async () => { up.res({ error: null }); await up.p; });
+    await tick();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(upFn).toHaveBeenCalledTimes(1);
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(net.kald.filter((k) => k.startsWith("insert"))).toEqual([]);
+    expect(gemtFil()).toBeNull();
+    expect(screen.queryByText("x.txt")).toBeNull();
+    r.unmount();
+  });
+});
+const LAGER_TEKST = "Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben";
