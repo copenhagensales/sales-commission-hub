@@ -39,7 +39,8 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }))
 vi.mock("@/components/mobile", async (orig) => ({ ...(await orig<typeof import("@/components/mobile")>()), SkeletonList: () => null }));
 vi.mock("./MessageSearch", () => ({ MessageSearch: () => null }));
 vi.mock("./TypingIndicator", () => ({ TypingIndicator: () => null }));
-vi.mock("./MentionInput", () => ({
+vi.mock("./MentionInput", async (orig) => ({
+  ...(await orig<typeof import("./MentionInput")>()),
   MentionInput: ({ value, onChange, onKeyDown }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void }) => (
     <textarea aria-label="besked" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} />
   ),
@@ -322,6 +323,8 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
     await act(async () => { up.res(undefined); await up.p; });
     expect(gemtFil()).toMatchObject({ trin: "uploadet", sti: "c/e/x.txt" });
     expect(screen.getByText("Klar til at sende")).toBeInTheDocument();
+    // Antagelse: registerrækken for egen ubundet sti med status uploadet.
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null }];
     await act(async () => { fireEvent.click(send()); });
     await tick();
     expect(net.insert).toHaveBeenCalledTimes(1);
