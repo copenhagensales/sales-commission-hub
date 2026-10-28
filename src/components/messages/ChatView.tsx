@@ -21,7 +21,7 @@ import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, erForaeldetOpe
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
   fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, harLagringsFejl, abonnerAfsendelser,
-  sessionsGeneration, fastholdEjer, ejerGyldig, nytOperationsId, type OperationsEjer, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
+  sessionsGeneration, fastholdEjer, annullerOperation, ejerGyldig, nytOperationsId, type OperationsEjer, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
   erAktuelKladdeUpload, fjernKladdeFil, saetKladdeFilPost, filErSendeklar, type Afsendelse, type FilMeta,
 } from "@/lib/sbKladder";
 
@@ -40,7 +40,9 @@ export function frigivLaas(k: string, op: string): void { if (laase.get(k) === o
 export const MAKS_SAMTIDIGE_AFSTEMNINGER = 3;
 const LAAST_VENT_MS = 1000;
 /** c2 §6: køens kapacitet tilhører én sessionsgeneration; gamle afslutninger frigiver kun deres egen sessions plads. */
-interface KoeSession { gen: number; aktive: number; koe: AfstemForloeb[]; venter: ((ok: boolean) => void)[] }
+/** d1 §2: en ventende pladsanmodning ejes af én operation for ét id (noegle), så stopvejen kan annullere netop den. */
+interface PladsAnmodning { noegle: string | null; op: string | null; r: (ok: boolean) => void }
+interface KoeSession { gen: number; aktive: number; koe: AfstemForloeb[]; venter: PladsAnmodning[] }
 interface AfstemForloeb {
   noegle: string; id: string; ejer: OperationsEjer; qc: QueryClient; session: KoeSession;
   forsoeg: number; naeste: number; timer: ReturnType<typeof setTimeout> | null;
@@ -49,6 +51,13 @@ interface AfstemForloeb {
   manuel: boolean;
 }
 const forloeb = new Map<string, AfstemForloeb>();
+/**
+ * d1 §1: accepteret manuel afsendelsesoperation pr. id (noegle → operations-id). Registreres synkront før første await
+ * og gælder, mens forsøget venter på plads eller arbejder. Ret/ny afsendelse med samme id afvises imens.
+ */
+const afsOps = new Map<string, string>();
+/** Til B2b/B2d: er id'et ejet af et accepteret manuelt forsøg lige nu? */
+export const afsendelseOptaget = (gen: number, emp: string, conv: string, id: string) => afsOps.has(laasNoegle(gen, emp, conv, id));
 let koeSession: KoeSession = { gen: sessionsGeneration(), aktive: 0, koe: [], venter: [] };
 const koeLyttere = new Set<() => void>();
 let koeVersion = 0;
@@ -65,7 +74,9 @@ function skiftKoeSession(gen: number): void {
   gl.koe.length = 0;
   const venter = gl.venter.splice(0);
   koeSession = { gen, aktive: 0, koe: [], venter: [] };
-  for (const r of venter) r(false);
+  for (const v of venter) v.r(false);
+  for (const op of afsOps.values()) annullerOperation(op);
+  afsOps.clear();
   meldKoe();
 }
 const aktuelKoeSession = (): KoeSession => {
@@ -79,16 +90,16 @@ abonnerAfsendelser(() => { if (koeSession.gen !== sessionsGeneration()) skiftKoe
 export const afstemningsKapacitet = () => ({ gen: koeSession.gen, aktive: koeSession.aktive, ventende: koeSession.venter.length, iKoe: koeSession.koe.length });
 
 /** Plads til manuel afsendelse/afstemning i samme kapacitet som baggrunden; false = sessionen er skiftet. */
-function tagPlads(s: KoeSession): Promise<boolean> {
+function tagPlads(s: KoeSession, noegle: string | null = null, op: string | null = null): Promise<boolean> {
   if (s !== aktuelKoeSession()) return Promise.resolve(false);
   if (s.aktive < MAKS_SAMTIDIGE_AFSTEMNINGER) { s.aktive++; return Promise.resolve(true); }
-  return new Promise<boolean>((r) => s.venter.push(r));
+  return new Promise<boolean>((r) => s.venter.push({ noegle, op, r }));
 }
 /** Frigiver kun den angivne sessions plads; en gammel session påvirker aldrig den nye. */
 function frigivPlads(s: KoeSession): void {
   if (s !== koeSession) return;
   const naeste = s.venter.shift();
-  if (naeste) { naeste(true); return; } // pladsen overdrages direkte
+  if (naeste) { naeste.r(true); return; } // pladsen overdrages direkte
   s.aktive = Math.max(0, s.aktive - 1);
   pumpKoe(s);
 }
@@ -214,9 +225,14 @@ function afslutManuel(f: AfstemForloeb | null, emp: string, conv: string, id: st
  */
 export function stopAfstemninger(emp: string, conv: string, id?: string): void {
   const s = aktuelKoeSession();
-  for (const f of [...forloeb.values()]) {
-    if (f.session === s && f.ejer.emp === emp && f.ejer.conv === conv && (id === undefined || f.id === id)) stopForloeb(f.noegle);
+  const ramt = (k: string) => (id === undefined ? k.startsWith(laasNoegle(s.gen, emp, conv, "")) : k === laasNoegle(s.gen, emp, conv, id));
+  // d1 §2: 1) invalidér operationerne, 2) annullér deres ventende pladsanmodninger, 3) stop timere/køposter.
+  for (const [k, op] of [...afsOps]) if (ramt(k)) { annullerOperation(op); afsOps.delete(k); }
+  for (const v of [...s.venter]) {
+    if (v.noegle && ramt(v.noegle)) { s.venter.splice(s.venter.indexOf(v), 1); if (v.op) annullerOperation(v.op); v.r(false); }
   }
+  for (const f of [...forloeb.values()]) if (f.session === s && ramt(f.noegle)) stopForloeb(f.noegle);
+  meldKoe();
 }
 const erUdtoemt = (gen: number, emp: string, conv: string, id: string) => !!forloeb.get(laasNoegle(gen, emp, conv, id))?.udtoemt;
 if (typeof window !== "undefined") {
@@ -374,19 +390,24 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const ejer = fastholdEjer(emp, conv, brugerRef.current);
     if (!ejer) return; // manglende identitet → ingen skrivende handling
     const gen = ejer.gen, op = ejer.op;
-    const vagt = () => ejerGyldig(ejer);
-    const kon = { vagt, bruger: ejer.bruger };
     const fk = laasNoegle(gen, emp, conv, id);
+    // d1 §1: vagten omfatter den konkrete operation – ikke kun session/samtale/id.
+    const vagt = () => ejerGyldig(ejer) && afsOps.get(fk) === op;
+    const kon = { vagt, bruger: ejer.bruger };
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
     // §4/§8(4): højst ét netværksforløb pr. id – også mod baggrundsafstemning.
     // c2 §5: optaget id tilsluttes det eksisterende forløb (genstart efter dets afslutning), intet konkurrerende kald.
-    if (!tagLaas(fk, op)) { const f = sikrForloeb(ejer, id, queryClient); if (f && !f.manuel) f.genstartVenter = true; return; }
+    if (afsOps.has(fk) || !tagLaas(fk, op)) { const f = sikrForloeb(ejer, id, queryClient); if (f && !f.manuel) f.genstartVenter = true; return; }
+    // d1 §1: ejerskab af netop denne afsendelse registreres synkront, før første await.
+    afsOps.set(fk, op);
     const ks = aktuelKoeSession();
     const forl = overtagForloeb(ejer, id, queryClient);
-    // c2 §6: manuel afsendelse deler køens tre pladser.
-    if (ks.gen !== gen || !(await tagPlads(ks))) { frigivLaas(fk, op); return; }
-    if (!vagt()) { frigivLaas(fk, op); frigivPlads(ks); return; }
+    meldKoe();
+    const slipEje = () => { if (afsOps.get(fk) === op) afsOps.delete(fk); frigivLaas(fk, op); meldKoe(); };
+    // c2 §6: manuel afsendelse deler køens tre pladser; anmodningen ejes af operationen (d1 §2).
+    if (ks.gen !== gen || !(await tagPlads(ks, fk, op))) { slipEje(); return; }
+    if (!vagt()) { slipEje(); frigivPlads(ks); return; }
     opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
     let filMeta = a.fil;
     try {
@@ -413,9 +434,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
         attachmentPath: filMeta?.sti ?? undefined, attachmentType: filMeta?.type, attachmentName: filMeta?.name,
         tidligereUkendt: a.tidligereUkendt, ejer,
       });
-      fjernAfsendelse(emp, conv, id, gen);
+      if (vagt()) fjernAfsendelse(emp, conv, id, gen);
     } catch (e) {
-      if (gen !== sessionsGeneration()) return;
+      if (!vagt()) return; // stoppet/erstattet/ny session: rør aldrig en nyere post med samme id
       if (e instanceof SendFejl) {
         if (e.art === "gemt_vaek") {
           saetAfsendelsesFil(emp, conv, id, null);
@@ -436,9 +457,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
         opdaterAfsendelse(emp, conv, id, { tilstand: "genudsted", fejl: udstedFejlTekst(e) }, gen);
       }
     } finally {
-      frigivLaas(fk, op);
+      const egen = vagt();
       frigivPlads(ks);
-      if (vagt()) afslutManuel(forl, emp, conv, id);
+      if (egen) afslutManuel(forl, emp, conv, id);
+      slipEje();
     }
   }, [sendMessage, queryClient]);
 
@@ -487,7 +509,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   /** §10: Ret af kendt afvist afsendelse – bevarer id, tekst, svar og vedhæftning; overskriver aldrig en anden kladde. */
   const ret = (a: Afsendelse) => {
-    if (!meId || !composerTom || a.tilstand !== "afvist") return;
+    // d1 §1: håndhævet i handlingen (også klik før næste render og efter remount): et accepteret forsøg ejer id'et.
+    if (!meId || !composerTom || a.tilstand !== "afvist" || afsendelseOptaget(sessionsGeneration(), meId, conversationId, a.id)) return;
     const file = afsendelsesFil(meId, conversationId, a.id);
     setMessage(a.tekst);
     setReplyTo(null); // visningen genskabes fra a.svarId
@@ -623,7 +646,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
                             Ikke sendt – prøv igen
                           </button>
                           {p.tilstand === "afvist" && (
-                            <button type="button" disabled={!composerTom}
+                            <button type="button" disabled={!composerTom || afsendelseOptaget(gen, meId ?? "", conversationId, p.id)}
                               title={composerTom ? undefined : "Send eller ryd den nuværende kladde først"}
                               className="flex min-h-11 min-w-11 items-center justify-center px-2 text-[14px] text-muted-foreground active:opacity-70 disabled:opacity-50"
                               onClick={() => ret(p)}>

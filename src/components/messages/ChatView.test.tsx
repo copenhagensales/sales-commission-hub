@@ -969,4 +969,125 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(net.insert).toHaveBeenCalledTimes(1);
     expect(net.insert.mock.calls[0][0]).toMatchObject({ id: "F1", attachment_path: "c/e/ny.txt" });
   });
+
+  // ---------- B2a-d1 ----------
+  const afvist = (id: string, tekst: string): Afsendelse => ({ id, tekst, svarId: null, fil: null, tilstand: "afvist", fejl: null, tidligereUkendt: false, oprettet: 1 });
+  async function fuldKapacitetMedR1() {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    for (const id of ["P0", "P1", "P2"]) tilfoejAfsendelse("e", "A", afs(id));
+    tilfoejAfsendelse("e", "A", afvist("R1", "gammel"));
+    const r = await klarFake();
+    expect(samtidige).toBe(3);
+    return r;
+  }
+  const afslutAlle = async () => { for (const x of [...ventende]) await svarFor(x.id, { id: x.id }); await fremad(0); };
+
+  it("d1 §1: Prøv igen på vent + Ret i samme handling (før render) → Ret afvist; kun det accepterede forsøg sendes", async () => {
+    const { afstemningsKapacitet } = await import("./ChatView");
+    await fuldKapacitetMedR1();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" }));
+      fireEvent.click(screen.getByRole("button", { name: "Ret" }));
+    });
+    expect(afstemningsKapacitet().ventende).toBe(1);
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("");
+    expect(hentAfsendelser("e", "A").find((x) => x.id === "R1")?.tekst).toBe("gammel");
+    expect(screen.getByRole("button", { name: "Ret" })).toBeDisabled();
+    net.insert.mockReturnValueOnce({ error: null });
+    await svarFor("P0", { id: "P0" });
+    await fremad(0);
+    await svarFor("R1", null); // forhåndsopslag
+    await fremad(0);
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(net.insert.mock.calls[0][0]).toMatchObject({ id: "R1", content: "gammel" });
+    await afslutAlle();
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+    expect(maks).toBe(3);
+  });
+
+  it("d1 §1: remount under pladsventning → Ret stadig spærret, ét INSERT, kapacitet frigivet", async () => {
+    const { afstemningsKapacitet } = await import("./ChatView");
+    const r = await fuldKapacitetMedR1();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    r.unmount();
+    await klarFake();
+    expect(screen.getByRole("button", { name: "Ret" })).toBeDisabled();
+    expect(afstemningsKapacitet().ventende).toBe(1);
+    net.insert.mockReturnValueOnce({ error: null });
+    await svarFor("P1", { id: "P1" });
+    await svarFor("R1", null);
+    await fremad(0);
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    await afslutAlle();
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0 });
+  });
+
+  it("d1 §1: sessionsskift under pladsventning → intet opslag/INSERT fra det gamle forsøg", async () => {
+    const { afstemningsKapacitet } = await import("./ChatView");
+    const { supabase } = await import("@/integrations/supabase/client");
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+    await fuldKapacitetMedR1();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    act(() => { auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } }); });
+    await fremad(0);
+    await afslutAlle();
+    expect(opslag("R1")).toBe(0);
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0 });
+  });
+
+  it("d1 §2: stop id + fjern pending mens manuel venter → nul SELECT/INSERT; andre id'er fortsætter", async () => {
+    const { fjernAfsendelse, tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
+    await fuldKapacitetMedR1();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    expect(afstemningsKapacitet().ventende).toBe(1);
+    act(() => { stopAfstemninger("e", "A", "R1"); fjernAfsendelse("e", "A", "R1"); });
+    expect(afstemningsKapacitet().ventende).toBe(0);
+    await act(async () => { tilfoejAfsendelse("e", "A", afs("Q1")); });
+    await svarFor("P0", { id: "P0" });
+    await fremad(0);
+    expect(opslag("Q1")).toBe(1); // andre forløb fortsætter på den frigivne plads
+    await afslutAlle();
+    expect(opslag("R1")).toBe(0);
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+  });
+
+  it("d1 §2: stop hele samtalen mens manuel venter → intet fra det annullerede arbejde, anden samtale uberørt", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
+    tilfoejAfsendelse("e", "B", afs("B1"));
+    await fuldKapacitetMedR1();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    act(() => { stopAfstemninger("e", "A"); });
+    expect(afstemningsKapacitet().ventende).toBe(0);
+    await afslutAlle(); // sene svar fra stoppede baggrundsforløb
+    expect(opslag("R1")).toBe(0);
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(hentAfsendelser("e", "A").map((x) => x.id).sort()).toEqual(["P0", "P1", "P2", "R1"]); // sene svar ændrer ikke lageret
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0 });
+  });
+
+  it("d1 §2: stop under startet forhåndsopslag → sent svar starter intet INSERT og ændrer ikke lager/cache", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
+    tilfoejAfsendelse("e", "A", afvist("R1", "gammel"));
+    await klarFake();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    await fremad(0);
+    expect(opslag("R1")).toBe(1);
+    expect(afstemningsKapacitet().aktive).toBe(1); // fysisk igangværende kald holder sin plads
+    act(() => { stopAfstemninger("e", "A", "R1"); });
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    await svarFor("R1", null);
+    await fremad(5000);
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(opslag("R1")).toBe(1);
+    expect(inv).not.toHaveBeenCalled();
+    expect(hentAfsendelser("e", "A").find((x) => x.id === "R1")?.tilstand).toBe("sender");
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+  });
 });
