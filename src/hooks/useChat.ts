@@ -49,6 +49,98 @@ export interface ReplyPreview {
   content: string;
   sender_id: string;
   sender?: { id: string; full_name: string };
+  /** B2c-1 §5: originalens serverstatus/frist/sletning – til lokal visningsvagt. */
+  status: BeskedStatusVaerdi | null;
+  slettes_efter: string | null;
+  deleted_at: string | null;
+}
+
+/** Søgeresultat (særskilt projektion af chat_messages). */
+export interface SoegeResultat {
+  id: string;
+  conversation_id: string;
+  content: string;
+  created_at: string;
+  slettes_efter: string | null;
+  sender?: { id: string; full_name: string };
+  conversation?: { id: string; name: string | null; is_group: boolean } | null;
+}
+
+// ---------- B2c-1 §5: lokal fristkontrol (kun visningsværn; skriver intet) ----------
+/** Er serverleveret slettes_efter passeret efter KLIENTENS ur? */
+export function erUdloebet(slettesEfter: string | null | undefined, nu: number): boolean {
+  if (!slettesEfter) return false;
+  const t = new Date(slettesEfter).getTime();
+  return Number.isFinite(t) && t <= nu;
+}
+/** Er svaroriginalen utilgængelig (tilbagetrukket, slettet eller udløbet lokalt)? */
+export function svarUtilgaengeligt(r: Pick<ReplyPreview, "status" | "slettes_efter" | "deleted_at">, nu: number): boolean {
+  return r.status === "trukket_tilbage" || !!r.deleted_at || erUdloebet(r.slettes_efter, nu);
+}
+/**
+ * Ur for frister: armeres med tidsforskellen (frist − Date.now()) til nærmeste FREMTIDIGE frist; efter udløb
+ * planlægges næste. Allerede udløbne frister armeres aldrig (ingen 0-ms-løkke). Forgrund/genforbindelse kontrollerer straks.
+ */
+export function useFristUr(frister: ReadonlyArray<string | null | undefined>): number {
+  const [nu, setNu] = useState(() => Date.now());
+  const noegle = [...new Set(frister.filter((f): f is string => !!f))].sort().join("|");
+  useEffect(() => {
+    const opd = () => setNu(Date.now());
+    const synlig = () => { if (document.visibilityState === "visible") opd(); };
+    const start = Date.now();
+    let min = Infinity;
+    for (const f of noegle ? noegle.split("|") : []) {
+      const d = new Date(f).getTime() - start;
+      if (d > 0 && d < min) min = d;
+    }
+    const t = Number.isFinite(min) ? setTimeout(opd, Math.min(min, 2 ** 31 - 1)) : null;
+    window.addEventListener("online", opd);
+    window.addEventListener("focus", opd);
+    document.addEventListener("visibilitychange", synlig);
+    return () => {
+      if (t) clearTimeout(t);
+      window.removeEventListener("online", opd);
+      window.removeEventListener("focus", opd);
+      document.removeEventListener("visibilitychange", synlig);
+    };
+  }, [noegle, nu]);
+  return nu;
+}
+
+/** Ventetider for genhentning, når serveren stadig returnerer en lokalt udløbet række (ure kan afvige). */
+export const FRIST_GENHENT_MS = [500, 2000, 4000, 8000, 16000, 32000] as const;
+
+/**
+ * B2c-1 §5: svaroriginal uden for de indlæste sider valideres ved et afgrænset RLS-opslag (én række).
+ * null = ingen synlig række (utilgængelig). Nøglen indeholder sessionsgenerationen, så et gammelt svar aldrig rammer en ny session.
+ */
+export function useSvarOriginal(id: string | null) {
+  const gen = sessionsGeneration();
+  return useQuery({
+    queryKey: ["chat-svar-original", gen, id],
+    enabled: !!id,
+    retry: false,
+    queryFn: async (): Promise<ReplyPreview | null> => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("id, content, sender_id, status, slettes_efter, deleted_at, sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name)")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const s = data.sender;
+      return {
+        id: data.id, content: data.content, sender_id: data.sender_id,
+        status: tilStatus(data.status), slettes_efter: data.slettes_efter, deleted_at: data.deleted_at,
+        sender: s && s.id ? { id: s.id, full_name: `${s.first_name || ""} ${s.last_name || ""}`.trim() } : undefined,
+      };
+    },
+  });
+}
+const STATUSSER: readonly BeskedStatusVaerdi[] = ["tjekkes", "leveret", "afventer_afsender", "trukket_tilbage"];
+function tilStatus(v: unknown): BeskedStatusVaerdi | null {
+  return STATUSSER.find((x) => x === v) ?? null;
 }
 
 export interface Message {
@@ -265,6 +357,7 @@ export function useMessages(conversationId: string | null) {
             id: replyTo.id,
             content: replyVaek ? "Beskeden er ikke længere tilgængelig" : replyTo.content,
             sender_id: replyTo.sender_id,
+            status: tilStatus(replyTo.status), slettes_efter: replyTo.slettes_efter ?? null, deleted_at: replyTo.deleted_at ?? null,
             sender: replyTo.sender ? {
               id: replyTo.sender.id,
               full_name: `${replyTo.sender.first_name || ''} ${replyTo.sender.last_name || ''}`.trim()
@@ -294,6 +387,8 @@ export function useMessages(conversationId: string | null) {
     hasOlder: !!query.hasNextPage,
     isLoadingOlder: query.isFetchingNextPage,
     loadOlder: () => { if (!query.isFetching) void query.fetchNextPage(); },
+    /** B2c-1: tidspunkt for seneste hentning (til fristgenhentning). */
+    opdateret: query.dataUpdatedAt,
   };
 }
 
@@ -690,7 +785,7 @@ export function useDeleteConversation() {
 
 export function useSearchMessages() {
   return useMutation({
-    mutationFn: async (query: string) => {
+    mutationFn: async (query: string): Promise<SoegeResultat[]> => {
       if (!query.trim()) return [];
       const { data, error } = await supabase
         .from("chat_messages")
