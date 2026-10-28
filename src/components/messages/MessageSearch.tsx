@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useSearchMessages } from "@/hooks/useChat";
+import { useState, useEffect, useRef } from "react";
+import { useSearchMessages, onChatSignal } from "@/hooks/useChat";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,9 +15,15 @@ interface MessageSearchProps {
 export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) {
   const [query, setQuery] = useState("");
   const searchMessages = useSearchMessages();
+  const sidst = useRef<string | null>(null);
+  // Genvalidér resultater ved signaler (tilbagetrækning, sletning, udløb) – viser aldrig forældet originaltekst.
+  useEffect(() => onChatSignal(() => { if (sidst.current) searchMessages.mutate(sidst.current); }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []);
 
   const handleSearch = () => {
     if (query.trim()) {
+      sidst.current = query;
       searchMessages.mutate(query);
     }
   };

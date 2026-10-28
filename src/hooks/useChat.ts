@@ -1,6 +1,7 @@
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 
 export interface Conversation {
   id: string;
@@ -9,6 +10,9 @@ export interface Conversation {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Nøgle for nye direkte samtaler (24d); null for grupper og historiske direkte samtaler. */
+  direct_key: string | null;
+  vaern_niveau: number;
   members?: ConversationMember[];
   unread_count?: number;
 }
@@ -36,6 +40,16 @@ export interface MessageReadReceipt {
   };
 }
 
+export type BeskedStatusVaerdi = "tjekkes" | "leveret" | "afventer_afsender" | "trukket_tilbage";
+
+/** Svaruddrag – ikke en komplet Message. */
+export interface ReplyPreview {
+  id: string;
+  content: string;
+  sender_id: string;
+  sender?: { id: string; full_name: string };
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -47,13 +61,22 @@ export interface Message {
   attachment_url?: string | null;
   attachment_type?: string | null;
   attachment_name?: string | null;
+  attachment_path: string | null;
   edited_at?: string | null;
   deleted_at?: string | null;
+  status: BeskedStatusVaerdi;
+  revision: number;
+  leveret_at: string | null;
+  afventer_fra: string | null;
+  trukket_tilbage_at: string | null;
+  slettes_efter: string | null;
+  personoplysning: boolean;
+  vaern_niveau: number;
   sender?: {
     id: string;
     full_name: string;
   };
-  reply_to?: Message | null;
+  reply_to?: ReplyPreview | null;
   reactions?: MessageReaction[];
   read_receipts?: MessageReadReceipt[];
 }
@@ -228,6 +251,9 @@ export function useMessages(conversationId: string | null) {
       
       return (data || []).map((msg: any) => {
         const replyTo = msg.reply_to_id ? replyMap.get(msg.reply_to_id) as any : null;
+        // Svaruddrag viser aldrig originaltekst, når originalen er trukket tilbage/slettet/udløbet.
+        const replyVaek = replyTo && (replyTo.status === "trukket_tilbage" || replyTo.deleted_at
+          || (replyTo.slettes_efter && new Date(replyTo.slettes_efter).getTime() <= Date.now()));
         return {
           ...msg,
           sender: msg.sender ? {
@@ -236,7 +262,7 @@ export function useMessages(conversationId: string | null) {
           } : undefined,
           reply_to: replyTo ? {
             id: replyTo.id,
-            content: replyTo.content,
+            content: replyVaek ? "Beskeden er ikke længere tilgængelig" : replyTo.content,
             sender_id: replyTo.sender_id,
             sender: replyTo.sender ? {
               id: replyTo.sender.id,
@@ -305,69 +331,81 @@ export function useMarkMessageAsRead() {
   });
 }
 
+/** Fejl ved afsendelse: `server` = afvist af serveren (tekst vises), `ukendt` = udfald ukendt (afstemmes før nyt forsøg). */
+export class SendFejl extends Error {
+  constructor(public art: "server" | "ukendt", tekst: string) { super(tekst); this.name = "SendFejl"; }
+}
+
+/** Findes beskeden med dette id allerede (egen række)? null = kunne ikke afgøres. */
+export async function afstemBesked(id: string): Promise<boolean | null> {
+  const { data, error } = await supabase.from("chat_messages").select("id").eq("id", id).maybeSingle();
+  if (error) return null;
+  return !!data;
+}
+
+export interface SendInput {
+  /** Stabil klientgenereret UUID for afsendelsen og alle dens genforsøg. */
+  id: string;
+  conversationId: string;
+  content: string;
+  replyToId?: string;
+  attachmentPath?: string;
+  attachmentType?: string;
+  attachmentName?: string;
+}
+
+/** Indsætter én besked med stabilt id. Ukendt udfald afstemmes med serveren; en bekræftet række genindsættes aldrig. */
+export async function sendBesked(v: SendInput, employeeId: string): Promise<void> {
+  const foer = await afstemBesked(v.id);
+  if (foer === true) return;
+  const { error } = await supabase.from("chat_messages").insert({
+    id: v.id,
+    conversation_id: v.conversationId,
+    sender_id: employeeId,
+    content: v.content,
+    reply_to_id: v.replyToId || null,
+    attachment_path: v.attachmentPath || null,
+    attachment_type: v.attachmentType || null,
+    attachment_name: v.attachmentName || null,
+  });
+  if (!error) return;
+  if (error.code === "P0001") throw new SendFejl("server", error.message || "Beskeden blev afvist");
+  // 23505 (samme id) eller transportfejl: afstem samme id.
+  const efter = await afstemBesked(v.id);
+  if (efter === true) return;
+  if (efter === false && error.code && error.code !== "23505") throw new SendFejl("server", "Beskeden kunne ikke sendes");
+  throw new SendFejl("ukendt", "Ikke sendt – prøv igen");
+}
+
 export function useSendMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      conversationId, 
-      content, 
-      replyToId,
-      attachmentUrl,
-      attachmentType,
-      attachmentName
-    }: { 
-      conversationId: string; 
-      content: string;
-      replyToId?: string;
-      attachmentUrl?: string;
-      attachmentType?: string;
-      attachmentName?: string;
-    }) => {
+    mutationFn: async (v: SendInput) => {
       const employeeId = await getCurrentEmployeeId();
-
-      const { data, error } = await supabase
-        .from("chat_messages")
-        .insert({ 
-          conversation_id: conversationId, 
-          sender_id: employeeId, 
-          content,
-          reply_to_id: replyToId || null,
-          attachment_url: attachmentUrl || null,
-          attachment_type: attachmentType || null,
-          attachment_name: attachmentName || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      await sendBesked(v, employeeId);
+      return v;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["chat-messages", variables.conversationId] });
+    onSuccess: (v) => {
+      efterHandling(queryClient, v.conversationId, v.id);
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
 }
 
+/** Redigering via sb_ret (ingen direkte content-UPDATE). Starter tjek for den nye revision. */
 export function useEditMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ messageId, content, conversationId }: { messageId: string; content: string; conversationId: string }) => {
-      const { data, error } = await supabase
-        .from("chat_messages")
-        .update({ content, edited_at: new Date().toISOString() })
-        .eq("id", messageId)
-        .select()
-        .single();
-
+    mutationFn: async ({ messageId, content, conversationId, revision }: { messageId: string; content: string; conversationId: string; revision: number }) => {
+      if (content.length > 4000) throw Object.assign(new Error("Højst 4.000 tegn"), { code: "P0001" });
+      const { data, error } = await supabase.rpc("sb_ret", { p_kilde: "besked", p_id: messageId, p_revision: revision, p_tekst: content });
       if (error) throw error;
-      return { data, conversationId };
+      return { revision: data, conversationId, messageId };
     },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["chat-messages", result.conversationId] });
-    },
+    onSuccess: (r) => efterHandling(queryClient, r.conversationId, r.messageId),
+    onError: (_e, v) => { queryClient.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
   });
 }
 
@@ -463,38 +501,41 @@ export function useMarkAsRead() {
   });
 }
 
+/** Nøglebundne direkte samtaler (direct_key) kan ikke slettes eller forlades. */
+export const kanSletteSamtale = (c: Pick<Conversation, "direct_key">) => !c.direct_key;
+
 export function useDeleteConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
       const employeeId = await getCurrentEmployeeId();
-      
-      // Delete membership (this effectively "leaves" the conversation)
-      // For 1:1 chats or if you're the creator, delete the whole conversation
-      const { data: conversation } = await supabase
+      const { data: conversation, error: cErr } = await supabase
         .from("chat_conversations")
-        .select("created_by, is_group")
+        .select("created_by, is_group, direct_key")
         .eq("id", conversationId)
-        .single() as any;
-      
-      if (conversation?.created_by === employeeId || !conversation?.is_group) {
-        // Delete all related data
-        await supabase.from("chat_messages").delete().eq("conversation_id", conversationId);
-        await supabase.from("chat_conversation_members").delete().eq("conversation_id", conversationId);
-        await supabase.from("chat_conversations").delete().eq("id", conversationId);
+        .single();
+      if (cErr || !conversation) throw cErr ?? new Error("Samtalen findes ikke");
+      // Afvis før nogen DELETE.
+      if (conversation.direct_key) throw new Error("Direkte samtaler kan ikke slettes");
+
+      if (conversation.created_by === employeeId || !conversation.is_group) {
+        const a = await supabase.from("chat_messages").delete().eq("conversation_id", conversationId);
+        if (a.error) throw a.error;
+        const b = await supabase.from("chat_conversation_members").delete().eq("conversation_id", conversationId);
+        if (b.error) throw b.error;
+        const c = await supabase.from("chat_conversations").delete().eq("id", conversationId).select("id");
+        if (c.error) throw c.error;
+        if (!c.data?.length) throw new Error("Sletningen blev afvist");
       } else {
-        // Just leave the group
-        await supabase
-          .from("chat_conversation_members")
-          .delete()
-          .eq("conversation_id", conversationId)
-          .eq("employee_id", employeeId);
+        const d = await supabase.from("chat_conversation_members").delete()
+          .eq("conversation_id", conversationId).eq("employee_id", employeeId).select("id");
+        if (d.error) throw d.error;
+        if (!d.data?.length) throw new Error("Kunne ikke forlade gruppen");
       }
-      
       return conversationId;
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
@@ -504,7 +545,6 @@ export function useSearchMessages() {
   return useMutation({
     mutationFn: async (query: string) => {
       if (!query.trim()) return [];
-      
       const { data, error } = await supabase
         .from("chat_messages")
         .select(`
@@ -513,46 +553,41 @@ export function useSearchMessages() {
           conversation:chat_conversations(id, name, is_group)
         `)
         .is("deleted_at", null)
+        .neq("status", "trukket_tilbage")
         .ilike("content", `%${query}%`)
         .order("created_at", { ascending: false })
         .limit(50) as any;
-      
       if (error) throw error;
-      
-      return (data || []).map((msg: any) => ({
-        ...msg,
-        sender: msg.sender ? {
-          id: msg.sender.id,
-          full_name: `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim()
-        } : undefined
-      }));
+      const nu = Date.now();
+      return (data || [])
+        .filter((msg: any) => !msg.slettes_efter || new Date(msg.slettes_efter).getTime() > nu)
+        .map((msg: any) => ({
+          ...msg,
+          sender: msg.sender ? {
+            id: msg.sender.id,
+            full_name: `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim()
+          } : undefined
+        }));
     },
   });
 }
 
-export function useUploadAttachment() {
-  return useMutation({
-    mutationFn: async (file: File) => {
-      const employeeId = await getCurrentEmployeeId();
-      const fileName = `${employeeId}/${Date.now()}-${file.name}`;
-      
-      const { data, error } = await supabase.storage
-        .from("chat-attachments")
-        .upload(fileName, file);
-      
-      if (error) throw error;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from("chat-attachments")
-        .getPublicUrl(data.path);
-      
-      return {
-        url: publicUrl,
-        type: file.type,
-        name: file.name
-      };
-    },
-  });
+/** Henter samtalen med medlemmer i samme format som useConversations. */
+async function hentSamtale(id: string): Promise<Conversation> {
+  const { data, error } = await supabase
+    .from("chat_conversations")
+    .select(`*, members:chat_conversation_members(*, employee:employee_basic_info(id, first_name, last_name))`)
+    .eq("id", id)
+    .single() as any;
+  if (error || !data) throw error ?? new Error("Samtalen findes ikke");
+  return {
+    ...data,
+    unread_count: 0,
+    members: data.members?.map((m: any) => ({
+      ...m,
+      employee: m.employee ? { id: m.employee.id, full_name: `${m.employee.first_name || ''} ${m.employee.last_name || ''}`.trim() } : undefined,
+    })),
+  } as Conversation;
 }
 
 export function useCreateConversation() {
@@ -560,25 +595,20 @@ export function useCreateConversation() {
 
   return useMutation({
     mutationFn: async ({ name, memberIds, isGroup }: { name?: string; memberIds: string[]; isGroup: boolean }) => {
-      const employeeId = await getCurrentEmployeeId();
-
-      const { data: conversation, error: convError } = await supabase
-        .from("chat_conversations")
-        .insert({ name: isGroup ? name : null, is_group: isGroup, created_by: employeeId })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      const allMemberIds = [...new Set([employeeId, ...memberIds])];
-      const { error: memberError } = await supabase
-        .from("chat_conversation_members")
-        .insert(allMemberIds.map((id) => ({ conversation_id: conversation.id, employee_id: id })));
-
-      if (memberError) throw memberError;
+      const mig = await getCurrentEmployeeId();
+      const andre = [...new Set(memberIds)].filter((x) => x && x !== mig);
+      const v = validerSamtale(andre.length, name, isGroup);
+      if ("fejl" in v) throw Object.assign(new Error(v.fejl), { code: "P0001" });
+      const { data: id, error } = isGroup
+        ? await supabase.rpc("sb_chat_start_gruppe", { p_navn: (name ?? "").trim(), p_medlemmer: andre })
+        : await supabase.rpc("sb_chat_start_direkte", { p_anden: andre[0] });
+      if (error) throw error;
+      if (typeof id !== "string") throw new Error("Intet samtale-id");
+      const conversation = await hentSamtale(id);
+      queryClient.setQueryData<Conversation[]>(["chat-conversations"], (old) => [conversation, ...(old ?? []).filter((c) => c.id !== id)]);
       return conversation;
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
@@ -589,18 +619,23 @@ export function useRealtimeMessages(conversationId: string | null) {
 
   useEffect(() => {
     if (!conversationId) return;
-
+    const key = ["chat-messages", conversationId] as const;
     const channel = supabase
       .channel(`messages-${conversationId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: `conversation_id=eq.${conversationId}` },
-        () => queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] })
+        () => planlaeg(queryClient, key)
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_message_reactions" },
-        () => queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] })
+        () => planlaeg(queryClient, key)
       )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+      // Offentlige samtalesignaler (24d); private signaler håndteres i useChatUnreadTotal.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "sb_signaler", filter: `conversation_id=eq.${conversationId}` },
+        (p) => { if ((p.new as { kilde?: string })?.kilde === "besked") planlaeg(queryClient, key); }
+      )
+      .subscribe((s) => { if (s === "SUBSCRIBED") planlaeg(queryClient, key); });
+    const forgrund = () => { if (document.visibilityState === "visible") planlaeg(queryClient, key); };
+    document.addEventListener("visibilitychange", forgrund);
+    return () => { document.removeEventListener("visibilitychange", forgrund); supabase.removeChannel(channel); };
   }, [conversationId, queryClient]);
 }
 
@@ -754,10 +789,10 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
   const on = enabled && !!employeeId;
 
   useEffect(() => {
-    if (!on) return;
+    if (!on || !employeeId) return;
     const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
-      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      planlaeg(queryClient, CHAT_UNREAD_KEY);
+      planlaeg(queryClient, ["chat-conversations"]);
     };
     const channel = supabase
       .channel(`chat-unread-${employeeId}`)
@@ -767,8 +802,13 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
         if (p.eventType === "UPDATE" && kunAktivitet(p.old as Record<string, unknown>, p.new as Record<string, unknown>)) return;
         invalidate();
       })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "sb_signaler" }, (p) => {
+        void behandlSignal(queryClient, p.new as SignalRaekke, employeeId);
+      })
+      .subscribe((s) => { if (s === "SUBSCRIBED") invalidate(); });
+    const forgrund = () => { if (document.visibilityState === "visible") { invalidate(); planlaeg(queryClient, ["chat-messages"]); } };
+    document.addEventListener("visibilitychange", forgrund);
+    return () => { document.removeEventListener("visibilitychange", forgrund); supabase.removeChannel(channel); };
   }, [on, employeeId, queryClient]);
 
   return useQuery({
@@ -781,6 +821,171 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
       return (data ?? []).reduce((sum, r) => sum + (Number(r.antal) || 0), 0);
     },
   });
+}
+
+// ---------- sb_signaler (S6) ----------
+
+interface SignalRaekke { id: number; kilde: string; kilde_id: string; haendelse: string; privat: boolean; conversation_id: string | null }
+
+const planlagt = new Map<string, ReturnType<typeof setTimeout>>();
+/** Debounce 300 ms pr. query-nøgle, delt på tværs af hookinstanser. */
+export function planlaeg(qc: QueryClient, key: readonly unknown[]): void {
+  const k = JSON.stringify(key);
+  if (planlagt.has(k)) return;
+  planlagt.set(k, setTimeout(() => { planlagt.delete(k); void qc.invalidateQueries({ queryKey: [...key] }); }, 300));
+}
+
+type SignalLytter = (s: { conversationId: string | null; kildeId: string; haendelse: string }) => void;
+const signalLyttere = new Set<SignalLytter>();
+/** Søgning og svaruddrag genvalideres ved signaler (tilbagetrækning, sletning, udløb). */
+export function onChatSignal(cb: SignalLytter): () => void {
+  signalLyttere.add(cb);
+  return () => { signalLyttere.delete(cb); };
+}
+
+const sete = new Set<string>();
+const toastet = new Set<number>();
+
+/** Kun kilde='besked'. Indhold/status læses aldrig fra payload – kun genhentning. */
+async function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: string): Promise<void> {
+  if (!s || s.kilde !== "besked") return;
+  const noegle = `${s.id}`;
+  let conv = s.conversation_id;
+  if (!s.privat) {
+    if (sete.has(noegle)) return;
+    sete.add(noegle);
+    if (conv) planlaeg(qc, ["chat-messages", conv]);
+    planlaeg(qc, ["chat-conversations"]);
+    planlaeg(qc, CHAT_UNREAD_KEY);
+  } else {
+    if (toastet.has(s.id)) return;
+    toastet.add(s.id);
+    const { data } = await supabase.from("chat_messages").select("conversation_id").eq("id", s.kilde_id).eq("sender_id", employeeId).maybeSingle();
+    conv = data?.conversation_id ?? null;
+    if (conv) planlaeg(qc, ["chat-messages", conv]);
+    planlaeg(qc, ["sb-begrundelse", employeeId]);
+    if (s.haendelse === "afventer") toast("Din besked afventer dig");
+    else if (s.haendelse === "udloeb") toast("Din besked blev trukket tilbage");
+  }
+  for (const l of signalLyttere) l({ conversationId: conv, kildeId: s.kilde_id, haendelse: s.haendelse });
+  if (sete.size > 2000) sete.clear();
+}
+
+// ---------- Status, begrundelser og handlinger (S6) ----------
+
+export type Begrundelse = "haard_tone" | "personoplysning" | "cpr_fil" | "ikke_tjekket_fil" | "ikke_tjekket";
+export const BEGRUNDELSE_TEKST: Record<Begrundelse, string> = {
+  haard_tone: "Tonen virker hård. Læs den igen, før du sender.",
+  personoplysning: "Beskeden ser ud til at indeholde personoplysninger. Sender du, slettes den automatisk efter 7 dage.",
+  cpr_fil: "Filen indeholder et CPR-nummer og kan ikke sendes.",
+  ikke_tjekket_fil: "Filen kunne ikke tjekkes. Fjern filen eller træk beskeden tilbage.",
+  ikke_tjekket: "Beskeden kunne ikke tjekkes. Læs den igennem, før du sender.",
+};
+const KENDTE = new Set(Object.keys(BEGRUNDELSE_TEKST));
+
+/** Egen begrundelse for præcis (besked, id, revision); cache adskilt pr. bruger. */
+export function useBegrundelse(employeeId: string | undefined, messageId: string, revision: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["sb-begrundelse", employeeId, messageId, revision],
+    enabled: enabled && !!employeeId,
+    retry: 2,
+    queryFn: async (): Promise<Begrundelse | null> => {
+      const { data, error } = await supabase.from("sb_tjek_begrundelser").select("aarsag_kode")
+        .eq("kilde", "besked").eq("kilde_id", messageId).eq("revision", revision).limit(1).maybeSingle();
+      if (error) throw error;
+      const k = data?.aarsag_kode;
+      return k && KENDTE.has(k) ? (k as Begrundelse) : null;
+    },
+  });
+}
+
+/** Fejl fra serveren: P0001 vises ordret, ellers fast tekst. */
+export function serverTekst(e: unknown, fast: string): string {
+  const pe = e as { code?: string; message?: string } | null;
+  if (pe?.code === "P0001" && typeof pe.message === "string" && pe.message) return pe.message;
+  return fast;
+}
+export const erForaeldet = (e: unknown) => (e as { code?: string; message?: string } | null)?.code === "P0001" && /forældet revision/i.test((e as { message?: string }).message ?? "");
+
+const vent = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét genforsøg efter 2 s ved transportfejl. */
+export async function startTjekHvisNoedvendigt(messageId: string): Promise<void> {
+  const { data: r } = await supabase.from("chat_messages").select("status, revision").eq("id", messageId).maybeSingle();
+  if (!r || r.status !== "tjekkes") return;
+  for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
+    const { error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } });
+    if (!error) return;
+    const navn = (error as { name?: string }).name;
+    if (navn !== "FunctionsFetchError" && navn !== "FunctionsRelayError") return;
+    if (forsoeg === 0) await vent(2000);
+  }
+}
+
+function efterHandling(qc: QueryClient, conversationId: string, messageId: string) {
+  void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+  void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
+  void startTjekHvisNoedvendigt(messageId).finally(() => {
+    void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+    void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
+  });
+}
+
+export function useAfgoer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { messageId: string; revision: number; handling: "send" | "traek"; conversationId: string }) => {
+      const { error } = await supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling });
+      if (error) throw error;
+      return v;
+    },
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] });
+      void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
+      void qc.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
+    },
+  });
+}
+
+export function useFjernFil() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { messageId: string; revision: number; conversationId: string }) => {
+      const { error } = await supabase.rpc("sb_fjern_fil", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision });
+      if (error) throw error;
+      return v;
+    },
+    onSuccess: (v) => efterHandling(qc, v.conversationId, v.messageId),
+    onError: (_e, v) => { void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
+  });
+}
+
+/** Minimalt aktivt kollegaopslag (samme som useActiveColleagues i usePulsen) til nye samtaler. */
+export function useActiveChatColleagues(enabled = true) {
+  return useQuery({
+    queryKey: ["chat-active-colleagues"],
+    enabled,
+    staleTime: 600000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("employee_master_data").select("id, first_name, last_name").eq("is_active", true).order("first_name");
+      if (error) throw error;
+      return (data ?? []).map((e) => ({ id: e.id, full_name: `${e.first_name || ""} ${e.last_name || ""}`.trim() }));
+    },
+  });
+}
+
+/** Unikke andre medarbejdere blandt aktive kolleger (egen og inaktive frasorteres). */
+export function normaliserDeltagere(ids: string[], mig: string | null | undefined, aktive: Set<string>): string[] {
+  return [...new Set(ids)].filter((id) => id && id !== mig && aktive.has(id));
+}
+
+export type SamtaleValidering = { ok: true } | { ok: false; fejl: string };
+export function validerSamtale(andre: number, navn: string | undefined, isGroup: boolean): SamtaleValidering {
+  if (!isGroup) return andre === 1 ? { ok: true } : { ok: false, fejl: "Vælg én aktiv kollega" };
+  if (andre < 2 || andre > 50) return { ok: false, fejl: "En gruppe har 2–50 andre medlemmer" };
+  const n = (navn ?? "").trim();
+  if (!n || n.length > 80) return { ok: false, fejl: "Gruppen skal have et navn (højst 80 tegn)" };
+  return { ok: true };
 }
 
 /** Vinduet er synligt og har fokus – betingelsen for kvitteringer og aktivitet. */

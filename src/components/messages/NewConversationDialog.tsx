@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { useCreateConversation, useEmployeesForChat, useTeamsForChat, useTeamMembers } from "@/hooks/useChat";
+import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst } from "@/hooks/useChat";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +35,16 @@ export function NewConversationDialog({
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"employees" | "teams">("employees");
   
-  const { data: employees, isLoading: employeesLoading } = useEmployeesForChat();
+  const { data: alleAktive, isLoading: employeesLoading, isError: employeesError, refetch: refetchEmployees } = useActiveChatColleagues(open);
+  const { data: mig } = useQuery({
+    queryKey: ["chat-mig"],
+    enabled: open,
+    staleTime: 600000,
+    queryFn: async () => { const { data } = await supabase.rpc("get_current_employee_id"); return typeof data === "string" ? data : null; },
+  });
+  // Egen og inaktive profiler kan ikke vælges.
+  const employees = alleAktive?.filter((e) => e.id !== mig);
+  const aktiveIds = new Set((employees ?? []).map((e) => e.id));
   const { data: teams, isLoading: teamsLoading } = useTeamsForChat();
   const { data: teamMembers } = useTeamMembers(selectedTeamId);
   const createConversation = useCreateConversation();
@@ -41,16 +52,18 @@ export function NewConversationDialog({
   // When a team is selected, auto-select all team members
   useEffect(() => {
     if (selectedTeamId && teamMembers && teamMembers.length > 0) {
-      setSelectedIds(teamMembers);
+      setSelectedIds(normaliserDeltagere(teamMembers, mig, aktiveIds));
       // Auto-set group name to team name
       const team = teams?.find((t: any) => t.id === selectedTeamId);
       if (team && !groupName) {
         setGroupName(team.name);
       }
     }
-  }, [selectedTeamId, teamMembers, teams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeamId, teamMembers, teams, mig, alleAktive]);
 
-  const isGroup = selectedIds.length > 1;
+  const deltagere = normaliserDeltagere(selectedIds, mig, aktiveIds);
+  const isGroup = deltagere.length > 1;
   
   const filteredEmployees = employees?.filter((emp) =>
     emp.full_name.toLowerCase().includes(search.toLowerCase())
@@ -78,23 +91,15 @@ export function NewConversationDialog({
   };
 
   const handleCreate = async () => {
-    if (selectedIds.length === 0) {
-      toast.error("Vælg mindst én deltager");
-      return;
-    }
-
-    if (isGroup && !groupName.trim()) {
-      toast.error("Angiv et gruppenavn");
-      return;
-    }
-
+    if (createConversation.isPending) return;
+    const v = validerSamtale(deltagere.length, groupName, isGroup);
+    if ("fejl" in v) { toast.error(v.fejl); return; }
     try {
       const conversation = await createConversation.mutateAsync({
-        name: isGroup ? groupName : undefined,
-        memberIds: selectedIds,
+        name: isGroup ? groupName.trim() : undefined,
+        memberIds: deltagere,
         isGroup,
       });
-      
       toast.success("Samtale oprettet");
       onCreated(conversation.id);
       setSelectedIds([]);
@@ -102,7 +107,8 @@ export function NewConversationDialog({
       setGroupName("");
       setSearch("");
     } catch (error) {
-      toast.error("Kunne ikke oprette samtale");
+      // Valg og navn bevares ved fejl.
+      toast.error(serverTekst(error, "Kunne ikke oprette samtale"));
     }
   };
 
@@ -128,6 +134,7 @@ export function NewConversationDialog({
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Angiv gruppenavn..."
+                maxLength={80}
               />
             </div>
           )}
@@ -156,7 +163,12 @@ export function NewConversationDialog({
 
             <TabsContent value="employees" className="mt-2">
               <ScrollArea className="h-[300px] max-md:h-[40dvh] border rounded-md">
-                {employeesLoading ? (
+                {employeesError ? (
+                  <div className="flex flex-col items-center justify-center gap-2 h-full p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Kunne ikke hente kolleger</p>
+                    <Button size="sm" variant="outline" className="min-h-11" onClick={() => void refetchEmployees()}>Prøv igen</Button>
+                  </div>
+                ) : employeesLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
@@ -219,12 +231,12 @@ export function NewConversationDialog({
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">
-              {selectedTeamId ? `Team valgt (${selectedIds.length} medlemmer)` : `${selectedIds.length} valgt`}
+              {selectedTeamId ? `Team valgt (${deltagere.length} medlemmer)` : `${deltagere.length} valgt`}
             </span>
             <Button
               className="max-md:min-h-11"
               onClick={handleCreate}
-              disabled={selectedIds.length === 0 || createConversation.isPending}
+              disabled={deltagere.length === 0 || createConversation.isPending}
             >
               {createConversation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
