@@ -89,6 +89,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     permissionKey: "menu_dashboard_eesy_tm_monthly_goal"
   },
   {
+    // Ingen permissionKey: kun ejer + team_dashboard_permissions (Eesy TM = "Kun teamleder").
+    slug: "opstartshold",
+    name: "Opstartshold",
+    path: "/dashboards/opstartshold",
+    description: "Eesy TM-opstartshold sammenlignet dag for dag",
+  },
+  {
     slug: "relatel-monthly-goal",
     name: "Relatel Månedsmål",
     path: "/dashboards/relatel-monthly-goal",
