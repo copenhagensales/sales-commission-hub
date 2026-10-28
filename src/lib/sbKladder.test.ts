@@ -283,3 +283,78 @@ describe("c1 §1/§2: fuld kontekst, uploadejerskab og redigeringsversion", () =
     expect(m.laesRetKladde("e", "A", "m")).toBeNull();
   });
 });
+
+describe("c2 §4 – rydning tåler fejl på selve sessionStorage-getteren", () => {
+  const lagerEgenskab = Object.getOwnPropertyDescriptor(window, "sessionStorage")!;
+  const ægte = window.sessionStorage;
+  const getterKaster = () => Object.defineProperty(window, "sessionStorage", { configurable: true, get() { throw new Error("SecurityError"); } });
+  const genetabler = () => Object.defineProperty(window, "sessionStorage", lagerEgenskab);
+  const gamle = (m: Mod) => {
+    m.gemKladde("e", "A", { tekst: "gammel tekst", svarId: "s1" });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "gammel ret", revision: 1 });
+    m.tilfoejAfsendelse("e", "A", afs("p1", "gammel pending"));
+    expect(ægte.getItem("sb-kladde:e:A")).not.toBeNull();
+  };
+  const ingenGamle = (m: Mod) => {
+    expect(m.laesKladde("e", "A")).toBeNull();
+    expect(m.laesRetKladde("e", "A", "m1")).toBeNull();
+    expect(m.hentAfsendelser("e", "A")).toEqual([]);
+  };
+
+  it("getter kaster under rydning → adgang genetableres → ingen gammel værdi genindlæses", async () => {
+    const m = await ny();
+    gamle(m);
+    getterKaster();
+    try { m.rydAlleKladder(); } finally { genetabler(); }
+    ingenGamle(m);
+    // Gamle nøgler er nu fjernet fra det genetablerede lager.
+    expect(ægte.getItem("sb-kladde:e:A")).toBeNull();
+    expect(ægte.getItem("sb-kladde:e:A:afs")).toBeNull();
+  });
+
+  it("gentagne mislykkede rydninger bevarer beskyttelsen", async () => {
+    const m = await ny();
+    gamle(m);
+    getterKaster();
+    try { m.rydAlleKladder(); m.rydAlleKladder(); } finally { genetabler(); }
+    getterKaster();
+    try { m.rydAlleKladder(); } finally { genetabler(); }
+    ingenGamle(m);
+  });
+
+  it("nye kladder i ny generation virker under og efter utilgængeligt lager; gamle forbliver væk", async () => {
+    const m = await ny();
+    gamle(m);
+    getterKaster();
+    try {
+      m.rydAlleKladder();
+      m.gemKladde("e", "A", { tekst: "ny tekst", svarId: null });
+      expect(m.laesKladde("e", "A")?.tekst).toBe("ny tekst");
+      expect(m.harKladdeLagerFejl("e", "A")).toBe(true);
+    } finally { genetabler(); }
+    expect(m.laesKladde("e", "A")?.tekst).toBe("ny tekst");
+    expect(m.laesRetKladde("e", "A", "m1")).toBeNull();
+    expect(m.hentAfsendelser("e", "A")).toEqual([]);
+  });
+
+  it("removeItem-fejl ved senere oprydning efterlader tombstone; spærring ophæves ikke for tidligt", async () => {
+    const m = await ny();
+    gamle(m);
+    getterKaster();
+    try { m.rydAlleKladder(); } finally { genetabler(); }
+    const rm = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("nej"); });
+    ingenGamle(m);
+    rm.mockRestore();
+    ingenGamle(m);
+  });
+
+  it("vellykket skrivning til én kladde skjuler ikke en anden kladdes fejl", async () => {
+    const m = await ny();
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => { throw new Error("fuld"); });
+    m.gemKladde("e", "A", { tekst: "a", svarId: null });
+    set.mockRestore();
+    m.gemKladde("e", "B", { tekst: "b", svarId: null });
+    expect(m.harKladdeLagerFejl("e", "A")).toBe(true);
+    expect(m.harKladdeLagerFejl("e", "B")).toBe(false);
+  });
+});

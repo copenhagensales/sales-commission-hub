@@ -39,45 +39,92 @@ export function frigivLaas(k: string, op: string): void { if (laase.get(k) === o
 
 export const MAKS_SAMTIDIGE_AFSTEMNINGER = 3;
 const LAAST_VENT_MS = 1000;
+/** c2 §6: køens kapacitet tilhører én sessionsgeneration; gamle afslutninger frigiver kun deres egen sessions plads. */
+interface KoeSession { gen: number; aktive: number; koe: AfstemForloeb[]; venter: ((ok: boolean) => void)[] }
 interface AfstemForloeb {
-  noegle: string; id: string; ejer: OperationsEjer; qc: QueryClient;
+  noegle: string; id: string; ejer: OperationsEjer; qc: QueryClient; session: KoeSession;
   forsoeg: number; naeste: number; timer: ReturnType<typeof setTimeout> | null;
   iKoe: boolean; aktiv: boolean; udtoemt: boolean; genstartVenter: boolean;
+  /** Manuel handling ejer id'et lige nu; baggrunden venter på dens eksplicitte fortsættelse. */
+  manuel: boolean;
 }
 const forloeb = new Map<string, AfstemForloeb>();
-const koe: AfstemForloeb[] = [];
-let aktiveAfstemninger = 0;
+let koeSession: KoeSession = { gen: sessionsGeneration(), aktive: 0, koe: [], venter: [] };
 const koeLyttere = new Set<() => void>();
 let koeVersion = 0;
 const meldKoe = () => { koeVersion++; for (const l of koeLyttere) l(); };
 const abonnerKoe = (l: () => void) => { koeLyttere.add(l); return () => { koeLyttere.delete(l); }; };
-const gyldigt = (f: AfstemForloeb) => forloeb.get(f.noegle) === f && ejerGyldig(f.ejer);
+
+/** Logud/brugerskift: gamle timere, køposter, ventende pladser og låse afkobles; ny session får ny kapacitet. */
+function skiftKoeSession(gen: number): void {
+  const gl = koeSession;
+  for (const [k, f] of forloeb) {
+    if (f.session === gl || f.ejer.gen !== gen) { if (f.timer) clearTimeout(f.timer); f.timer = null; forloeb.delete(k); }
+  }
+  for (const k of [...laase.keys()]) if (!k.startsWith(`${gen}:`)) laase.delete(k);
+  gl.koe.length = 0;
+  const venter = gl.venter.splice(0);
+  koeSession = { gen, aktive: 0, koe: [], venter: [] };
+  for (const r of venter) r(false);
+  meldKoe();
+}
+const aktuelKoeSession = (): KoeSession => {
+  const g = sessionsGeneration();
+  if (koeSession.gen !== g) skiftKoeSession(g);
+  return koeSession;
+};
+abonnerAfsendelser(() => { if (koeSession.gen !== sessionsGeneration()) skiftKoeSession(sessionsGeneration()); });
+
+/** Til prøver og B2d-diagnose: aktuel sessions kapacitet (kun tal). */
+export const afstemningsKapacitet = () => ({ gen: koeSession.gen, aktive: koeSession.aktive, ventende: koeSession.venter.length, iKoe: koeSession.koe.length });
+
+/** Plads til manuel afsendelse/afstemning i samme kapacitet som baggrunden; false = sessionen er skiftet. */
+function tagPlads(s: KoeSession): Promise<boolean> {
+  if (s !== aktuelKoeSession()) return Promise.resolve(false);
+  if (s.aktive < MAKS_SAMTIDIGE_AFSTEMNINGER) { s.aktive++; return Promise.resolve(true); }
+  return new Promise<boolean>((r) => s.venter.push(r));
+}
+/** Frigiver kun den angivne sessions plads; en gammel session påvirker aldrig den nye. */
+function frigivPlads(s: KoeSession): void {
+  if (s !== koeSession) return;
+  const naeste = s.venter.shift();
+  if (naeste) { naeste(true); return; } // pladsen overdrages direkte
+  s.aktive = Math.max(0, s.aktive - 1);
+  pumpKoe(s);
+}
+
+const gyldigt = (f: AfstemForloeb) => forloeb.get(f.noegle) === f && f.session === koeSession && ejerGyldig(f.ejer);
 
 function planlaegForloeb(f: AfstemForloeb): void {
-  if (!gyldigt(f) || f.timer || f.iKoe || f.aktiv || f.udtoemt) return;
-  f.timer = setTimeout(() => { f.timer = null; if (!gyldigt(f)) return; f.iKoe = true; koe.push(f); pumpKoe(); }, Math.max(0, f.naeste - Date.now()));
+  if (!gyldigt(f) || f.timer || f.iKoe || f.aktiv || f.udtoemt || f.manuel) return;
+  f.timer = setTimeout(() => {
+    f.timer = null;
+    if (!gyldigt(f) || f.manuel) return;
+    f.iKoe = true; f.session.koe.push(f); pumpKoe(f.session);
+  }, Math.max(0, f.naeste - Date.now()));
 }
-function pumpKoe(): void {
-  while (aktiveAfstemninger < MAKS_SAMTIDIGE_AFSTEMNINGER && koe.length) {
-    const f = koe.shift()!;
+function pumpKoe(s: KoeSession): void {
+  if (s !== koeSession) return;
+  while (s.aktive < MAKS_SAMTIDIGE_AFSTEMNINGER && s.koe.length && !s.venter.length) {
+    const f = s.koe.shift()!;
     f.iKoe = false;
-    if (gyldigt(f)) void koerForloeb(f);
+    if (!gyldigt(f) || f.manuel) continue;
+    s.aktive++;
+    void koerForloeb(f, s);
   }
 }
-async function koerForloeb(f: AfstemForloeb): Promise<void> {
+async function koerForloeb(f: AfstemForloeb, s: KoeSession): Promise<void> {
   const { emp, conv, gen } = f.ejer;
   const a = hentAfsendelser(emp, conv).find((x) => x.id === f.id);
-  if (!a || a.tilstand !== "afstemmer") { stopForloeb(f.noegle); return; }
+  if (!a || a.tilstand !== "afstemmer") { frigivPlads(s); stopForloeb(f.noegle); return; }
   const op = nytOperationsId();
   // Optaget af manuel afsendelse: planlæg fortsættelse i stedet for at opgive (§4).
-  if (!tagLaas(f.noegle, op)) { f.naeste = Date.now() + LAAST_VENT_MS; planlaegForloeb(f); return; }
+  if (!tagLaas(f.noegle, op)) { frigivPlads(s); f.naeste = Date.now() + LAAST_VENT_MS; planlaegForloeb(f); return; }
   f.aktiv = true;
-  aktiveAfstemninger++;
   let r: Awaited<ReturnType<typeof afstemKun>> = "ukendt";
   try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: { ...f.ejer, op } }); }
   catch { r = "ukendt"; }
-  finally { frigivLaas(f.noegle, op); f.aktiv = false; aktiveAfstemninger--; }
-  pumpKoe();
+  finally { frigivLaas(f.noegle, op); f.aktiv = false; frigivPlads(s); }
   if (!gyldigt(f)) return;
   if (r === "fundet") {
     fjernAfsendelse(emp, conv, f.id, gen);
@@ -108,37 +155,68 @@ function stopForloeb(k: string): void {
   const f = forloeb.get(k);
   if (!f) return;
   if (f.timer) clearTimeout(f.timer);
+  f.timer = null;
+  const i = f.session.koe.indexOf(f);
+  if (i >= 0) f.session.koe.splice(i, 1);
   forloeb.delete(k);
   meldKoe();
 }
 /** Sikrer ét forløb pr. id; eksisterende forløb (med backoff) bevares ved remount. */
-function sikrForloeb(ejer: OperationsEjer, id: string, qc: QueryClient): void {
+function sikrForloeb(ejer: OperationsEjer, id: string, qc: QueryClient): AfstemForloeb | null {
+  const s = aktuelKoeSession();
+  if (ejer.gen !== s.gen || !ejerGyldig(ejer)) return null;
   const k = laasNoegle(ejer.gen, ejer.emp, ejer.conv, id);
   const f = forloeb.get(k);
-  if (f && gyldigt(f)) { f.qc = qc; planlaegForloeb(f); return; }
-  const ny: AfstemForloeb = { noegle: k, id, ejer, qc, forsoeg: 0, naeste: 0, timer: null, iKoe: false, aktiv: false, udtoemt: false, genstartVenter: false };
+  if (f && gyldigt(f)) { f.qc = qc; planlaegForloeb(f); return f; }
+  const ny: AfstemForloeb = { noegle: k, id, ejer, qc, session: s, forsoeg: 0, naeste: 0, timer: null, iKoe: false, aktiv: false, udtoemt: false, genstartVenter: false, manuel: false };
   forloeb.set(k, ny);
   planlaegForloeb(ny);
+  return ny;
 }
-/** Online/forgrund: højst én ventende genstart pr. id (gentagne hændelser samles). */
+/** Online/forgrund: højst én ventende genstart pr. id (gentagne hændelser samles). Kun læsning. */
 function genstartForloeb(): void {
   if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+  const s = aktuelKoeSession();
   for (const f of forloeb.values()) {
-    if (!gyldigt(f)) continue;
-    if (f.aktiv || f.iKoe) { f.genstartVenter = true; continue; }
+    if (!gyldigt(f) || f.session !== s) continue;
+    if (f.aktiv || f.iKoe || f.manuel) { f.genstartVenter = true; continue; }
     if (f.timer) { clearTimeout(f.timer); f.timer = null; }
     f.forsoeg = 0; f.naeste = 0; f.udtoemt = false;
     planlaegForloeb(f);
   }
   meldKoe();
 }
-/** Manuelt genforsøg (»Prøv igen«) nulstiller serien for id'et. */
-function nulstilForloeb(gen: number, emp: string, conv: string, id: string): void {
-  const f = forloeb.get(laasNoegle(gen, emp, conv, id));
-  if (!f) return;
+/** c2 §5: manuel handling overtager forløbet for id'et (timer/køpost stoppes, forløbet bevares). */
+function overtagForloeb(ejer: OperationsEjer, id: string, qc: QueryClient): AfstemForloeb | null {
+  const f = sikrForloeb(ejer, id, qc);
+  if (!f) return null;
   if (f.timer) { clearTimeout(f.timer); f.timer = null; }
-  f.forsoeg = 0; f.naeste = 0; f.udtoemt = false;
+  const i = f.session.koe.indexOf(f);
+  if (i >= 0) { f.session.koe.splice(i, 1); f.iKoe = false; }
+  f.manuel = true; f.udtoemt = false;
   meldKoe();
+  return f;
+}
+/** c2 §5: efter manuel handling planlægges eksplicit næste afstemning (eller forløbet stoppes) – uafhængigt af React. */
+function afslutManuel(f: AfstemForloeb | null, emp: string, conv: string, id: string): void {
+  if (!f || !gyldigt(f)) return;
+  f.manuel = false;
+  const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
+  if (!a || a.tilstand !== "afstemmer") { stopForloeb(f.noegle); return; }
+  f.genstartVenter = false;
+  f.forsoeg = 1; f.naeste = Date.now() + AFSTEM_BACKOFF_MS[0];
+  planlaegForloeb(f);
+  meldKoe();
+}
+/**
+ * c2 §6: afgrænset stopvej (til B2d ved bekræftet sletning/forladelse). Stopper timere og køposter for
+ * (medarbejder, samtale[, id]) i den aktuelle generation; igangværende kald afslutter og frigiver kun egne ressourcer.
+ */
+export function stopAfstemninger(emp: string, conv: string, id?: string): void {
+  const s = aktuelKoeSession();
+  for (const f of [...forloeb.values()]) {
+    if (f.session === s && f.ejer.emp === emp && f.ejer.conv === conv && (id === undefined || f.id === id)) stopForloeb(f.noegle);
+  }
 }
 const erUdtoemt = (gen: number, emp: string, conv: string, id: string) => !!forloeb.get(laasNoegle(gen, emp, conv, id))?.udtoemt;
 if (typeof window !== "undefined") {
@@ -302,8 +380,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
     // §4/§8(4): højst ét netværksforløb pr. id – også mod baggrundsafstemning.
-    if (!tagLaas(fk, op)) return;
-    nulstilForloeb(gen, emp, conv, id);
+    // c2 §5: optaget id tilsluttes det eksisterende forløb (genstart efter dets afslutning), intet konkurrerende kald.
+    if (!tagLaas(fk, op)) { const f = sikrForloeb(ejer, id, queryClient); if (f && !f.manuel) f.genstartVenter = true; return; }
+    const ks = aktuelKoeSession();
+    const forl = overtagForloeb(ejer, id, queryClient);
+    // c2 §6: manuel afsendelse deler køens tre pladser.
+    if (ks.gen !== gen || !(await tagPlads(ks))) { frigivLaas(fk, op); return; }
+    if (!vagt()) { frigivLaas(fk, op); frigivPlads(ks); return; }
     opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
     let filMeta = a.fil;
     try {
@@ -354,8 +437,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
       }
     } finally {
       frigivLaas(fk, op);
+      frigivPlads(ks);
+      if (vagt()) afslutManuel(forl, emp, conv, id);
     }
-  }, [sendMessage]);
+  }, [sendMessage, queryClient]);
 
   // §4: afstemning (kun læsning) via den fælles kø; listeændringer berører kun tilføjede/fjernede id'er.
   const afstemmer = afsendelser.filter((a) => a.tilstand === "afstemmer").map((a) => a.id).join(",");
@@ -367,7 +452,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const ids = new Set(afstemmer ? afstemmer.split(",") : []);
     for (const id of ids) sikrForloeb(ejer, id, queryClient);
     for (const f of [...forloeb.values()]) {
-      if (f.ejer.emp === meId && f.ejer.conv === conversationId && f.ejer.gen === ejer.gen && !ids.has(f.id) && !f.aktiv) stopForloeb(f.noegle);
+      if (f.ejer.emp === meId && f.ejer.conv === conversationId && f.ejer.gen === ejer.gen && !ids.has(f.id) && !f.aktiv && !f.manuel) stopForloeb(f.noegle);
     }
   }, [meId, conversationId, afstemmer, queryClient]);
   void koeV;

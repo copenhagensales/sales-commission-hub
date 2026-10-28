@@ -63,7 +63,24 @@ function skriv(k: string, v: unknown | null): boolean {
   if (ok || v === null) noegleFejl.delete(k); else noegleFejl.add(k);
   return ok;
 }
+/** c2 §4: efter en mislykket rydning ophæves spærringen først, når alle gamle generationsværdier er fjernet. */
+function haandterGamleVaerdier(): void {
+  if (!ignorerLager) return;
+  const l = lager();
+  if (!l) return;
+  try {
+    let ok = true;
+    for (let i = l.length - 1; i >= 0; i--) {
+      const k = l.key(i);
+      // Nøgler i hukommelsen tilhører den nye generation (eller er tombstones); alt andet er gammelt.
+      if (!k?.startsWith(PREFIX) || hukommelse.has(k)) continue;
+      try { l.removeItem(k); } catch { hukommelse.set(k, null); ok = false; }
+    }
+    if (ok) ignorerLager = false;
+  } catch { /* spærringen bevares */ }
+}
 function laes(k: string): unknown {
+  haandterGamleVaerdier();
   try {
     const s = hukommelse.has(k) ? hukommelse.get(k) : ignorerLager ? null : lager()?.getItem(k);
     return s ? JSON.parse(s) : null;
@@ -337,9 +354,10 @@ export function rydAlleKladder(): void {
   lagringsFejl.clear();
   hukommelse.clear();
   noegleFejl.clear();
-  ignorerLager = false;
+  // c2 §4: en spærring fra en tidligere mislykket rydning bevares, indtil denne rydning beviseligt lykkes.
   const l = lager();
-  if (l) {
+  if (!l) { ignorerLager = true; meld(); return; } // getter kastede/utilgængelig: gamle værdier må aldrig genindlæses
+  {
     try {
       for (let i = l.length - 1; i >= 0; i--) {
         const k = l.key(i);
@@ -347,6 +365,7 @@ export function rydAlleKladder(): void {
         // Fejlet sletning → tombstone, så ryddede værdier ikke genindlæses i den nye generation.
         try { l.removeItem(k); } catch { hukommelse.set(k, null); }
       }
+      ignorerLager = false; // alle gamle nøgler er fjernet eller tombstonet
     } catch { ignorerLager = true; }
   }
   meld();
