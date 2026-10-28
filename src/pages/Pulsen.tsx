@@ -194,10 +194,10 @@ function PulsenFeed() {
                   comments: fr.getComments(key),
                   canInteract: fr.canInteract,
                   onReact: (reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: key, reaction }),
-                  onComment: (body) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body }),
+                  onComment: (body, mentions) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body, mentions }),
                   onDeleteComment: (id) => fr.deleteComment.mutateAsync(id),
                 } : undefined}
-                onEdit={(body) => mut.edit.mutateAsync({ id: p.id, body })}
+                onEdit={(body, mentions) => mut.edit.mutateAsync({ id: p.id, body, mentions })}
                 onDelete={() => mut.remove.mutate(p, { onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
                 onHide={(hidden) => mut.setHidden.mutate({ id: p.id, hidden }, { onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
                 onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: p.id, commentId }, { onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}

@@ -10,6 +10,7 @@ import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { compressPulsenImage } from "@/lib/pulsen/compressImage";
 import { PULSEN_MAX_CHARS, PULSEN_PAGE_SIZE } from "@/lib/pulsen/format";
+import { rensOmtaler, tilOmtaler, type Omtale } from "@/components/pulsen/omtaler";
 
 export const PULSEN_BUCKET = "pulsen-images";
 export type PulsenScope = { kind: "house" } | { kind: "team"; teamId: string };
@@ -30,6 +31,8 @@ export interface PulsenPost {
   hidden_at: string | null;
   created_at: string;
   edited_at: string | null;
+  /** @-omtaler (tom liste for opslag uden omtaler). */
+  mentions?: Omtale[];
   author: PersonRef | null;
   praised: PersonRef | null;
   praised_employee_ids?: string[];
@@ -41,11 +44,12 @@ export interface PulsenPost {
 }
 
 const POST_SELECT =
-  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, best_answer_comment_id, hidden_at, created_at, edited_at, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
+  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, best_answer_comment_id, hidden_at, created_at, edited_at, mentions, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
 
 /** Henter navne på alle roste kolleger, så ros til flere vises korrekt. */
 async function attachPraised(posts: PulsenPost[]): Promise<PulsenPost[]> {
   const ids = Array.from(new Set(posts.flatMap((p) => p.praised_employee_ids ?? [])));
+  posts = posts.map((p) => ({ ...p, mentions: tilOmtaler(p.mentions) }));
   if (ids.length === 0) return posts;
   const { data, error } = await supabase.from("employee_master_data").select("id, first_name, last_name").in("id", ids);
   if (error) throw error;
@@ -91,7 +95,28 @@ export function usePulsenMe() {
     enabled: !!employeeId,
     staleTime: 300000,
   });
-  const teams = useQuery({
+  const teams = usePulsenTeams();
+  const self = usePulsenSelf(employeeId);
+  const led = ledTeams.data ?? [];
+  return {
+    employeeId: employeeId ?? null,
+    self: self.data ?? (employeeId ? { id: employeeId, first_name: null, last_name: null } : null),
+    isLoading: isLoading || teams.isLoading,
+    teams: teams.data ?? [],
+    isOwner,
+    canPostHouse: canEdit("action_pulsen_post_house"),
+    canManageEvents: canEdit("action_manage_company_events"),
+    /** Spejler pulsen_can_moderate i databasen (kun til visning af knappen). */
+    canModerate: (p: Pick<PulsenPost, "audience" | "team_id">) =>
+      isOwner || (p.audience === "team" && canEdit("action_pulsen_moderate") && !!p.team_id && led.includes(p.team_id)),
+  };
+}
+
+/** Brugerens teams (ejer: alle teams). Bruges af Storkbook og @-omtaler. */
+export function usePulsenTeams() {
+  const { data: employeeId } = useCurrentEmployeeId();
+  const { isOwner } = usePermissions();
+  return useQuery({
     queryKey: ["pulsen-teams", employeeId, isOwner],
     queryFn: async () => {
       if (isOwner) {
@@ -112,20 +137,6 @@ export function usePulsenMe() {
     enabled: !!employeeId,
     staleTime: 300000,
   });
-  const self = usePulsenSelf(employeeId);
-  const led = ledTeams.data ?? [];
-  return {
-    employeeId: employeeId ?? null,
-    self: self.data ?? (employeeId ? { id: employeeId, first_name: null, last_name: null } : null),
-    isLoading: isLoading || teams.isLoading,
-    teams: teams.data ?? [],
-    isOwner,
-    canPostHouse: canEdit("action_pulsen_post_house"),
-    canManageEvents: canEdit("action_manage_company_events"),
-    /** Spejler pulsen_can_moderate i databasen (kun til visning af knappen). */
-    canModerate: (p: Pick<PulsenPost, "audience" | "team_id">) =>
-      isOwner || (p.audience === "team" && canEdit("action_pulsen_moderate") && !!p.team_id && led.includes(p.team_id)),
-  };
 }
 
 export function usePulsenFeed(scope: PulsenScope, enabled: boolean) {
@@ -202,6 +213,7 @@ export interface NewPulsenPost {
   body: string;
   praised?: { id: string; first_name: string | null; last_name: string | null }[] | null;
   imageFile?: File | null;
+  mentions?: Omtale[];
 }
 
 type FeedData = InfiniteData<PulsenPost[], number>;
@@ -259,6 +271,7 @@ export function usePulsenMutations(author: PersonRef | null) {
           praised_employee_id: input.postType === "praise" ? input.praised?.[0]?.id ?? null : null,
           praised_employee_ids: input.postType === "praise" ? (input.praised ?? []).map((p) => p.id) : [],
           image_path: imagePath,
+          mentions: rensOmtaler(body, input.mentions ?? []),
         })
         .select(POST_SELECT)
         .single();
@@ -287,6 +300,7 @@ export function usePulsenMutations(author: PersonRef | null) {
         hidden_at: null,
         created_at: new Date().toISOString(),
         edited_at: null,
+        mentions: rensOmtaler(input.body.trim(), input.mentions ?? []),
         author,
         praised: input.praised?.[0] ?? null,
         pending: true,
@@ -307,13 +321,18 @@ export function usePulsenMutations(author: PersonRef | null) {
   });
 
   const edit = useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: string }) => {
-      const { error } = await supabase.from("pulsen_posts").update({ body: body.trim().slice(0, PULSEN_MAX_CHARS) }).eq("id", id);
+    mutationFn: async ({ id, body, mentions }: { id: string; body: string; mentions?: Omtale[] }) => {
+      const tekst = body.trim().slice(0, PULSEN_MAX_CHARS);
+      // Omtaler sendes kun, når feltet har en liste (databasen tillader kun forfatteren at ændre dem).
+      const { error } = await supabase.from("pulsen_posts")
+        .update(mentions ? { body: tekst, mentions: rensOmtaler(tekst, mentions) } : { body: tekst }).eq("id", id);
       if (error) throw error;
     },
-    onMutate: async ({ id, body }) => {
+    onMutate: async ({ id, body, mentions }) => {
       await cancelFor(id);
-      patchEverywhere((p) => (p.id === id ? { ...p, body: body.trim(), edited_at: new Date().toISOString() } : p));
+      patchEverywhere((p) => (p.id === id
+        ? { ...p, body: body.trim(), edited_at: new Date().toISOString(), ...(mentions ? { mentions: rensOmtaler(body.trim(), mentions) } : {}) }
+        : p));
     },
     onError: (_e, v) => refresh(v.id),
     onSettled: (_d, _e, v) => refresh(v.id),
@@ -589,6 +608,7 @@ export interface NewPulsenPoll {
   options: string[];
   anonymous: boolean;
   dage: number;
+  mentions?: Omtale[];
 }
 
 /** Opretter en afstemning via RPC; feedet hentes igen bagefter (ingen optimistisk række). */
@@ -606,6 +626,12 @@ export function useOpretAfstemning() {
         p_dage: p.dage,
       });
       if (error) throw error;
+      // RPC'en kender ikke omtaler; forfatteren sætter dem på det oprettede opslag bagefter.
+      const omtaler = rensOmtaler(p.body.trim(), p.mentions ?? []);
+      if (omtaler.length && data) {
+        const { error: mErr } = await supabase.from("pulsen_posts").update({ mentions: omtaler }).eq("id", data);
+        if (mErr) throw mErr;
+      }
       return data;
     },
     onSettled: () => {

@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { REACTIONS, reactionKeyForEmoji, reactionOption, type ReactionKey } from "@/lib/feedReactions";
+import { rensOmtaler, tilOmtaler, type Omtale } from "@/components/pulsen/omtaler";
 
 /** pulsen_post/milestone: kun Huset-indhold (databasen afviser team-indhold). */
 export type FeedTargetType = "birthday" | "anniversary" | "league_round" | "pulsen_post" | "milestone";
@@ -36,6 +37,7 @@ export interface FeedCommentView {
   authorName: string;
   isMine: boolean;
   createdAt: string;
+  mentions: Omtale[];
 }
 
 export function buildTargetKey(
@@ -136,7 +138,7 @@ export function useFeedReactions(targetKeys: string[]) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("feed_comments")
-        .select("id, target_key, user_id, body, created_at")
+        .select("id, target_key, user_id, body, created_at, mentions")
         .in("target_key", keys)
         .order("created_at", { ascending: false });
 
@@ -246,10 +248,12 @@ export function useFeedReactions(targetKeys: string[]) {
       targetType,
       targetKey,
       body,
+      mentions,
     }: {
       targetType: FeedTargetType;
       targetKey: string;
       body: string;
+      mentions?: Omtale[];
     }) => {
       if (!myUserId) throw new Error("Du skal være logget ind");
       const trimmed = body.trim().slice(0, 200);
@@ -260,6 +264,7 @@ export function useFeedReactions(targetKeys: string[]) {
         target_key: targetKey,
         user_id: myUserId,
         body: trimmed,
+        mentions: rensOmtaler(trimmed, mentions ?? []),
       });
       if (error) throw error;
     },
@@ -320,6 +325,7 @@ export function useFeedReactions(targetKeys: string[]) {
           authorName: lookupName(c.user_id),
           isMine: c.user_id === myUserId,
           createdAt: c.created_at,
+          mentions: tilOmtaler(c.mentions),
         })),
     [commentsQuery.data, lookupName, myUserId]
   );

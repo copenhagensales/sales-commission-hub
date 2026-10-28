@@ -55,10 +55,10 @@ export default function StorkbookIndlaeg() {
           comments: fr.getComments(key),
           canInteract: fr.canInteract,
           onReact: (reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: key, reaction }),
-          onComment: (b) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body: b }),
+          onComment: (b, m) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body: b, mentions: m }),
           onDeleteComment: (cid) => fr.deleteComment.mutateAsync(cid),
         }}
-        onEdit={(b) => mut.edit.mutateAsync({ id: post.id, body: b }).then(() => postQ.refetch())}
+        onEdit={(b, m) => mut.edit.mutateAsync({ id: post.id, body: b, mentions: m }).then(() => postQ.refetch())}
         onDelete={() => mut.remove.mutate(post, { onSuccess: () => navigate(backTo, { replace: true }), onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
         onHide={(hidden) => mut.setHidden.mutate({ id: post.id, hidden }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
         onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: post.id, commentId }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}

@@ -6,6 +6,8 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@
 import { useActiveColleagues, useOpretAfstemning, type NewPulsenPost } from "@/hooks/usePulsen";
 import { PULSEN_IMAGE_MAX_BYTES, PULSEN_MAX_CHARS, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
+import { OmtaleFelt } from "./OmtaleFelt";
+import { erOmtaleFejl, type Omtale } from "./omtaler";
 
 export type Mode = "post" | "praise" | "question" | "poll";
 
@@ -45,6 +47,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [open, setOpen] = useState(!!initialMode);
   const [mode, setMode] = useState<Mode>(initialMode && initialMode !== "image" ? initialMode : "post");
   const [body, setBody] = useState(initialBody ?? "");
+  const [mentions, setMentions] = useState<Omtale[]>([]);
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
   const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -76,7 +79,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   }, [defaultAudience, canPostHouse, team?.id]);
 
   const reset = () => {
-    setBody(""); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
+    setBody(""); setMentions([]); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
     setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false);
   };
 
@@ -117,9 +120,11 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
         options,
         anonymous: pollAnonymous,
         dage: pollDage,
+        mentions,
       });
       reset();
     } catch (e) {
+      if (erOmtaleFejl(e)) { toast.error("Omtalen kunne ikke gemmes"); return; }
       const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "Prøv igen";
       toast.error("Afstemningen blev ikke delt", { description: msg });
     } finally {
@@ -138,12 +143,21 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
       body,
       praised: mode === "praise" ? praised : null,
       imageFile: file,
+      mentions,
     };
     const localUrl = preview;
     reset();
     try {
       await onSubmit(input, localUrl);
     } catch (e) {
+      if (erOmtaleFejl(e)) {
+        // Feltet beholder teksten.
+        setOpen(true); setMode(input.postType === "image" ? "post" : input.postType); setBody(input.body); setMentions(input.mentions ?? []);
+        if (input.praised) setPraised(input.praised);
+        toast.error("Omtalen kunne ikke gemmes");
+        if (localUrl) URL.revokeObjectURL(localUrl);
+        return;
+      }
       toast.error("Indlægget blev ikke delt", { description: e instanceof Error ? e.message : "Prøv igen" });
       if (localUrl) URL.revokeObjectURL(localUrl);
     } finally {
@@ -198,15 +212,15 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
               )}
             </div>
           )}
-          <textarea
+          <OmtaleFelt
             autoFocus
             value={body}
+            mentions={mentions}
             maxLength={PULSEN_MAX_CHARS}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(t, m) => { setBody(t); setMentions(m); }}
             rows={4}
             placeholder={mode === "poll" ? "Hvad vil du spørge om?" : mode === "question" ? "Hvad vil du spørge huset om?" : mode === "praise" ? "Hvad har din kollega gjort godt?" : "Hvad vil du dele?"}
             aria-label="Tekst"
-            className="w-full resize-y rounded-[18px] bg-[hsl(var(--cph-light-blue))] px-4 py-3 text-[17px] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
           {mode === "poll" && (
             <div className="mt-3 space-y-2">

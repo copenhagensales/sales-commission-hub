@@ -58,7 +58,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  const { data: messages, isLoading } = useMessages(conversationId);
+  const { data: messages, isLoading, hasOlder, isLoadingOlder, loadOlder } = useMessages(conversationId);
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
   const uploadAttachment = useUploadAttachment();
@@ -73,10 +73,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   useChatAktiv(conversationId);
 
-  // Kvitter samtalen ved åbning – kun når vinduet er synligt og har fokus; ellers når fokus vender tilbage.
+  // Kvitterer kun hentede/viste beskeder fra andre uden egen kvittering – kun når vinduet er synligt og har fokus.
+  const meId = currentEmployee?.id;
+  const ukvitterede = (messages ?? [])
+    .filter((m) => meId && m.sender_id !== meId && !m.read_receipts?.some((rr) => rr.employee_id === meId))
+    .map((m) => m.id);
+  const ukvitteretNoegle = ukvitterede.join(",");
   useEffect(() => {
-    if (!conversationId) return;
-    const kvitter = () => { if (erSynligMedFokus()) markAsRead.mutate(conversationId); };
+    if (!conversationId || !ukvitterede.length) return;
+    const kvitter = () => { if (erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ conversationId, messageIds: ukvitterede }); };
     kvitter();
     window.addEventListener("focus", kvitter);
     document.addEventListener("visibilitychange", kvitter);
@@ -84,12 +89,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
       window.removeEventListener("focus", kvitter);
       document.removeEventListener("visibilitychange", kvitter);
     };
-  }, [conversationId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, ukvitteretNoegle]);
 
-  // Rul til nyeste besked ved åbning, ved ny besked og ved afsendelse.
+  // Rul til nyeste besked ved åbning, ved ny besked og ved afsendelse (ikke når ældre historik indlæses).
+  const nyesteId = messages?.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, pending.length, conversationId, isLoading]);
+  }, [nyesteId, pending.length, conversationId, isLoading]);
 
   useEffect(() => {
     setPending([]);
@@ -222,6 +229,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       <ScrollArea className="flex-1 p-2 md:p-4" ref={scrollRef}>
         <div className="space-y-3 md:space-y-4">
+          {hasOlder && (
+            <div className="flex justify-center">
+              <Button variant="ghost" size="sm" className="min-h-11" onClick={loadOlder} disabled={isLoadingOlder}>
+                {isLoadingOlder ? "Henter …" : "Indlæs ældre"}
+              </Button>
+            </div>
+          )}
           {messages?.map((msg) => (
             <MessageBubble
               key={msg.id}

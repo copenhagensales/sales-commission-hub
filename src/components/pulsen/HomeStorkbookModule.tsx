@@ -15,6 +15,7 @@ import {
   postTargetKey, usePulsenImageUrls, usePulsenLastSeen, usePulsenLatestPosts, usePulsenMutations, usePulsenSelf, usePulsenUnread,
   type PulsenPost,
 } from "@/hooks/usePulsen";
+import { renderOmtaler } from "@/components/pulsen/omtaler";
 import { PULSEN_MAX_CHARS, pulsenRelativeTime, shortName } from "@/lib/pulsen/format";
 
 const LATEST_KEY = ["pulsen-latest-posts", 3];
@@ -131,7 +132,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
                 {isNew(first) && <span className="rounded-full bg-[hsl(var(--cph-emerald))] px-2.5 py-1 text-[11px] font-black text-[hsl(var(--cph-onyx))]">NYT</span>}
               </div>
               <Link to={`/storkbook/indlaeg/${first.id}`} className="mt-3 block">
-                <p className="line-clamp-3 whitespace-pre-line text-[15px] leading-[1.5]">{first.body}</p>
+                <p className="line-clamp-3 whitespace-pre-line text-[15px] leading-[1.5]">{renderOmtaler(first.body, first.mentions)}</p>
                 {first.image_path && images.data?.get(first.image_path) && (
                   <img src={images.data.get(first.image_path)} alt="" className="mt-3 h-[132px] w-full rounded-[18px] object-cover" />
                 )}
@@ -163,7 +164,7 @@ export function HomeStorkbookModule({ employeeId, firstName, celebrations }: Pro
                         <PulsenAvatar employeeId={p.author_employee_id} name={shortName(p.author?.first_name, p.author?.last_name)} size={32} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[14px]"><Lead p={p} /></p>
-                          <p className="line-clamp-2 text-[13px] text-muted-foreground">{p.body}</p>
+                          <p className="line-clamp-2 text-[13px] text-muted-foreground">{renderOmtaler(p.body, p.mentions)}</p>
                           <p className="mt-0.5 text-[12px] text-muted-foreground">
                             {pulsenRelativeTime(p.created_at)}
                             {p.post_type === "question" && !p.best_answer_comment_id
