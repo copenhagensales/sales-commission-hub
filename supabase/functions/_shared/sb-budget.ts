@@ -89,8 +89,3 @@ export async function laesBegraenset(body: ReadableStream<Uint8Array> | null, ma
   for (const d of dele) { ud.set(d, o); o += d.byteLength; }
   return { ok: true, bytes: ud };
 }
-
-/** Kører et SDK-kald og normaliserer kastede exceptions til {error}. */
-export async function sikkert<T>(f: () => PromiseLike<T>): Promise<T | { data: null; error: { kode: string; stop: boolean } }> {
-  try { return await f(); } catch (e) { return { data: null, error: { kode: erBudgetStop(e) ? "budget" : "undtagelse", stop: erBudgetStop(e) } }; }
-}
