@@ -413,3 +413,41 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await flush();
   });
 });
+
+
+describe("B2c-1 §5 – editorspærring ved udløbet indhold (klientens ur)", () => {
+  it("åben editor + frist passerer → Gem forsvinder, tekst skjules, ingen sb_ret", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      aegte.brug = true;
+      vi.mocked(supabase.rpc).mockReset();
+      const m = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() + 1000).toISOString() } as Message;
+      gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
+      render(ui(m, "e"));
+      expect(felt()?.value).toBe("min rettelse");
+      expect(screen.getByRole("button", { name: "Gem ændring" })).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(felt()).toBeNull();
+      expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(screen.queryByText("original")).toBeNull();
+      expect(supabase.rpc).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("gendannet kladde til allerede udløbet række genskabes ikke", () => {
+    const m = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() - 1).toISOString() } as Message;
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
+    render(ui(m, "e"));
+    expect(felt()).toBeNull();
+    expect(screen.queryByText("min rettelse")).toBeNull();
+    expect(screen.getByText("Beskeden er ikke længere tilgængelig")).toBeTruthy();
+  });
+
+  it("svaruddrag med lokalt udløbet original viser ingen originaltekst", () => {
+    const m = { ...besked("m2", "svar"), reply_to: { id: "o", content: "gammel", sender_id: "s", status: "leveret", slettes_efter: new Date(Date.now() - 1).toISOString(), deleted_at: null } } as Message;
+    render(ui(m, "e"));
+    expect(screen.queryByText("gammel")).toBeNull();
+    expect(screen.getByText("Beskeden er ikke længere tilgængelig")).toBeTruthy();
+  });
+});

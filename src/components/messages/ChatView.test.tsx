@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 
 const mutateAsync = vi.fn();
-const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false, ægteFil: false }));
+const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false, ægteFil: false, opdateret: 0 }));
+const kvitMutate = vi.hoisted(() => ({ fn: (() => undefined) as (...a: unknown[]) => void }));
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
 const udstedUpload = vi.fn();
@@ -69,11 +70,11 @@ vi.mock("@/hooks/useChat", async (orig) => {
   const ægte = await orig<typeof import("@/hooks/useChat")>();
   return {
     ...ægte,
-    useMessages: () => ({ data: beskeder.liste, isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined }),
+    useMessages: () => ({ data: beskeder.liste, isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined, opdateret: beskeder.opdateret }),
     // §9: rigtig useSendMessage (rigtige send-/afstemningsfunktioner) når ægteSend er sat; ellers kontrolleret mutateAsync.
     useSendMessage: () => (beskeder.ægteSend ? ægte.useSendMessage() : { mutateAsync }),
     useRealtimeMessages: () => undefined,
-    useMarkAsRead: () => ({ mutate: vi.fn(), isPending: false }),
+    useMarkAsRead: () => ({ mutate: (...a: unknown[]) => kvitMutate.fn(...a), isPending: false }),
     useTypingIndicator: () => ({ typingUsers: [], setTyping: vi.fn() }),
     useChatAktiv: () => undefined,
     afstemKun: (...a: Parameters<typeof ægte.afstemKun>) => (beskeder.ægteSend ? ægte.afstemKun(...a) : afstemKun()),
@@ -82,7 +83,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
 
 import { ChatView } from "./ChatView";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
-import { rydAlleKladder, hentAfsendelser, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
+import { rydAlleKladder, hentAfsendelser, gemKladde, laesKladde, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
 import { hasUnsentDrafts } from "@/components/mobile";
 
 // Én stabil QueryClient pr. prøve (også gennem rerender/navigation), mutations.retry=1 som App.tsx.
@@ -106,7 +107,7 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
-  beskeder.liste = []; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
+  beskeder.liste = []; beskeder.opdateret = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
   net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
@@ -1299,3 +1300,188 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
   });
 });
 const LAGER_TEKST = "Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben";
+
+
+// ---------- B2c-1 §5 (T5) – frister, søgning og svaruddrag ----------
+describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt svar", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn> | undefined;
+  afterEach(() => { fetchSpy?.mockRestore(); fetchSpy = undefined; vi.useRealTimers(); });
+  const om = (ms: number) => new Date(Date.now() + ms).toISOString();
+  const vent = (ms: number) => act(async () => { await new Promise((x) => setTimeout(x, ms)); });
+  const svarFra = (id: string, content: string, slettes_efter: string | null) => ({
+    id, content, sender_id: "anden", sender: { id: "anden", full_name: "Kollega" }, status: "leveret", slettes_efter, deleted_at: null,
+  });
+
+  it("offline-udløb: åben tekstfil, åbent billede, pågående hentning, svaruddrag og valgt svar fjernes straks uden netværk", async () => {
+    const frist = om(400);
+    const signaler: AbortSignal[] = [];
+    let n = 0;
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: string, init?: RequestInit) => {
+      if (init?.signal) signaler.push(init.signal);
+      n++;
+      if (n === 1) return Promise.resolve(new Response("filindhold", { status: 200, headers: { "Content-Type": "text/plain" } }));
+      if (n === 2) return Promise.resolve(new Response(new Uint8Array([1, 2]), { status: 200, headers: { "Content-Type": "image/png" } }));
+      // Pågående hentning, der skal aborteres (afvises ved abort, så sbFil's plads frigives).
+      return new Promise((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
+    }) as typeof fetch);
+    // jsdom mangler Blob.text(); læses via FileReader (kun prøvemiljø).
+    if (!Blob.prototype.text) {
+      Blob.prototype.text = function (this: Blob) {
+        return new Promise<string>((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsText(this); });
+      };
+    }
+    const revoke = vi.fn();
+    globalThis.URL.revokeObjectURL = revoke;
+    beskeder.liste = [
+      fremmed("m1", "hemmelig", { attachment_path: "A/x/a.txt", attachment_type: "text/plain", attachment_name: "a.txt", slettes_efter: frist }),
+      fremmed("m2", "billede", { attachment_path: "A/x/b.png", attachment_type: "image/png", attachment_name: "b.png", slettes_efter: frist }),
+      fremmed("m3", "langsom", { attachment_path: "A/x/c.png", attachment_type: "image/png", attachment_name: "c.png", slettes_efter: frist }),
+      fremmed("m4", "mit svar", { reply_to_id: "m1", reply_to: svarFra("m1", "hemmelig", frist) }),
+    ];
+    gemKladde("e", "A", { tekst: "kladde", svarId: "m1", fil: null, retId: null });
+    await klar();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Åbn a.txt" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Åbn b.png" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Åbn c.png" })); });
+    await waitFor(() => expect(screen.getByText("filindhold")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("img", { name: "b.png" })).toBeTruthy());
+    expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
+    expect(screen.getByText("Svarer på:")).toBeTruthy();
+    const kaldFoer = fetchSpy.mock.calls.length;
+    await vent(450);
+    expect(screen.queryByText("hemmelig")).toBeNull();
+    expect(screen.queryByText("filindhold")).toBeNull();
+    expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
+    expect(screen.queryByText("Svarer på:")).toBeNull();
+    expect(screen.getByText("Beskeden er ikke længere tilgængelig")).toBeTruthy(); // m4's svaruddrag
+    expect(revoke).toHaveBeenCalledWith("blob:test");
+    expect(signaler[2]?.aborted).toBe(true);
+    expect(fetchSpy.mock.calls.length).toBe(kaldFoer); // skjulning kræver ingen netværkskald
+    expect(laesKladde("e", "A")?.svarId ?? null).toBeNull();
+    expect(laesKladde("e", "A")?.tekst).toBe("kladde");
+  });
+
+  it("successive frister: hver frist planlægges efter den forrige", async () => {
+    beskeder.liste = [fremmed("a", "første", { slettes_efter: om(150) }), fremmed("b", "anden", { slettes_efter: om(450) }), fremmed("c", "varig")];
+    await klar();
+    await vent(250);
+    expect(screen.queryByText("første")).toBeNull();
+    expect(screen.getByText("anden")).toBeTruthy();
+    await vent(300);
+    expect(screen.queryByText("anden")).toBeNull();
+    expect(screen.getByText("varig")).toBeTruthy();
+  });
+
+  it("SQL-pladsholder efter oprydning: samme id vises igen med serverens pladsholder (ingen blokliste)", async () => {
+    beskeder.liste = [fremmed("a", "original", { slettes_efter: om(-1000) })];
+    const r = await klar();
+    expect(screen.queryByText("original")).toBeNull();
+    expect(screen.getByText("Ingen beskeder endnu. Start samtalen!")).toBeTruthy(); // tomtilstand fra det viste indhold
+    beskeder.liste = [fremmed("a", "Beskeden er slettet efter fristen", { status: "trukket_tilbage", slettes_efter: null })];
+    beskeder.opdateret = 1;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await tick();
+    expect(screen.getByText("Beskeden er slettet efter fristen")).toBeTruthy();
+    expect(screen.queryByText("original")).toBeNull();
+  });
+
+  it("ingen kvittering for lokalt skjulte rækker (kun den viste)", async () => {
+    const kvit = vi.fn();
+    kvitMutate.fn = kvit;
+    const fokus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    beskeder.liste = [
+      fremmed("skjult", "x", { read_receipts: [], slettes_efter: om(-1000) }),
+      fremmed("vist", "y", { read_receipts: [] }),
+    ];
+    await klar();
+    fokus.mockRestore();
+    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds: string[] }).messageIds);
+    expect(ids).toContain("vist");
+    expect(ids).not.toContain("skjult");
+  });
+
+  it("svaroriginal uden for indlæste sider: afgrænset opslag viser originalen; fravær i siden fjerner ikke svaret", async () => {
+    beskeder.liste = [fremmed("m", "tråd")];
+    net.svar.chat_messages = [{ data: { id: "ude", content: "gammel original", sender_id: "s", status: "leveret", slettes_efter: null, deleted_at: null, sender: { id: "s", first_name: "Kol", last_name: "Lega" } }, error: null }];
+    gemKladde("e", "A", { tekst: "", svarId: "ude", fil: null, retId: null });
+    await klar();
+    await waitFor(() => expect(screen.getByText("gammel original")).toBeTruthy());
+    expect(net.kald).toContain("select:chat_messages");
+    expect(laesKladde("e", "A")?.svarId).toBe("ude");
+  });
+
+  it("svaroriginal: tomt RLS-opslag → ingen svartekst og referencen ryddes; fejl → ingen tekst, referencen bevares", async () => {
+    beskeder.liste = [fremmed("m", "tråd")];
+    net.svar.chat_messages = [{ data: null, error: null }];
+    gemKladde("e", "A", { tekst: "t", svarId: "vaek", fil: null, retId: null });
+    const r = await klar();
+    await waitFor(() => expect(laesKladde("e", "A")?.svarId ?? null).toBeNull());
+    expect(screen.queryByText("Svarer på:")).toBeNull();
+    r.unmount(); qc.clear();
+    net.svar.chat_messages = [{ data: null, error: { message: "netværk" } }];
+    gemKladde("e", "A", { tekst: "t", svarId: "fejl", fil: null, retId: null });
+    await klar();
+    await waitFor(() => expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy());
+    expect(laesKladde("e", "A")?.svarId).toBe("fejl");
+  });
+
+  it("svaroriginal fra opslag med udløbet frist (klientens ur) vises ikke, selv om serveren returnerede den", async () => {
+    beskeder.liste = [fremmed("m", "tråd")];
+    net.svar.chat_messages = [{ data: { id: "ude", content: "skal skjules", sender_id: "s", status: "leveret", slettes_efter: om(-10), deleted_at: null, sender: null }, error: null }];
+    gemKladde("e", "A", { tekst: "", svarId: "ude", fil: null, retId: null });
+    await klar();
+    await tick(); await tick();
+    expect(screen.queryByText("skal skjules")).toBeNull();
+  });
+
+  it("urforskel: serveren returnerer fortsat rækken → skjult lokalt og ny genhentning 2/4/8/16/32 s; uden rækken stopper planlægningen", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const inval = vi.spyOn(qc, "invalidateQueries");
+    const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
+    beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() + 100).toISOString() })];
+    const r = render(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    expect(screen.getByText("original")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    expect(screen.queryByText("original")).toBeNull(); // lokalt visningsværn uanset server
+    expect(genhentninger()).toBe(0);
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(genhentninger()).toBe(1);
+    // Serveren (bagud-ur) returnerer stadig rækken med samme frist.
+    const returner = async () => { beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    await returner();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(genhentninger()).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(genhentninger()).toBe(2);
+    expect(screen.queryByText("original")).toBeNull();
+    // Anden genhentning uden rækken → planlægningen stopper.
+    beskeder.liste = []; beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(genhentninger()).toBe(2);
+  });
+
+  it("urforskel: højst fem ekstra genhentninger (2, 4, 8, 16, 32 s), derefter ingen 0-ms-løkke", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const inval = vi.spyOn(qc, "invalidateQueries");
+    const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
+    beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() - 1).toISOString() })];
+    const r = render(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(genhentninger()).toBe(1);
+    for (const [i, ms] of [2000, 4000, 8000, 16000, 32000].entries()) {
+      beskeder.opdateret++;
+      r.rerender(wrap(<ChatView conversationId="A" />));
+      await act(async () => { await vi.advanceTimersByTimeAsync(ms - 1); });
+      expect(genhentninger()).toBe(i + 1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(genhentninger()).toBe(i + 2);
+    }
+    beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+    expect(genhentninger()).toBe(6);
+    expect(vi.getTimerCount()).toBeLessThan(5); // ingen ophobede/løbske timere
+  });
+});
