@@ -18,8 +18,12 @@ export interface LokalFil {
   fejl?: string;
 }
 
-/** Kræver filen et nyt valg (ingen File og ingen bekræftet upload)? */
-export const kraeverGenvalg = (f: LokalFil) => !f.file && !(f.trin === "uploadet" && f.sti);
+/**
+ * Kræver filen et nyt valg? Ja, når intet levende uploadforløb findes, ingen fejl med genforsøg vises,
+ * og uploaden ikke er bekræftet (trin=uploadet med sti) – fx efter reload under udstedelse/upload.
+ */
+export const kraeverGenvalg = (f: LokalFil) =>
+  !f.uploader && !(f.trin === "uploadet" && !!f.sti) && !(f.fejl && f.file);
 
 interface AttachmentPreviewProps {
   fil: LokalFil;

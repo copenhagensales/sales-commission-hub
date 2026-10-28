@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useSyncExternalStore, useCallback } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
   erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
@@ -20,8 +20,9 @@ import { SkeletonList, useDraftGuard } from "@/components/mobile";
 import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, FIL_ACCEPT, FIL_GRAENSER_TEKST } from "@/lib/sbFil";
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
-  fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, kladdeFil, saetKladdeFil, harLagringsFejl, abonnerAfsendelser,
-  sessionsGeneration, fastholdEjer, ejerGyldig, harKladdeLagerFejl, type Afsendelse, type FilMeta,
+  fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, harLagringsFejl, abonnerAfsendelser,
+  sessionsGeneration, fastholdEjer, ejerGyldig, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
+  erAktuelKladdeUpload, fjernKladdeFil, saetKladdeFilPost, filErSendeklar, type Afsendelse, type FilMeta,
 } from "@/lib/sbKladder";
 
 registrerKladdeOprydning();
@@ -42,10 +43,6 @@ async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string }
 }
 
 const metaFra = (f: LokalFil): FilMeta => ({ name: f.name, type: f.type, size: f.size, sti: f.sti ?? null, trin: f.trin });
-const lokalFra = (m: FilMeta, file: File | null): LokalFil => ({
-  file, name: m.name, type: m.type, size: m.size, sti: m.sti ?? undefined, trin: m.trin,
-  uploader: false, previewUrl: file && m.type.startsWith("image/") ? URL.createObjectURL(file) : null,
-});
 
 export function ChatView({ conversationId }: ChatViewProps) {
   const [message, setMessage] = useState("");
@@ -55,7 +52,6 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [kladdeEjer, setKladdeEjer] = useState<string | null>(null);
   const [kladdeLagerFejl, setKladdeLagerFejl] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [fil, setFil] = useState<LokalFil | null>(null);
   const [filFejl, setFilFejl] = useState<string | null>(null);
   const [kladdeVersion, setKladdeVersion] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -84,8 +80,19 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const afsendelser = useSyncExternalStore(abonnerAfsendelser, () => (meId ? hentAfsendelser(meId, conversationId) : TOM));
   const afsLagerFejl = useSyncExternalStore(abonnerAfsendelser, () => (meId ? harLagringsFejl(meId, conversationId) : false));
 
+  // §3: filposten og uploadforløbet ejes af lageret; komponenten abonnerer (overlever afmontering og navigation).
+  const filTilstand = useSyncExternalStore(abonnerAfsendelser, () => (meId ? kladdeFilTilstand(meId, conversationId) : null));
+  const visFil = filTilstand?.file && filTilstand.meta.type.startsWith("image/") ? filTilstand.file : null;
+  const previewUrl = useMemo(() => (visFil ? URL.createObjectURL(visFil) : null), [visFil]);
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+  const fil: LokalFil | null = filTilstand ? {
+    file: filTilstand.file, name: filTilstand.meta.name, type: filTilstand.meta.type, size: filTilstand.meta.size, previewUrl,
+    uploader: filTilstand.aktiv, sti: filTilstand.meta.sti ?? undefined, trin: filTilstand.meta.trin, fejl: filTilstand.fejl ?? undefined,
+  } : null;
+
   useChatAktiv(conversationId);
-  useDraftGuard(!!message.trim() || !!fil || !!retId || afsendelser.some((a) => a.tilstand !== "gemt_vaek"));
+  // §5: en valgt svarreference alene er også en kladde.
+  useDraftGuard(!!message.trim() || !!fil || !!retId || !!svarId || !!replyTo || afsendelser.some((a) => a.tilstand !== "gemt_vaek"));
 
   // Skrivekladde: indlæs ved skift. Gem kun, når state tilhører den aktuelle nøgle (aldrig gamle render-værdier).
   useEffect(() => {
@@ -96,29 +103,26 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setRetId(k?.retId ?? null);
     setReplyTo(null);
     setFilFejl(null);
-    setFil((gammel) => {
-      if (gammel?.previewUrl) URL.revokeObjectURL(gammel.previewUrl);
-      return k?.fil ? lokalFra(k.fil, kladdeFil(meId, conversationId)) : null;
-    });
     setKladdeLagerFejl(harKladdeLagerFejl(meId, conversationId));
     setKladdeEjer(`${meId}:${conversationId}`);
   }, [meId, conversationId]);
   useEffect(() => {
     if (!meId || !noegle || kladdeEjer !== noegle) return;
-    gemKladde(meId, conversationId, { tekst: message, svarId: replyTo?.id ?? svarId, fil: fil ? metaFra(fil) : null, retId });
+    // Filposten skrives kun af lageret (§3); her bevares den uændret.
+    gemKladde(meId, conversationId, { tekst: message, svarId: svarId ?? replyTo?.id ?? null, fil: laesKladde(meId, conversationId)?.fil ?? null, retId });
     setKladdeLagerFejl(harKladdeLagerFejl(meId, conversationId));
-  }, [meId, noegle, kladdeEjer, conversationId, message, replyTo, svarId, fil, retId]);
-  useEffect(() => () => { setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return f; }); }, []);
+  }, [meId, noegle, kladdeEjer, conversationId, message, replyTo, svarId, retId]);
   // Send-låsen frigives først, når den ryddede kladde er renderet.
   useEffect(() => { sendLaas.current = false; }, [kladdeVersion, conversationId]);
 
   // Genskab/ryd svaruddrag ud fra den aktuelle tråd (aldrig originaltekst, når tråden viser pladsholder).
   useEffect(() => {
-    const id = replyTo?.id ?? svarId;
+    // §5: svarId er kladdens svarreference; replyTo er kun dens visning.
+    const id = svarId ?? replyTo?.id;
     if (!id || !messages) return;
     const m = messages.find((x) => x.id === id);
     if (!m || m.status === "trukket_tilbage") { setReplyTo(null); setSvarId(null); return; }
-    if (!replyTo || replyTo.content !== m.content) setReplyTo(m);
+    if (!replyTo || replyTo.id !== m.id || replyTo.content !== m.content) setReplyTo(m);
   }, [messages, svarId, replyTo]);
   useEffect(() => onChatSignal((s) => {
     if (["trukket", "slettet", "udloeb"].includes(s.haendelse) && (replyTo?.id === s.kildeId || svarId === s.kildeId)) {
@@ -194,6 +198,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
         if (gen !== sessionsGeneration()) return;
         filMeta = { ...filMeta, trin: "uploadet" };
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
+      }
+      // §3: en filsending kræver bekræftet upload (trin=uploadet) og ikke-tom sti på alle veje.
+      if (filMeta && !filErSendeklar(filMeta)) {
+        opdaterAfsendelse(emp, conv, id, { tilstand: afsendelsesFil(emp, conv, id) ? "genudsted" : "vaelg_fil", fejl: null }, gen);
+        return;
       }
       await sendMessage.mutateAsync({
         id, conversationId: conv, content: a.tekst, replyToId: a.svarId ?? undefined,
@@ -286,8 +295,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
     };
   }, [meId, conversationId, afstemmer, queryClient]);
 
-  const composerTom = !message.trim() && !fil && !retId;
-  const kanSende = !!meId && (!!message.trim() || !!fil) && !fil?.uploader && !fil?.fejl && !(fil && kraeverGenvalg(fil));
+  const composerTom = !message.trim() && !fil && !retId && !svarId && !replyTo;
+  const kanSende = !!meId && (!!message.trim() || !!fil) && !fil?.uploader && !fil?.fejl && !(fil && kraeverGenvalg(fil))
+    && filErSendeklar(fil ? metaFra(fil) : null);
 
   const handleSend = () => {
     if (sendLaas.current || !meId || !kanSende) return;
@@ -297,7 +307,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (currentEmployee) setTyping(false, currentEmployee.id, currentEmployee.full_name);
     const id = retId ?? crypto.randomUUID();
     const a: Afsendelse = {
-      id, tekst: message.trim(), svarId: replyTo?.id ?? svarId ?? null,
+      id, tekst: message.trim(), svarId: svarId ?? replyTo?.id ?? null,
       fil: fil ? metaFra(fil) : null, tilstand: "sender", fejl: null, tidligereUkendt: false, oprettet: Date.now(),
     };
     tilfoejAfsendelse(emp, conv, a, fil?.file ?? null);
@@ -306,8 +316,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setSvarId(null);
     setRetId(null);
     sletKladde(emp, conv);
-    saetKladdeFil(emp, conv, null);
-    setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
+    fjernKladdeFil(emp, conv);
     setKladdeVersion((v) => v + 1);
     void deliver(emp, conv, id);
   };
@@ -317,10 +326,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (!meId || !composerTom || a.tilstand !== "afvist") return;
     const file = afsendelsesFil(meId, conversationId, a.id);
     setMessage(a.tekst);
+    setReplyTo(null); // visningen genskabes fra a.svarId
     setSvarId(a.svarId);
     setRetId(a.id);
-    setFil(a.fil ? lokalFra(a.fil, file) : null);
-    saetKladdeFil(meId, conversationId, file);
+    saetKladdeFilPost(meId, conversationId, a.fil, file);
     fjernAfsendelse(meId, conversationId, a.id);
   };
 
@@ -328,33 +337,19 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  /** Markerer kladdefilens trin for den fastholdte (bruger, samtale); kun hvis det stadig er samme File. */
-  const markerKladdeFil = (emp: string, conv: string, file: File, ret: Partial<LokalFil>) => {
-    if (kladdeFil(emp, conv) !== file) return;
-    if (meRef.current === emp && convRef.current === conv) {
-      setFil((f) => (f && f.file === file ? { ...f, ...ret } : f));
-      return;
-    }
-    const k = laesKladde(emp, conv);
-    if (k?.fil) gemKladde(emp, conv, { ...k, fil: { ...k.fil, sti: ret.sti ?? k.fil.sti, trin: ret.trin ?? k.fil.trin } });
-  };
-
-  const upload = async (file: File, type: string, previewUrl: string | null) => {
+  /** §3: ét uploadforsøg ejet af lageret; sene svar opdaterer kun den filpost, forsøget stadig ejer. */
+  const upload = async (file: File, type: string) => {
     if (!meId) return;
     const emp = meId, conv = conversationId, gen = sessionsGeneration();
-    const vagt = () => gen === sessionsGeneration();
-    saetKladdeFil(emp, conv, file);
-    setFil({ name: file.name, type, size: file.size, previewUrl, uploader: true, file, trin: "valgt" });
+    const forsoeg = startKladdeUpload(emp, conv, file, { name: file.name, type, size: file.size });
+    const vagt = () => erAktuelKladdeUpload(emp, conv, forsoeg, gen);
     try {
       const u = await udstedUpload(conv, file, type, vagt);
-      if (gen !== sessionsGeneration()) return;
-      markerKladdeFil(emp, conv, file, { sti: u.sti, trin: "uploader" });
+      if (!opdaterKladdeUpload(emp, conv, forsoeg, gen, { sti: u.sti, trin: "uploader" })) return;
       await uploadTilSti(u, file, type, vagt);
-      if (gen !== sessionsGeneration()) return;
-      markerKladdeFil(emp, conv, file, { uploader: false, trin: "uploadet" });
+      opdaterKladdeUpload(emp, conv, forsoeg, gen, { trin: "uploadet", aktiv: false });
     } catch (e) {
-      if (gen !== sessionsGeneration()) return;
-      markerKladdeFil(emp, conv, file, { uploader: false, sti: undefined, trin: "valgt", fejl: udstedFejlTekst(e) });
+      opdaterKladdeUpload(emp, conv, forsoeg, gen, { aktiv: false, sti: null, trin: "valgt", fejl: udstedFejlTekst(e) });
     }
   };
 
@@ -375,16 +370,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
       opdaterAfsendelse(meId, conversationId, maal, { tilstand: "genudsted", fil: { ...a.fil, name: file.name, size: file.size, type: v.type } });
       return;
     }
-    setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
-    const previewUrl = v.type.startsWith("image/") ? URL.createObjectURL(file) : null;
-    void upload(file, v.type, previewUrl);
+    void upload(file, v.type);
   };
 
   const vaelgFil = (afsendelsesId: string | null) => { genvalgFor.current = afsendelsesId; fileInputRef.current?.click(); };
 
   const fjernFil = () => {
-    if (meId) saetKladdeFil(meId, conversationId, null);
-    setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
+    if (meId) fjernKladdeFil(meId, conversationId);
   };
 
   const otherTypingUsers = typingUsers.filter(u => u.id !== currentEmployee?.id);
@@ -501,7 +493,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {fil && (
         <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
-          onRetry={fil.fejl && fil.file ? () => { const f = fil.file; if (f) void upload(f, fil.type, fil.previewUrl); } : undefined} />
+          onRetry={fil.fejl && fil.file ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
       )}
       {filFejl && (
         <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">

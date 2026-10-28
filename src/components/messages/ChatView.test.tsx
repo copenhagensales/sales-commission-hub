@@ -1,23 +1,46 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 const mutateAsync = vi.fn();
+const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
 const udstedUpload = vi.fn();
 const uploadTilSti = vi.fn();
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn() } },
-}));
+// Netværksgrænsen: supabase-klienten. maybeSingle-svar pr. tabel i kø; INSERT tælles. (Antagelser, ikke SQL-bevis.)
+const net = vi.hoisted(() => ({ svar: {} as Record<string, Array<{ data: unknown; error: unknown }>>, insert: vi.fn(), kald: [] as string[] }));
+vi.mock("@/integrations/supabase/client", () => {
+  const builder = (t: string) => {
+    const b: Record<string, unknown> = {};
+    Object.assign(b, {
+      select: () => b, eq: () => b,
+      insert: (row: unknown) => { net.kald.push(`insert:${t}`); return Promise.resolve(net.insert(row) ?? { error: null }); },
+      maybeSingle: () => { net.kald.push(`select:${t}`); return Promise.resolve(net.svar[t]?.shift() ?? { data: null, error: null }); },
+    });
+    return b;
+  };
+  return {
+    supabase: {
+      from: (t: string) => builder(t),
+      rpc: vi.fn(async () => ({ data: "e", error: null })),
+      functions: { invoke: vi.fn(async () => ({ error: null })) },
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
+        getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
+      },
+    },
+  };
+});
 vi.mock("@/lib/employeeLookup", () => ({ findEmployeeByAuth: vi.fn(async () => ({ data: { id: "e", first_name: "A", last_name: "B" } })) }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 // Rigtig useDraftGuard og rigtig MessageBubble (§9); kun skelet erstattes.
 vi.mock("@/components/mobile", async (orig) => ({ ...(await orig<typeof import("@/components/mobile")>()), SkeletonList: () => null }));
 vi.mock("./MessageSearch", () => ({ MessageSearch: () => null }));
 vi.mock("./TypingIndicator", () => ({ TypingIndicator: () => null }));
-vi.mock("./MentionInput", () => ({
+vi.mock("./MentionInput", async (orig) => ({
+  ...(await orig<typeof import("./MentionInput")>()),
   MentionInput: ({ value, onChange, onKeyDown }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void }) => (
     <textarea aria-label="besked" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} />
   ),
@@ -31,8 +54,9 @@ vi.mock("@/hooks/useChat", async (orig) => {
   const ægte = await orig<typeof import("@/hooks/useChat")>();
   return {
     ...ægte,
-    useMessages: () => ({ data: [], isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined }),
-    useSendMessage: () => ({ mutateAsync }),
+    useMessages: () => ({ data: beskeder.liste, isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined }),
+    // §9: rigtig useSendMessage (rigtige send-/afstemningsfunktioner) når ægteSend er sat; ellers kontrolleret mutateAsync.
+    useSendMessage: () => (beskeder.ægteSend ? ægte.useSendMessage() : { mutateAsync }),
     useRealtimeMessages: () => undefined,
     useMarkAsRead: () => ({ mutate: vi.fn(), isPending: false }),
     useTypingIndicator: () => ({ typingUsers: [], setTyping: vi.fn() }),
@@ -44,6 +68,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
 import { ChatView } from "./ChatView";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
 import { rydAlleKladder, hentAfsendelser } from "@/lib/sbKladder";
+import { hasUnsentDrafts } from "@/components/mobile";
 
 // Én stabil QueryClient pr. prøve (også gennem rerender/navigation), mutations.retry=1 som App.tsx.
 let qc: QueryClient;
@@ -66,6 +91,8 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
+  beskeder.liste = []; beskeder.ægteSend = false;
+  net.insert.mockReset(); net.kald.length = 0; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
 
@@ -257,4 +284,247 @@ describe("§2 – stop ved binding til andet id (B2a-b2)", () => {
     expect(udstedUpload).toHaveBeenCalledTimes(1);
     expect(hentAfsendelser("e", "A")[0]).toMatchObject({ tilstand: "afvist" });
   });
+});
+
+// ---------- B2a-b3 ----------
+const fremmed = (id: string, content: string, extra: Record<string, unknown> = {}) => ({
+  id, conversation_id: "A", sender_id: "anden", content, status: "leveret", revision: 1, created_at: "2026-10-28T10:00:00Z",
+  leveret_at: "2026-10-28T10:00:00Z", edited_at: null, reactions: [], read_receipts: [{ employee_id: "e" }],
+  sender: { full_name: "Kollega" }, ...extra,
+});
+const vaelg = async (c: HTMLElement, f: File) => {
+  const input = c.querySelector('input[type="file"]') as HTMLInputElement;
+  await act(async () => { fireEvent.change(input, { target: { files: [f] } }); });
+};
+const tick = () => act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+const gemtFil = () => (JSON.parse(sessionStorage.getItem("sb-kladde:e:A") ?? "null") as { fil?: { trin: string; sti: string | null } } | null)?.fil ?? null;
+const navigér = async (r: ReturnType<typeof render>, conv: string) => { r.rerender(wrap(<ChatView conversationId={conv} />)); await tick(); };
+
+describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
+  beforeEach(() => { beskeder.ægteSend = true; });
+
+  it("A–B–A under udstedelse og under upload: Send låst, trin bevaret, nul INSERT før bekræftet upload", async () => {
+    const u = kontrol<unknown>(), up = kontrol<unknown>();
+    udstedUpload.mockReturnValueOnce(u.p);
+    uploadTilSti.mockReturnValueOnce(up.p);
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await navigér(r, "B"); await navigér(r, "A");
+    expect(screen.getByText("Uploader …")).toBeInTheDocument();
+    expect(send()).toBeDisabled();
+    expect(gemtFil()).toMatchObject({ trin: "valgt", sti: null });
+    await act(async () => { u.res({ sti: "c/e/x.txt", token: "t", conversationId: "A" }); await u.p; });
+    await navigér(r, "B"); await navigér(r, "A");
+    expect(screen.getByText("Uploader …")).toBeInTheDocument();
+    expect(send()).toBeDisabled();
+    expect(gemtFil()).toMatchObject({ trin: "uploader", sti: "c/e/x.txt" });
+    fireEvent.click(send());
+    expect(net.insert).not.toHaveBeenCalled();
+    await act(async () => { up.res(undefined); await up.p; });
+    expect(gemtFil()).toMatchObject({ trin: "uploadet", sti: "c/e/x.txt" });
+    expect(screen.getByText("Klar til at sende")).toBeInTheDocument();
+    // Antagelse: registerrækken for egen ubundet sti med status uploadet.
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null }];
+    await act(async () => { fireEvent.click(send()); });
+    await tick();
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(net.insert.mock.calls[0][0]).toMatchObject({ attachment_path: "c/e/x.txt" });
+  });
+
+  it("fejl under udstedelse efter afmontering bevares og kan genforsøges", async () => {
+    const u = kontrol<unknown>();
+    udstedUpload.mockReturnValueOnce(u.p);
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    r.unmount();
+    await act(async () => { u.rej(new Error("net")); await u.p.catch(() => undefined); });
+    await klar();
+    expect(screen.getByText("Filen kunne ikke uploades – prøv igen")).toBeInTheDocument();
+    expect(send()).toBeDisabled();
+    udstedUpload.mockReturnValueOnce(new Promise(() => undefined));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
+    expect(udstedUpload).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Uploader …")).toBeInTheDocument();
+  });
+
+  it("fejl under upload efter afmontering bevares i lageret, ingen sti tilbage", async () => {
+    const up = kontrol<unknown>();
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockReturnValueOnce(up.p);
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await tick();
+    r.unmount();
+    await act(async () => { up.rej(new Error("upload")); await up.p.catch(() => undefined); });
+    expect(gemtFil()).toMatchObject({ trin: "valgt", sti: null });
+    await klar();
+    expect(screen.getByText("Filen kunne ikke uploades – prøv igen")).toBeInTheDocument();
+    expect(send()).toBeDisabled();
+  });
+
+  for (const trin of ["valgt", "udstedt", "uploader"] as const) {
+    it(`reload ved trin ${trin}: ingen levende forløb → »Vælg filen igen«, Send låst`, async () => {
+      sessionStorage.setItem("sb-kladde:e:A", JSON.stringify({ tekst: "t", svarId: null, retId: null, fil: { name: "x.txt", type: "text/plain", size: 1, sti: trin === "valgt" ? null : "c/e/x.txt", trin } }));
+      await klar();
+      expect(screen.queryByText("Uploader …")).toBeNull();
+      expect(screen.getAllByText("Vælg filen igen").length).toBeGreaterThan(0);
+      expect(send()).toBeDisabled();
+      fireEvent.keyDown(screen.getByLabelText("besked"), { key: "Enter" });
+      expect(net.insert).not.toHaveBeenCalled();
+    });
+  }
+
+  it("reload ved trin uploadet med sti: sendeklar uden File", async () => {
+    sessionStorage.setItem("sb-kladde:e:A", JSON.stringify({ tekst: "t", svarId: null, retId: null, fil: { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/x.txt", trin: "uploadet" } }));
+    await klar();
+    expect(screen.getByText("Klar til at sende")).toBeInTheDocument();
+    expect(send()).not.toBeDisabled();
+  });
+
+  it("fjern fil → sent udstedelsessvar ignoreres (ingen upload, fil genskabes ikke)", async () => {
+    const u = kontrol<unknown>();
+    udstedUpload.mockReturnValueOnce(u.p);
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fjern fil" }));
+    await act(async () => { u.res({ sti: "c/e/x.txt", token: "t", conversationId: "A" }); await u.p; });
+    expect(uploadTilSti).not.toHaveBeenCalled();
+    expect(screen.queryByText("x.txt")).toBeNull();
+    expect(gemtFil()).toBeNull();
+  });
+
+  it("genvalg → gammelt svar ignoreres; genbrug af samme File i nyt forsøg", async () => {
+    const f = new File(["x"], "x.txt", { type: "text/plain" });
+    const u1 = kontrol<unknown>(), u2 = kontrol<unknown>();
+    udstedUpload.mockReturnValueOnce(u1.p).mockReturnValueOnce(u2.p);
+    uploadTilSti.mockResolvedValue(undefined);
+    const r = await klar();
+    await vaelg(r.container, f);
+    await vaelg(r.container, f); // samme File-objekt, nyt forsøg
+    await act(async () => { u1.res({ sti: "c/e/gammel.txt", token: "t1", conversationId: "A" }); await u1.p; });
+    expect(uploadTilSti).not.toHaveBeenCalled();
+    expect(gemtFil()).toMatchObject({ sti: null, trin: "valgt" });
+    await act(async () => { u2.res({ sti: "c/e/ny.txt", token: "t2", conversationId: "A" }); await u2.p; });
+    await tick();
+    expect(uploadTilSti).toHaveBeenCalledTimes(1);
+    expect(gemtFil()).toMatchObject({ sti: "c/e/ny.txt", trin: "uploadet" });
+  });
+
+  it("sen uploadafslutning overskriver ikke nyere tekst/svar", async () => {
+    const up = kontrol<unknown>();
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockReturnValueOnce(up.p);
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await tick();
+    skriv("nyere tekst");
+    await act(async () => { up.res(undefined); await up.p; });
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("nyere tekst");
+    expect(JSON.parse(sessionStorage.getItem("sb-kladde:e:A")!)).toMatchObject({ tekst: "nyere tekst", fil: { trin: "uploadet" } });
+  });
+
+  it("filbytes, token og preview-URL gemmes aldrig i sessionStorage", async () => {
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.png", token: "HEMMELIGT-TOKEN", conversationId: "A" });
+    uploadTilSti.mockReturnValueOnce(new Promise(() => undefined));
+    const r = await klar();
+    await vaelg(r.container, new File(["BYTES"], "x.png", { type: "image/png" }));
+    await tick();
+    const alt = Object.keys(sessionStorage).map((k) => sessionStorage.getItem(k)).join("");
+    expect(alt).not.toContain("HEMMELIGT-TOKEN");
+    expect(alt).not.toContain("blob:");
+    expect(alt).not.toContain("BYTES");
+  });
+});
+
+describe("§5 – Ret med svarreference (B2a-b3)", () => {
+  beforeEach(() => {
+    beskeder.ægteSend = true;
+    beskeder.liste = [fremmed("svar-A", "besked A"), fremmed("svar-B", "besked B")];
+  });
+  const svarPaa = (tekst: string) => {
+    const boble = screen.getByText(tekst).closest(".group") as HTMLElement;
+    fireEvent.click(within(boble).getByRole("button", { name: "Svar" }));
+  };
+  async function afvistMedSvarA() {
+    await klar();
+    svarPaa("besked A");
+    skriv("min tekst");
+    net.insert.mockReturnValueOnce({ error: { code: "P0001", message: "Afvist af server" } });
+    await act(async () => { fireEvent.click(send()); });
+    await screen.findByText("Afvist af server");
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    return (net.insert.mock.calls[0][0] as { id: string }).id;
+  }
+
+  it("(a) svar B som eneste skrivekladde: Ret låst, B bevares, intet sendes; DraftGuard aktiv", async () => {
+    await afvistMedSvarA();
+    svarPaa("besked B");
+    const retKnap = screen.getByRole("button", { name: "Ret" });
+    expect(retKnap).toBeDisabled();
+    fireEvent.click(retKnap);
+    expect(screen.getByText("Svarer på:").parentElement).toHaveTextContent("besked B");
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(hasUnsentDrafts()).toBe(true);
+  });
+
+  it("(b) efter rydning af B gendanner Ret svar A, tekst og id; næste Send bruger A", async () => {
+    const id = await afvistMedSvarA();
+    svarPaa("besked B");
+    fireEvent.click(screen.getByRole("button", { name: "Fjern svar" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ret" })); });
+    await tick();
+    expect(screen.getByText("Svarer på:").parentElement).toHaveTextContent("besked A");
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("min tekst");
+    net.insert.mockReturnValueOnce({ error: null });
+    await act(async () => { fireEvent.click(send()); });
+    await tick();
+    expect(net.insert.mock.calls[1][0]).toMatchObject({ id, reply_to_id: "svar-A", content: "min tekst" });
+  });
+
+  it("(b, fil) Ret gendanner den afviste afsendelses fil og sti", async () => {
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockResolvedValueOnce(undefined);
+    const r = await klar();
+    svarPaa("besked A");
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    net.insert.mockReturnValueOnce({ error: { code: "P0001", message: "Afvist af server" } });
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null },
+      { data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null }];
+    await act(async () => { fireEvent.click(send()); });
+    await screen.findByText("Afvist af server");
+    const id = (net.insert.mock.calls[0][0] as { id: string }).id;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ret" })); });
+    await tick();
+    expect(screen.getByText("x.txt")).toBeInTheDocument();
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null }];
+    net.insert.mockReturnValueOnce({ error: null });
+    await act(async () => { fireEvent.click(send()); });
+    await tick();
+    expect(net.insert.mock.calls[1][0]).toMatchObject({ id, reply_to_id: "svar-A", attachment_path: "c/e/x.txt" });
+  });
+
+  it("DraftGuard dækker gendannet svarId alene", async () => {
+    sessionStorage.setItem("sb-kladde:e:A", JSON.stringify({ tekst: "", svarId: "svar-A", retId: null, fil: null }));
+    await klar();
+    expect(hasUnsentDrafts()).toBe(true);
+  });
+});
+
+describe("§9 – GET 403/404/410 gennem rigtig FilVedhaeftning (B2a-b3)", () => {
+  for (const status of [403, 404, 410]) {
+    it(`GET ${status} → »Filen er ikke længere tilgængelig«, nul udstedelse/upload/INSERT`, async () => {
+      beskeder.ægteSend = true;
+      beskeder.liste = [fremmed("m-fil", "", { attachment_path: "c/x/f.txt", attachment_name: "f.txt", attachment_type: "text/plain" })];
+      const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ kode: "x" }), { status }));
+      await klar();
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Åbn f.txt" })); });
+      expect(await screen.findByText("Filen er ikke længere tilgængelig")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Prøv igen" })).toBeNull();
+      expect(udstedUpload).not.toHaveBeenCalled();
+      expect(uploadTilSti).not.toHaveBeenCalled();
+      expect(net.insert).not.toHaveBeenCalled();
+      f.mockRestore();
+    });
+  }
 });
