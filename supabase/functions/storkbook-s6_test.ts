@@ -1,13 +1,90 @@
-// S6 (leverance A): rene kontraktprøver uden netværk og uden produktionskald.
-// Deno.serve stubbes før dynamisk import, så ingen server startes.
+// S6 (leverance A + A2): kontrakt- og handlerprøver UDEN netværk og uden produktionskald.
+// Deno.serve stubbes før dynamisk import (ingen server startes); handlerne fanges og kaldes med Request-objekter.
+// globalThis.fetch erstattes KUN i prøverne af en mock; ukendt adresse får prøven til at fejle.
+// SQL-adfærd (kø, register, slet_tidligst) er MOCKET i JS – det er ikke kørte SQL-prøver.
+// Tid styres med FakeTime (std testing/time); ingen rigtige ventetider.
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { FakeTime } from "https://deno.land/std@0.224.0/testing/time.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
-(Deno as unknown as { serve: unknown }).serve = () => ({ finished: Promise.resolve(), shutdown: () => Promise.resolve() });
+type Handler = (r: Request) => Promise<Response>;
+const fangede: Handler[] = [];
+(Deno as unknown as { serve: unknown }).serve = (a: unknown, b?: unknown) => {
+  fangede.push((typeof a === "function" ? a : b) as Handler);
+  return { finished: Promise.resolve(), shutdown: () => Promise.resolve() };
+};
+const MOCK = "http://mock.test";
+Deno.env.set("SUPABASE_URL", MOCK);
+Deno.env.set("SUPABASE_ANON_KEY", "anon-test");
+Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "svc-test");
+Deno.env.set("LOVABLE_API_KEY", "gw-test");
+Deno.env.delete("SB_TJEK_STUB");
+
 const tjek = await import("./storkbook-tjek/index.ts");
+const hTjek = fangede[fangede.length - 1];
 const fil = await import("./sb-fil/index.ts");
+const hFil = fangede[fangede.length - 1];
 const opr = await import("./beskeder-oprydning/index.ts");
+const hOpr = fangede[fangede.length - 1];
 const wrk = await import("./storkbook-udsendelser/index.ts");
+const ft = await import("./_shared/sb-filtype.ts");
+const bud = await import("./_shared/sb-budget.ts");
 
+// ---------------------------------------------------------------- mock-infrastruktur
+type Kald = { metode: string; sti: string; url: URL; krop: string; signal: AbortSignal | null; t: number };
+type Rute = (k: Kald) => Promise<Response | undefined> | Response | undefined;
+let rute: Rute = () => undefined;
+let kald: Kald[] = [];
+let ukendt: string[] = [];
+const ægteFetch = globalThis.fetch;
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const req = new Request(input, init);
+  const url = new URL(req.url);
+  if (url.origin !== MOCK && url.origin !== "https://ai.gateway.lovable.dev") { ukendt.push(url.origin); throw new Error("ukendt netværksadresse i prøve"); }
+  if (req.signal.aborted) throw req.signal.reason;
+  const k: Kald = { metode: req.method, sti: url.pathname, url, krop: req.body ? await req.text() : "", signal: init?.signal ?? req.signal, t: Date.now() };
+  kald.push(k);
+  const r = await rute(k);
+  if (!r) { ukendt.push(`${req.method} ${url.pathname}`); throw new Error("ingen mockrute"); }
+  return r;
+}) as typeof fetch;
+void ægteFetch;
+
+const nulstil = (r: Rute) => { rute = r; kald = []; ukendt = []; };
+const jsonR = (b: unknown, status = 200, h: Record<string, string> = {}) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", ...h } });
+const tom = (status = 204) => new Response(null, { status });
+const fejlR = () => jsonR({ message: "mockfejl", code: "XX000" }, 500);
+/** Venter (fake) ms; afvises ved abort på kaldets signal. */
+const vent = (ms: number, s: AbortSignal | null) => new Promise<void>((res, rej) => {
+  if (s?.aborted) return rej(s.reason);
+  const t = setTimeout(res, ms);
+  s?.addEventListener("abort", () => { clearTimeout(t); rej(s.reason); }, { once: true });
+});
+const hænger = (s: AbortSignal | null) => new Promise<never>((_, rej) => s?.addEventListener("abort", () => rej(s.reason), { once: true }));
+const tabel = (k: Kald, navn: string) => k.sti === `/rest/v1/${navn}`;
+const rpc = (k: Kald, navn: string) => k.sti === `/rest/v1/rpc/${navn}`;
+const kaldTil = (pred: (k: Kald) => boolean) => kald.filter(pred);
+const ingenUkendte = () => assertEquals(ukendt, []);
+
+let uidNr = 0;
+const fælles = (k: Kald): Response | undefined => {
+  if (k.sti === "/auth/v1/user") return jsonR({ id: `00000000-0000-4000-8000-${String(++uidNr).padStart(12, "0")}`, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" });
+  if (rpc(k, "get_current_employee_id")) return jsonR("e1");
+  if (tabel(k, "employee_master_data")) return jsonR([{ is_active: true }]);
+  return undefined;
+};
+
+/** Kører en handler under FakeTime til den svarer (eller maks fake-ms). */
+async function kørFake(h: Handler, req: Request, time: FakeTime, maks = 120_000): Promise<{ res: Response; ms: number }> {
+  const t0 = Date.now();
+  let res: Response | null = null;
+  h(req).then((r) => { res = r; });
+  while (!res && Date.now() - t0 < maks) await time.tickAsync(25);
+  assert(res, "handler svarede ikke inden for fake-tiden");
+  return { res: res as Response, ms: Date.now() - t0 };
+}
+
+// ---------------------------------------------------------------- eksisterende kontraktprøver (A)
 Deno.test("tjek: gyldige domme for alle fem begrundelsesveje", () => {
   assertEquals(tjek.validerDom({ tone: "ok", personoplysninger: "ingen", cpr: false }), { tone: "ok", personoplysninger: "ingen", cpr: false });
   assert(tjek.validerDom({ tone: "haard", personoplysninger: "ingen", type: "truende", cpr: false }));
@@ -24,14 +101,6 @@ Deno.test("tjek: ugyldige/modstridende domme afvises (→ ukendt)", () => {
   }
   assertEquals(tjek.UKENDT, { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" });
   assertEquals(tjek.MAKS_OUTPUT_TOKENS, 200);
-});
-
-Deno.test("filtype fra indhold, ikke fra navn", () => {
-  assertEquals(fil.filtype(new Uint8Array([0xff, 0xd8, 0xff, 0])), "image/jpeg");
-  assertEquals(fil.filtype(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), "image/png");
-  assertEquals(fil.filtype(new TextEncoder().encode("hej")), "text/plain");
-  assertEquals(fil.filtype(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0])), null);
-  assertEquals(tjek.filtype(new TextEncoder().encode("GIF89a")), "image/gif");
 });
 
 Deno.test("Content-Disposition er sikker og tvinger faktisk endelse", () => {
@@ -63,7 +132,7 @@ Deno.test("oprydning: konstant-tid og tidsvindue 03–04 dansk", () => {
   assert(opr.ensKonstantTid("abc", "abc"));
   assert(!opr.ensKonstantTid("abc", "abd"));
   assert(!opr.ensKonstantTid("abc", "abcd"));
-  assert(opr.iOptaellingsvindue(new Date("2026-10-28T02:30:00Z"))); // 03:30 CET
+  assert(opr.iOptaellingsvindue(new Date("2026-10-28T02:30:00Z")));
   assert(!opr.iOptaellingsvindue(new Date("2026-10-28T03:30:00Z")));
 });
 
@@ -92,4 +161,614 @@ Deno.test("worker: indhold med feltet status er ikke et Afslut", () => {
   assert(wrk.erLeveret({ status: "leveret", slettes_efter: null }));
   assert(!wrk.erLeveret({ status: "tjekkes", slettes_efter: null }));
   assert(!wrk.erLeveret({ status: "leveret", slettes_efter: "2000-01-01T00:00:00Z" }));
+});
+
+// ---------------------------------------------------------------- §4 filtype (helper)
+const enc = (s: string) => new TextEncoder().encode(s);
+const cat = (...a: (Uint8Array | number[])[]) => { const ud: number[] = []; for (const x of a) ud.push(...x); return new Uint8Array(ud); };
+const BOM = [0xef, 0xbb, 0xbf];
+
+Deno.test("§4 filtype: billeder uændrede, tekst accepteres", () => {
+  assertEquals(ft.filtype(new Uint8Array([0xff, 0xd8, 0xff, 0])), "image/jpeg");
+  assertEquals(ft.filtype(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), "image/png");
+  assertEquals(ft.filtype(enc("GIF89a")), "image/gif");
+  assertEquals(ft.filtype(cat(enc("RIFF"), [0, 0, 0, 0], enc("WEBP"))), "image/webp");
+  assertEquals(ft.filtype(enc("hej")), "text/plain");
+  assertEquals(ft.filtype(cat(BOM, enc("Almindelig tekst æøå"))), "text/plain");
+  assertEquals(ft.filtype(enc("Se fx eksemplet <html><body> længere inde i prosa.")), "text/plain");
+  assertEquals(ft.filtype(enc("2 < 3 og a<b")), "text/plain");
+  assertEquals(ft.filtype(new Uint8Array([0x68, 0, 0x69])), null);
+  assertEquals(ft.filtype(new Uint8Array([0xc3, 0x28])), null);
+});
+
+Deno.test("§4 filtype: PDF afvises også uden NUL og efter indledende bytes", () => {
+  assertEquals(ft.filtype(enc("%PDF-1.4\n1 0 obj << >> endobj\ntrailer\n%%EOF")), null);
+  assertEquals(ft.filtype(cat(BOM, enc("\r\n\n  %PDF-1.7\n"))), null);
+  assertEquals(ft.filtype(cat(enc("x".repeat(900)), enc("%PDF-1.3"))), null);
+  assertEquals(ft.filtype(cat(enc("x".repeat(1100)), enc("%PDF-1.3"))), "text/plain"); // efter 1.024 bytes: prosa
+});
+
+Deno.test("§4 filtype: alle dokument-/arkivsignaturer afvises (byteværdier)", () => {
+  for (const sig of [[0x50, 0x4b, 3, 4], [0x50, 0x4b, 5, 6], [0x50, 0x4b, 7, 8], [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
+    [0x1f, 0x8b, 8], [0x52, 0x61, 0x72, 0x21, 0x1a, 7, 0], [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]]) {
+    assertEquals(ft.filtype(cat(sig, enc("abc"))), null, `signatur ${sig}`);
+  }
+  assertEquals(ft.filtype(enc("PK\\x03\\x04 er bare tekst")), "text/plain"); // bogstavelig tekst er ikke signaturen
+  for (const t of ["{\\rtf1\\ansi hej}", "  {\\RTF1 x}", "%!PS-Adobe-3.0", "%!ps"]) assertEquals(ft.filtype(enc(t)), null, t);
+});
+
+Deno.test("§4 filtype: markup ved begyndelsen afvises (kommentar, deklaration, fragment, XML uden <?xml)", () => {
+  for (const t of ["<!-- k --><html></html>", "<!DOCTYPE html><p>x", "<?xml version='1.0'?><a/>", "<svg xmlns='x'></svg>",
+    "<!-- kommentar -->\n<svg></svg>", "<div>fragment</div>", "<rod><barn/></rod>", "</p>", "<HTML>", "\n\t <Svg>"]) {
+    assertEquals(ft.filtype(enc(t)), null, t);
+    assertEquals(ft.filtype(cat(BOM, enc(t))), null, `BOM+${t}`);
+  }
+  // Ægte tekst med dokumentpræfiks afvises som besluttet (konservativt værn).
+  assertEquals(ft.filtype(enc("<b>Husk</b> mødet i morgen")), null);
+});
+
+// ---------------------------------------------------------------- §5 Content-Disposition
+Deno.test("§5 disposition: kodepunkter, surrogater og RFC 5987", () => {
+  const d = fil.disposition("a".repeat(99) + "😀.png", "image/png");
+  const enc5987 = /filename\*=UTF-8''([^;]+)$/.exec(d)![1];
+  assertEquals(decodeURIComponent(enc5987), "a".repeat(99) + "😀.png");
+  const lang = fil.disposition("ø".repeat(150) + ".txt", "text/plain");
+  assertEquals(Array.from(decodeURIComponent(/filename\*=UTF-8''([^;]+)$/.exec(lang)![1])).length, 104);
+  const s = fil.disposition("x\uD800y\uDC00z😀.png", "image/png");
+  assertEquals(decodeURIComponent(/filename\*=UTF-8''([^;]+)$/.exec(s)![1]), "xyz😀.png");
+  assert(fil.disposition("chef's (ny)*.txt", "text/plain").endsWith("filename*=UTF-8''chef%27s%20%28ny%29%2A.txt"));
+  assert(fil.disposition("Æble Øl.png", "image/png").includes("%C3%86ble%20%C3%98l.png"));
+});
+
+// ---------------------------------------------------------------- sb-fil laes (handler)
+const MID = "11111111-2222-4333-8444-555555555555";
+type FilOps = { sti?: string; navn?: string; info?: (k: Kald) => Response | Promise<Response>; download?: (k: Kald) => Response | Promise<Response> };
+function laesRute(o: FilOps): Rute {
+  const sti = o.sti ?? "c/e1/x.png";
+  return (k) => fælles(k) ?? (tabel(k, "chat_messages") ? jsonR([{ id: MID, attachment_path: sti, attachment_name: o.navn ?? "foto.png", deleted_at: null, slettes_efter: null, status: "leveret" }])
+    : tabel(k, "sb_stier") ? jsonR([{ status: "bundet", besked_id: MID }])
+    : k.sti === `/storage/v1/object/info/chat-attachments/${sti}` ? o.info?.(k)
+    : k.sti === `/storage/v1/object/chat-attachments/${sti}` ? o.download?.(k) : undefined);
+}
+const laesReq = (range?: string) => new Request(`${MOCK}/functions/v1/sb-fil?action=laes&message_id=${MID}`, { headers: { Authorization: "Bearer jwt-test", ...(range ? { Range: range } : {}) } });
+const downloads = () => kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")).length;
+const png = (n: number) => { const b = new Uint8Array(n); b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); return b; };
+const info = (size: unknown) => () => jsonR(size === undefined ? { name: "x" } : { name: "x", size });
+
+Deno.test("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download", async () => {
+  const N = 10 * 1024 * 1024;
+  nulstil(laesRute({ info: info(N), download: () => new Response(png(N)) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 200); assertEquals((await r.arrayBuffer()).byteLength, N); ingenUkendte();
+  nulstil(laesRute({ info: info(N + 1), download: () => new Response(png(N + 1)) }));
+  const r2 = await hFil(laesReq());
+  assertEquals(r2.status, 410); assertEquals(await r2.json(), { kode: "vaek" }); assertEquals(downloads(), 0); ingenUkendte();
+});
+
+Deno.test("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden download", async () => {
+  const N = 20 * 1024;
+  nulstil(laesRute({ sti: "c/e1/n.txt", navn: "n.txt", info: info(N), download: () => new Response(enc("a".repeat(N))) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 200); assertEquals(r.headers.get("Content-Type"), "text/plain"); await r.body?.cancel();
+  nulstil(laesRute({ sti: "c/e1/n.txt", navn: "n.txt", info: info(N + 1), download: () => new Response(enc("a".repeat(N + 1))) }));
+  const r2 = await hFil(laesReq());
+  assertEquals(r2.status, 410); assertEquals(downloads(), 0); ingenUkendte();
+});
+
+Deno.test("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt, 404, exception) → 410 uden download", async () => {
+  const varianter: (() => Response | Promise<Response>)[] = [info(null), info("5"), info(-1), info(undefined), info(1.5),
+    () => jsonR({ statusCode: "404", error: "not_found", message: "Object not found" }, 404), () => { throw new Error("transport"); }];
+  for (const v of varianter) {
+    nulstil(laesRute({ info: v, download: () => new Response(png(10)) }));
+    const r = await hFil(laesReq());
+    assertEquals(r.status, 410); assertEquals(await r.json(), { kode: "vaek" }); assertEquals(downloads(), 0);
+  }
+});
+
+Deno.test("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size", async () => {
+  const sti = "c/e1/a.b.c.png";
+  nulstil(laesRute({ sti, info: info(16), download: () => new Response(png(16)) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 200); assertEquals((await r.arrayBuffer()).byteLength, 16);
+  assertEquals(kaldTil((k) => k.sti === `/storage/v1/object/info/chat-attachments/${sti}`).length, 1); ingenUkendte();
+});
+
+Deno.test("§2 sb-fil: lille metadata men for stor stream → reader annulleres tidligt, 410", async () => {
+  let træk = 0, annulleret = false;
+  const strøm = () => new Response(new ReadableStream<Uint8Array>({
+    pull(c) { træk++; c.enqueue(træk === 1 ? png(1024) : new Uint8Array(1024)); },
+    cancel() { annulleret = true; },
+  }));
+  nulstil(laesRute({ info: info(1500), download: strøm }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 410); assert(annulleret, "reader blev ikke annulleret"); assert(træk <= 3, `for mange træk: ${træk}`);
+});
+
+Deno.test("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410", async () => {
+  nulstil(laesRute({ info: info(100), download: () => new Response(png(50)) }));
+  assertEquals((await hFil(laesReq())).status, 410);
+  nulstil(laesRute({ info: info(100), download: () => new Response(new ReadableStream({ start(c) { c.enqueue(png(20)); c.error(new Error("afbrudt")); } })) }));
+  assertEquals((await hFil(laesReq())).status, 410);
+  nulstil(laesRute({ info: info(100), download: () => fejlR() }));
+  assertEquals((await hFil(laesReq())).status, 410);
+});
+
+Deno.test("§2 sb-fil: faktisk tekst over 20 KiB med misvisende endelse → 410", async () => {
+  const N = 30 * 1024;
+  nulstil(laesRute({ sti: "c/e1/x.png", info: info(N), download: () => new Response(enc("a".repeat(N))) }));
+  assertEquals((await hFil(laesReq())).status, 410);
+});
+
+Deno.test("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", async () => {
+  nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
+  const r = await hFil(laesReq("bytes=0-7"));
+  assertEquals(r.status, 206); assertEquals(r.headers.get("Content-Range"), "bytes 0-7/32"); assertEquals((await r.arrayBuffer()).byteLength, 8);
+  assert(!kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")).some((k) => k.url.searchParams.has("range")));
+  nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
+  const r2 = await hFil(laesReq("bytes=40-"));
+  assertEquals(r2.status, 416); assertEquals(r2.headers.get("Content-Range"), "bytes */32");
+  nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
+  const r3 = await hFil(laesReq());
+  assertEquals(r3.status, 200); assertEquals(r3.headers.get("X-Content-Type-Options"), "nosniff"); await r3.body?.cancel();
+});
+
+Deno.test("§4 sb-fil: ASCII-PDF uden NUL som .txt → 410 type_afvist", async () => {
+  const pdf = enc("%PDF-1.4\n1 0 obj << >> endobj\n%%EOF");
+  nulstil(laesRute({ sti: "c/e1/d.txt", info: info(pdf.length), download: () => new Response(pdf) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 410); assertEquals(await r.json(), { kode: "vaek" });
+});
+
+Deno.test("§5 sb-fil: Content-Disposition gennem handleren (emoji, surrogater, '()*)", async () => {
+  for (const [navn, forventet] of [["a".repeat(99) + "😀.png", "a".repeat(99) + "😀.png"], ["x\uD800\uDC00\uDC00y.png", "x\u{10000}y.png"], ["Æ😀 ø.png", "Æ😀 ø.png"]] as const) {
+    nulstil(laesRute({ navn, info: info(16), download: () => new Response(png(16)) }));
+    const r = await hFil(laesReq());
+    assertEquals(r.status, 200);
+    const cd = r.headers.get("Content-Disposition")!;
+    assert(!/[\r\n]/.test(cd));
+    assertEquals(decodeURIComponent(/filename\*=UTF-8''([^;]+)$/.exec(cd)![1]), forventet);
+    await r.body?.cancel();
+  }
+  nulstil(laesRute({ sti: "c/e1/t.txt", navn: "chef's (ny)*.html", info: info(3), download: () => new Response(enc("hej")) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 200);
+  assert(r.headers.get("Content-Disposition")!.endsWith("filename*=UTF-8''chef%27s%20%28ny%29%2A.txt"));
+  await r.body?.cancel();
+});
+
+// ---------------------------------------------------------------- §1 sb-fil udsted/opryd (handler)
+const KONV = "22222222-3333-4444-8555-666666666666";
+const udstedReq = () => new Request(`${MOCK}/functions/v1/sb-fil`, { method: "POST", headers: { Authorization: "Bearer jwt-test", "Content-Type": "application/json" },
+  body: JSON.stringify({ action: "udsted", conversation_id: KONV, filnavn: "a.png", type: "image/png", size: 10 }) });
+function udstedRute(koe: (k: Kald) => Response | Promise<Response>, patch: (k: Kald) => Response = () => tom()): Rute {
+  return (k) => fælles(k) ?? (tabel(k, "chat_conversation_members") ? jsonR([{ id: "m" }])
+    : tabel(k, "sb_stier") && k.metode === "POST" ? tom(201)
+    : tabel(k, "sb_stier") && k.metode === "PATCH" ? patch(k)
+    : k.sti.startsWith("/storage/v1/object/upload/sign/") ? fejlR()
+    : rpc(k, "sb_koe_fil") ? koe(k) : undefined);
+}
+const statusPatches = () => kaldTil((k) => tabel(k, "sb_stier") && k.metode === "PATCH");
+
+Deno.test("§1 sb-fil: køfejl som {error} → ingen statusopdatering, 500 token_fejl, intet token", async () => {
+  nulstil(udstedRute(() => fejlR()));
+  const r = await hFil(udstedReq());
+  assertEquals(r.status, 500); const b = await r.json(); assertEquals(b, { kode: "token_fejl" }); assert(!("token" in b));
+  assertEquals(statusPatches().length, 0); ingenUkendte();
+});
+
+Deno.test("§1 sb-fil: køfejl som exception → ingen statusopdatering, 500 token_fejl", async () => {
+  nulstil(udstedRute(() => { throw new Error("transport"); }));
+  const r = await hFil(udstedReq());
+  assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" }); assertEquals(statusPatches().length, 0);
+});
+
+Deno.test("§1 sb-fil: køsucces med data=null (void) → statusopdatering forsøges på bucket/sti/uploadet", async () => {
+  nulstil(udstedRute(() => tom(204)));
+  const r = await hFil(udstedReq());
+  assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
+  const p = statusPatches(); assertEquals(p.length, 1);
+  assertEquals(JSON.parse(p[0].krop), { status: "slettes" });
+  assertEquals(p[0].url.searchParams.get("status"), "eq.uploadet"); assertEquals(p[0].url.searchParams.get("bucket"), "eq.chat-attachments");
+  // Køen kaldes FØR statusændringen.
+  const ik = kald.findIndex((k) => rpc(k, "sb_koe_fil")), ip = kald.findIndex((k) => tabel(k, "sb_stier") && k.metode === "PATCH");
+  assert(ik >= 0 && ik < ip);
+});
+
+Deno.test("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kompensation), 500", async () => {
+  nulstil(udstedRute(() => tom(204), () => fejlR()));
+  const r = await hFil(udstedReq());
+  assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
+  assertEquals(kaldTil((k) => rpc(k, "sb_koe_fil")).length, 1); assertEquals(statusPatches().length, 1);
+  assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0);
+});
+
+// Stateful MOCK af SQL-protokollen (ikke kørt SQL): register + kø + slet_tidligst.
+Deno.test("§1 stateful mock: mislykket statusopdatering → senere overtagelse → to køposter afsluttes → slettet; intet før slet_tidligst", async () => {
+  const T0 = Date.parse("2026-10-28T10:00:00Z");
+  const time = new FakeTime(T0);
+  try {
+    type Reg = { sti: string; status: string; oprettet: number };
+    type Post = { id: number; sti: string; kilde: string; slet_tidligst: number; reserveret: boolean; afsluttet: boolean };
+    let reg: Reg | null = null;
+    const koe: Post[] = [];
+    const objekter = new Set<string>();
+    const SLET_EFTER = 3600_000;
+    // a) Udstedelse fejler: koe_fil lykkes, statusopdatering fejler.
+    nulstil((k) => fælles(k) ?? (tabel(k, "chat_conversation_members") ? jsonR([{ id: "m" }])
+      : tabel(k, "sb_stier") && k.metode === "POST" ? (() => { const b = JSON.parse(k.krop); reg = { sti: b.sti, status: "uploadet", oprettet: Date.now() }; objekter.add(b.sti); return tom(201); })()
+      : tabel(k, "sb_stier") && k.metode === "PATCH" ? fejlR()
+      : k.sti.startsWith("/storage/v1/object/upload/sign/") ? fejlR()
+      : rpc(k, "sb_koe_fil") ? (() => { const b = JSON.parse(k.krop); koe.push({ id: koe.length + 1, sti: b.p_sti, kilde: b.p_kilde, slet_tidligst: Date.now() + SLET_EFTER, reserveret: false, afsluttet: false }); return tom(204); })()
+      : undefined));
+    assertEquals((await hFil(udstedReq())).status, 500);
+    assertEquals(reg!.status, "uploadet"); assertEquals(koe.length, 1);
+
+    const token = "cron-test";
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc(token)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const oprRute: Rute = (k) => {
+      if (tabel(k, "pulsen_config")) return jsonR([{ value: hash }]);
+      if (rpc(k, "sb_version")) return jsonR("24d");
+      if (rpc(k, "sb_overtag_foraeldreloese")) {
+        let n = 0;
+        if (reg && reg.status === "uploadet" && Date.now() - reg.oprettet > 3 * 3600_000) {
+          koe.push({ id: koe.length + 1, sti: reg.sti, kilde: "foraeldreloes", slet_tidligst: Date.now(), reserveret: false, afsluttet: false }); n++;
+        }
+        return jsonR(n);
+      }
+      if (rpc(k, "sb_koe_naeste")) {
+        const klar = koe.filter((p) => !p.afsluttet && !p.reserveret && p.slet_tidligst <= Date.now());
+        for (const p of klar) { p.reserveret = true; if (reg && (reg.status === "uploadet" || reg.status === "bundet")) reg.status = "slettes"; }
+        return jsonR(klar.map((p) => ({ id: p.id, bucket: "chat-attachments", sti: p.sti })));
+      }
+      if (k.metode === "DELETE" && k.sti === "/storage/v1/object/chat-attachments") { for (const s of JSON.parse(k.krop).prefixes) objekter.delete(s); return jsonR([]); }
+      if (rpc(k, "sb_koe_afslut")) {
+        const b = JSON.parse(k.krop); const p = koe.find((x) => x.id === b.p_id)!; p.afsluttet = b.p_ok;
+        if (reg && koe.filter((x) => x.sti === reg!.sti).every((x) => x.afsluttet)) reg.status = "slettet";
+        return jsonR(true);
+      }
+      if (rpc(k, "sb_personoplysninger_til_sletning")) return jsonR([]);
+      if (rpc(k, "sb_minimer_register")) return jsonR(0);
+      return undefined;
+    };
+    const oprReq = () => new Request(`${MOCK}/functions/v1/beskeder-oprydning`, { method: "POST", headers: { "x-pulsen-cron-token": token }, body: "{}" });
+    // b) Kørsel efter 1 t: rækken er endnu ikke overtaget (≤ 3 t), og køposten er ikke klar (slet_tidligst) → ingen fysisk sletning.
+    time.tick(3600_000 - 60_000);
+    nulstil(oprRute);
+    const r1 = await kørFake(hOpr, oprReq(), time);
+    assertEquals((await r1.res.json()).slettet, 0);
+    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0); assert(objekter.size === 1);
+    // c) Efter > 3 t: overtagelse giver post 2; begge afhentes og afsluttes; registeret ender slettet.
+    time.tick(3 * 3600_000);
+    nulstil(oprRute);
+    const r2 = await kørFake(hOpr, oprReq(), time);
+    const b2 = await r2.res.json();
+    assertEquals(b2.foraeldreloese, 1); assertEquals(koe.length, 2); assertEquals(koe.map((p) => p.kilde), ["udstedelse_fejl", "foraeldreloes"]);
+    assert(koe.every((p) => p.afsluttet)); assertEquals(reg!.status, "slettet"); assertEquals(objekter.size, 0); assertEquals(b2.ok, true);
+    ingenUkendte();
+  } finally { time.restore(); }
+});
+
+// ---------------------------------------------------------------- storkbook-tjek (handler)
+const TJEK_ID = "33333333-4444-4555-8666-777777777777";
+type TjekOps = { sti?: string | null; info?: (k: Kald) => Response | Promise<Response>; download?: (k: Kald) => Response | Promise<Response>;
+  gateway?: (k: Kald) => Response | Promise<Response>; afslut?: (k: Kald) => Response | Promise<Response>; auth?: (k: Kald) => Response | Promise<Response> | undefined };
+const okDom = () => jsonR({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ tone: "ok", personoplysninger: "ingen", cpr: false }) } }] });
+function tjekRute(o: TjekOps): Rute {
+  const sti = o.sti === undefined ? "c/e1/x.png" : o.sti;
+  return (k) => {
+    if (o.auth && k.sti === "/auth/v1/user") return o.auth(k);
+    const f = fælles(k); if (f) return f;
+    if (tabel(k, "chat_messages")) return jsonR([{ id: TJEK_ID, sender_id: "e1", revision: 1, content: "hej kollega", attachment_path: sti, conversation_id: "c", status: "tjekkes" }]);
+    if (tabel(k, "pulsen_config")) return jsonR([{ value: "model-test" }]);
+    if (rpc(k, "sb_tjek_reserver")) return jsonR("tok");
+    if (tabel(k, "sb_stier")) return jsonR([{ status: "bundet", besked_id: TJEK_ID, samtale_id: "c", ejer_employee_id: "e1" }]);
+    if (sti && k.sti === `/storage/v1/object/info/chat-attachments/${sti}`) return o.info?.(k);
+    if (sti && k.sti === `/storage/v1/object/chat-attachments/${sti}`) return o.download?.(k);
+    if (k.url.origin === "https://ai.gateway.lovable.dev") return (o.gateway ?? okDom)(k);
+    if (rpc(k, "sb_tjek_afslut")) return (o.afslut ?? (() => jsonR(true)))(k);
+    return undefined;
+  };
+}
+const tjekReq = (body: BodyInit = JSON.stringify({ type: "besked", id: TJEK_ID, revision: 1 })) =>
+  new Request(`${MOCK}/functions/v1/storkbook-tjek`, { method: "POST", headers: { Authorization: "Bearer jwt-test", "Content-Type": "application/json" }, body });
+const gwKald = () => kaldTil((k) => k.url.origin === "https://ai.gateway.lovable.dev");
+const afslutKald = () => kaldTil((k) => rpc(k, "sb_tjek_afslut"));
+const udfaldSendt = () => JSON.parse(afslutKald()[0].krop).p_udfald;
+const harFilPayload = () => gwKald().some((k) => k.krop.includes("image_url") || k.krop.includes("<<<FIL>>>"));
+
+Deno.test("§2/§4 tjek: gyldigt billede sendes som filpayload, fil_tjekket=true", async () => {
+  nulstil(tjekRute({ info: info(16), download: () => new Response(png(16)) }));
+  const r = await hTjek(tjekReq());
+  assertEquals(await r.json(), { status: "tjekket" }); assert(harFilPayload()); assertEquals(udfaldSendt().fil_tjekket, true); ingenUkendte();
+});
+
+Deno.test("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, markup) → ingen filpayload, fil_tjekket=false, tekst tjekkes", async () => {
+  const pdf = enc("%PDF-1.4\n%%EOF"), svg = enc("<!-- k --><svg></svg>");
+  const varianter: TjekOps[] = [
+    { info: info(10 * 1024 * 1024 + 1), download: () => new Response(png(16)) },
+    { info: info(null), download: () => new Response(png(16)) },
+    { info: () => fejlR(), download: () => new Response(png(16)) },
+    { info: info(100), download: () => new Response(png(50)) },
+    { sti: "c/e1/d.txt", info: info(pdf.length), download: () => new Response(pdf) },
+    { sti: "c/e1/s.txt", info: info(svg.length), download: () => new Response(svg) },
+    { sti: "c/e1/x.png", info: info(30 * 1024), download: () => new Response(enc("a".repeat(30 * 1024))) },
+  ];
+  for (const v of varianter) {
+    nulstil(tjekRute(v));
+    const r = await hTjek(tjekReq());
+    assertEquals(await r.json(), { status: "tjekket" });
+    assertEquals(gwKald().length, 1, "beskedteksten tjekkes fortsat"); assert(!harFilPayload(), "afvist fil sendt til gateway");
+    const u = udfaldSendt(); assertEquals(u.fil_tjekket, false); assertEquals(u.udfald, "ok");
+    // Ingen egen begrundelseskode i payloaden – SQL bestemmer.
+    assertEquals(Object.keys(u).sort(), ["cpr", "fil_tjekket", "personoplysninger", "tone", "udfald"]);
+    ingenUkendte();
+  }
+  // Ingen download ved afvisende metadata.
+  nulstil(tjekRute({ info: info(10 * 1024 * 1024 + 1), download: () => new Response(png(16)) }));
+  await (await hTjek(tjekReq())).json();
+  assertEquals(kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")).length, 0);
+});
+
+Deno.test("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false og afslutning inden 55 s", async () => {
+  for (const variant of ["før", "efter"] as const) {
+    const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+    try {
+      nulstil(tjekRute({ info: info(16), download: (k) => variant === "før" ? hænger(k.signal) as Promise<Response>
+        : new Response(new ReadableStream<Uint8Array>({ start(c) { c.enqueue(png(8)); } })) }));
+      const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+      assertEquals(await res.json(), { status: "tjekket" });
+      assert(ms < 55_000, `varighed ${ms}`);
+      assertEquals(afslutKald().length, 1); assertEquals(udfaldSendt().fil_tjekket, false); assert(!harFilPayload());
+    } finally { time.restore(); }
+  }
+});
+
+Deno.test("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; langsom request-body → intet efterfølgende arbejde", async () => {
+  let time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    nulstil(tjekRute({ auth: (k) => hænger(k.signal) as Promise<Response> }));
+    const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(res.status, 401); assert(ms >= 15_000 && ms < 16_000, `auth-varighed ${ms}`);
+  } finally { time.restore(); }
+  time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    nulstil(tjekRute({}));
+    const evig = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(enc("{")); } });
+    const { res, ms } = await kørFake(hTjek, tjekReq(evig), time);
+    assertEquals(res.status, 500); assert(ms <= 50_100, `body-varighed ${ms}`);
+    assertEquals(kald.length, 0, "arbejde startet efter budgetstop under parsing");
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver positiv afslut-timeout; 0 s → intet kald", async () => {
+  // Ikke-samarbejdende transport, der ignorerer abort, flytter tiden forbi arbejdsfristen.
+  let time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now(); let afslutVarighed = -1;
+    nulstil(tjekRute({ sti: null, gateway: async () => { await vent(51_000 - (Date.now() - t0), null); return okDom(); },
+      afslut: async (k) => { const s = Date.now(); try { return await hænger(k.signal); } finally { afslutVarighed = Date.now() - s; } } }));
+    const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(res.status, 500); assertEquals(await res.json(), { kode: "afslut_fejl" });
+    assert(afslutVarighed > 3_900 && afslutVarighed <= 4_100, `afslut-timeout ${afslutVarighed}`); assert(ms <= 55_100);
+  } finally { time.restore(); }
+  time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    nulstil(tjekRute({ sti: null, gateway: async () => { await vent(56_000 - (Date.now() - t0), null); return okDom(); } }));
+    const { res } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(res.status, 500); assertEquals(await res.json(), { kode: "afslut_fejl" }); assertEquals(afslutKald().length, 0);
+  } finally { time.restore(); }
+  // Gateway hænger → afbrydes ved arbejdsfristen (50 s) → UKENDT, afslutning lykkes.
+  time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    nulstil(tjekRute({ sti: null, gateway: (k) => hænger(k.signal) as Promise<Response> }));
+    const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(await res.json(), { status: "tjekket" }); assertEquals(udfaldSendt().udfald, "ukendt"); assert(ms < 51_000);
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/optaget bevares", async () => {
+  nulstil(tjekRute({ sti: null, afslut: () => jsonR(false) }));
+  assertEquals(await (await hTjek(tjekReq())).json(), { status: "forældet" });
+  nulstil(tjekRute({ sti: null, afslut: () => fejlR() }));
+  const r = await hTjek(tjekReq()); assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "afslut_fejl" });
+  nulstil((k) => tabel(k, "pulsen_config") ? jsonR([]) : tjekRute({ sti: null })(k));
+  assertEquals(await (await hTjek(tjekReq())).json(), { status: "ikke_konfigureret" });
+  nulstil((k) => rpc(k, "sb_tjek_reserver") ? jsonR(null) : tjekRute({ sti: null })(k));
+  assertEquals(await (await hTjek(tjekReq())).json(), { status: "optaget" });
+  ingenUkendte();
+});
+
+// ---------------------------------------------------------------- beskeder-oprydning (handler, kontrolleret tid)
+const CRON = "cron-test";
+const CRON_HASH = await (async () => [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc(CRON)))].map((b) => b.toString(16).padStart(2, "0")).join(""))();
+const oprReq = (body = "{}") => new Request(`${MOCK}/functions/v1/beskeder-oprydning`, { method: "POST", headers: { "x-pulsen-cron-token": CRON }, body });
+type OprOps = { naeste?: (k: Kald, n: number) => Response | Promise<Response>; remove?: (k: Kald) => Response | Promise<Response>; afslut?: (k: Kald) => Response | Promise<Response>;
+  overtag?: (k: Kald) => Response | Promise<Response>; slet?: (k: Kald) => Response | Promise<Response>; udvaelg?: (k: Kald, n: number) => Response | Promise<Response>;
+  minimer?: (k: Kald) => Response | Promise<Response>; list?: (k: Kald) => Response | Promise<Response>; register?: (k: Kald) => Response | Promise<Response>; dagstal?: (k: Kald) => Response };
+function oprRute(o: OprOps): Rute {
+  let n = 0, u = 0;
+  return (k) => {
+    if (tabel(k, "pulsen_config")) return jsonR([{ value: CRON_HASH }]);
+    if (rpc(k, "sb_version")) return jsonR("24d");
+    if (rpc(k, "sb_overtag_foraeldreloese")) return (o.overtag ?? (() => jsonR(0)))(k);
+    if (rpc(k, "sb_koe_naeste")) return (o.naeste ?? (() => jsonR([])))(k, n++);
+    if (k.metode === "DELETE" && k.sti === "/storage/v1/object/chat-attachments") return (o.remove ?? (() => jsonR([])))(k);
+    if (rpc(k, "sb_koe_afslut")) return (o.afslut ?? (() => jsonR(true)))(k);
+    if (rpc(k, "sb_personoplysninger_til_sletning")) return (o.udvaelg ?? (() => jsonR([])))(k, u++);
+    if (rpc(k, "sb_slet_personoplysninger")) return (o.slet ?? (() => jsonR(0)))(k);
+    if (rpc(k, "sb_minimer_register")) return (o.minimer ?? (() => jsonR(0)))(k);
+    if (k.sti === "/storage/v1/object/list/chat-attachments") return (o.list ?? (() => jsonR([])))(k);
+    if (tabel(k, "sb_stier")) return (o.register ?? (() => jsonR([])))(k);
+    if (rpc(k, "sb_dagstal_objekter")) return (o.dagstal ?? (() => tom()))(k);
+    return undefined;
+  };
+}
+const poster = (n: number, fra = 0) => Array.from({ length: n }, (_, i) => ({ id: fra + i + 1, bucket: "chat-attachments", sti: `c/e/${fra + i}.png` }));
+const DAG = Date.parse("2026-10-28T10:00:00Z"); // uden for optællingsvinduet
+const NAT = Date.parse("2026-10-28T02:30:00Z"); // 03:30 dansk
+
+Deno.test("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, rester synlige, ok=true", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(50) : []), remove: async (k) => { await vent(7_000, k.signal); return jsonR([]); },
+      afslut: async (k) => { await vent(1_000, k.signal); return jsonR(true); } }));
+    const { res, ms } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assert(ms <= 58_100, `varighed ${ms}`);
+    assertEquals(b.ok, true); assertEquals(b.fejl, []);
+    assertEquals(b.rester.koe, true); assertEquals(b.rester.personoplysninger, true); assertEquals(b.rester.minimering, true);
+    assertEquals(b.slettet, 7 * 4); // grupper startet ved 0,8,…,48 s
+    ingenUkendte();
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → ingen overskridelse, afbrudt afslut er fejl", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    let gruppe = 0;
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(32) : []),
+      remove: async (k) => { const langsom = Date.now() - DAG >= 49_000; await vent(langsom ? 60_000 : 7_000, k.signal); return jsonR([]); },
+      afslut: async (k) => { if (Date.now() - DAG >= 49_000) return await hænger(k.signal); gruppe++; return jsonR(true); } }));
+    const { res, ms } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assert(ms <= 58_100, `varighed ${ms} (må ikke nå 65 s)`);
+    assertEquals(b.ok, false); assert(b.fejl.includes("koe_afslut")); assert(b.fejl.includes("storage_fejl")); assertEquals(b.rester.koe, true);
+    assertEquals(b.slettet, gruppe); // kun bekræftede
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8 s-fejl)", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ overtag: async (k) => { await vent(9_000, k.signal); return jsonR(3); },
+      udvaelg: (_k, u) => jsonR(u === 0 ? [{ kilde: "besked", kilde_id: "a" }] : []),
+      slet: async (k) => { await vent(9_000, k.signal); return jsonR(1); } }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(b.ok, true); assertEquals(b.foraeldreloese, 3); assertEquals(b.personoplysninger, 1); assertEquals(b.fejl, []);
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), afslut: (k) => hænger(k.signal) as Promise<Response> }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(b.ok, false); assertEquals(b.slettet, 0); assert(b.fejl.includes("koe_afslut"));
+    assertEquals(afslutKald().length + kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 1);
+    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 1);
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 oprydning: budgetstop midt i optælling og lige før dagstal → ingen dagstal; reel Storage-fejl skelnes", async () => {
+  // a) midt i optælling
+  let time = new FakeTime(NAT);
+  try {
+    const side = Array.from({ length: 1000 }, (_, i) => ({ name: `f${i}`, id: `i${i}` }));
+    nulstil(oprRute({ list: async (k) => { await vent(7_000, k.signal); return jsonR(side); } }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(b.ok, true); assertEquals(b.rester.optaelling, true); assertEquals(b.objekter_uden_register, null);
+    assertEquals(kaldTil((k) => rpc(k, "sb_dagstal_objekter")).length, 0);
+  } finally { time.restore(); }
+  // b) komplet optælling afsluttes efter arbejdsfristen → dagstal skrives ikke
+  time = new FakeTime(NAT);
+  try {
+    nulstil(oprRute({ minimer: async (k) => { await vent(7_900, k.signal); return jsonR(0); }, overtag: async (k) => { await vent(14_000, k.signal); return jsonR(0); },
+      udvaelg: async (k) => { await vent(7_900, k.signal); return jsonR([]); },
+      list: async (k) => { await vent(7_900, k.signal); return jsonR([{ name: "a", id: "x" }]); },
+      naeste: async (k) => { await vent(7_900, k.signal); return jsonR([]); } }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(kaldTil((k) => rpc(k, "sb_dagstal_objekter")).length, 0);
+    assertEquals(b.objekter_uden_register, null); assertEquals(b.rester.optaelling, true); assertEquals(b.ok, true);
+  } finally { time.restore(); }
+  // c) reel Storage-fejl → ok=false
+  time = new FakeTime(NAT);
+  try {
+    nulstil(oprRute({ list: () => fejlR() }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(b.ok, false); assert(b.fejl.includes("optaelling")); assertEquals(kaldTil((k) => rpc(k, "sb_dagstal_objekter")).length, 0);
+  } finally { time.restore(); }
+  // d) komplet optælling med tid tilbage → dagstal skrives
+  time = new FakeTime(NAT);
+  try {
+    nulstil(oprRute({ list: () => jsonR([{ name: "a", id: "x" }, { name: "b", id: "y" }]), register: () => jsonR([{ sti: "a" }]) }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(b.ok, true); assertEquals(b.objekter_uden_register, 1); assertEquals(JSON.parse(kaldTil((k) => rpc(k, "sb_dagstal_objekter"))[0].krop), { p_antal: 1 });
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 oprydning: dry_run er skrivefri og budgetbeskyttet", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil((k) => tabel(k, "sb_filsletninger") ? hænger(k.signal) as Promise<Response> : oprRute({})(k) ?? (tabel(k, "sb_stier") ? jsonR([]) : undefined));
+    const { res, ms } = await kørFake(hOpr, oprReq(JSON.stringify({ dry_run: true })), time);
+    const b = await res.json();
+    assertEquals(b.dry_run, true); assertEquals(b.ok, false); assert(b.fejl.includes("koe")); assert(ms <= 8_100);
+    assert(kald.every((k) => k.metode === "GET" || k.metode === "HEAD" || ["sb_version", "sb_personoplysninger_til_sletning"].some((n) => rpc(k, n))), "skrivende kald i dry_run");
+    for (const n of ["sb_overtag_foraeldreloese", "sb_koe_naeste", "sb_koe_afslut", "sb_minimer_register", "sb_dagstal_objekter"]) assertEquals(kaldTil((k) => rpc(k, n)).length, 0);
+  } finally { time.restore(); }
+});
+
+// ---------------------------------------------------------------- §3 budgethelper + SDK med mocket fetch
+Deno.test("§3 budgetFetch: ms<=0 → intet netværkskald; eksisterende abortsignal respekteres; timeout gælder body", async () => {
+  nulstil(() => jsonR({}));
+  let fejl: unknown = null;
+  try { await bud.budgetFetch(() => Date.now() - 1, 8_000)(`${MOCK}/x`); } catch (e) { fejl = e; }
+  assert(bud.erBudgetStop(fejl)); assertEquals(kald.length, 0);
+  const ac = new AbortController(); ac.abort();
+  fejl = null;
+  try { await bud.budgetFetch(() => Date.now() + 10_000, 8_000)(`${MOCK}/x`, { signal: ac.signal }); } catch (e) { fejl = e; }
+  assert(fejl); assertEquals(kald.length, 0);
+  const time = new FakeTime(DAG);
+  try {
+    nulstil((k) => new Response(new ReadableStream<Uint8Array>({ start(c) { c.enqueue(enc("{")); k.signal?.addEventListener("abort", () => c.error(k.signal!.reason)); } })));
+    const res = await bud.budgetFetch(() => Date.now() + 60_000, 8_000)(`${MOCK}/x`);
+    let færdig = false, bodyFejl: unknown = null;
+    res.text().catch((e) => { bodyFejl = e; }).finally(() => { færdig = true; });
+    await time.tickAsync(7_000); assert(!færdig, "timeout ryddet ved headers");
+    await time.tickAsync(1_100); assert(færdig && bodyFejl, "body-timeout virkede ikke");
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 laesBegraenset: overskridelse annullerer, frist annullerer, ingen delvis fil", async () => {
+  let annulleret = 0;
+  const s = () => new ReadableStream<Uint8Array>({ pull(c) { c.enqueue(new Uint8Array(10)); }, cancel() { annulleret++; } });
+  assertEquals(await bud.laesBegraenset(s(), 25, Date.now() + 1000), { ok: false, grund: "for_stor" }); assertEquals(annulleret, 1);
+  const time = new FakeTime(DAG);
+  try {
+    const p = bud.laesBegraenset(new ReadableStream<Uint8Array>({ cancel() { annulleret++; } }), 25, Date.now() + 5_000);
+    let r: unknown = null; p.then((x) => { r = x; });
+    await time.tickAsync(5_100);
+    assertEquals(r, { ok: false, grund: "frist" }); assertEquals(annulleret, 2);
+  } finally { time.restore(); }
+});
+
+Deno.test("§3 SDK 2.118.0 med mocket fetch: RPC/Storage {error} og exception, ingen skjulte genforsøg", async () => {
+  const c = createClient(MOCK, "svc-test", bud.budgetIndstillinger(() => Date.now() + 30_000, 8_000));
+  nulstil(() => jsonR({ message: "x" }, 503));
+  const r1 = await c.rpc("sb_version"); assert(r1.error); assertEquals(kald.length, 1);
+  nulstil(() => jsonR({ message: "x" }, 503));
+  const r2 = await c.from("sb_stier").select("sti"); assert(r2.error); assertEquals(kald.length, 1, "skjult GET-genforsøg");
+  nulstil(() => { throw new Error("transport"); });
+  let kastet = false;
+  try { const r3 = await c.from("sb_stier").select("sti"); kastet = !!r3.error; } catch { kastet = true; }
+  assert(kastet); assertEquals(kald.length, 1);
+  nulstil(() => fejlR());
+  const r4 = await c.storage.from("chat-attachments").remove(["a"]); assert(r4.error); assertEquals(kald.length, 1);
+  nulstil(() => { throw new Error("transport"); });
+  let k5 = false; try { const r5 = await c.storage.from("chat-attachments").remove(["a"]); k5 = !!r5.error; } catch { k5 = true; }
+  assert(k5);
+  nulstil(() => new Response(enc("abc")));
+  const r6 = await c.storage.from("chat-attachments").download("a.b.txt").asStream();
+  assert(r6.data instanceof ReadableStream); assertEquals(kald[0].sti, "/storage/v1/object/chat-attachments/a.b.txt");
+  await r6.data!.cancel();
+  nulstil(() => jsonR({ name: "a", size: 42 }));
+  assertEquals(await ft.objektStoerrelse(c, "chat-attachments", "x/a.b.png"), 42); assertEquals(kald[0].sti, "/storage/v1/object/info/chat-attachments/x/a.b.png");
+  ingenUkendte();
 });
