@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -18,6 +17,8 @@ import type { PulsenPost } from "@/hooks/usePulsen";
 import { PulsenAvatar } from "./PulsenAvatar";
 import { PULSEN_MAX_CHARS, pulsenRelativeTime, shortName, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
+import { OmtaleFelt } from "./OmtaleFelt";
+import { erOmtaleFejl, renderOmtaler, type Omtale } from "./omtaler";
 
 const TYPE_PILL: Partial<Record<PulsenPost["post_type"], { label: string; cls: string }>> = {
   praise: { label: "Ros", cls: "bg-[hsl(var(--cph-praise))] text-[hsl(var(--cph-praise-foreground))]" },
@@ -31,7 +32,7 @@ export interface PostInteractions {
   comments: FeedCommentView[];
   canInteract: boolean;
   onReact: (r: ReactionKey) => void;
-  onComment: (body: string) => Promise<unknown>;
+  onComment: (body: string, mentions: Omtale[]) => Promise<unknown>;
   onDeleteComment: (id: string) => Promise<unknown>;
 }
 
@@ -43,7 +44,7 @@ interface Props {
   imageUrl?: string | null;
   /** Reaktioner og kommentarer i både Huset og team. */
   interactions?: PostInteractions;
-  onEdit: (body: string) => Promise<unknown>;
+  onEdit: (body: string, mentions: Omtale[]) => Promise<unknown>;
   onDelete: () => void;
   onHide: (hidden: boolean) => void;
   onBestAnswer: (commentId: string | null) => void;
@@ -58,6 +59,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
   // Reserveret plads (4:3) indtil billedets egne mål kendes, så feedet ikke hopper.
   const [imgRatio, setImgRatio] = useState<string | null>(null);
   const [draft, setDraft] = useState(post.body);
+  const [draftMentions, setDraftMentions] = useState<Omtale[]>(post.mentions ?? []);
   const [zoom, setZoom] = useState(false);
   const authorName = shortName(post.author?.first_name, post.author?.last_name);
   const praisedList = post.praisedAll?.length ? post.praisedAll : post.praised ? [post.praised] : [];
@@ -83,10 +85,10 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
 
   const saveEdit = async () => {
     try {
-      await onEdit(draft);
+      await onEdit(draft, draftMentions);
       setEditing(false);
-    } catch {
-      toast.error("Ændringen blev ikke gemt");
+    } catch (e) {
+      toast.error(erOmtaleFejl(e) ? "Omtalen kunne ikke gemmes" : "Ændringen blev ikke gemt");
     }
   };
 
@@ -135,7 +137,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
                 </DropdownMenuItem>
               )}
               {isMine && !isPoll && (
-                <DropdownMenuItem onSelect={() => { setDraft(post.body); setEditing(true); }}>
+                <DropdownMenuItem onSelect={() => { setDraft(post.body); setDraftMentions(post.mentions ?? []); setEditing(true); }}>
                   <Pencil className="mr-2 h-4 w-4" aria-hidden="true" /> Redigér
                 </DropdownMenuItem>
               )}
@@ -162,7 +164,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
 
       {editing ? (
         <div className="mt-3">
-          <Textarea value={draft} maxLength={PULSEN_MAX_CHARS} onChange={(e) => setDraft(e.target.value)} className="min-h-[120px] rounded-2xl text-[17px]" aria-label="Redigér indlæg" />
+          <OmtaleFelt value={draft} mentions={draftMentions} maxLength={PULSEN_MAX_CHARS} onChange={(t, m) => { setDraft(t); setDraftMentions(m); }} rows={5} aria-label="Redigér indlæg" />
           <div className="mt-2 flex items-center justify-end gap-2">
             {showCharCounter(draft.length) && <span className="mr-auto text-[13px] tabular-nums text-muted-foreground">{draft.length}/{PULSEN_MAX_CHARS}</span>}
             <button type="button" onClick={() => setEditing(false)} className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">Annullér</button>
@@ -170,7 +172,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
           </div>
         </div>
       ) : (
-        post.body && <p className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-[1.5] text-foreground">{post.body}</p>
+        post.body && <p className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-[1.5] text-foreground">{renderOmtaler(post.body, post.mentions)}</p>
       )}
 
       {isPoll && !post.pending && <PulsenPollCard postId={post.id} />}
@@ -224,6 +226,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
   const [showAll, setShowAll] = useState(false);
   const [composing, setComposing] = useState(false);
   const [value, setValue] = useState("");
+  const [valueMentions, setValueMentions] = useState<Omtale[]>([]);
   const [saving, setSaving] = useState(false);
   // Ældste først i tråden
   const comments = [...interactions.comments].reverse();
@@ -236,11 +239,12 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
     if (!value.trim()) return;
     setSaving(true);
     try {
-      await interactions.onComment(value);
+      await interactions.onComment(value, valueMentions);
       setValue("");
+      setValueMentions([]);
       setComposing(false);
-    } catch {
-      toast.error("Kommentaren blev ikke gemt");
+    } catch (e) {
+      toast.error(erOmtaleFejl(e) ? "Omtalen kunne ikke gemmes" : "Kommentaren blev ikke gemt");
     } finally {
       setSaving(false);
     }
@@ -264,7 +268,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
       {best && (
         <div className="mt-2 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-4 py-3">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--cph-praise-foreground))]">★ Bedste svar · {best.authorName}</p>
-          <p className="mt-1 break-words text-[15px] text-foreground">{best.body}</p>
+          <p className="mt-1 break-words text-[15px] text-foreground">{renderOmtaler(best.body, best.mentions)}</p>
           {canPickBest && (
             <button type="button" onClick={() => onBestAnswer(null)} className="mt-1 min-h-[44px] text-[13px] font-semibold text-muted-foreground hover:underline">Fjern som bedste svar</button>
           )}
@@ -277,7 +281,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
             <li key={c.id} className="flex items-start gap-2">
               <div className="min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-3 py-2">
                 <p className="text-[13px] font-extrabold text-foreground">{c.authorName}</p>
-                <p className="break-words text-[15px] text-foreground">{c.body}</p>
+                <p className="break-words whitespace-pre-wrap text-[15px] text-foreground">{renderOmtaler(c.body, c.mentions)}</p>
               </div>
               {canPickBest && (
                 <button type="button" aria-label="Markér som bedste svar" onClick={() => onBestAnswer(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
@@ -300,20 +304,24 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
       )}
 
       {composing && (
-        <div className="mt-2 flex items-center gap-2">
-          <input
-            autoFocus
-            value={value}
-            maxLength={200}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); void submit(); }
-              if (e.key === "Escape") setComposing(false);
-            }}
-            placeholder={post.post_type === "question" ? "Skriv et svar …" : "Skriv en kommentar …"}
-            aria-label="Din kommentar, højst 200 tegn"
-            className="h-11 min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-4 text-[15px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+        <div className="mt-2 flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <OmtaleFelt
+              autoFocus
+              value={value}
+              mentions={valueMentions}
+              maxLength={200}
+              rows={1}
+              onChange={(t, m) => { setValue(t); setValueMentions(m); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); }
+                if (e.key === "Escape") setComposing(false);
+              }}
+              placeholder={post.post_type === "question" ? "Skriv et svar …" : "Skriv en kommentar …"}
+              aria-label="Din kommentar, højst 200 tegn"
+              className="min-h-[44px] resize-none rounded-[16px] py-2.5 text-[16px]"
+            />
+          </div>
           <button type="button" onClick={() => void submit()} disabled={saving || !value.trim()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50 active:opacity-70">Send</button>
         </div>
       )}
