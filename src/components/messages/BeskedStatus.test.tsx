@@ -126,11 +126,9 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     render(ui(afventer(1, true)));
     await waitFor(() => knap("Send alligevel"));
     const k = styret();
-    fireEvent.click(knap("Send alligevel"));
-    fireEvent.click(knap("Send alligevel"));
-    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
-    fireEvent.click(knap("Fjern fil"));
-    fireEvent.click(knap("Ret"));
+    // Referencer fastholdes før første klik (knappen viser spinner under handlingen).
+    const send = knap("Send alligevel"), traek = screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!, fjern = knap("Fjern fil"), retK = knap("Ret");
+    fireEvent.click(send); fireEvent.click(send); fireEvent.click(traek); fireEvent.click(fjern); fireEvent.click(retK);
     await flush();
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
     expect(kald("sb_afgoer")[0][1]).toMatchObject({ p_handling: "send" });
@@ -144,7 +142,8 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it("dobbeltklik på Fjern fil giver ét sb_fjern_fil", async () => {
     render(ui(afventer(1, true)));
     const k = styret();
-    fireEvent.click(knap("Fjern fil")); fireEvent.click(knap("Fjern fil"));
+    const fjern = knap("Fjern fil");
+    fireEvent.click(fjern); fireEvent.click(fjern);
     await flush();
     expect(kald("sb_fjern_fil")).toHaveLength(1);
     await act(async () => { k.svar({ data: 2, error: null }); });
@@ -160,7 +159,8 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     r.unmount();
     expect(aktiveHandlinger()).toBe(1);
     render(ui(afventer(1)));
-    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    // Ny montering ser låsen: Træk tilbage-knappen er optaget (spinner) og et klik giver intet kald.
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.className.includes("text-destructive"))!);
     await flush();
     expect(kald("sb_afgoer")).toHaveLength(1);
     await act(async () => { k.svar({ data: true, error: null }); });
