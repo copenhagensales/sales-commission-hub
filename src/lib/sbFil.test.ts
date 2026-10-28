@@ -56,7 +56,7 @@ describe("§1 – identitets-/generationsværn i udstedelse og upload (B2a-b1)",
     const { uploadTilSti } = await import("./sbFil");
     const up = vi.fn();
     vi.mocked(supabase.storage.from).mockReturnValue({ uploadToSignedUrl: up } as never);
-    await expect(uploadTilSti({ sti: "s", token: "t", conversationId: "c" }, new File(["x"], "x.png"), "image/png", { vagt: () => false, bruger: "u" })).rejects.toBeInstanceOf(SbFilFejl);
+    await expect(uploadTilSti({ sti: "s", token: "t", conversationId: "c" }, new File(["x"], "x.png"), "image/png", { vagt: () => false, bruger: "u" })).rejects.toMatchObject({ name: "SbFilFejl", kode: "foraeldet" });
     expect(up).not.toHaveBeenCalled();
   });
 

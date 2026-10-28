@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 const mutateAsync = vi.fn();
-const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false }));
+const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false, ægteFil: false }));
+const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
 const udstedUpload = vi.fn();
 const uploadTilSti = vi.fn();
@@ -36,6 +37,8 @@ vi.mock("@/integrations/supabase/client", () => {
       from: (t: string) => builder(t),
       rpc: vi.fn(async () => ({ data: "e", error: null })),
       functions: { invoke: vi.fn(async () => ({ error: null })) },
+      // c3 §7: storage ved netværksgrænsen til den rigtige sbFil.
+      storage: { from: () => ({ uploadToSignedUrl: (...a: unknown[]) => (lagerUpload.fn ? lagerUpload.fn(...a) : Promise.resolve({ error: null })) }) },
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
         getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
@@ -57,8 +60,9 @@ vi.mock("./MentionInput", async (orig) => ({
 }));
 vi.mock("@/lib/sbFil", async (orig) => ({
   ...(await orig<typeof import("@/lib/sbFil")>()),
-  udstedUpload: (...a: unknown[]) => udstedUpload(...a),
-  uploadTilSti: (...a: unknown[]) => uploadTilSti(...a),
+  // c3 §7: med ægteFil kører den rigtige sbFil (fetch/storage mockes ved grænsen).
+  udstedUpload: async (...a: Parameters<typeof import("@/lib/sbFil").udstedUpload>) => (beskeder.ægteFil ? (await orig<typeof import("@/lib/sbFil")>()).udstedUpload(...a) : udstedUpload(...a)),
+  uploadTilSti: async (...a: Parameters<typeof import("@/lib/sbFil").uploadTilSti>) => (beskeder.ægteFil ? (await orig<typeof import("@/lib/sbFil")>()).uploadTilSti(...a) : uploadTilSti(...a)),
 }));
 vi.mock("@/hooks/useChat", async (orig) => {
   const ægte = await orig<typeof import("@/hooks/useChat")>();
@@ -101,7 +105,7 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
-  beskeder.liste = []; beskeder.ægteSend = false;
+  beskeder.liste = []; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
   net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
@@ -422,16 +426,21 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
   });
 
   it("sen uploadafslutning overskriver ikke nyere tekst/svar", async () => {
+    beskeder.liste = [fremmed("svar-A", "besked A")];
     const up = kontrol<unknown>();
     udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
     uploadTilSti.mockReturnValueOnce(up.p);
     const r = await klar();
     await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
     await tick();
+    expect(uploadTilSti).toHaveBeenCalledTimes(1); // upload-trinnet er startet
     skriv("nyere tekst");
+    const boble = screen.getByText("besked A").closest(".group") as HTMLElement;
+    fireEvent.click(within(boble).getByRole("button", { name: "Svar" }));
     await act(async () => { up.res(undefined); await up.p; });
     expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("nyere tekst");
-    expect(JSON.parse(sessionStorage.getItem("sb-kladde:e:A")!)).toMatchObject({ tekst: "nyere tekst", fil: { trin: "uploadet" } });
+    expect(screen.getByText("Svarer på:").parentElement).toHaveTextContent("besked A");
+    expect(JSON.parse(sessionStorage.getItem("sb-kladde:e:A")!)).toMatchObject({ tekst: "nyere tekst", svarId: "svar-A", fil: { trin: "uploadet" } });
   });
 
   it("filbytes, token og preview-URL gemmes aldrig i sessionStorage", async () => {
@@ -444,6 +453,79 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
     expect(alt).not.toContain("HEMMELIGT-TOKEN");
     expect(alt).not.toContain("blob:");
     expect(alt).not.toContain("BYTES");
+  });
+});
+
+describe("c3 §7 – uploadnavigation gennem rigtig sbFil (fetch/storage ved grænsen)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(async () => {
+    beskeder.ægteSend = true; beskeder.ægteFil = true;
+    const { supabase } = await import("@/integrations/supabase/client");
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+  });
+  afterEach(() => { fetchSpy?.mockRestore(); });
+
+  it("A–B–A under rigtig udstedelse og upload → sti bevares, ét POST, ét upload, INSERT med stien", async () => {
+    const post = kontrol<Response>();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValueOnce(post.p);
+    const up = kontrol<{ error: unknown }>();
+    const upFn = vi.fn(() => up.p);
+    lagerUpload.fn = upFn;
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1)); // POST er startet
+    await navigér(r, "B"); await navigér(r, "A");
+    await act(async () => { post.res(new Response(JSON.stringify({ sti: "c/e/x.txt", token: "k" }), { status: 200 })); });
+    await waitFor(() => expect(upFn).toHaveBeenCalledTimes(1));
+    await navigér(r, "B"); await navigér(r, "A");
+    expect(send()).toBeDisabled();
+    await act(async () => { up.res({ error: null }); });
+    await tick();
+    expect(gemtFil()).toMatchObject({ sti: "c/e/x.txt", trin: "uploadet" });
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null }];
+    net.insert.mockReturnValueOnce({ error: null });
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    await act(async () => { fireEvent.click(send()); });
+    await tick(); await tick();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(net.insert.mock.calls[0][0]).toMatchObject({ attachment_path: "c/e/x.txt" });
+    expect(JSON.stringify(sessionStorage)).not.toContain("\"k\"");
+  });
+
+  it("faktisk logud (auth-callback) efter startet POST → intet upload, intet INSERT, ingen lagerændring", async () => {
+    const post = kontrol<Response>();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValueOnce(post.p);
+    const upFn = vi.fn(async () => ({ error: null }));
+    lagerUpload.fn = upFn;
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    const { supabase } = await import("@/integrations/supabase/client");
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_OUT", null); });
+    await act(async () => { post.res(new Response(JSON.stringify({ sti: "c/e/x.txt", token: "k" }), { status: 200 })); });
+    await tick();
+    expect(upFn).not.toHaveBeenCalled();
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("sb-kladde:e:A")).toBeNull();
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+  });
+
+  it("fjern fil under rigtig sessionsopslag → nul POST", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const sess = kontrol<unknown>();
+    vi.mocked(supabase.auth.getSession).mockReturnValueOnce(sess.p as never);
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(supabase.auth.getSession).toHaveBeenCalled()); // sessionsopslaget er startet
+    fireEvent.click(screen.getByRole("button", { name: "Fjern fil" }));
+    await act(async () => { sess.res({ data: { session: { access_token: "t", user: { id: "u" } } } }); });
+    await tick();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -518,7 +600,14 @@ describe("§5 – Ret med svarreference (B2a-b3)", () => {
   it("DraftGuard dækker gendannet svarId alene", async () => {
     sessionStorage.setItem("sb-kladde:e:A", JSON.stringify({ tekst: "", svarId: "svar-A", retId: null, fil: null }));
     await klar();
+    // Kun svaret: ingen tekst, fil eller pending poster kan gøre værnet aktivt.
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("");
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(JSON.parse(sessionStorage.getItem("sb-kladde:e:A")!)).toMatchObject({ tekst: "", fil: null });
     expect(hasUnsentDrafts()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Fjern svar" }));
+    await tick();
+    expect(hasUnsentDrafts()).toBe(false);
   });
 });
 
@@ -652,7 +741,7 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(maksPrId).toBe(1);
   });
 
-  it("manuelt genforsøg samtidig med timer: højst ét netværksforløb pr. id", async () => {
+  it("manuelt genforsøg efter udtømt serie (ingen baggrundstimer tilbage): højst ét netværksforløb pr. id", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     tilfoejAfsendelse("e", "A", afs("A1"));
     await klarFake();
@@ -660,7 +749,7 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     const foer = opslag("A1");
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
     await fremad(0);
-    await fremad(1000); // køens timer når frem, mens den manuelle afsendelse holder låsen
+    await fremad(1000); // ingen baggrundsafstemning starter, mens den manuelle afsendelse holder låsen
     expect(maksPrId).toBe(1);
     expect(opslag("A1")).toBe(foer + 1);
     await svarFor("A1", { id: "A1" });
@@ -668,7 +757,7 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(net.insert).not.toHaveBeenCalled();
   });
 
-  it("gammel afslutning efter overdragelse frigiver kun egen lås", async () => {
+  it("lås-enhed: gammel frigivelse efter overdragelse frigiver kun egen lås", async () => {
     const { tagLaas, frigivLaas } = await import("./ChatView");
     expect(tagLaas("k", "op1")).toBe(true);
     frigivLaas("k", "op1");
@@ -816,12 +905,54 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     await svarFor("A2", { id: "A2" });
   });
 
-  it("§8 A: forhåndsopslag med overtaget sti → tilbud, nul INSERT; efter tryk én udstedelse og samme id", async () => {
+  it("c3 §7: reel overdragelse med sent svar – stoppet forløb holder låsen; nyt forløb venter på timer og afslutter", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    let r = await klarFake();
+    expect(opslag("A1")).toBe(1); // det gamle forløbs netværkstrin er startet
+    stopAfstemninger("e", "A", "A1");
+    r.unmount();
+    r = await klarFake(); // nyt forløb for samme id overtager
+    expect(opslag("A1")).toBe(1); // låsen ejes stadig af det gamle kald → ingen konkurrence, timer planlagt
+    await svarFor("A1", { id: "A1" }); // sent svar fra det gamle forløb
+    expect(hentAfsendelser("e", "A").map((x) => x.id)).toEqual(["A1"]); // gammelt forløb ændrer ikke lageret
+    await fremad(1000); // det nye forløbs reelle timer
+    expect(opslag("A1")).toBe(2);
+    expect(maksPrId).toBe(1);
+    await svarFor("A1", { id: "A1" });
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(afstemningsKapacitet().aktive).toBe(0);
+    r.unmount();
+  });
+
+  it("c3 §7: manuel handling mens en reel baggrundstimer er aktiv (online-genstart) – ét kald, fuld afslutning", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { afstemningsKapacitet } = await import("./ChatView");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    for (let n = 0; n < 7; n++) { if (ventende.some((x) => x.id === "A1")) await svarFor("A1", null); await fremad(30000); }
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
+    await fremad(0);
+    await svarFor("A1", { data: null } as unknown as null); // manuelt forhåndsopslag uden række
+    await fremad(0);
+    // Uafklaret → forløbet planlagde en reel timer (1 s); online-hændelse under timeren samles.
+    window.dispatchEvent(new Event("online"));
+    await fremad(0);
+    expect(maksPrId).toBe(1);
+    for (const x of [...ventende]) await svarFor(x.id, { id: x.id });
+    await fremad(60000);
+    for (const x of [...ventende]) await svarFor(x.id, { status: "leveret", revision: 1 });
+    expect(ventende).toEqual([]);
+    expect(afstemningsKapacitet().aktive).toBe(0);
+  });
+
+  for (const status of ["slettes", "slettet"]) it(`§8 A (${status}): forhåndsopslag med overtaget sti → tilbud, nul INSERT; efter tryk én udstedelse og samme id`, async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     const fil: FilMeta = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/gammel.txt", trin: "uploadet" };
     tilfoejAfsendelse("e", "A", afs("F1", fil), new File(["x"], "x.txt", { type: "text/plain" }));
     const reg = (sti: string, status: string) => ({ data: { bucket: "chat-attachments", sti, besked_id: null, status, samtale_id: "A", ejer_employee_id: "e" }, error: null });
-    net.svar.sb_stier = [reg("c/e/gammel.txt", "slettet")];
+    net.svar.sb_stier = [reg("c/e/gammel.txt", status)];
     await klarFake();
     await svarFor("F1", null);
     expect(udstedUpload).not.toHaveBeenCalled(); // automatisk afstemning udfører aldrig genudstedelse

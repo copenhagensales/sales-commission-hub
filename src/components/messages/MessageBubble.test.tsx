@@ -40,6 +40,10 @@ beforeEach(() => {
   rydAlleKladder();
   sessionStorage.clear();
   editMutate.mockReset();
+  // c3 §7: fast udgangspunkt uafhængigt af rækkefølge: mocket hook, aktiv auth-bruger "u" via rigtig callback.
+  aegte.brug = false;
+  registrerKladdeOprydning();
+  (vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void)("SIGNED_IN", { user: { id: "u" } });
 });
 
 describe("§7 – gemt redigeringskladde gendannes ved asynkron identitet", () => {
