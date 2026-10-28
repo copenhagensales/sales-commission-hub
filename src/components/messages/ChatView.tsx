@@ -21,7 +21,7 @@ import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, erForaeldetOpe
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
   fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, harLagringsFejl, abonnerAfsendelser,
-  sessionsGeneration, fastholdEjer, ejerGyldig, nytOperationsId, type OperationsEjer, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
+  sessionsGeneration, fastholdEjer, annullerOperation, ejerGyldig, nytOperationsId, type OperationsEjer, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
   erAktuelKladdeUpload, fjernKladdeFil, saetKladdeFilPost, filErSendeklar, type Afsendelse, type FilMeta,
 } from "@/lib/sbKladder";
 
