@@ -241,3 +241,20 @@ describe("§1 – sessionsskift i ChatView (B2a-b1)", () => {
     expect(hentAfsendelser("e", "A")).toEqual([]);
   });
 });
+
+describe("§2 – stop ved binding til andet id (B2a-b2)", () => {
+  it("stop vises som ikke sendt med fast tekst; ingen genudstedelse ved Prøv igen", async () => {
+    mutateAsync.mockRejectedValue(new SendFejl("stop", IKKE_REGISTRERET_TEKST, false));
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockResolvedValueOnce(undefined);
+    const r = await klar();
+    const input = r.container.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    await act(async () => { fireEvent.click(send()); });
+    expect(await screen.findByText(IKKE_REGISTRERET_TEKST)).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    expect(udstedUpload).toHaveBeenCalledTimes(1);
+    expect(hentAfsendelser("e", "A")[0]).toMatchObject({ tilstand: "afvist" });
+  });
+});

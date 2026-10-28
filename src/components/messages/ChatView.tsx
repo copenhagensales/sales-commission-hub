@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useSyncExternalStore, useCallback } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -209,7 +209,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
           opdaterAfsendelse(emp, conv, id, { tilstand: "gemt_vaek", tekst: "", fil: null, svarId: null, fejl: null }, gen);
         } else if (e.art === "genudsted") {
           opdaterAfsendelse(emp, conv, id, { tilstand: afsendelsesFil(emp, conv, id) ? "genudsted" : "vaelg_fil", fejl: null }, gen);
-        } else if (e.art === "server") {
+        } else if (e.art === "server" || e.art === "stop") {
+          // stop: filstien er bundet til et andet id – ingen succes, intet INSERT, ingen genudstedelse.
           opdaterAfsendelse(emp, conv, id, { tilstand: "afvist", fejl: e.message }, gen);
         } else if (e.indsat || a.tidligereUkendt) {
           opdaterAfsendelse(emp, conv, id, { tilstand: "afstemmer", tidligereUkendt: true, fejl: null }, gen);
@@ -248,6 +249,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
       if (r === "fundet") {
         fjernAfsendelse(emp, conv, id, gen);
         void queryClient.invalidateQueries({ queryKey: ["chat-messages", conv] });
+        return;
+      }
+      if (r === "stop") {
+        opdaterAfsendelse(emp, conv, id, { tilstand: "afvist", fejl: IKKE_REGISTRERET_TEKST }, gen);
         return;
       }
       if (r === "gemt_vaek") {

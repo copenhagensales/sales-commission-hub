@@ -42,7 +42,9 @@ import {
 
 const v = { id: "11111111-1111-1111-1111-111111111111", conversationId: "c", content: "hej" };
 const vf = { ...v, attachmentPath: "c/e/x.png", attachmentType: "image/png", attachmentName: "x.png" };
-const egen = (besked_id: string | null, status = "bundet") => ({ data: { besked_id, status, samtale_id: "c", ejer_employee_id: "e" }, error: null });
+// Antagelse (ikke SQL-bevis): sb_stier-rækken som 24d-vaern.sql v4 beskriver den, set gennem eksisterende RLS.
+const række = (o: Record<string, unknown> = {}) => ({ data: { bucket: "chat-attachments", sti: "c/e/x.png", besked_id: null, status: "uploadet", samtale_id: "c", ejer_employee_id: "e", ...o }, error: null });
+const egen = (besked_id: string | null, status = "bundet") => række({ besked_id, status });
 const msg = (data: unknown, error: unknown = null) => ({ data, error });
 const fejl = (p: Promise<unknown>) => p.then(() => null, (x) => x as SendFejl);
 
@@ -185,16 +187,17 @@ describe("T10 – genudstedelse kun ved dokumenteret ubundet overtaget sti (§10
     expect((await fejl(sendBesked(vf, "e")))?.art).toBe("genudsted");
   });
 
-  it("bundet til andet id → ingen genudstedelse (ordret afvisning)", async () => {
-    svar.chat_messages = [msg(null), msg(null)];
-    svar.sb_stier = [egen("andet", "bundet"), egen("andet", "bundet")];
-    insert.mockResolvedValueOnce({ error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } });
-    expect((await fejl(sendBesked(vf, "e")))?.art).toBe("server");
+  it("bundet til andet id → stop før INSERT (ingen succes, INSERT eller genudstedelse)", async () => {
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [egen("andet", "bundet")];
+    const e = await fejl(sendBesked(vf, "e"));
+    expect(e?.art).toBe("stop");
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("fremmed ejer/samtale tæller som ukendt register", async () => {
     svar.chat_messages = [msg(null), msg(null)];
-    svar.sb_stier = [egen(null), { data: { besked_id: null, status: "slettes", samtale_id: "anden", ejer_employee_id: "e" }, error: null }];
+    svar.sb_stier = [egen(null), række({ status: "slettes", samtale_id: "anden" })];
     insert.mockResolvedValueOnce({ error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } });
     expect((await fejl(sendBesked(vf, "e")))?.art).toBe("ukendt");
   });
@@ -308,5 +311,142 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     ins.res({ error: null });
     await p;
     expect(inv).not.toHaveBeenCalled();
+  });
+});
+
+describe("§2/§8 – registerafstemning og genudstedelse gennem rigtig useSendMessage (B2a-b2)", () => {
+  // Rigtige send-/afstemningsfunktioner; kun supabase-klienten er mocket. Én stabil QueryClient, mutations.retry=1.
+  const opsaet = () => {
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+    const { result } = renderHook(() => useSendMessage(), { wrapper });
+    return (x: Parameters<typeof result.current.mutateAsync>[0]) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c") }));
+  };
+  const vu = { ...vf, replyToId: "svar-1", tidligereUkendt: true };
+  const P = (message: string) => ({ error: { code: "P0001", message } });
+
+  it("registerfejl efter fejlfrit tomt beskedopslag → uafklaret, intet INSERT", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [msg(null, { message: "rls" })];
+    const e = await send(vu);
+    expect(e?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("RLS-usynlig tekstbesked efter tidligere ukendt forsøg → uafklaret (ingen Ret)", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null), msg(null)];
+    insert.mockResolvedValueOnce({ error: { code: "23505", message: "duplicate" } });
+    expect((await send({ ...v, tidligereUkendt: true }))?.art).toBe("ukendt");
+    svar.chat_messages = [msg(null), msg(null)];
+    insert.mockResolvedValueOnce(P("Beskeden indeholder et CPR-nummer"));
+    expect((await send({ ...v, tidligereUkendt: true }))?.art).toBe("ukendt");
+  });
+
+  it("tilladt brugertryk: fejlfri opslag + egen ubundet uploadet sti → samme id/tekst/svar/sti; tidligereUkendt bevares", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [række()];
+    insert.mockResolvedValueOnce({ error: null });
+    const input = { ...vu };
+    expect(await send(input)).toBeNull();
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.calls[0][0]).toMatchObject({ id: v.id, content: "hej", reply_to_id: "svar-1", attachment_path: "c/e/x.png" });
+    expect(input.tidligereUkendt).toBe(true);
+  });
+
+  it("manglende eller minimeret registerrække → uafklaret, intet INSERT", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null), msg(null)];
+    svar.sb_stier = [msg(null), msg({ besked_id: null })];
+    expect((await send(vu))?.art).toBe("ukendt");
+    expect((await send(vu))?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("forkert ejer eller samtale → uafklaret, intet INSERT", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null), msg(null)];
+    svar.sb_stier = [række({ ejer_employee_id: "anden" }), række({ samtale_id: "anden" })];
+    expect((await send(vf))?.art).toBe("ukendt");
+    expect((await send(vf))?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("ukendt/inkonsistent status (fx udstedt) → uafklaret, intet INSERT", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [række({ status: "udstedt" })];
+    expect((await send(vf))?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("binding til samme id → bevist tidligere gemning (gemt_vaek), intet INSERT", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [række({ besked_id: v.id, status: "bundet" })];
+    expect((await send(vu))?.art).toBe("gemt_vaek");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("binding til andet id → stop: hverken succes, INSERT eller genudstedelse (også efter INSERT)", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [række({ besked_id: "andet", status: "bundet" })];
+    expect((await send(vu))?.art).toBe("stop");
+    expect(insert).not.toHaveBeenCalled();
+    svar.chat_messages = [msg(null), msg(null)];
+    svar.sb_stier = [række(), række({ besked_id: "andet", status: "bundet" })];
+    insert.mockResolvedValueOnce(P(IKKE_REGISTRERET_TEKST));
+    expect((await send(vf))?.art).toBe("stop");
+  });
+
+  it("§8: begge overtagelsesstatusser (slettes/slettet) + præcis filbindings-P0001 efter tidligere ukendt → genudsted", async () => {
+    const send = opsaet();
+    for (const status of ["slettes", "slettet"]) {
+      svar.chat_messages = [msg(null), msg(null)];
+      svar.sb_stier = [række(), række({ status })];
+      insert.mockResolvedValueOnce(P(IKKE_REGISTRERET_TEKST));
+      expect((await send(vu))?.art).toBe("genudsted");
+    }
+  });
+
+  it("§8: CPR- eller generel P0001 med overtaget sti åbner ikke genudstedelse", async () => {
+    const send = opsaet();
+    for (const tekst of ["Filen indeholder et CPR-nummer", "Beskeden blev afvist"]) {
+      for (const tu of [false, true]) {
+        svar.chat_messages = [msg(null), msg(null)];
+        svar.sb_stier = [række(), række({ status: "slettet" })];
+        insert.mockResolvedValueOnce(P(tekst));
+        expect((await send({ ...vf, tidligereUkendt: tu }))?.art).toBe(tu ? "ukendt" : "server");
+      }
+    }
+  });
+
+  it("§8: registerfejl efter præcis filbindings-P0001 → uafklaret", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null), msg(null)];
+    svar.sb_stier = [række(), msg(null, { message: "net" })];
+    insert.mockResolvedValueOnce(P(IKKE_REGISTRERET_TEKST));
+    expect((await send(vu))?.art).toBe("ukendt");
+  });
+
+  it("bevis fra en anden sti frigiver ikke forsøget", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null), msg(null), msg(null)];
+    svar.sb_stier = [række({ sti: "c/e/andet.png", besked_id: v.id, status: "bundet" }), række({ sti: "c/e/andet.png" }), række({ bucket: "andet" })];
+    expect((await send(vu))?.art).toBe("ukendt");
+    expect((await send(vu))?.art).toBe("ukendt");
+    expect((await send(vu))?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("overtaget sti i forhåndsopslaget → intet INSERT (uafklaret)", async () => {
+    const send = opsaet();
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [række({ status: "slettet" })];
+    expect((await send(vu))?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
   });
 });
