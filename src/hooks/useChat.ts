@@ -341,7 +341,7 @@ export function useMarkMessageAsRead() {
  */
 export class SendFejl extends Error {
   /** `indsat=false`: intet INSERT blev forsøgt i dette forsøg (fx fejlet forhåndsopslag). */
-  constructor(public art: "server" | "ukendt" | "gemt_vaek" | "genudsted", tekst: string, public indsat = true) { super(tekst); this.name = "SendFejl"; }
+  constructor(public art: "server" | "ukendt" | "gemt_vaek" | "genudsted" | "stop", tekst: string, public indsat = true) { super(tekst); this.name = "SendFejl"; }
 }
 
 export const GEMT_VAEK_TEKST = "Beskeden blev gemt, men er ikke længere tilgængelig";
@@ -364,23 +364,31 @@ export type RegisterUdfald =
   | { art: "bundet_her" }                // binding til netop dette besked-id (beviser gemning)
   | { art: "bundet_andet" }              // binding til et andet id – aldrig denne afsendelses succes
   | { art: "ubundet_overtaget" }         // besked_id=null og status slettes/slettet
-  | { art: "ubundet" }                   // besked_id=null, endnu ikke overtaget
-  | { art: "ukendt" };                   // manglende række, fejl, fremmed ejer/samtale
+  | { art: "ubundet" }                   // besked_id=null og status uploadet (gyldig egen sti)
+  | { art: "ukendt" };                   // manglende/minimeret række, fejl, fremmed ejer/samtale/sti, ukendt status
 export async function laesRegister(sti: string, beskedId: string, conversationId: string, employeeId: string): Promise<RegisterUdfald> {
   try {
-    const { data, error } = await supabase.from("sb_stier").select("besked_id, status, samtale_id, ejer_employee_id")
+    const { data, error } = await supabase.from("sb_stier").select("bucket, sti, besked_id, status, samtale_id, ejer_employee_id")
       .eq("bucket", CHAT_BUCKET).eq("sti", sti).maybeSingle();
     if (error || !data) return { art: "ukendt" };
+    // §2/§8: beviset skal vedrøre præcis denne sti i chat-bucket med egen ejer og samtale.
+    if (data.bucket !== CHAT_BUCKET || data.sti !== sti) return { art: "ukendt" };
     if (data.ejer_employee_id !== employeeId || data.samtale_id !== conversationId) return { art: "ukendt" };
-    if (data.besked_id === beskedId) return { art: "bundet_her" };
-    if (data.besked_id) return { art: "bundet_andet" };
+    if (typeof data.besked_id === "string" && data.besked_id) return data.besked_id === beskedId ? { art: "bundet_her" } : { art: "bundet_andet" };
+    if (data.besked_id !== null) return { art: "ukendt" }; // ubundet betyder udtrykkeligt besked_id=null
     if (data.status === "slettes" || data.status === "slettet") return { art: "ubundet_overtaget" };
-    return { art: "ubundet" };
+    if (data.status === "uploadet") return { art: "ubundet" };
+    return { art: "ukendt" }; // ukendt/inkonsistent status
   } catch { return { art: "ukendt" }; }
 }
 
-export type Afstemning = "fundet" | "gemt_vaek" | "ikke_fundet" | "ukendt";
-/** Afstemmer et afsendelses-id. Et tomt SELECT er ikke bevis for, at beskeden aldrig blev gemt. */
+/**
+ * fundet = synlig egen besked; gemt_vaek = bevist tidligere gemning uden synlig besked;
+ * ikke_fundet = fejlfrit tomt opslag (og for fil: gyldig egen ubundet sti med status uploadet) – ALDRIG bevis for »ikke gemt«;
+ * stop = filstien er bundet til et andet id (ingen succes, INSERT eller genudstedelse); ukendt = uafklaret.
+ */
+export type Afstemning = "fundet" | "gemt_vaek" | "ikke_fundet" | "stop" | "ukendt";
+/** Afstemmer et afsendelses-id (kun læsning). Et tomt SELECT er ikke bevis for, at beskeden aldrig blev gemt. */
 export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath">, employeeId: string, vagt: () => boolean = () => true): Promise<Afstemning> {
   const r = await afstemBesked(v.id, v.conversationId);
   if (r === true) return "fundet";
@@ -388,6 +396,9 @@ export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId
   if (v.attachmentPath) {
     const reg = await laesRegister(v.attachmentPath, v.id, v.conversationId, employeeId);
     if (reg.art === "bundet_her") return "gemt_vaek";
+    if (reg.art === "bundet_andet") return "stop";
+    if (r === null || reg.art !== "ubundet") return "ukendt"; // registerfejl/overtaget/ukendt → intet INSERT
+    return "ikke_fundet";
   }
   return r === null ? "ukendt" : "ikke_fundet";
 }
@@ -422,6 +433,7 @@ export async function sendBesked(v: SendInput, employeeId: string, vagt: () => b
   if (!vagt()) throw foraeldet();
   if (foer === "fundet") return;
   if (foer === "gemt_vaek") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
+  if (foer === "stop") throw new SendFejl("stop", IKKE_REGISTRERET_TEKST, false);
   if (foer === "ukendt") throw new SendFejl("ukendt", "Ikke sendt – prøv igen", false);
   let error: { code?: string; message?: string } | null = null;
   try {
@@ -447,14 +459,17 @@ export async function sendBesked(v: SendInput, employeeId: string, vagt: () => b
   if (!vagt()) throw ukendt();
   const reg = v.attachmentPath ? await laesRegister(v.attachmentPath, v.id, v.conversationId, employeeId) : null;
   if (reg?.art === "bundet_her") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
+  if (reg?.art === "bundet_andet") throw new SendFejl("stop", IKKE_REGISTRERET_TEKST);
   if (efter === null) throw ukendt();
 
   if (error.code === "P0001") {
-    if (v.tidligereUkendt) throw ukendt();
-    if (v.attachmentPath) {
-      if (reg?.art === "ubundet_overtaget" && error.message === IKKE_REGISTRERET_TEKST) throw new SendFejl("genudsted", IKKE_REGISTRERET_TEKST);
-      if (reg?.art === "ukendt" && error.message === IKKE_REGISTRERET_TEKST) throw ukendt();
+    if (v.attachmentPath && error.message === IKKE_REGISTRERET_TEKST) {
+      // §8: præcis filbindingsfejl + dokumenteret ubundet, overtaget egen sti → genudstedelse, også efter tidligere ukendt forsøg.
+      if (reg?.art === "ubundet_overtaget") throw new SendFejl("genudsted", IKKE_REGISTRERET_TEKST);
+      if (reg?.art !== "ubundet" || v.tidligereUkendt) throw ukendt();
     }
+    // Generel P0001/CPR efter tidligere ukendt udfald er ikke bevis for afvisning → uafklaret.
+    if (v.tidligereUkendt) throw ukendt();
     throw new SendFejl("server", error.message || "Beskeden blev afvist");
   }
   // 23505 uden synlig række eller transportfejl: uafklaret.
