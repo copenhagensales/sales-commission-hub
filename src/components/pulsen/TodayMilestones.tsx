@@ -19,6 +19,22 @@ const UNIT: Record<PulsenMilestoneType, string> = {
   first_sale: "salg", record_day: "kr", record_week: "kr", record_pay_period: "kr",
   club: "kr", team_day_sales: "salg", team_record: "salg", streak: "dage", house_record: "salg",
 };
+const RECORD_TYPES = new Set<string>(["record_day", "team_record", "house_record"]);
+/** Placering i top 5 fra payload.tier; null/0 (gammel SQL-kontrakt) = bedst nogensinde. */
+export const milestonePlacering = (m: Pick<PulsenMilestone, "payload">) => {
+  const t = m.payload?.tier;
+  return t == null || t === 0 ? 1 : t;
+};
+export const isTop5Placering = (m: Pick<PulsenMilestone, "milestone_type" | "payload">) => {
+  const p = milestonePlacering(m);
+  return RECORD_TYPES.has(m.milestone_type) && p >= 2 && p <= 5;
+};
+/** Dagens højdepunkt: kun hus-/teamrekord som bedste dag nogensinde. */
+export const isHeroMilestone = (m: Pick<PulsenMilestone, "milestone_type" | "payload">) =>
+  (m.milestone_type === "house_record" || m.milestone_type === "team_record") && milestonePlacering(m) === 1;
+export const milestoneIcon = (m: Pick<PulsenMilestone, "milestone_type">): LucideIcon => ICON[m.milestone_type] ?? Users;
+export const milestoneTypeLabel = (m: Pick<PulsenMilestone, "milestone_type" | "payload">) =>
+  isTop5Placering(m) ? "top 5-dag" : TYPE[m.milestone_type] ?? "milepæl";
 const EMERALD = new Set<PulsenMilestoneType>(["streak", "first_sale"]);
 
 /** Navnet er første fed del af jobbets tekst ("**Aslak L.** …"). */
@@ -29,7 +45,7 @@ export function milestoneName(m: PulsenMilestone): string {
 }
 /** Husrekord level 1 måles i provision (kr); level 0 er historiske salgsrekorder. */
 export const milestoneUnit = (m: PulsenMilestone) =>
-  (m.milestone_type === "house_record" || m.milestone_type === "team_record") && m.level === 1 ? "kr" : UNIT[m.milestone_type];
+  (m.milestone_type === "house_record" || m.milestone_type === "team_record") && m.level === 1 ? "kr" : UNIT[m.milestone_type] ?? "";
 export const milestoneNumber = (m: PulsenMilestone) => Math.round(Number(m.value ?? 0)).toLocaleString("da-DK");
 export const milestoneValue = (m: PulsenMilestone) => `${milestoneNumber(m)} ${milestoneUnit(m)}`;
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" });
@@ -64,7 +80,7 @@ export function HighFiveButton({ m, fr, dark = false }: { m: PulsenMilestone; fr
 export function MilestoneRow({ m, fr, interactive, isNew, compact = false, dark = false }: {
   m: PulsenMilestone; fr: Reactions; interactive: boolean; isNew?: boolean; compact?: boolean; dark?: boolean;
 }) {
-  const Icon = ICON[m.milestone_type];
+  const Icon = milestoneIcon(m);
   return (
     <div className={cn("flex items-center gap-3 py-2.5", isNew && "animate-pulsen-in")}>
       <span className={cn(
@@ -72,11 +88,11 @@ export function MilestoneRow({ m, fr, interactive, isNew, compact = false, dark 
         EMERALD.has(m.milestone_type) ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]"
           : dark ? "bg-[hsl(var(--cph-light-blue)/0.12)] text-[hsl(var(--cph-emerald))]" : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))]",
       )}>
-        <Icon className="h-4 w-4" aria-label={TYPE[m.milestone_type]} />
+        <Icon className="h-4 w-4" aria-label={milestoneTypeLabel(m)} />
       </span>
       <div className="min-w-0 flex-1">
         <p className={cn("text-[14px] leading-tight", compact ? "truncate" : "line-clamp-2")}>
-          <b className="font-extrabold">{milestoneName(m)}</b> · {TYPE[m.milestone_type]}
+          <b className="font-extrabold">{milestoneName(m)}</b> · {milestoneTypeLabel(m)}
           {compact && <span className="opacity-70"> · {milestoneValue(m)}</span>}
         </p>
         {!compact && (

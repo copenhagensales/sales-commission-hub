@@ -99,7 +99,7 @@ function PulsenFeed() {
 
   // Dagens højdepunkt: kun husrekord/teamrekord, højst ét (samme hook som højrekolonnen).
   const today = usePulsenMilestonesToday(scope, !!me.employeeId);
-  const highlight = (today.data?.items ?? []).find((m) => m.milestone_type === "house_record" || m.milestone_type === "team_record") ?? null;
+  const highlight = (today.data?.items ?? []).find(isHeroMilestone) ?? null;
   // Indlæg har reaktioner i både Huset og team; milepæle kun i Huset.
   const reactionKeys = [
     ...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)),

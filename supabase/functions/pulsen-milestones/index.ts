@@ -8,7 +8,7 @@ import { authUsersForEmployees, sendPush } from "../_shared/push.ts";
 
 type Cand = {
   milestone_type: string; employee_id: string | null; team_id: string | null; period_key: string;
-  level: number; value: number | null; previous: number | null; occurred_on: string; occurred_at: string | null; tier: number;
+  level: number; value: number | null; previous: number | null; occurred_on: string; occurred_at: string | null; tier: number | null;
 };
 type Out = Cand & { shown_in_house: boolean; rarity: number; text: string };
 
