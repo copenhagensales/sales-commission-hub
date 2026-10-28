@@ -1078,12 +1078,19 @@ export function registrerAfsendelsesKoordinering(fn: AfsKoordinering): void { af
  */
 export function tagHandling(ejer: OperationsEjer | null, id: string, art: HandlingsArt): boolean {
   if (!ejer || !ejerGyldig(ejer)) return false;
+  rydGamleGenerationer();
   const k = hNoegle(ejer.gen, ejer.emp, ejer.conv, id);
   if (handlinger.has(k) || afsKoordinering(ejer.gen, ejer.emp, ejer.conv, id)) return false;
   handlinger.set(k, { ejer, art });
   ukendte.delete(k);
   hMeld();
   return true;
+}
+/** Låse og ukendt-markeringer fra en tidligere sessionsgeneration kan aldrig matche igen (nøglen indeholder generationen). */
+function rydGamleGenerationer(): void {
+  const pre = `${sessionsGeneration()}:`;
+  for (const k of [...handlinger.keys()]) if (!k.startsWith(pre)) handlinger.delete(k);
+  for (const k of [...ukendte.keys()]) if (!k.startsWith(pre)) ukendte.delete(k);
 }
 /** Atomisk overgang editor → Gem: kun hvis låsen er editorens (art 'ret') eller fri. */
 export function overtagTilGem(ejer: OperationsEjer | null, id: string): boolean {
@@ -1124,7 +1131,7 @@ export function useHandling(emp: string | undefined, conv: string, id: string) {
   return handlingFor(emp, conv, id);
 }
 /** Til prøver: antal holdte låse (kun tal). */
-export const aktiveHandlinger = () => handlinger.size;
+export const aktiveHandlinger = () => { const pre = `${sessionsGeneration()}:`; return [...handlinger.keys()].filter((k) => k.startsWith(pre)).length; };
 
 /** Klassificeret udfald af en serverhandling efter resultatafstemning. */
 export class HandlingsFejl extends Error {

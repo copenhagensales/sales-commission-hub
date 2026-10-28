@@ -45,6 +45,7 @@ beforeEach(() => {
   vi.mocked(toast.error).mockReset();
   registrerKladdeOprydning();
   auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+  auth("SIGNED_OUT", null); // ny generation pr. prøve: ingen låse fra tidligere prøver
   auth("SIGNED_IN", { user: { id: "u" } });
 });
 
