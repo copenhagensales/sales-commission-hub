@@ -340,6 +340,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     raekke = { data: null, error: null };
     vi.mocked(supabase.rpc).mockReset();
     vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
+    vi.mocked(supabase.functions.invoke).mockResolvedValue({ data: null, error: null } as never);
     vi.mocked(toast.error).mockReset();
     const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } });

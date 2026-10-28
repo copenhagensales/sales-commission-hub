@@ -1209,7 +1209,9 @@ export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => bo
   try {
     for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
       if (!vagt()) return;
-      const { error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } });
+      let error: unknown = null;
+      try { ({ error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } })); }
+      catch { return; } // uventet kast: intet genforsøg; klienten læser altid faktisk DB-status
       if (!error || !erTransport(error) || forsoeg === 1) return;
       await vent(2000);
       if (!vagt()) return;
