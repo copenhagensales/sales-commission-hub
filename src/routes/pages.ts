@@ -139,6 +139,7 @@ export const ReportsAdmin = lazyPage(() => import("@/pages/reports/ReportsAdmin"
 export const ReportsManagement = lazyPage(() => import("@/pages/reports/ReportsManagement"));
 export const DailyReports = lazyPage(() => import("@/pages/reports/DailyReports"));
 export const RevenueByClient = lazyPage(() => import("@/pages/reports/RevenueByClient"));
+export const Opstartshold = lazyPage(() => import("@/pages/reports/Opstartshold"));
 export const WeeklyLeadClosureReport = lazyPage(() => import("@/pages/reports/WeeklyLeadClosureReport"));
 export const TdcErhvervEditSales = lazyPage(() => import("@/pages/reports/TdcErhvervEditSales"));
 export const TrygEditSales = lazyPage(() => import("@/pages/reports/TrygEditSales"));

@@ -20503,6 +20503,25 @@ export type Database = {
           subscription: string
         }[]
       }
+      opstartshold_dage: {
+        Args: {
+          p_ad_hoc_datoer: string[]
+          p_cohort_ids: string[]
+          p_dage?: number
+        }
+        Returns: {
+          dag: number
+          dato: string
+          employee_id: string
+          hiper: number
+          hold_navn: string
+          hold_noegle: string
+          linjer: number
+          navn: string
+          slut_dato: string
+          start_dato: string
+        }[]
+      }
       pay_period_start: { Args: { ts: string }; Returns: string }
       pulsen_can_moderate: {
         Args: { _audience: string; _team_id: string }
