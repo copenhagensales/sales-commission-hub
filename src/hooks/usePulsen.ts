@@ -611,26 +611,37 @@ export interface NewPulsenPoll {
   mentions?: Omtale[];
 }
 
+/** Afstemningen er oprettet, men omtalerne blev ikke gemt; genforsøg skal kun gentage UPDATE på `postId`. */
+export class AfstemningOmtaleFejl extends Error {
+  constructor(public postId: string, public cause: unknown) {
+    super("Omtalerne kunne ikke gemmes");
+  }
+}
+
 /** Opretter en afstemning via RPC; feedet hentes igen bagefter (ingen optimistisk række). */
 export function useOpretAfstemning() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (p: NewPulsenPoll) => {
-      const { data, error } = await supabase.rpc("pulsen_opret_afstemning", {
-        p_audience: p.audience,
-        // null for Huset; typerne kender ikke nullable parametre
-        p_team_id: (p.audience === "team" ? p.teamId : null) as string,
-        p_body: p.body.trim(),
-        p_options: p.options,
-        p_anonymous: p.anonymous,
-        p_dage: p.dage,
-      });
-      if (error) throw error;
+    mutationFn: async (p: NewPulsenPoll & { eksisterendeId?: string }) => {
+      let data: string | null = p.eksisterendeId ?? null;
+      if (!data) {
+        const res = await supabase.rpc("pulsen_opret_afstemning", {
+          p_audience: p.audience,
+          // null for Huset; typerne kender ikke nullable parametre
+          p_team_id: (p.audience === "team" ? p.teamId : null) as string,
+          p_body: p.body.trim(),
+          p_options: p.options,
+          p_anonymous: p.anonymous,
+          p_dage: p.dage,
+        });
+        if (res.error) throw res.error;
+        data = res.data;
+      }
       // RPC'en kender ikke omtaler; forfatteren sætter dem på det oprettede opslag bagefter.
       const omtaler = rensOmtaler(p.body.trim(), p.mentions ?? []);
       if (omtaler.length && data) {
         const { error: mErr } = await supabase.from("pulsen_posts").update({ mentions: omtaler }).eq("id", data);
-        if (mErr) throw mErr;
+        if (mErr) throw new AfstemningOmtaleFejl(data, mErr);
       }
       return data;
     },

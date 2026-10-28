@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Én omtale i Storkbook (samme form som CHECK pulsen_omtaler_gyldige): e = medarbejder, t = team. */
+/** Én omtale i Storkbook (samme form som CHECK *_mentions_gyldige): e = medarbejder, t = team. */
 export type Omtale = { t: "e" | "t"; id: string; navn: string };
 
 export const OMTALER_MAX = 10;
@@ -25,8 +25,11 @@ export function rensOmtaler(tekst: string, mentions: Omtale[]): Omtale[] {
 /** Fejl fra databasens CHECK på omtaler. */
 export function erOmtaleFejl(e: unknown): boolean {
   if (!e || typeof e !== "object") return false;
-  const o = e as { code?: unknown; message?: unknown };
-  return o.code === "23514" && typeof o.message === "string" && o.message.includes("pulsen_omtaler_gyldige");
+  const o = e as { code?: unknown; message?: unknown; details?: unknown };
+  if (o.code !== "23514") return false;
+  // Constraints: pulsen_posts_mentions_gyldige, feed_comments_mentions_gyldige.
+  const tekst = `${typeof o.message === "string" ? o.message : ""} ${typeof o.details === "string" ? o.details : ""}`;
+  return /\w+_mentions_gyldige\b/.test(tekst);
 }
 
 /** Fremhæver hvert »@navn« fra mentions. Uden omtaler returneres teksten uændret. */
