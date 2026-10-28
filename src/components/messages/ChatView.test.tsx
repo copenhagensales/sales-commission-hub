@@ -1245,8 +1245,11 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
     const { supabase } = await import("@/integrations/supabase/client");
     beskeder.liste = [fremmed("svar-A", "besked A"), fremmed("m1", "original", { sender_id: "e", revision: 3 })];
     gemRetKladde("e", "A", { beskedId: "m1", tekst: "min rettelse", revision: 3 });
-    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
-    uploadTilSti.mockResolvedValueOnce(undefined);
+    // B2b-2: udstedelse og upload gennem den rigtige sbFil (fetch/storage ved netværksgrænsen).
+    beskeder.ægteFil = true;
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ sti: "c/e/x.txt", token: "k" }), { status: 200 }));
+    const upFn = vi.fn(async () => ({ error: null }));
+    lagerUpload.fn = upFn;
     const r = await klar();
     const editor = () => screen.getAllByRole("textbox").find((x) => x.getAttribute("aria-label") !== "besked") as HTMLTextAreaElement;
     await waitFor(() => expect(editor().value).toBe("min rettelse"));
@@ -1256,6 +1259,8 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
       skriv("kladdetekst");
       await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
       await waitFor(() => expect(send()).not.toBeDisabled());
+      expect(fetchSpy).toHaveBeenCalledTimes(1); expect(upFn).toHaveBeenCalledTimes(1);
+      expect(udstedUpload).not.toHaveBeenCalled(); // ingen mocket udstedelse
       fireEvent.change(editor(), { target: { value: "min rettelse 2" } });
       await tick();
       expect(set).toHaveBeenCalled(); // lagringen fejlede faktisk
