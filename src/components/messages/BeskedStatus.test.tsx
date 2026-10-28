@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -11,6 +11,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }))
 vi.mock("./FilVedhaeftning", () => ({ FilVedhaeftning: () => null }));
 
 import { MessageBubble } from "./MessageBubble";
+import { aktiveHandlinger } from "@/hooks/useChat";
 import { rydAlleKladder, registrerKladdeOprydning, laesRetKladde } from "@/lib/sbKladder";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,7 +29,10 @@ const ui = (m: Message, bruger: string | null = "u") => (
   <QueryClientProvider client={qc}>
     <MessageBubble message={m} isOwn currentEmployeeId="e" authBrugerId={bruger} conversationId="c" onReply={() => undefined} />
   </QueryClientProvider>) as ReactNode;
-const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
+// Rækkeopslag (antagelse om SQL-adfærd): chat_messages giver `raekke`, begrundelse giver `haard_tone`.
+let raekke: { data: unknown; error: unknown } = { data: null, error: null };
+const chain = (tabel: string) => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b;
+  b.maybeSingle = async () => (tabel === "sb_tjek_begrundelser" ? { data: { aarsag_kode: "haard_tone" }, error: null } : tabel === "chat_messages" ? raekke : { data: null, error: null }); return b; };
 const kald = (navn: string) => vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === navn);
 
 beforeEach(() => {
@@ -36,7 +40,8 @@ beforeEach(() => {
   rydAlleKladder();
   sessionStorage.clear();
   vi.mocked(supabase.rpc).mockReset();
-  vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
+  vi.mocked(supabase.from).mockImplementation(((t: string) => chain(t)) as never);
+  raekke = { data: null, error: null };
   vi.mocked(toast.error).mockReset();
   registrerKladdeOprydning();
   auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
@@ -106,5 +111,131 @@ describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatori
     await act(async () => { afvis({ code: "P0001", message: "afvist" }); await new Promise((x) => setTimeout(x, 10)); });
     expect(toast.error).not.toHaveBeenCalled();
     expect(kald("sb_afgoer")).toHaveLength(1);
+  });
+});
+
+describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", () => {
+  const styret = () => { let a!: (v: unknown) => void; let r!: (e: unknown) => void;
+    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((x, y) => { a = x; r = y; })) as never);
+    return { svar: (v: unknown) => a(v), afvis: (e: unknown) => r(e) }; };
+  const flush = async () => { await act(async () => { await new Promise((x) => setTimeout(x, 5)); }); };
+  const knap = (n: string) => screen.getByRole("button", { name: n });
+
+  it("dobbeltklik og blandede klik (Send alligevel, Træk tilbage, Fjern fil, Ret) giver ét RPC-kald og ingen toast", async () => {
+    render(ui(afventer(1, true)));
+    await waitFor(() => knap("Send alligevel"));
+    const k = styret();
+    fireEvent.click(knap("Send alligevel"));
+    fireEvent.click(knap("Send alligevel"));
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    fireEvent.click(knap("Fjern fil"));
+    fireEvent.click(knap("Ret"));
+    await flush();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(kald("sb_afgoer")[0][1]).toMatchObject({ p_handling: "send" });
+    expect(screen.queryByRole("textbox")).toBeNull(); // Ret ignoreret mens Send holder låsen
+    await act(async () => { k.svar({ data: true, error: null }); });
+    await flush();
+    expect(aktiveHandlinger()).toBe(0);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("dobbeltklik på Fjern fil giver ét sb_fjern_fil", async () => {
+    render(ui(afventer(1, true)));
+    const k = styret();
+    fireEvent.click(knap("Fjern fil")); fireEvent.click(knap("Fjern fil"));
+    await flush();
+    expect(kald("sb_fjern_fil")).toHaveLength(1);
+    await act(async () => { k.svar({ data: 2, error: null }); });
+    await flush();
+    expect(aktiveHandlinger()).toBe(0);
+  });
+
+  it("afmontering under kaldet: låsen holdes til kaldet er afsluttet og frigives derefter", async () => {
+    const r = render(ui(afventer(1)));
+    const k = styret();
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    await flush();
+    r.unmount();
+    expect(aktiveHandlinger()).toBe(1);
+    render(ui(afventer(1)));
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    await flush();
+    expect(kald("sb_afgoer")).toHaveLength(1);
+    await act(async () => { k.svar({ data: true, error: null }); });
+    await flush();
+    expect(aktiveHandlinger()).toBe(0);
+  });
+
+  it("tabt succes-svar (transportfejl) afstemmes mod rækken: samme revision trukket tilbage → ingen toast", async () => {
+    render(ui(afventer(4)));
+    raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    await flush();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("gentaget Send med P0001-statusafvisning, men rækken er leveret i samme revision → bekræftet uden toast", async () => {
+    render(ui(afventer(4)));
+    await waitFor(() => knap("Send alligevel"));
+    raekke = { data: { status: "leveret", revision: 4, content: "x", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } } as never);
+    fireEvent.click(knap("Send alligevel"));
+    await flush();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("reel konflikt med samme status skjules ikke: leveret men nyere revision → afvisningen vises ordret én gang", async () => {
+    render(ui(afventer(4)));
+    await waitFor(() => knap("Send alligevel"));
+    raekke = { data: { status: "leveret", revision: 5, content: "x", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } } as never);
+    fireEvent.click(knap("Send alligevel"));
+    await flush();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Kun afventende indhold kan sendes");
+  });
+
+  it("forældet revision vises som »Beskeden er ændret – prøv igen« én gang", async () => {
+    render(ui(afventer(4)));
+    raekke = { data: { status: "afventer_afsender", revision: 5, content: "x", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } } as never);
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    await flush();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Beskeden er ændret – prøv igen");
+  });
+
+  it.each([[false], [null]])("uventet %s fra sb_afgoer er ikke succes – ukendt udfald vises lokalt uden ny skrivning", async (data) => {
+    render(ui(afventer(4)));
+    raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    fireEvent.click(knap("Tjek igen"));
+    await flush();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1); // Tjek igen læser kun
+  });
+
+  it.each([[null], [1]])("uventet sb_fjern_fil-resultat %s (ikke ny revision) er ikke succes", async (data) => {
+    render(ui(afventer(1, true)));
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
+    fireEvent.click(knap("Fjern fil"));
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+  });
+
+  it("Ret fra statuskortet: kortet afmonteres, editoren holder låsen; Træk tilbage i boblen er ignoreret indtil Annullér", async () => {
+    render(ui(afventer(1)));
+    fireEvent.click(knap("Ret"));
+    expect(screen.getByRole("textbox")).toBeTruthy();
+    expect(aktiveHandlinger()).toBe(1);
+    fireEvent.click(knap("Annullér"));
+    expect(aktiveHandlinger()).toBe(0);
   });
 });
