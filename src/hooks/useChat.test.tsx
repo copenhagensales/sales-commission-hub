@@ -632,3 +632,95 @@ describe("c3 §8 – to isolerede klientforløb med samme id mod fælles netvær
     fane1.unmount(); fane2.unmount(); fane1.qc.clear(); fane2.qc.clear();
   });
 });
+
+/**
+ * d2 §5 – fælles netværksmodel. ANTAGELSER (ikke SQL-bevis; SQL er ikke kørt): sb_stier-rækken pr. (bucket, sti) med
+ * ejer/samtale/status/besked_id; INSERT i chat_messages er atomisk: primærnøglekonflikt (23505) og filbindingsfejl
+ * (P0001 IKKE_REGISTRERET_TEKST, når stien ikke er egen, ubundet og 'uploadet') tilbagefører hele transaktionen.
+ * Oprydning overtager kun en ubundet 'uploadet' sti (→ 'slettes'); en sti i 'slettes'/'slettet' kan aldrig bindes igen.
+ */
+function lavModel() {
+  type Sti = { bucket: string; sti: string; ejer_employee_id: string; samtale_id: string; status: string; besked_id: string | null };
+  const stier = new Map<string, Sti>();
+  const rækker = new Map<string, { id: string; attachment_path: string | null }>();
+  const holdte: Array<() => void> = [];
+  let hold = 0;
+  const nySti = (sti: string, status = "uploadet") => stier.set(sti, { bucket: "chat-attachments", sti, ejer_employee_id: "e", samtale_id: "c", status, besked_id: null });
+  const oprydning = (sti: string) => { const s = stier.get(sti); if (s && s.besked_id === null && s.status === "uploadet") s.status = "slettes"; };
+  const udfoer = (row: { id: string; conversation_id: string; sender_id: string; attachment_path: string | null }) => {
+    if (rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } }; // tilbageført, ingen binding
+    if (row.attachment_path) {
+      const s = stier.get(row.attachment_path);
+      if (!s || s.besked_id !== null || s.status !== "uploadet" || s.ejer_employee_id !== row.sender_id || s.samtale_id !== row.conversation_id)
+        return { error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } }; // tilbageført
+      s.besked_id = row.id; s.status = "bundet";
+    }
+    rækker.set(row.id, { id: row.id, attachment_path: row.attachment_path });
+    return { error: null };
+  };
+  dyn.chat_messages = async (f) => ({ data: rækker.has(String(f.id)) ? { id: f.id, status: "leveret", revision: 1 } : null, error: null });
+  dyn.sb_stier = async (f) => { const s = stier.get(String(f.sti)); return { data: s && s.bucket === f.bucket ? { ...s } : null, error: null }; };
+  dynInsert.fn = (_t, r) => {
+    const row = r as Parameters<typeof udfoer>[0];
+    if (hold > 0) { hold--; return new Promise((res) => holdte.push(() => res(udfoer(row)))); }
+    return Promise.resolve(udfoer(row));
+  };
+  return { stier, rækker, holdte, nySti, oprydning, holdNaeste: () => { hold++; } };
+}
+
+describe("d2 §5 – sent gammelt INSERT og to klienter mod fælles netværksmodel (antagelse, ikke SQL)", () => {
+  const vA = { ...vf, attachmentPath: "c/e/gammel.png" };
+
+  it("binding/INSERT vinder før oprydning → én række, stien bundet; oprydning overtager ikke", async () => {
+    const m = lavModel(); m.nySti("c/e/gammel.png");
+    m.holdNaeste();
+    const p = sendBesked(vA, "e");
+    await vi.waitFor(() => expect(m.holdte).toHaveLength(1));
+    m.holdte[0]();
+    await p;
+    m.oprydning("c/e/gammel.png");
+    expect(m.rækker.size).toBe(1);
+    expect(m.stier.get("c/e/gammel.png")).toMatchObject({ besked_id: vA.id, status: "bundet" });
+  });
+
+  for (const status of ["slettes", "slettet"]) it(`oprydning overtager (${status}) før gammelt INSERT → tilbageført, genudsted-tilbud, stien kan ikke bindes igen`, async () => {
+    const m = lavModel(); m.nySti("c/e/gammel.png");
+    m.holdNaeste();
+    const p = fejl(sendBesked(vA, "e"));
+    await vi.waitFor(() => expect(m.holdte).toHaveLength(1)); // det gamle INSERT er sendt og venter
+    m.oprydning("c/e/gammel.png");
+    m.stier.get("c/e/gammel.png")!.status = status;
+    m.holdte[0]();
+    const e = await p;
+    expect(e).toBeInstanceOf(SendFejl);
+    expect(e?.art).toBe("genudsted"); // præcis filbindings-P0001 + overtaget egen sti
+    expect(m.rækker.size).toBe(0);
+    expect(m.stier.get("c/e/gammel.png")).toMatchObject({ besked_id: null, status });
+    const igen = await fejl(sendBesked(vA, "e")); // nyt forsøg på samme sti
+    expect(igen?.art).toBe("genudsted");
+    expect(m.rækker.size).toBe(0);
+    expect(m.stier.get("c/e/gammel.png")?.besked_id).toBeNull();
+  });
+
+  it("to isolerede klienter, samme id, hver sin nye sti → begge afslutter, én række, taberens sti ubundet, ingen ekstra besked", async () => {
+    auth("SIGNED_IN", "u");
+    const m = lavModel(); m.nySti("c/e/b.png"); m.nySti("c/e/c.png");
+    const lav = () => {
+      const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+      const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+      return { qc, ...renderHook(() => useSendMessage(), { wrapper }) };
+    };
+    const k1 = lav(), k2 = lav();
+    m.holdNaeste();
+    const p1 = k1.result.current.mutateAsync({ ...vf, attachmentPath: "c/e/b.png", ejer: fastholdEjer("e", "c", "u")! });
+    await vi.waitFor(() => expect(m.holdte).toHaveLength(1));
+    await k2.result.current.mutateAsync({ ...vf, attachmentPath: "c/e/c.png", ejer: fastholdEjer("e", "c", "u")! });
+    m.holdte[0](); // klient 1's INSERT taber på primærnøglen og tilbageføres
+    await p1; // afstemt: samme id findes → ingen ny besked, ingen fejl
+    expect(m.rækker.size).toBe(1);
+    expect(m.rækker.get(vf.id)?.attachment_path).toBe("c/e/c.png");
+    expect(m.stier.get("c/e/b.png")).toMatchObject({ besked_id: null, status: "uploadet" });
+    expect(m.stier.get("c/e/c.png")).toMatchObject({ besked_id: vf.id, status: "bundet" });
+    for (const k of [k1, k2]) { k.unmount(); k.qc.clear(); }
+  });
+});
