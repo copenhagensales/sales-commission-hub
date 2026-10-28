@@ -362,6 +362,8 @@ describe("c2 §4 – rydning tåler fejl på selve sessionStorage-getteren", () 
 describe("B2a-d1 §2 – annullerOperation", () => {
   it("ugyldiggør kun den annullerede operation; andre operationer i samme session forbliver gyldige", async () => {
     const m = await import("./sbKladder");
+    m.registrerKladdeOprydning(); // fast udgangspunkt uafhængigt af rækkefølge: aktiv auth-bruger via rigtig callback
+    (vi.mocked(supabase.auth.onAuthStateChange).mock.calls.at(-1)![0] as (e: string, s: unknown) => void)("SIGNED_IN", { user: { id: "u" } });
     const a = m.fastholdEjer("e", "A", "u"), b = m.fastholdEjer("e", "A", "u");
     expect(m.ejerGyldig(a) && m.ejerGyldig(b)).toBe(true);
     m.annullerOperation(a!.op);
