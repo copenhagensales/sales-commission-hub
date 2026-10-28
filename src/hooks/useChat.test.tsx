@@ -174,7 +174,7 @@ describe("T2 – afstemning og P0001 ved filbinding (§2)", () => {
     const { result } = renderHook(() => useSendMessage(), { wrapper });
     svar.chat_messages = [msg(null), msg(null, { message: "x" })];
     insert.mockResolvedValue({ error: { message: "Failed to fetch" } });
-    await fejl(result.current.mutateAsync(v));
+    await fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     expect(insert).toHaveBeenCalledTimes(1);
   });
 });
@@ -493,28 +493,41 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     expect(kald.filter((k) => !k.startsWith("select"))).toEqual([]);
   });
 
-  it("(ii) ejerløs send: logud under identitetsopslag → nul INSERT (ingen altid gyldig vagt)", async () => {
+  it("(c1 §1) manglende identitet: fastholdEjer giver null og ingen ejer starter ingen skrivning", async () => {
+    expect(fastholdEjer("e", "c", null)).toBeNull();
+    expect(fastholdEjer(undefined, "c", "u")).toBeNull();
+    expect(fastholdEjer("e", "", "u")).toBeNull();
     const { result } = opsaet();
-    const id = kontrol<{ data: unknown; error: null }>();
-    vi.mocked(supabase.rpc).mockReturnValueOnce(id.p as never);
-    const p = fejl(result.current.mutateAsync(v));
-    await vi.waitFor(() => expect(supabase.rpc).toHaveBeenCalled());
-    rydAlleKladder();
-    id.res({ data: "e", error: null });
-    await p;
+    const e = await fejl(result.current.mutateAsync({ ...v, ejer: undefined as never }));
+    expect(e?.art).toBe("ukendt");
+    expect(kald).toEqual([]);
     expect(insert).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("(c1 §1) forkert samtale i konteksten → ingen opslag, intet INSERT", async () => {
+    const { result } = opsaet();
+    const e = await fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "anden", "u")! }));
+    expect(e?.art).toBe("ukendt");
+    expect(kald).toEqual([]);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("(c1 §1) afstemKun uden kontekst eller med forkert samtale → ukendt, ingen opslag", async () => {
+    const { afstemKun } = await import("./useChat");
+    expect(await afstemKun({ id: v.id, conversationId: "c", ejer: undefined as never })).toBe("ukendt");
+    expect(await afstemKun({ id: v.id, conversationId: "c", ejer: fastholdEjer("e", "anden", "u")! })).toBe("ukendt");
     expect(kald).toEqual([]);
   });
 
-  it("(ii) ejerløs afstemKun: logud under opslag → ukendt", async () => {
-    const { afstemKun } = await import("./useChat");
-    const id = kontrol<{ data: unknown; error: null }>();
-    vi.mocked(supabase.rpc).mockReturnValueOnce(id.p as never);
-    const p = afstemKun({ id: v.id, conversationId: "c" });
-    rydAlleKladder();
-    id.res({ data: "e", error: null });
-    expect(await p).toBe("ukendt");
+  it("(c1 §1) konteksten fastholdes før mutate: logud mellem brugerhandling og mutationens start → nul skrivning", async () => {
+    const { result } = opsaet();
+    const ejer = fastholdEjer("e", "c", "u")!; // brugerhandlingen
+    rydAlleKladder(); // logud før mutate
+    const e = await fejl(result.current.mutateAsync({ ...v, ejer }));
+    expect(e?.art).toBe("ukendt");
     expect(kald).toEqual([]);
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("(iv) efterbehandling: logud under statusopslag → intet tjek-kald og ingen cacheændring derefter", async () => {
