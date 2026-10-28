@@ -118,29 +118,41 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id, isOwn, currentEmployeeId, hasRead, leveret]);
 
-  const startRet = () => setRet({ ejer: noegle, aaben: true, tekst: message.content, revision: message.revision, lagerFejl: false });
+  /** B2b-1 §3: Ret (boble og statuskort) fastholder den viste rækkes revision; en eksisterende kladde gendannes med sin startrevision. */
+  const startRet = () => {
+    if (trukket || !fastholdEjer(currentEmployeeId, conversationId, authBrugerId)) return; // ingen ejer → ingen lokal sideeffekt
+    const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
+    setRet({ ejer: noegle, aaben: true, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+      lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false, konflikt: false });
+  };
 
   const handleSaveEdit = async () => {
-    if (!editContent.trim() || editMessage.isPending) return;
+    if (!kanGemme || !editContent.trim() || editMessage.isPending) return;
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     // §1/§2 (c1): fuld kontekst og kladdeversion fastholdes synkront før mutateAsync.
     const ejerNoegle = noegle, conv = conversationId, msg = message.id;
     const ejer = fastholdEjer(currentEmployeeId, conv, authBrugerId);
     if (!ejer) return;
     const emp = ejer.emp;
-    gemRetKladde(emp, conv, { beskedId: msg, tekst: editContent, revision: retRevision });
+    // Startrevisionen (serverens grundlag) og kladdeversionen (lokal markør) fastholdes særskilt.
+    const startRevision = retRevision;
+    gemRetKladde(emp, conv, { beskedId: msg, tekst: editContent, revision: startRevision });
     const version = retKladdeVersion(emp, conv, msg);
     try {
-      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: retRevision, ejer });
+      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: startRevision, ejer });
       if (!ejerGyldig(ejer)) return; // ny session: ingen sletning/lukning
       // Kun den oprindelige kladdeversion ryddes; en nyere/genåbnet kladde bevares.
       if (sletRetKladdeHvis(emp, conv, msg, version, ejer.gen) && noegleRef.current === ejerNoegle) {
-        setRet((r) => (r.ejer === ejerNoegle ? { ...r, aaben: false, lagerFejl: false } : r));
+        setRet((r) => (r.ejer === ejerNoegle ? { ...r, aaben: false, lagerFejl: false, konflikt: false } : r));
       }
     } catch (e) {
-      // Kladden bevares ved fejl; ingen toast i en ny session.
+      // Kladden og startrevisionen bevares ved fejl; ingen toast i en ny session.
       if (!ejerGyldig(ejer)) return;
-      toast.error(erForaeldet(e) ? "Beskeden er ændret – prøv igen" : serverTekst(e, "Kunne ikke gemme ændringen"));
+      if (erForaeldet(e)) {
+        // Reel revisionskonflikt: rækken genhentes (hookens onError), fejlen vises én gang og ved editoren.
+        if (noegleRef.current === ejerNoegle) setRet((r) => (r.ejer === ejerNoegle ? { ...r, konflikt: true } : r));
+        toast.error("Beskeden er ændret – prøv igen");
+      } else toast.error(serverTekst(e, "Kunne ikke gemme ændringen"));
     }
   };
 
@@ -153,10 +165,14 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
 
   const handleTraek = () => {
     if (afgoer.isPending) return;
-    afgoer.mutate({ messageId: message.id, revision: message.revision, handling: "traek", conversationId }, {
-      onError: (e) => toast.error(erForaeldet(e) ? "Beskeden er ændret – prøv igen" : serverTekst(e, "Kunne ikke trække beskeden tilbage")),
+    // B2b-1: kontekst og den viste rækkes revision fastholdes ved trykket.
+    const ejer = fastholdEjer(currentEmployeeId, conversationId, authBrugerId);
+    if (!ejer) return;
+    afgoer.mutate({ messageId: message.id, revision: message.revision, handling: "traek", conversationId, ejer }, {
+      onError: (e) => { if (ejerGyldig(ejer)) toast.error(erForaeldet(e) ? "Beskeden er ændret – prøv igen" : serverTekst(e, "Kunne ikke trække beskeden tilbage")); },
     });
   };
+
 
   const handleReaction = async (emoji: string) => {
     await toggleReaction.mutateAsync({ messageId: message.id, emoji, conversationId });
