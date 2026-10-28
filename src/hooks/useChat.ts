@@ -1148,8 +1148,17 @@ export function handlingsTekst(e: unknown, fast: string): string | null {
   return serverTekst(e, fast);
 }
 interface RpcSvar { data: unknown; error: { code?: string; message?: string } | null }
+/** Fejlobjekt uden cast: kun code/message læses. */
+function tilFejl(e: unknown): RpcSvar["error"] {
+  if (!e) return null;
+  if (typeof e !== "object") return { message: "ukendt" };
+  return {
+    code: "code" in e && typeof e.code === "string" ? e.code : undefined,
+    message: "message" in e && typeof e.message === "string" ? e.message : undefined,
+  };
+}
 async function kaldRpc(f: () => PromiseLike<{ data: unknown; error: unknown }>): Promise<RpcSvar> {
-  try { const r = await f(); return { data: r.data, error: (r.error as RpcSvar["error"]) ?? null }; }
+  try { const r = await f(); return { data: r.data, error: tilFejl(r.error) }; }
   catch { return { data: null, error: { message: "transport" } }; }
 }
 interface Raekke { status: string; revision: number; content: string; attachment_path: string | null }
