@@ -21,7 +21,7 @@ type Reservation = {
   afsender_employee_id: string | null; transportforsoeg: number; metadata: Record<string, unknown> | null;
 };
 type Afslut = { status: "sendt" | "ikke_sendt" | "ukendt" | "udskudt" | "sprunget_over" | "annulleret"; aarsag: string | null; naeste?: string | null; metadata?: Record<string, unknown>; transport?: boolean };
-type Klar = { userId: string; title: string; body: string; url: string; tag: string; ttl: number };
+type Klar = { userId: string; title: string; body: string; url: string; tag: string; ttl: number; udloeber?: number };
 
 const PRIO: Record<StorkbookType, number> = {
   storkbook_omtale: 60, storkbook_svar: 50, storkbook_kommentar: 40, storkbook_ros: 30,
@@ -73,10 +73,8 @@ function plusDage(dato: string, n: number): string {
   const [y, m, d] = dato.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
-/** Sekunder til 23:59:59 dansk tid (ingen nedre grænse). */
-const sekTilDagensSlut = () => 86399 - dkDele().sek;
-/** Dagens dansk 23:59:59 som epoch (ms). */
-const dagensSlutEpoch = () => dkTilUtc(dkDele().dato, "23:59").getTime() + 59_000;
+/** Begivenhedens udløb: dagen før event_date kl. 23:59:59 dansk tid som epoch (ms) – aldrig beregnet fra »nu«. */
+const begivenhedUdloeb = (eventDate: string) => dkTilUtc(plusDage(eventDate, -1), "23:59").getTime() + 59_000;
 const omMin = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
 
 // ---------- hjælpere ----------
@@ -457,7 +455,11 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
         if (!inviteret) return { status: "annulleret", aarsag: "ikke inviteret" };
       }
       const kl = e.event_time ? e.event_time.slice(0, 5) : null;
-      return { title: "Begivenhed i morgen", body: kl ? `Begivenhed i morgen kl. ${kl}` : "Begivenhed i morgen", url: `/storkbook/begivenhed/${eventId}`, tag: `begivenhed:${eventId}`, ttl: sekTilDagensSlut() };
+      // Udløb bundet til den genvaliderede begivenhed; er det passeret (fx efter midnat), annulleres.
+      const udloeber = begivenhedUdloeb(e.event_date);
+      const rest = Math.floor((udloeber - Date.now()) / 1000);
+      if (rest <= 0) return { status: "annulleret", aarsag: "udløbet" };
+      return { title: "Begivenhed i morgen", body: kl ? `Begivenhed i morgen kl. ${kl}` : "Begivenhed i morgen", url: `/storkbook/begivenhed/${eventId}`, tag: `begivenhed:${eventId}`, ttl: rest, udloeber };
     }
   }
   return { status: "annulleret", aarsag: "ukendt type" };
@@ -570,7 +572,7 @@ Deno.serve(async (req) => {
     const ejede = new Map<string, Ejet>();
     let fikLaas = false;
     let frigivet = 0;
-    const fejlT = { afslut_fejl: 0, frigiv_fejl: 0, laas_fejl: 0, afstemning_fejl: 0 };
+    const fejlT = { afslut_fejl: 0, frigiv_fejl: 0, laas_fejl: 0, afstemning_fejl: 0, overtag_fejl: 0, oprydning_fejl: 0, koersel_fejl: 0 };
     const trin: Record<string, string> = {};
     try {
       const laas = await s(svc.rpc("udsendelse_laas", { p_token: token }), hoved.signal);
@@ -581,6 +583,7 @@ Deno.serve(async (req) => {
         // (5) oprydning
         const op = await s(svc.rpc("udsendelse_oprydning"), hoved.signal);
         rapport.oprydning = op.error ? "fejl" : op.data;
+        if (op.error) fejlT.oprydning_fejl++;
         // (6) fase 1
         rapport.fase1 = await fase1(svc, false, start, hoved.signal);
         // (7) fase 2
@@ -588,7 +591,7 @@ Deno.serve(async (req) => {
         let stop = false;
         while (!stop && frist2 - Date.now() >= NY_PORTION_MIN_MS && !hoved.signal.aborted) {
           const { data, error } = await s(svc.rpc("udsendelse_overtag", { p_token: token, p_limit: 5 }), hoved.signal);
-          if (error) { rapport.overtag = "fejl"; break; }
+          if (error) { rapport.overtag = "fejl"; fejlT.overtag_fejl++; break; }
           const rows = (data ?? []) as Reservation[];
           if (!rows.length) break;
           for (const r of rows) ejede.set(r.id, { transport: false });
@@ -609,8 +612,8 @@ Deno.serve(async (req) => {
               if (hoved.signal.aborted) throw e;
               a = { status: "ikke_sendt", aarsag: e instanceof DbFejl ? "db-fejl" : "db-timeout", naeste: omMin(2), transport: false };
             }
-            // Begivenhed: fast udløb dansk 23:59:59; resterende TTL beregnes i sendPushUdfald før hvert fetch.
-            const udloeberKl = r.type_noegle === "storkbook_begivenhed" ? dagensSlutEpoch() : undefined;
+            // Begivenhed: udløb fra begivenhedens dato (dagen før kl. 23:59:59 dansk); resterende TTL beregnes i sendPushUdfald før hvert fetch.
+            const udloeberKl = klar?.udloeber;
             if (klar) {
               const res = await sendPushUdfald(svc, [klar.userId], r.type_noegle, {
                 udsendType: r.type_noegle, tag: klar.tag, renotify: true, url: klar.url, tekst: { title: klar.title, body: klar.body },
@@ -642,6 +645,7 @@ Deno.serve(async (req) => {
         }
       }
     } catch (e) {
+      fejlT.koersel_fejl++;
       if (!hoved.signal.aborted) console.error("storkbook-udsendelser: kørsel fejlede", (e as Error)?.message ?? "fejl");
     } finally {
       clearTimeout(hovedTimer);
