@@ -74,7 +74,7 @@ export function erUdloebet(slettesEfter: string | null | undefined, nu: number):
   return Number.isFinite(t) && t <= nu;
 }
 /** Er svaroriginalen utilgængelig (tilbagetrukket, slettet eller udløbet lokalt)? */
-export function svarUtilgaengeligt(r: Pick<ReplyPreview, "status" | "slettes_efter" | "deleted_at">, nu: number): boolean {
+export function svarUtilgaengeligt(r: { status: BeskedStatusVaerdi | null; slettes_efter: string | null; deleted_at?: string | null }, nu: number): boolean {
   return r.status === "trukket_tilbage" || !!r.deleted_at || erUdloebet(r.slettes_efter, nu);
 }
 /**
