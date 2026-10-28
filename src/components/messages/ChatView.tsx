@@ -452,7 +452,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const ids = new Set(afstemmer ? afstemmer.split(",") : []);
     for (const id of ids) sikrForloeb(ejer, id, queryClient);
     for (const f of [...forloeb.values()]) {
-      if (f.ejer.emp === meId && f.ejer.conv === conversationId && f.ejer.gen === ejer.gen && !ids.has(f.id) && !f.aktiv) stopForloeb(f.noegle);
+      if (f.ejer.emp === meId && f.ejer.conv === conversationId && f.ejer.gen === ejer.gen && !ids.has(f.id) && !f.aktiv && !f.manuel) stopForloeb(f.noegle);
     }
   }, [meId, conversationId, afstemmer, queryClient]);
   void koeV;
