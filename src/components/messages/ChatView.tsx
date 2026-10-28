@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore, useCallback } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -12,26 +12,23 @@ import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { MessageSearch } from "./MessageSearch";
-import { AttachmentPreview, type LokalFil } from "./AttachmentPreview";
+import { AttachmentPreview, kraeverGenvalg, type LokalFil } from "./AttachmentPreview";
 import { TypingIndicator } from "./TypingIndicator";
 import { MentionInput } from "./MentionInput";
 import { toast } from "sonner";
 import { SkeletonList, useDraftGuard } from "@/components/mobile";
 import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, FIL_ACCEPT, FIL_GRAENSER_TEKST } from "@/lib/sbFil";
-import { laesKladde, gemKladde, sletKladde, registrerKladdeOprydning } from "@/lib/sbKladder";
+import {
+  laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
+  fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, kladdeFil, saetKladdeFil, harLagringsFejl, abonnerAfsendelser,
+  sessionsGeneration, type Afsendelse, type FilMeta,
+} from "@/lib/sbKladder";
 
 registrerKladdeOprydning();
 
-/** Besked vist straks i tråden, men endnu ikke bekræftet. Samme id bruges ved alle genforsøg. */
-interface PendingMessage {
-  id: string;
-  content: string;
-  replyToId?: string;
-  fil: { sti: string; type: string; name: string } | null;
-  status: "sending" | "afstemmer" | "failed";
-  fejl?: string;
-  ukendt?: boolean;
-}
+const LAGER_FEJL = "Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben";
+const TOM: Afsendelse[] = [];
+const indsendes = new Set<string>(); // id'er med igangværende netværksforløb (delt på tværs af montering)
 
 interface ChatViewProps {
   conversationId: string;
@@ -44,17 +41,27 @@ async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string }
   return data ? { id: data.id, full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim() } : null;
 }
 
+const metaFra = (f: LokalFil): FilMeta => ({ name: f.name, type: f.type, size: f.size, sti: f.sti ?? null, trin: f.trin });
+const lokalFra = (m: FilMeta, file: File | null): LokalFil => ({
+  file, name: m.name, type: m.type, size: m.size, sti: m.sti ?? undefined, trin: m.trin,
+  uploader: false, previewUrl: file && m.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+});
+
 export function ChatView({ conversationId }: ChatViewProps) {
   const [message, setMessage] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [svarId, setSvarId] = useState<string | null>(null);
+  const [retId, setRetId] = useState<string | null>(null);
+  const [kladdeEjer, setKladdeEjer] = useState<string | null>(null);
+  const [kladdeLagerFejl, setKladdeLagerFejl] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [fil, setFil] = useState<LokalFil | null>(null);
   const [filFejl, setFilFejl] = useState<string | null>(null);
+  const [kladdeVersion, setKladdeVersion] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [pending, setPending] = useState<PendingMessage[]>([]);
-  const inFlight = useRef<Set<string>>(new Set());
+  const sendLaas = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const genvalgFor = useRef<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const convRef = useRef(conversationId);
   convRef.current = conversationId;
@@ -69,24 +76,39 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const { data: currentEmployee } = useQuery({ queryKey: ["current-employee"], queryFn: fetchCurrentEmployee });
   const meId = currentEmployee?.id;
+  const meRef = useRef(meId);
+  meRef.current = meId;
+  const noegle = meId ? `${meId}:${conversationId}` : null;
+
+  // Afsendelser pr. (bruger, samtale) i et delt lager – overlever samtaleskift og afmontering.
+  const afsendelser = useSyncExternalStore(abonnerAfsendelser, () => (meId ? hentAfsendelser(meId, conversationId) : TOM));
+  const afsLagerFejl = useSyncExternalStore(abonnerAfsendelser, () => (meId ? harLagringsFejl(meId, conversationId) : false));
 
   useChatAktiv(conversationId);
-  useDraftGuard(!!message.trim() || !!fil || pending.length > 0);
+  useDraftGuard(!!message.trim() || !!fil || !!retId || afsendelser.some((a) => a.tilstand !== "gemt_vaek"));
 
-  // Kladde pr. bruger/samtale: indlæs ved skift, gem ved ændring (kun tekst + svarreference-id).
-  const indlaest = useRef<string | null>(null);
+  // Skrivekladde: indlæs ved skift. Gem kun, når state tilhører den aktuelle nøgle (aldrig gamle render-værdier).
   useEffect(() => {
     if (!meId) return;
     const k = laesKladde(meId, conversationId);
     setMessage(k?.tekst ?? "");
     setSvarId(k?.svarId ?? null);
+    setRetId(k?.retId ?? null);
     setReplyTo(null);
-    indlaest.current = `${meId}:${conversationId}`;
+    setFilFejl(null);
+    setFil((gammel) => {
+      if (gammel?.previewUrl) URL.revokeObjectURL(gammel.previewUrl);
+      return k?.fil ? lokalFra(k.fil, kladdeFil(meId, conversationId)) : null;
+    });
+    setKladdeEjer(`${meId}:${conversationId}`);
   }, [meId, conversationId]);
   useEffect(() => {
-    if (!meId || indlaest.current !== `${meId}:${conversationId}`) return;
-    gemKladde(meId, conversationId, { tekst: message, svarId: replyTo?.id ?? svarId });
-  }, [meId, conversationId, message, replyTo, svarId]);
+    if (!meId || !noegle || kladdeEjer !== noegle) return;
+    setKladdeLagerFejl(!gemKladde(meId, conversationId, { tekst: message, svarId: replyTo?.id ?? svarId, fil: fil ? metaFra(fil) : null, retId }));
+  }, [meId, noegle, kladdeEjer, conversationId, message, replyTo, svarId, fil, retId]);
+  useEffect(() => () => { setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return f; }); }, []);
+  // Send-låsen frigives først, når den ryddede kladde er renderet.
+  useEffect(() => { sendLaas.current = false; }, [kladdeVersion, conversationId]);
 
   // Genskab/ryd svaruddrag ud fra den aktuelle tråd (aldrig originaltekst, når tråden viser pladsholder).
   useEffect(() => {
@@ -136,14 +158,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const nyesteId = messages?.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [nyesteId, pending.length, conversationId, isLoading]);
-
-  useEffect(() => {
-    setPending([]);
-    setFilFejl(null);
-    setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
-  }, [conversationId]);
-  useEffect(() => () => { setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; }); }, []);
+  }, [nyesteId, afsendelser.length, conversationId, isLoading]);
 
   const handleTyping = () => {
     if (!currentEmployee) return;
@@ -152,88 +167,223 @@ export function ChatView({ conversationId }: ChatViewProps) {
     typingTimeoutRef.current = setTimeout(() => setTyping(false, currentEmployee.id, currentEmployee.full_name), 2000);
   };
 
-  const deliver = async (p: PendingMessage) => {
-    if (inFlight.current.has(p.id)) return;
-    inFlight.current.add(p.id);
-    setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: p.ukendt ? "afstemmer" : "sending", fejl: undefined } : x)));
+  /** Ét afsendelsesforsøg for samme id. Bruger, samtale og sessionsgeneration fastholdes fra starten. */
+  const deliver = useCallback(async (emp: string, conv: string, id: string, genudsted = false) => {
+    const fk = `${emp}:${conv}:${id}`;
+    if (indsendes.has(fk)) return;
+    const gen = sessionsGeneration();
+    const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
+    if (!a) return;
+    indsendes.add(fk);
+    opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
+    let filMeta = a.fil;
     try {
+      if (genudsted && filMeta) {
+        // §10: genudstedelse fra den bevarede File (kun dokumenteret ubundet overtaget sti, kun brugerudløst, én gang).
+        const file = afsendelsesFil(emp, conv, id);
+        if (!file) { opdaterAfsendelse(emp, conv, id, { tilstand: "vaelg_fil" }, gen); return; }
+        const u = await udstedUpload(conv, file, filMeta.type);
+        if (gen !== sessionsGeneration()) return;
+        filMeta = { ...filMeta, sti: u.sti, trin: "uploader" };
+        opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
+        await uploadTilSti(u, file, filMeta.type);
+        if (gen !== sessionsGeneration()) return;
+        filMeta = { ...filMeta, trin: "uploadet" };
+        opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
+      }
       await sendMessage.mutateAsync({
-        id: p.id,
-        conversationId,
-        content: p.content,
-        replyToId: p.replyToId,
-        attachmentPath: p.fil?.sti,
-        attachmentType: p.fil?.type,
-        attachmentName: p.fil?.name,
+        id, conversationId: conv, content: a.tekst, replyToId: a.svarId ?? undefined,
+        attachmentPath: filMeta?.sti ?? undefined, attachmentType: filMeta?.type, attachmentName: filMeta?.name,
+        tidligereUkendt: a.tidligereUkendt,
       });
-      setPending((prev) => prev.filter((x) => x.id !== p.id));
+      fjernAfsendelse(emp, conv, id, gen);
     } catch (e) {
-      const server = e instanceof SendFejl && e.art === "server";
-      setPending((prev) => prev.map((x) => (x.id === p.id
-        ? { ...x, status: "failed", ukendt: !server, fejl: server ? e.message : "Ikke sendt – prøv igen" } : x)));
+      if (gen !== sessionsGeneration()) return;
+      if (e instanceof SendFejl) {
+        if (e.art === "gemt_vaek") {
+          saetAfsendelsesFil(emp, conv, id, null);
+          opdaterAfsendelse(emp, conv, id, { tilstand: "gemt_vaek", tekst: "", fil: null, svarId: null, fejl: null }, gen);
+        } else if (e.art === "genudsted") {
+          opdaterAfsendelse(emp, conv, id, { tilstand: afsendelsesFil(emp, conv, id) ? "genudsted" : "vaelg_fil", fejl: null }, gen);
+        } else if (e.art === "server") {
+          opdaterAfsendelse(emp, conv, id, { tilstand: "afvist", fejl: e.message }, gen);
+        } else if (e.indsat || a.tidligereUkendt) {
+          opdaterAfsendelse(emp, conv, id, { tilstand: "afstemmer", tidligereUkendt: true, fejl: null }, gen);
+        } else {
+          // Fejlet forhåndsopslag uden tidligere ukendt udfald: intet INSERT – kendt ikke gennemført.
+          opdaterAfsendelse(emp, conv, id, { tilstand: "afvist", fejl: null }, gen);
+        }
+      } else {
+        // Udstedelse/upload ved genudstedelse fejlede før INSERT.
+        opdaterAfsendelse(emp, conv, id, { tilstand: "genudsted", fejl: udstedFejlTekst(e) }, gen);
+      }
     } finally {
-      inFlight.current.delete(p.id);
+      indsendes.delete(fk);
     }
-  };
+  }, [sendMessage]);
+
+  // §2: afstemning (kun læsning) af uafklarede afsendelser med backoff 1–30 s; derefter bruger/online/forgrund.
+  const afstemmer = afsendelser.filter((a) => a.tilstand === "afstemmer").map((a) => a.id).join(",");
+  const forsoeg = useRef(new Map<string, number>());
+  const [udtoemt, setUdtoemt] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!meId || !afstemmer) return;
+    const emp = meId, conv = conversationId, gen = sessionsGeneration();
+    const ids = afstemmer.split(",");
+    const timere = new Map<string, ReturnType<typeof setTimeout>>();
+    let stoppet = false;
+    const tjek = async (id: string) => {
+      const fk = `${emp}:${conv}:${id}`;
+      if (stoppet || indsendes.has(fk)) return;
+      const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
+      if (!a || a.tilstand !== "afstemmer") return;
+      indsendes.add(fk);
+      let r: Awaited<ReturnType<typeof afstemKun>>;
+      try { r = await afstemKun({ id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined }); } finally { indsendes.delete(fk); }
+      if (stoppet || gen !== sessionsGeneration()) return;
+      if (r === "fundet") {
+        fjernAfsendelse(emp, conv, id, gen);
+        void queryClient.invalidateQueries({ queryKey: ["chat-messages", conv] });
+        return;
+      }
+      if (r === "gemt_vaek") {
+        saetAfsendelsesFil(emp, conv, id, null);
+        opdaterAfsendelse(emp, conv, id, { tilstand: "gemt_vaek", tekst: "", fil: null, svarId: null }, gen);
+        return;
+      }
+      const n = forsoeg.current.get(id) ?? 0;
+      if (n >= AFSTEM_BACKOFF_MS.length) { setUdtoemt((s) => new Set(s).add(id)); return; }
+      forsoeg.current.set(id, n + 1);
+      timere.set(id, setTimeout(() => void tjek(id), AFSTEM_BACKOFF_MS[n]));
+    };
+    const genstart = () => {
+      if (document.visibilityState !== "visible") return;
+      for (const id of ids) {
+        const t = timere.get(id);
+        if (t) clearTimeout(t);
+        forsoeg.current.set(id, 0);
+        void tjek(id);
+      }
+      setUdtoemt(new Set());
+    };
+    for (const id of ids) void tjek(id);
+    window.addEventListener("online", genstart);
+    document.addEventListener("visibilitychange", genstart);
+    return () => {
+      stoppet = true;
+      for (const t of timere.values()) clearTimeout(t);
+      window.removeEventListener("online", genstart);
+      document.removeEventListener("visibilitychange", genstart);
+    };
+  }, [meId, conversationId, afstemmer, queryClient]);
+
+  const composerTom = !message.trim() && !fil && !retId;
+  const kanSende = !!meId && (!!message.trim() || !!fil) && !fil?.uploader && !fil?.fejl && !(fil && kraeverGenvalg(fil));
 
   const handleSend = () => {
-    if ((!message.trim() && !fil) || fil?.uploader || fil?.fejl) return;
+    if (sendLaas.current || !meId || !kanSende) return;
     if (message.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
+    sendLaas.current = true; // synkront, før id dannes
+    const emp = meId, conv = conversationId;
     if (currentEmployee) setTyping(false, currentEmployee.id, currentEmployee.full_name);
-    const p: PendingMessage = {
-      id: crypto.randomUUID(),
-      content: message.trim(),
-      replyToId: replyTo?.id,
-      fil: fil?.sti ? { sti: fil.sti, type: fil.type, name: fil.name } : null,
-      status: "sending",
+    const id = retId ?? crypto.randomUUID();
+    const a: Afsendelse = {
+      id, tekst: message.trim(), svarId: replyTo?.id ?? svarId ?? null,
+      fil: fil ? metaFra(fil) : null, tilstand: "sender", fejl: null, tidligereUkendt: false, oprettet: Date.now(),
     };
-    setPending((prev) => [...prev, p]);
+    tilfoejAfsendelse(emp, conv, a, fil?.file ?? null);
     setMessage("");
     setReplyTo(null);
     setSvarId(null);
-    if (meId) sletKladde(meId, conversationId);
+    setRetId(null);
+    sletKladde(emp, conv);
+    saetKladdeFil(emp, conv, null);
     setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
-    void deliver(p);
+    setKladdeVersion((v) => v + 1);
+    void deliver(emp, conv, id);
+  };
+
+  /** §10: Ret af kendt afvist afsendelse – bevarer id, tekst, svar og vedhæftning; overskriver aldrig en anden kladde. */
+  const ret = (a: Afsendelse) => {
+    if (!meId || !composerTom || a.tilstand !== "afvist") return;
+    const file = afsendelsesFil(meId, conversationId, a.id);
+    setMessage(a.tekst);
+    setSvarId(a.svarId);
+    setRetId(a.id);
+    setFil(a.fil ? lokalFra(a.fil, file) : null);
+    saetKladdeFil(meId, conversationId, file);
+    fjernAfsendelse(meId, conversationId, a.id);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  /** Markerer kladdefilens trin for den fastholdte (bruger, samtale); kun hvis det stadig er samme File. */
+  const markerKladdeFil = (emp: string, conv: string, file: File, ret: Partial<LokalFil>) => {
+    if (kladdeFil(emp, conv) !== file) return;
+    if (meRef.current === emp && convRef.current === conv) {
+      setFil((f) => (f && f.file === file ? { ...f, ...ret } : f));
+      return;
+    }
+    const k = laesKladde(emp, conv);
+    if (k?.fil) gemKladde(emp, conv, { ...k, fil: { ...k.fil, sti: ret.sti ?? k.fil.sti, trin: ret.trin ?? k.fil.trin } });
+  };
+
   const upload = async (file: File, type: string, previewUrl: string | null) => {
-    const conv = conversationId;
-    setFil({ name: file.name, type, size: file.size, previewUrl, uploader: true, file });
+    if (!meId) return;
+    const emp = meId, conv = conversationId, gen = sessionsGeneration();
+    saetKladdeFil(emp, conv, file);
+    setFil({ name: file.name, type, size: file.size, previewUrl, uploader: true, file, trin: "valgt" });
     try {
       const u = await udstedUpload(conv, file, type);
+      if (gen !== sessionsGeneration()) return;
+      markerKladdeFil(emp, conv, file, { sti: u.sti, trin: "uploader" });
       await uploadTilSti(u, file, type);
-      // Langsomt svar for en anden samtale knyttes aldrig hertil.
-      if (convRef.current !== conv) return;
-      setFil((f) => (f && f.file === file ? { ...f, uploader: false, sti: u.sti } : f));
+      if (gen !== sessionsGeneration()) return;
+      markerKladdeFil(emp, conv, file, { uploader: false, trin: "uploadet" });
     } catch (e) {
-      if (convRef.current !== conv) return;
-      setFil((f) => (f && f.file === file ? { ...f, uploader: false, fejl: udstedFejlTekst(e) } : f));
+      if (gen !== sessionsGeneration()) return;
+      markerKladdeFil(emp, conv, file, { uploader: false, sti: undefined, trin: "valgt", fejl: udstedFejlTekst(e) });
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
+    const maal = genvalgFor.current;
+    genvalgFor.current = null;
     if (!file) return;
     const v = validerFil(file);
     if ("fejl" in v) { setFilFejl(v.fejl); return; }
     setFilFejl(null);
+    if (maal && meId) {
+      // Genvalg for en afsendelse, der venter på »Vælg filen igen« (samme id; ny sti ved genudstedelse).
+      const a = hentAfsendelser(meId, conversationId).find((x) => x.id === maal);
+      if (!a?.fil) return;
+      saetAfsendelsesFil(meId, conversationId, maal, file);
+      opdaterAfsendelse(meId, conversationId, maal, { tilstand: "genudsted", fil: { ...a.fil, name: file.name, size: file.size, type: v.type } });
+      return;
+    }
     setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
     const previewUrl = v.type.startsWith("image/") ? URL.createObjectURL(file) : null;
     void upload(file, v.type, previewUrl);
   };
 
-  const fjernFil = () => setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
+  const vaelgFil = (afsendelsesId: string | null) => { genvalgFor.current = afsendelsesId; fileInputRef.current?.click(); };
+
+  const fjernFil = () => {
+    if (meId) saetKladdeFil(meId, conversationId, null);
+    setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return null; });
+  };
 
   const otherTypingUsers = typingUsers.filter(u => u.id !== currentEmployee?.id);
 
   if (isLoading) {
     return <div className="h-full p-3"><SkeletonList count={4} /></div>;
   }
+
+  const lagerFejl = kladdeLagerFejl || afsLagerFejl;
 
   return (
     <div className="h-full flex flex-col min-w-0">
@@ -259,36 +409,66 @@ export function ChatView({ conversationId }: ChatViewProps) {
             <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === meId} currentEmployeeId={meId}
               conversationId={conversationId} onReply={(m) => { setReplyTo(m); setSvarId(m.id); }} />
           ))}
-          {pending.map((p) => (
+          {afsendelser.filter((p) => !messages?.some((m) => m.id === p.id)).map((p) => (
             <div key={p.id} className="flex justify-end" aria-live="polite">
               <div className="max-w-[80%] min-w-0">
-                <div className={cn("rounded-2xl px-3 py-2 text-[15px] break-words", p.status === "failed" ? "bg-destructive/10 text-foreground border border-destructive/40" : "bg-primary/70 text-primary-foreground")}>
-                  {p.content || p.fil?.name}
-                </div>
-                {p.status === "sending" ? (
-                  <p className="mt-1 text-right text-[14px] text-muted-foreground">Sender …</p>
-                ) : p.status === "afstemmer" ? (
-                  <p className="mt-1 text-right text-[14px] text-muted-foreground">Afstemmer …</p>
-                ) : (
-                  <div className="mt-1 flex flex-col items-end">
-                    {p.fejl && p.fejl !== "Ikke sendt – prøv igen" && <p className="text-right text-[14px] text-destructive">{p.fejl}</p>}
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => void deliver(p)} className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70">
-                        Ikke sendt – prøv igen
-                      </button>
-                      {!p.ukendt && (
-                        <button type="button" className="flex min-h-11 items-center px-2 text-[14px] text-muted-foreground active:opacity-70"
-                          onClick={() => { setPending((prev) => prev.filter((x) => x.id !== p.id)); if (!message) setMessage(p.content); }}>
-                          Ret
-                        </button>
-                      )}
-                    </div>
+                {p.tilstand === "gemt_vaek" ? (
+                  <div className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-[14px] text-muted-foreground">
+                    <span className="min-w-0">{GEMT_VAEK_TEKST}</span>
+                    <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Luk"
+                      onClick={() => meId && fjernAfsendelse(meId, conversationId, p.id)}>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
+                ) : (
+                  <>
+                    <div className={cn("rounded-2xl px-3 py-2 text-[15px] break-words", ["afvist", "genudsted", "vaelg_fil"].includes(p.tilstand) ? "bg-destructive/10 text-foreground border border-destructive/40" : "bg-primary/70 text-primary-foreground")}>
+                      {p.tekst || p.fil?.name}
+                    </div>
+                    {p.tilstand === "sender" ? (
+                      <p className="mt-1 text-right text-[14px] text-muted-foreground">Sender …</p>
+                    ) : p.tilstand === "afstemmer" ? (
+                      <div className="mt-1 flex flex-col items-end">
+                        <p className="text-right text-[14px] text-muted-foreground">Afstemmer …</p>
+                        {udtoemt.has(p.id) && (
+                          <button type="button" onClick={() => meId && void deliver(meId, conversationId, p.id)}
+                            className="flex min-h-11 items-center text-[14px] font-medium text-muted-foreground active:opacity-70">
+                            Prøv igen
+                          </button>
+                        )}
+                      </div>
+                    ) : p.tilstand === "vaelg_fil" ? (
+                      <div className="mt-1 flex flex-col items-end">
+                        <p className="text-right text-[14px] text-destructive">Vælg filen igen</p>
+                        <button type="button" onClick={() => vaelgFil(p.id)} className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70">
+                          Vælg filen igen
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex flex-col items-end">
+                        {p.fejl && p.fejl !== "Ikke sendt – prøv igen" && <p className="text-right text-[14px] text-destructive">{p.fejl}</p>}
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => meId && void deliver(meId, conversationId, p.id, p.tilstand === "genudsted")}
+                            className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70">
+                            Ikke sendt – prøv igen
+                          </button>
+                          {p.tilstand === "afvist" && (
+                            <button type="button" disabled={!composerTom}
+                              title={composerTom ? undefined : "Send eller ryd den nuværende kladde først"}
+                              className="flex min-h-11 min-w-11 items-center justify-center px-2 text-[14px] text-muted-foreground active:opacity-70 disabled:opacity-50"
+                              onClick={() => ret(p)}>
+                              Ret
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           ))}
-          {messages?.length === 0 && pending.length === 0 && (
+          {messages?.length === 0 && afsendelser.length === 0 && (
             <div className="text-center text-muted-foreground py-8">Ingen beskeder endnu. Start samtalen!</div>
           )}
         </div>
@@ -309,7 +489,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
         </div>
       )}
 
-      {fil && <AttachmentPreview fil={fil} onRemove={fjernFil} onRetry={fil.fejl ? () => void upload(fil.file, fil.type, fil.previewUrl) : undefined} />}
+      {fil && (
+        <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
+          onRetry={fil.fejl && fil.file ? () => { const f = fil.file; if (f) void upload(f, fil.type, fil.previewUrl); } : undefined} />
+      )}
       {filFejl && (
         <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
           <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
@@ -318,18 +501,19 @@ export function ChatView({ conversationId }: ChatViewProps) {
           </Button>
         </div>
       )}
+      {lagerFejl && <p className="px-2 md:px-4 py-1 border-t text-[14px] text-muted-foreground" role="status">{LAGER_FEJL}</p>}
 
       <div className="p-2 md:p-4 border-t safe-area-bottom">
         <div className="flex gap-1 md:gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
-          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={!!fil?.uploader}
+          <Button variant="ghost" size="icon" onClick={() => vaelgFil(null)} disabled={!!fil?.uploader}
             className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11" aria-label="Vedhæft fil" title={FIL_GRAENSER_TEKST}>
             {fil?.uploader ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </Button>
           <div className="flex-1 min-w-0">
             <MentionInput value={message} onChange={setMessage} onKeyDown={handleKeyDown} placeholder="Skriv en besked..." onTyping={handleTyping} />
           </div>
-          <Button onClick={handleSend} disabled={(!message.trim() && !fil) || !!fil?.uploader || !!fil?.fejl}
+          <Button onClick={handleSend} disabled={!kanSende}
             size="icon" className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11" aria-label="Send">
             <Send className="h-4 w-4" />
           </Button>
