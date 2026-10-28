@@ -254,7 +254,8 @@ describe("§1 – sessionsskift i ChatView (B2a-b1)", () => {
     const { container } = await klar();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
-    const vagt = udstedUpload.mock.calls[0][3] as () => boolean;
+    const vagt = (udstedUpload.mock.calls[0][3] as { vagt: () => boolean; bruger: string }).vagt;
+    expect((udstedUpload.mock.calls[0][3] as { bruger: string }).bruger).toBe("u");
     expect(vagt()).toBe(true);
     act(() => { rydAlleKladder(); });
     expect(vagt()).toBe(false);

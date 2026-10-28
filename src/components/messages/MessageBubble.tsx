@@ -18,12 +18,14 @@ import { MessageWithLinks } from "./LinkPreview";
 import { renderMentions } from "./MentionInput";
 import { BeskedStatus } from "./BeskedStatus";
 import { FilVedhaeftning } from "./FilVedhaeftning";
-import { laesRetKladde, gemRetKladde, sletRetKladde, harRetLagerFejl } from "@/lib/sbKladder";
+import { laesRetKladde, gemRetKladde, sletRetKladde, sletRetKladdeHvis, retKladdeVersion, harRetLagerFejl, fastholdEjer, ejerGyldig } from "@/lib/sbKladder";
 
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
   currentEmployeeId?: string;
+  /** Auth-bruger-id for operationskonteksten (§1 c1). */
+  authBrugerId?: string | null;
   conversationId: string;
   onReply: (message: Message) => void;
 }
@@ -38,7 +40,7 @@ export function slettesTekst(slettesEfter: string, nu = Date.now()): string {
   return n <= 0 ? "Slettes i dag" : n === 1 ? "Slettes om 1 dag" : `Slettes om ${n} dage`;
 }
 
-export function MessageBubble({ message, isOwn, currentEmployeeId, conversationId, onReply }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId = null, conversationId, onReply }: MessageBubbleProps) {
   // Uafsendt redigeringskladde: besked-id, tekst og revisionen, redigeringen begyndte fra.
   // §1/§7: redigeringsstate ejes af nøglen (medarbejder, samtale, besked), den blev startet/gendannet under.
   const noegle = currentEmployeeId ? `${currentEmployeeId}\u0000${conversationId}\u0000${message.id}` : null;
@@ -116,14 +118,23 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
   const handleSaveEdit = async () => {
     if (!editContent.trim() || editMessage.isPending) return;
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
-    // Ejer fastholdes før første await; en sen afslutning rydder kun sin egen kladde.
-    const ejer = noegle, emp = currentEmployeeId, conv = conversationId, msg = message.id;
+    // §1/§2 (c1): fuld kontekst og kladdeversion fastholdes synkront før mutateAsync.
+    const ejerNoegle = noegle, conv = conversationId, msg = message.id;
+    const ejer = fastholdEjer(currentEmployeeId, conv, authBrugerId);
+    if (!ejer) return;
+    const emp = ejer.emp;
+    gemRetKladde(emp, conv, { beskedId: msg, tekst: editContent, revision: retRevision });
+    const version = retKladdeVersion(emp, conv, msg);
     try {
-      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: retRevision });
-      if (noegleRef.current === ejer) afslutRet(ejer, emp, conv, msg);
-      else if (emp) sletRetKladde(emp, conv, msg);
+      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: retRevision, ejer });
+      if (!ejerGyldig(ejer)) return; // ny session: ingen sletning/lukning
+      // Kun den oprindelige kladdeversion ryddes; en nyere/genåbnet kladde bevares.
+      if (sletRetKladdeHvis(emp, conv, msg, version, ejer.gen) && noegleRef.current === ejerNoegle) {
+        setRet((r) => (r.ejer === ejerNoegle ? { ...r, aaben: false, lagerFejl: false } : r));
+      }
     } catch (e) {
-      // Kladden bevares ved fejl.
+      // Kladden bevares ved fejl; ingen toast i en ny session.
+      if (!ejerGyldig(ejer)) return;
       toast.error(erForaeldet(e) ? "Beskeden er ændret – prøv igen" : serverTekst(e, "Kunne ikke gemme ændringen"));
     }
   };

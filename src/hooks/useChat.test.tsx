@@ -174,7 +174,7 @@ describe("T2 – afstemning og P0001 ved filbinding (§2)", () => {
     const { result } = renderHook(() => useSendMessage(), { wrapper });
     svar.chat_messages = [msg(null), msg(null, { message: "x" })];
     insert.mockResolvedValue({ error: { message: "Failed to fetch" } });
-    await fejl(result.current.mutateAsync(v));
+    await fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     expect(insert).toHaveBeenCalledTimes(1);
   });
 });
@@ -258,7 +258,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
   it("fastholdt ejer: ingen identitetsopslag undervejs, sender_id er den fastholdte", async () => {
     const { result } = opsaet();
     insert.mockResolvedValueOnce({ error: null });
-    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("fast", "c") });
+    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("fast", "c", "u")! });
     expect(supabase.rpc).not.toHaveBeenCalled();
     expect(insert.mock.calls[0][0]).toMatchObject({ sender_id: "fast" });
   });
@@ -267,7 +267,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const foer = kontrol<{ data: unknown; error: unknown }>();
     svar.chat_messages = [foer.p];
-    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     rydAlleKladder(); // logud/brugerskift
     foer.res(msg(null));
     expect((await p)?.indsat).toBe(false);
@@ -279,7 +279,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result } = opsaet();
     const foer = kontrol<{ data: unknown; error: unknown }>();
     svar.chat_messages = [foer.p];
-    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     rydAlleKladder(); // SIGNED_OUT → ny generation; genlogin som "e" giver ikke den gamle generation tilbage
     foer.res(msg(null));
     await p;
@@ -290,7 +290,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const ins = kontrol<{ error: unknown }>();
     insert.mockReturnValueOnce(ins.p);
-    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     await vi.waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     const foerAntal = kald.length;
     rydAlleKladder();
@@ -305,7 +305,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const ins = kontrol<{ error: unknown }>();
     insert.mockReturnValueOnce(ins.p);
-    const p = result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") });
+    const p = result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
     await vi.waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     rydAlleKladder();
     ins.res({ error: null });
@@ -320,7 +320,7 @@ describe("§2/§8 – registerafstemning og genudstedelse gennem rigtig useSendM
     const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     const { result } = renderHook(() => useSendMessage(), { wrapper });
-    return (x: Parameters<typeof result.current.mutateAsync>[0]) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c") }));
+    return (x: Omit<Parameters<typeof result.current.mutateAsync>[0], "ejer">) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c", "u")! }));
   };
   const vu = { ...vf, replyToId: "svar-1", tidligereUkendt: true };
   const P = (message: string) => ({ error: { code: "P0001", message } });
@@ -469,7 +469,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     const { result } = opsaet();
     svar.chat_messages = [msg(null, { message: "net" })];
     svar.sb_stier = [række({ status: "slettet" })];
-    expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c") })))?.art).toBe("ukendt");
+    expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c", "u")! })))?.art).toBe("ukendt");
     expect(insert).not.toHaveBeenCalled();
   });
 
@@ -480,7 +480,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     for (const c of cases) {
       svar.chat_messages = [msg(null)];
       svar.sb_stier = [c];
-      expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c") })))?.art).toBe("ukendt");
+      expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c", "u")! })))?.art).toBe("ukendt");
     }
     expect(insert).not.toHaveBeenCalled();
   });
@@ -489,32 +489,45 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     const { afstemKun } = await import("./useChat");
     svar.chat_messages = [msg(null)];
     svar.sb_stier = [række({ status: "slettes" })];
-    expect(await afstemKun({ id: v.id, conversationId: "c", attachmentPath: "c/e/x.png", ejer: fastholdEjer("e", "c") })).toBe("genudsted");
+    expect(await afstemKun({ id: v.id, conversationId: "c", attachmentPath: "c/e/x.png", ejer: fastholdEjer("e", "c", "u")! })).toBe("genudsted");
     expect(kald.filter((k) => !k.startsWith("select"))).toEqual([]);
   });
 
-  it("(ii) ejerløs send: logud under identitetsopslag → nul INSERT (ingen altid gyldig vagt)", async () => {
+  it("(c1 §1) manglende identitet: fastholdEjer giver null og ingen ejer starter ingen skrivning", async () => {
+    expect(fastholdEjer("e", "c", null)).toBeNull();
+    expect(fastholdEjer(undefined, "c", "u")).toBeNull();
+    expect(fastholdEjer("e", "", "u")).toBeNull();
     const { result } = opsaet();
-    const id = kontrol<{ data: unknown; error: null }>();
-    vi.mocked(supabase.rpc).mockReturnValueOnce(id.p as never);
-    const p = fejl(result.current.mutateAsync(v));
-    await vi.waitFor(() => expect(supabase.rpc).toHaveBeenCalled());
-    rydAlleKladder();
-    id.res({ data: "e", error: null });
-    await p;
+    const e = await fejl(result.current.mutateAsync({ ...v, ejer: undefined as never }));
+    expect(e?.art).toBe("ukendt");
+    expect(kald).toEqual([]);
     expect(insert).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("(c1 §1) forkert samtale i konteksten → ingen opslag, intet INSERT", async () => {
+    const { result } = opsaet();
+    const e = await fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "anden", "u")! }));
+    expect(e?.art).toBe("ukendt");
+    expect(kald).toEqual([]);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("(c1 §1) afstemKun uden kontekst eller med forkert samtale → ukendt, ingen opslag", async () => {
+    const { afstemKun } = await import("./useChat");
+    expect(await afstemKun({ id: v.id, conversationId: "c", ejer: undefined as never })).toBe("ukendt");
+    expect(await afstemKun({ id: v.id, conversationId: "c", ejer: fastholdEjer("e", "anden", "u")! })).toBe("ukendt");
     expect(kald).toEqual([]);
   });
 
-  it("(ii) ejerløs afstemKun: logud under opslag → ukendt", async () => {
-    const { afstemKun } = await import("./useChat");
-    const id = kontrol<{ data: unknown; error: null }>();
-    vi.mocked(supabase.rpc).mockReturnValueOnce(id.p as never);
-    const p = afstemKun({ id: v.id, conversationId: "c" });
-    rydAlleKladder();
-    id.res({ data: "e", error: null });
-    expect(await p).toBe("ukendt");
+  it("(c1 §1) konteksten fastholdes før mutate: logud mellem brugerhandling og mutationens start → nul skrivning", async () => {
+    const { result } = opsaet();
+    const ejer = fastholdEjer("e", "c", "u")!; // brugerhandlingen
+    rydAlleKladder(); // logud før mutate
+    const e = await fejl(result.current.mutateAsync({ ...v, ejer }));
+    expect(e?.art).toBe("ukendt");
     expect(kald).toEqual([]);
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("(iv) efterbehandling: logud under statusopslag → intet tjek-kald og ingen cacheændring derefter", async () => {
@@ -522,7 +535,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     const status = kontrol<{ data: unknown; error: null }>();
     svar.chat_messages = [msg(null), status.p];
     insert.mockResolvedValueOnce({ error: null });
-    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") });
+    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
     await vi.waitFor(() => expect(kald.filter((k) => k === "select:chat_messages")).toHaveLength(2));
     const foer = inv.mock.calls.length;
     rydAlleKladder();

@@ -17,7 +17,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { MentionInput } from "./MentionInput";
 import { toast } from "sonner";
 import { SkeletonList, useDraftGuard } from "@/components/mobile";
-import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, FIL_ACCEPT, FIL_GRAENSER_TEKST } from "@/lib/sbFil";
+import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, erForaeldetOperation, FIL_ACCEPT, FIL_GRAENSER_TEKST } from "@/lib/sbFil";
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
   fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, harLagringsFejl, abonnerAfsendelser,
@@ -74,7 +74,7 @@ async function koerForloeb(f: AfstemForloeb): Promise<void> {
   f.aktiv = true;
   aktiveAfstemninger++;
   let r: Awaited<ReturnType<typeof afstemKun>> = "ukendt";
-  try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: f.ejer }); }
+  try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: { ...f.ejer, op } }); }
   catch { r = "ukendt"; }
   finally { frigivLaas(f.noegle, op); f.aktiv = false; aktiveAfstemninger--; }
   pumpKoe();
@@ -293,9 +293,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
   /** Ét afsendelsesforsøg for samme id. Bruger, samtale og sessionsgeneration fastholdes fra starten. */
   const deliver = useCallback(async (emp: string, conv: string, id: string, genudsted = false) => {
     // §1: ejer fastholdes synkront før første await; alle efterfølgende trin tjekker ejerskabet.
-    const ejer = fastholdEjer(emp, conv, brugerRef.current), gen = ejer.gen, op = ejer.op!;
-    const fk = laasNoegle(gen, emp, conv, id);
+    const ejer = fastholdEjer(emp, conv, brugerRef.current);
+    if (!ejer) return; // manglende identitet → ingen skrivende handling
+    const gen = ejer.gen, op = ejer.op;
     const vagt = () => ejerGyldig(ejer);
+    const kon = { vagt, bruger: ejer.bruger };
+    const fk = laasNoegle(gen, emp, conv, id);
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
     // §4/§8(4): højst ét netværksforløb pr. id – også mod baggrundsafstemning.
@@ -308,12 +311,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
         // §10: genudstedelse fra den bevarede File (kun dokumenteret ubundet overtaget sti, kun brugerudløst, én gang).
         const file = afsendelsesFil(emp, conv, id);
         if (!file) { opdaterAfsendelse(emp, conv, id, { tilstand: "vaelg_fil" }, gen); return; }
-        const u = await udstedUpload(conv, file, filMeta.type, vagt);
+        const u = await udstedUpload(conv, file, filMeta.type, kon);
         if (!vagt()) return;
         filMeta = { ...filMeta, sti: u.sti, trin: "uploader" };
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
-        await uploadTilSti(u, file, filMeta.type, vagt);
-        if (gen !== sessionsGeneration()) return;
+        await uploadTilSti(u, file, filMeta.type, kon);
+        if (!vagt()) return;
         filMeta = { ...filMeta, trin: "uploadet" };
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
       }
@@ -360,6 +363,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   useEffect(() => {
     if (!meId) return;
     const ejer = fastholdEjer(meId, conversationId, brugerRef.current);
+    if (!ejer) return;
     const ids = new Set(afstemmer ? afstemmer.split(",") : []);
     for (const id of ids) sikrForloeb(ejer, id, queryClient);
     for (const f of [...forloeb.values()]) {
@@ -414,17 +418,21 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   /** §3: ét uploadforsøg ejet af lageret; sene svar opdaterer kun den filpost, forsøget stadig ejer. */
   const upload = async (file: File, type: string) => {
-    if (!meId) return;
-    const emp = meId, conv = conversationId, gen = sessionsGeneration();
-    const forsoeg = startKladdeUpload(emp, conv, file, { name: file.name, type, size: file.size });
-    const vagt = () => erAktuelKladdeUpload(emp, conv, forsoeg, gen);
+    // §1/§3 (c1): fuld kontekst fastholdes synkront; uploadforsøgets id er adskilt fra operations-id.
+    const ejer = fastholdEjer(meId, conversationId, brugerRef.current);
+    if (!ejer) return;
+    const forsoeg = startKladdeUpload(ejer, file, { name: file.name, type, size: file.size });
+    if (!forsoeg) return;
+    const kon = { vagt: () => erAktuelKladdeUpload(ejer, forsoeg), bruger: ejer.bruger };
     try {
-      const u = await udstedUpload(conv, file, type, vagt);
-      if (!opdaterKladdeUpload(emp, conv, forsoeg, gen, { sti: u.sti, trin: "uploader" })) return;
-      await uploadTilSti(u, file, type, vagt);
-      opdaterKladdeUpload(emp, conv, forsoeg, gen, { trin: "uploadet", aktiv: false });
+      const u = await udstedUpload(ejer.conv, file, type, kon);
+      if (!opdaterKladdeUpload(ejer, forsoeg, { sti: u.sti, trin: "uploader" })) return;
+      await uploadTilSti(u, file, type, kon);
+      opdaterKladdeUpload(ejer, forsoeg, { trin: "uploadet", aktiv: false });
     } catch (e) {
-      opdaterKladdeUpload(emp, conv, forsoeg, gen, { aktiv: false, sti: null, trin: "valgt", fejl: udstedFejlTekst(e) });
+      // Forældet operation er et særskilt udfald: ingen fejltekst, intet genforsøg, ingen skrivning.
+      if (erForaeldetOperation(e)) return;
+      opdaterKladdeUpload(ejer, forsoeg, { aktiv: false, sti: null, trin: "valgt", fejl: udstedFejlTekst(e) });
     }
   };
 
@@ -483,7 +491,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             </div>
           )}
           {messages?.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === meId} currentEmployeeId={meId}
+            <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === meId} currentEmployeeId={meId} authBrugerId={currentEmployee?.authId ?? null}
               conversationId={conversationId} onReply={(m) => { setReplyTo(m); setSvarId(m.id); }} />
           ))}
           {afsendelser.filter((p) => !messages?.some((m) => m.id === p.id)).map((p) => (

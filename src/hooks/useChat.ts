@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, sessionsGeneration, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -418,8 +418,8 @@ export interface SendInput {
   attachmentName?: string;
   /** Mindst ét tidligere forsøg med samme id havde ukendt udfald. */
   tidligereUkendt?: boolean;
-  /** §1: fastholdt ejer (medarbejder, samtale, sessionsgeneration) fra brugerhandlingens start; sender_id tages herfra. */
-  ejer?: OperationsEjer;
+  /** §1: obligatorisk fastholdt kontekst fra brugerhandlingens start; sender_id tages herfra. */
+  ejer: OperationsEjer;
 }
 
 /** Forældet operation (logud/brugerskift): intet efterfølgende kald startes. */
@@ -431,7 +431,7 @@ const ukendt = () => new SendFejl("ukendt", "Ikke sendt – prøv igen");
  * Indsætter én besked med stabilt id. INSERT sker kun efter et fejlfrit forhåndsopslag;
  * ukendt udfald afstemmes, og en bekræftet række genindsættes aldrig.
  */
-export async function sendBesked(v: SendInput, employeeId: string, vagt: () => boolean = () => true): Promise<void> {
+export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string, vagt: () => boolean = () => true): Promise<void> {
   if (!vagt()) throw foraeldet();
   const foer = await afstemAfsendelse(v, employeeId, vagt);
   if (!vagt()) throw foraeldet();
@@ -487,15 +487,12 @@ export function useSendMessage() {
 
   return useMutation({
     mutationFn: async (v: SendInput) => {
-      // §1: med fastholdt ejer slås medarbejderen ikke op undervejs; sender_id er den fastholdte.
-      // b4 (ii): uden ejer fastholdes generationen synkront her – aldrig en altid gyldig vagt.
-      const gen0 = sessionsGeneration();
-      const vagt = () => (v.ejer ? ejerGyldig(v.ejer) : gen0 === sessionsGeneration());
-      const employeeId = v.ejer?.emp ?? await getCurrentEmployeeId().catch(() => { throw foraeldet(); });
-      const ejer: OperationsEjer = v.ejer ?? { emp: employeeId, conv: v.conversationId, gen: gen0 };
+      // §1 (c1): kun med fuld kontekst for netop denne samtale; ingen ejerløs fallback, intet opslag undervejs.
+      const ejer = v.ejer;
+      const vagt = () => ejerPasser(ejer, v.conversationId);
       if (!vagt()) throw foraeldet();
-      await sendBesked(v, employeeId, vagt);
-      return { ...v, ejer };
+      await sendBesked(v, ejer.emp, vagt);
+      return v;
     },
     // Afstemningsforløbet ejer genforsøgene (App.tsx' mutations.retry=1 overstyres lokalt).
     retry: 0,
@@ -511,15 +508,10 @@ export function useSendMessage() {
 
 /** Ren afstemning (kun læsning) til backoff-løkken. */
 export async function afstemKun(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath" | "ejer">): Promise<Afstemning> {
-  // b4 (ii): uden ejer fastholdes generationen ved start (ingen altid gyldig vagt).
-  const gen0 = sessionsGeneration();
-  const vagt = () => (v.ejer ? ejerGyldig(v.ejer) : gen0 === sessionsGeneration());
+  // §1 (c1): uden fuld, passende kontekst afstemmes intet.
+  const vagt = () => ejerPasser(v.ejer, v.conversationId);
   if (!vagt()) return "ukendt";
-  let emp: string;
-  if (v.ejer) emp = v.ejer.emp;
-  else { try { emp = await getCurrentEmployeeId(); } catch { return "ukendt"; } }
-  if (!vagt()) return "ukendt";
-  const r = await afstemAfsendelse(v, emp, vagt);
+  const r = await afstemAfsendelse(v, v.ejer.emp, vagt);
   return vagt() ? r : "ukendt";
 }
 
@@ -527,18 +519,33 @@ export async function afstemKun(v: Pick<SendInput, "id" | "conversationId" | "at
 export const AFSTEM_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000] as const;
 
 /** Redigering via sb_ret (ingen direkte content-UPDATE). Starter tjek for den nye revision. */
+export interface RetInput {
+  messageId: string; content: string; conversationId: string; revision: number;
+  /** §2 (c1): fastholdt kontekst fra Gem-trykket. */
+  ejer: OperationsEjer;
+}
+
+/** Ejerskab kontrolleres før sb_ret, efter svaret og før hver efterbehandling. */
 export function useEditMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ messageId, content, conversationId, revision }: { messageId: string; content: string; conversationId: string; revision: number }) => {
+    mutationFn: async ({ messageId, content, conversationId, revision, ejer }: RetInput) => {
+      if (!ejerPasser(ejer, conversationId)) throw foraeldet();
       if (content.length > 4000) throw Object.assign(new Error("Højst 4.000 tegn"), { code: "P0001" });
       const { data, error } = await supabase.rpc("sb_ret", { p_kilde: "besked", p_id: messageId, p_revision: revision, p_tekst: content });
+      if (!ejerPasser(ejer, conversationId)) throw foraeldet();
       if (error) throw error;
-      return { revision: data, conversationId, messageId };
+      return { revision: data, conversationId, messageId, ejer };
     },
-    onSuccess: (r) => efterHandling(queryClient, r.conversationId, r.messageId),
-    onError: (_e, v) => { queryClient.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
+    // §2 (c1): ingen automatisk genkørsel af sb_ret (App.tsx' mutations.retry=1 overstyres lokalt).
+    retry: 0,
+    onSuccess: (r) => {
+      const vagt = () => ejerGyldig(r.ejer);
+      if (!vagt()) return;
+      efterHandling(queryClient, r.conversationId, r.messageId, vagt);
+    },
+    onError: (_e, v) => { if (ejerGyldig(v.ejer)) void queryClient.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
   });
 }
 

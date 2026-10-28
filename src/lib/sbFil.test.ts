@@ -42,9 +42,9 @@ describe("§1 – identitets-/generationsværn i udstedelse og upload (B2a-b1)",
     vi.mocked(supabase.auth.getSession).mockReturnValueOnce(new Promise((r) => { svar = r; }) as never);
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     let gyldig = true;
-    const p = udstedUpload("c", { name: "x.png", size: 1 }, "image/png", () => gyldig);
+    const p = udstedUpload("c", { name: "x.png", size: 1 }, "image/png", { vagt: () => gyldig, bruger: "u" });
     gyldig = false; // logud/brugerskift mens sessionen slås op
-    svar({ data: { session: { access_token: "t" } } });
+    svar({ data: { session: { access_token: "t", user: { id: "u" } } } });
     const e = await p.catch((x) => x);
     expect(erForaeldetOperation(e)).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -56,18 +56,70 @@ describe("§1 – identitets-/generationsværn i udstedelse og upload (B2a-b1)",
     const { uploadTilSti } = await import("./sbFil");
     const up = vi.fn();
     vi.mocked(supabase.storage.from).mockReturnValue({ uploadToSignedUrl: up } as never);
-    await expect(uploadTilSti({ sti: "s", token: "t", conversationId: "c" }, new File(["x"], "x.png"), "image/png", () => false)).rejects.toBeInstanceOf(SbFilFejl);
+    await expect(uploadTilSti({ sti: "s", token: "t", conversationId: "c" }, new File(["x"], "x.png"), "image/png", { vagt: () => false, bruger: "u" })).rejects.toBeInstanceOf(SbFilFejl);
     expect(up).not.toHaveBeenCalled();
   });
 
   it("gyldig vagt: HTTP-kontrakten er uændret (ét POST med samme felter)", async () => {
     const { supabase } = await import("@/integrations/supabase/client");
     const { udstedUpload } = await import("./sbFil");
-    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: { access_token: "t" } } } as never);
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ sti: "s", token: "k" }), { status: 200 }));
-    await expect(udstedUpload("c", { name: "x.png", size: 1 }, "image/png", () => true)).resolves.toEqual({ sti: "s", token: "k", conversationId: "c" });
+    await expect(udstedUpload("c", { name: "x.png", size: 1 }, "image/png", { vagt: () => true, bruger: "u" })).resolves.toEqual({ sti: "s", token: "k", conversationId: "c" });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String((fetchSpy.mock.calls[0][1] as RequestInit).body))).toEqual({ action: "udsted", conversation_id: "c", filnavn: "x.png", type: "image/png", size: 1 });
+    fetchSpy.mockRestore();
+  });
+});
+
+describe("c1 §3 – sidste await-hul før POST og sessionens bruger", () => {
+  const kontrolSession = async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    let svar!: (v: unknown) => void;
+    vi.mocked(supabase.auth.getSession).mockReturnValueOnce(new Promise((r) => { svar = r; }) as never);
+    return (v: unknown) => svar(v);
+  };
+  const gyldigSession = { data: { session: { access_token: "t", user: { id: "u" } } } };
+
+  it("hoveder fortsætter gyldigt, men operationen invalideres før udstedUpload fortsætter (logud) → nul POST", async () => {
+    const { udstedUpload, erForaeldetOperation } = await import("./sbFil");
+    const svar = await kontrolSession();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    // Vagten er gyldig ved sessionsopslaget (2 kald i hoveder), men forældet ved kontrollen umiddelbart før POST.
+    let n = 0;
+    const p = udstedUpload("c", { name: "x.png", size: 1 }, "image/png", { vagt: () => ++n <= 2, bruger: "u" });
+    svar(gyldigSession);
+    const e = await p.catch((x) => x);
+    expect(n).toBe(3);
+    expect(erForaeldetOperation(e)).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("fjernelse/genvalg under sessionsopslag (rigtigt uploadejerskab) → nul POST, forældet udfald", async () => {
+    vi.resetModules();
+    const k = await import("./sbKladder");
+    const { udstedUpload, erForaeldetOperation } = await import("./sbFil");
+    const svar = await kontrolSession();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const ejer = k.fastholdEjer("e", "c", "u")!;
+    const id = k.startKladdeUpload(ejer, new File(["x"], "x.png"), { name: "x.png", type: "image/png", size: 1 })!;
+    const p = udstedUpload("c", { name: "x.png", size: 1 }, "image/png", { vagt: () => k.erAktuelKladdeUpload(ejer, id), bruger: "u" });
+    k.fjernKladdeFil("e", "c");
+    svar(gyldigSession);
+    expect(erForaeldetOperation(await p.catch((x) => x))).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("returneret session med andet user.id → nul POST, forældet udfald", async () => {
+    const { udstedUpload, erForaeldetOperation } = await import("./sbFil");
+    const svar = await kontrolSession();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const p = udstedUpload("c", { name: "x.png", size: 1 }, "image/png", { vagt: () => true, bruger: "u" });
+    svar({ data: { session: { access_token: "t", user: { id: "anden" } } } });
+    expect(erForaeldetOperation(await p.catch((x) => x))).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 });
