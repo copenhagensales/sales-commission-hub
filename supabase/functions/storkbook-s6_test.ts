@@ -30,13 +30,20 @@ const wrk = await import("./storkbook-udsendelser/index.ts");
 const ft = await import("./_shared/sb-filtype.ts");
 const bud = await import("./_shared/sb-budget.ts");
 
-// supabase-js' auth-klient starter et auto-refresh-interval i de eksisterende brugerklienter; derfor slås
-// ops-/resource-sanitizerne fra (ingen netværkskald følger af det – mocken registrerer alle kald).
-const test = (name: string, fn: () => void | Promise<void>) => Deno.test({ name, fn, sanitizeOps: false, sanitizeResources: false });
+// Hver prøve nulstiller listen over ukendte/umockede kald ved start og FEJLER, hvis der efter prøven er
+// registreret et ukendt kald – også når SDK/handler har fanget fetch-exceptionen.
+// Sanitizers er som standard SLÅET TIL. Undtagelse: se `klientTest` nedenfor.
+const medKontrol = (fn: () => void | Promise<void>) => async () => { ukendt = []; await fn(); assertEquals(ukendt, [], "ukendt/umocket request i prøven"); };
+const test = (name: string, fn: () => void | Promise<void>) => Deno.test({ name, fn: medKontrol(fn) });
+// Sanitizer-undtagelse (kun handlerprøver, der opretter supabase-js-klienter gennem handlerne):
+// supabase-js' GoTrue-klient registrerer timere/listeners (bl.a. lock/visibility-håndtering), som ikke ryddes
+// inden prøven slutter. Ingen netværkskald følger af det – fetch-mocken registrerer alle kald, og
+// medKontrol fejler ved ukendte kald.
+const klientTest = (name: string, fn: () => void | Promise<void>) => Deno.test({ name, fn: medKontrol(fn), sanitizeOps: false, sanitizeResources: false });
 const flush = async (time: FakeTime) => { for (let i = 0; i < 20; i++) await time.tickAsync(0); };
 
 // ---------------------------------------------------------------- mock-infrastruktur
-type Kald = { metode: string; sti: string; url: URL; krop: string; signal: AbortSignal | null; t: number };
+type Kald = { metode: string; sti: string; url: URL; krop: string; headers: Headers; signal: AbortSignal | null; t: number };
 type Rute = (k: Kald) => Promise<Response | undefined> | Response | undefined;
 let rute: Rute = () => undefined;
 let kald: Kald[] = [];
@@ -47,7 +54,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(req.url);
   if (url.origin !== MOCK && url.origin !== "https://ai.gateway.lovable.dev") { ukendt.push(url.origin); throw new Error("ukendt netværksadresse i prøve"); }
   if (req.signal.aborted) throw req.signal.reason;
-  const k: Kald = { metode: req.method, sti: url.pathname, url, krop: req.body ? await req.text() : "", signal: init?.signal ?? req.signal, t: Date.now() };
+  const k: Kald = { metode: req.method, sti: url.pathname, url, krop: req.body ? await req.text() : "", headers: req.headers, signal: init?.signal ?? req.signal, t: Date.now() };
   kald.push(k);
   const r = await rute(k);
   if (!r) { ukendt.push(`${req.method} ${url.pathname}`); throw new Error("ingen mockrute"); }
@@ -55,7 +62,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 }) as typeof fetch;
 void ægteFetch;
 
-const nulstil = (r: Rute) => { rute = r; kald = []; ukendt = []; };
+const nulstil = (r: Rute) => { rute = r; kald = []; };
 const jsonR = (b: unknown, status = 200, h: Record<string, string> = {}) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", ...h } });
 const tom = (status = 204) => new Response(null, { status });
 const fejlR = () => jsonR({ message: "mockfejl", code: "XX000" }, 500);
@@ -240,7 +247,7 @@ const downloads = () => kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat
 const png = (n: number) => { const b = new Uint8Array(n); b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); return b; };
 const info = (size: unknown) => () => jsonR(size === undefined ? { name: "x" } : { name: "x", size });
 
-test("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download", async () => {
+klientTest("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download", async () => {
   const N = 10 * 1024 * 1024;
   nulstil(laesRute({ info: info(N), download: () => new Response(png(N)) }));
   const r = await hFil(laesReq());
@@ -250,7 +257,7 @@ test("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download", asy
   assertEquals(r2.status, 410); assertEquals(await r2.json(), { kode: "vaek" }); assertEquals(downloads(), 0); ingenUkendte();
 });
 
-test("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden download", async () => {
+klientTest("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden download", async () => {
   const N = 20 * 1024;
   nulstil(laesRute({ sti: "c/e1/n.txt", navn: "n.txt", info: info(N), download: () => new Response(enc("a".repeat(N))) }));
   const r = await hFil(laesReq());
@@ -260,7 +267,7 @@ test("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden downl
   assertEquals(r2.status, 410); assertEquals(downloads(), 0); ingenUkendte();
 });
 
-test("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt, 404, exception) → 410 uden download", async () => {
+klientTest("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt, 404, exception) → 410 uden download", async () => {
   const varianter: (() => Response | Promise<Response>)[] = [info(null), info("5"), info(-1), info(undefined), info(1.5),
     () => jsonR({ statusCode: "404", error: "not_found", message: "Object not found" }, 404), () => { throw new Error("transport"); }];
   for (const v of varianter) {
@@ -270,7 +277,7 @@ test("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt, 404,
   }
 });
 
-test("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size", async () => {
+klientTest("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size", async () => {
   const sti = "c/e1/a.b.c.png";
   nulstil(laesRute({ sti, info: info(16), download: () => new Response(png(16)) }));
   const r = await hFil(laesReq());
@@ -278,7 +285,7 @@ test("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size", as
   assertEquals(kaldTil((k) => k.sti === `/storage/v1/object/info/chat-attachments/${sti}`).length, 1); ingenUkendte();
 });
 
-test("§2 sb-fil: lille metadata men for stor stream → reader annulleres tidligt, 410", async () => {
+klientTest("§2 sb-fil: lille metadata men for stor stream → reader annulleres tidligt, 410", async () => {
   let træk = 0, annulleret = false;
   const strøm = () => new Response(new ReadableStream<Uint8Array>({
     pull(c) { træk++; c.enqueue(træk === 1 ? png(1024) : new Uint8Array(1024)); },
@@ -289,7 +296,7 @@ test("§2 sb-fil: lille metadata men for stor stream → reader annulleres tidli
   assertEquals(r.status, 410); assert(annulleret, "reader blev ikke annulleret"); assert(træk <= 5, `for mange træk: ${træk}`); // få chunks pga. stream-buffering, ikke hele objektet
 });
 
-test("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410", async () => {
+klientTest("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410", async () => {
   nulstil(laesRute({ info: info(100), download: () => new Response(png(50)) }));
   assertEquals((await hFil(laesReq())).status, 410);
   nulstil(laesRute({ info: info(100), download: () => new Response(new ReadableStream({ start(c) { c.enqueue(png(20)); c.error(new Error("afbrudt")); } })) }));
@@ -298,13 +305,13 @@ test("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410", asy
   assertEquals((await hFil(laesReq())).status, 410);
 });
 
-test("§2 sb-fil: faktisk tekst over 20 KiB med misvisende endelse → 410", async () => {
+klientTest("§2 sb-fil: faktisk tekst over 20 KiB med misvisende endelse → 410", async () => {
   const N = 30 * 1024;
   nulstil(laesRute({ sti: "c/e1/x.png", info: info(N), download: () => new Response(enc("a".repeat(N))) }));
   assertEquals((await hFil(laesReq())).status, 410);
 });
 
-test("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", async () => {
+klientTest("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", async () => {
   nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
   const r = await hFil(laesReq("bytes=0-7"));
   assertEquals(r.status, 206); assertEquals(r.headers.get("Content-Range"), "bytes 0-7/32"); assertEquals((await r.arrayBuffer()).byteLength, 8);
@@ -317,14 +324,14 @@ test("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", as
   assertEquals(r3.status, 200); assertEquals(r3.headers.get("X-Content-Type-Options"), "nosniff"); await r3.body?.cancel();
 });
 
-test("§4 sb-fil: ASCII-PDF uden NUL som .txt → 410 type_afvist", async () => {
+klientTest("§4 sb-fil: ASCII-PDF uden NUL som .txt → 410 type_afvist", async () => {
   const pdf = enc("%PDF-1.4\n1 0 obj << >> endobj\n%%EOF");
   nulstil(laesRute({ sti: "c/e1/d.txt", info: info(pdf.length), download: () => new Response(pdf) }));
   const r = await hFil(laesReq());
   assertEquals(r.status, 410); assertEquals(await r.json(), { kode: "vaek" });
 });
 
-test("§5 sb-fil: Content-Disposition gennem handleren (emoji, surrogater, '()*)", async () => {
+klientTest("§5 sb-fil: Content-Disposition gennem handleren (emoji, surrogater, '()*)", async () => {
   for (const [navn, forventet] of [["a".repeat(99) + "😀.png", "a".repeat(99) + "😀.png"], ["x\uD800\uDC00\uDC00y.png", "x\u{10000}y.png"], ["Æ😀 ø.png", "Æ😀 ø.png"]] as const) {
     nulstil(laesRute({ navn, info: info(16), download: () => new Response(png(16)) }));
     const r = await hFil(laesReq());
@@ -354,20 +361,20 @@ function udstedRute(koe: (k: Kald) => Response | Promise<Response>, patch: (k: K
 }
 const statusPatches = () => kaldTil((k) => tabel(k, "sb_stier") && k.metode === "PATCH");
 
-test("§1 sb-fil: køfejl som {error} → ingen statusopdatering, 500 token_fejl, intet token", async () => {
+klientTest("§1 sb-fil: køfejl som {error} → ingen statusopdatering, 500 token_fejl, intet token", async () => {
   nulstil(udstedRute(() => fejlR()));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); const b = await r.json(); assertEquals(b, { kode: "token_fejl" }); assert(!("token" in b));
   assertEquals(statusPatches().length, 0); ingenUkendte();
 });
 
-test("§1 sb-fil: køfejl som exception → ingen statusopdatering, 500 token_fejl", async () => {
+klientTest("§1 sb-fil: køfejl som exception → ingen statusopdatering, 500 token_fejl", async () => {
   nulstil(udstedRute(() => { throw new Error("transport"); }));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" }); assertEquals(statusPatches().length, 0);
 });
 
-test("§1 sb-fil: køsucces med data=null (void) → statusopdatering forsøges på bucket/sti/uploadet", async () => {
+klientTest("§1 sb-fil: køsucces med data=null (void) → statusopdatering forsøges på bucket/sti/uploadet", async () => {
   nulstil(udstedRute(() => tom(204)));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
@@ -379,7 +386,7 @@ test("§1 sb-fil: køsucces med data=null (void) → statusopdatering forsøges 
   assert(ik >= 0 && ik < ip);
 });
 
-test("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kompensation), 500", async () => {
+klientTest("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kompensation), 500", async () => {
   nulstil(udstedRute(() => tom(204), () => fejlR()));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
@@ -388,7 +395,7 @@ test("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kompensat
 });
 
 // Stateful MOCK af SQL-protokollen (ikke kørt SQL): register + kø + slet_tidligst.
-test("§1 stateful mock: mislykket statusopdatering → senere overtagelse → to køposter afsluttes → slettet; intet før slet_tidligst", async () => {
+klientTest("§1 stateful mock: mislykket statusopdatering → senere overtagelse → to køposter afsluttes → slettet; intet før slet_tidligst", async () => {
   const T0 = Date.parse("2026-10-28T10:00:00Z");
   const time = new FakeTime(T0);
   try {
@@ -481,13 +488,13 @@ const afslutKald = () => kaldTil((k) => rpc(k, "sb_tjek_afslut"));
 const udfaldSendt = () => JSON.parse(afslutKald()[0].krop).p_udfald;
 const harFilPayload = () => gwKald().some((k) => k.krop.includes("image_url") || k.krop.includes("<<<FIL>>>"));
 
-test("§2/§4 tjek: gyldigt billede sendes som filpayload, fil_tjekket=true", async () => {
+klientTest("§2/§4 tjek: gyldigt billede sendes som filpayload, fil_tjekket=true", async () => {
   nulstil(tjekRute({ info: info(16), download: () => new Response(png(16)) }));
   const r = await hTjek(tjekReq());
   assertEquals(await r.json(), { status: "tjekket" }); assert(harFilPayload()); assertEquals(udfaldSendt().fil_tjekket, true); ingenUkendte();
 });
 
-test("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, markup) → ingen filpayload, fil_tjekket=false, tekst tjekkes", async () => {
+klientTest("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, markup) → ingen filpayload, fil_tjekket=false, tekst tjekkes", async () => {
   const pdf = enc("%PDF-1.4\n%%EOF"), svg = enc("<!-- k --><svg></svg>");
   const varianter: TjekOps[] = [
     { info: info(10 * 1024 * 1024 + 1), download: () => new Response(png(16)) },
@@ -514,7 +521,7 @@ test("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, markup) �
   assertEquals(kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")).length, 0);
 });
 
-test("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false og afslutning inden 55 s", async () => {
+klientTest("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false og afslutning inden 55 s", async () => {
   for (const variant of ["før", "efter"] as const) {
     const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
     try {
@@ -528,7 +535,7 @@ test("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false og a
   }
 });
 
-test("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; langsom request-body → intet efterfølgende arbejde", async () => {
+klientTest("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; langsom request-body → intet efterfølgende arbejde", async () => {
   let time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
   try {
     nulstil(tjekRute({ auth: (k) => hænger(k.signal) as Promise<Response> }));
@@ -545,7 +552,7 @@ test("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; langsom r
   } finally { time.restore(); }
 });
 
-test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver positiv afslut-timeout; 0 s → intet kald", async () => {
+klientTest("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver positiv afslut-timeout; 0 s → intet kald", async () => {
   // Ikke-samarbejdende transport, der ignorerer abort, flytter tiden forbi arbejdsfristen.
   let time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
   try {
@@ -572,7 +579,7 @@ test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver posit
   } finally { time.restore(); }
 });
 
-test("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/optaget bevares", async () => {
+klientTest("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/optaget bevares", async () => {
   nulstil(tjekRute({ sti: null, afslut: () => jsonR(false) }));
   assertEquals(await (await hTjek(tjekReq())).json(), { status: "forældet" });
   nulstil(tjekRute({ sti: null, afslut: () => fejlR() }));
@@ -613,7 +620,7 @@ const poster = (n: number, fra = 0) => Array.from({ length: n }, (_, i) => ({ id
 const DAG = Date.parse("2026-10-28T10:00:00Z"); // uden for optællingsvinduet
 const NAT = Date.parse("2026-10-28T02:30:00Z"); // 03:30 dansk
 
-test("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, rester synlige, ok=true", async () => {
+klientTest("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, rester synlige, ok=true", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(50) : []), remove: async (k) => { await vent(7_000, k.signal); return jsonR([]); },
@@ -628,7 +635,7 @@ test("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, rester
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → ingen overskridelse, afbrudt afslut er fejl", async () => {
+klientTest("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → ingen overskridelse, afbrudt afslut er fejl", async () => {
   const time = new FakeTime(DAG);
   try {
     let gruppe = 0;
@@ -649,7 +656,7 @@ test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → in
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8 s-fejl)", async () => {
+klientTest("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8 s-fejl)", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ overtag: async (k) => { await vent(9_000, k.signal); return jsonR(3); },
@@ -661,7 +668,7 @@ test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
+klientTest("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), afslut: (k) => hænger(k.signal) as Promise<Response> }));
@@ -673,7 +680,7 @@ test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet bli
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: budgetstop midt i optælling og lige før dagstal → ingen dagstal; reel Storage-fejl skelnes", async () => {
+klientTest("§3 oprydning: budgetstop midt i optælling og lige før dagstal → ingen dagstal; reel Storage-fejl skelnes", async () => {
   // a) midt i optælling
   let time = new FakeTime(NAT);
   try {
@@ -715,7 +722,7 @@ test("§3 oprydning: budgetstop midt i optælling og lige før dagstal → ingen
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: dry_run er skrivefri og budgetbeskyttet", async () => {
+klientTest("§3 oprydning: dry_run er skrivefri og budgetbeskyttet", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil((k) => tabel(k, "sb_filsletninger") ? hænger(k.signal) as Promise<Response> : oprRute({})(k) ?? (tabel(k, "sb_stier") ? jsonR([]) : undefined));
@@ -761,7 +768,7 @@ test("§3 laesBegraenset: overskridelse annullerer, frist annullerer, ingen delv
   } finally { time.restore(); }
 });
 
-test("§3 SDK 2.118.0 med mocket fetch: RPC/Storage {error} og exception, ingen skjulte genforsøg", async () => {
+klientTest("§3 SDK 2.118.0 med mocket fetch: RPC/Storage {error} og exception, ingen skjulte genforsøg", async () => {
   const c = createClient(MOCK, "svc-test", bud.budgetIndstillinger(() => Date.now() + 30_000, 8_000));
   nulstil(() => jsonR({ message: "x" }, 503));
   const r1 = await c.rpc("sb_version"); assert(r1.error); assertEquals(kald.length, 1);
