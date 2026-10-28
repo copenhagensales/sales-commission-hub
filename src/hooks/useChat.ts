@@ -1077,15 +1077,24 @@ function efterHandling(qc: QueryClient, conversationId: string, messageId: strin
   });
 }
 
+/** B2b-1: revisionen er fastholdt fra den viste række; ejer er obligatorisk og fastholdt synkront ved trykket. */
+export interface AfgoerInput { messageId: string; revision: number; handling: "send" | "traek"; conversationId: string; ejer: OperationsEjer }
+export interface FjernFilInput { messageId: string; revision: number; conversationId: string; ejer: OperationsEjer }
+
 export function useAfgoer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { messageId: string; revision: number; handling: "send" | "traek"; conversationId: string }) => {
+    mutationFn: async (v: AfgoerInput) => {
+      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
       const { error } = await supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling });
+      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
       if (error) throw error;
       return v;
     },
+    // B2b-1: ingen automatisk genkørsel af sb_afgoer (App.tsx' mutations.retry=1 overstyres lokalt).
+    retry: 0,
     onSettled: (_d, _e, v) => {
+      if (!ejerGyldig(v.ejer)) return;
       void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] });
       void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
       void qc.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
@@ -1096,13 +1105,17 @@ export function useAfgoer() {
 export function useFjernFil() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { messageId: string; revision: number; conversationId: string }) => {
+    mutationFn: async (v: FjernFilInput) => {
+      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
       const { error } = await supabase.rpc("sb_fjern_fil", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision });
+      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
       if (error) throw error;
       return v;
     },
-    onSuccess: (v) => efterHandling(qc, v.conversationId, v.messageId),
-    onError: (_e, v) => { void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
+    // B2b-1: ingen automatisk genkørsel af sb_fjern_fil.
+    retry: 0,
+    onSuccess: (v) => { const vagt = () => ejerGyldig(v.ejer); if (vagt()) efterHandling(qc, v.conversationId, v.messageId, vagt); },
+    onError: (_e, v) => { if (ejerGyldig(v.ejer)) void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
   });
 }
 
