@@ -15,7 +15,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
   // c1 §2: kan skiftes til den rigtige useEditMessage (netværk mocket ved supabase-grænsen).
   return { ...o, useEditMessage: () => (aegte.brug ? o.useEditMessage() : { mutateAsync: editMutate, isPending: false }) };
 });
-vi.mock("./BeskedStatus", () => ({ BeskedStatus: () => null }));
+vi.mock("./BeskedStatus", async (orig) => ({ ...(await orig<typeof import("./BeskedStatus")>()), BeskedStatus: () => null }));
 vi.mock("./FilVedhaeftning", () => ({ FilVedhaeftning: () => null }));
 
 import { MessageBubble } from "./MessageBubble";
