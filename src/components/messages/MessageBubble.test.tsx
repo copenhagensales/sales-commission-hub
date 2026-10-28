@@ -192,14 +192,15 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("anden brugers");
   });
 
-  it("transportfejl i samme session: præcis ét sb_ret (retry 0 trods mutations.retry=1), kladden bevares, én toast", async () => {
+  it("transportfejl i samme session: præcis ét sb_ret (retry 0 trods mutations.retry=1), kladden bevares; usynlig række = ukendt udfald ved editoren uden toast (B2b-2)", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "behold", revision: 1 });
     kontrolRet();
     render(ui(besked("m1", "a"), "e"));
     await act(async () => { gem(); });
     await act(async () => { afvis(new TypeError("Failed to fetch")); await new Promise((x) => setTimeout(x, 10)); });
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
-    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("behold");
   });
 

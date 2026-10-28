@@ -72,7 +72,9 @@ describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatori
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Træk tilbage" })); await new Promise((x) => setTimeout(x, 10)); });
     expect(kald("sb_afgoer")).toHaveLength(1);
     expect(kald("sb_afgoer")[0][1]).toMatchObject({ p_revision: 7, p_handling: "traek" });
-    expect(toast.error).toHaveBeenCalledTimes(1);
+    // B2b-2: rækken er usynlig i mocken → ukendt udfald vises lokalt, ingen toast.
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
   });
 
   it("Fjern fil sender den viste revision; transportfejl giver præcis ét sb_fjern_fil", async () => {
