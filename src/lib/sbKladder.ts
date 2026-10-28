@@ -175,9 +175,13 @@ export function fastholdEjer(emp: string | null | undefined, conv: string | null
   if (lytterAktiv && aktivBruger !== null && aktivBruger !== b) return null;
   return { emp, conv, gen: generation, bruger: b, op: nytOperationsId() };
 }
-/** Ejerskab gælder: samme sessionsgeneration og – når auth-lytteren kører – samme auth-bruger. Navigation ændrer ikke ejeren. */
+/** d1 §2: eksplicit annullerede operationer (stopvej). Operations-id'er er unikke, så sættet kan kun ugyldiggøre netop dem. */
+const annulleredeOps = new Set<string>();
+/** Gør én operation ugyldig overalt, hvor dens kontekst føres (send, afstemning, upload, efterbehandling). */
+export function annullerOperation(op: string): void { annulleredeOps.add(op); }
+/** Ejerskab gælder: samme sessionsgeneration, ikke annulleret og – når auth-lytteren kører – samme auth-bruger. Navigation ændrer ikke ejeren. */
 export const ejerGyldig = (e: OperationsEjer | null | undefined) =>
-  !!e && !!e.bruger && !!e.op && e.gen === generation && (!lytterAktiv || aktivBruger === e.bruger);
+  !!e && !!e.bruger && !!e.op && e.gen === generation && !annulleredeOps.has(e.op) && (!lytterAktiv || aktivBruger === e.bruger);
 /** Konteksten passer til input (samtale) og er stadig gyldig. */
 export const ejerPasser = (e: OperationsEjer | null | undefined, conv: string) => !!e && e.conv === conv && ejerGyldig(e);
 
