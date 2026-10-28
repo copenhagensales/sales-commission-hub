@@ -189,7 +189,9 @@ Deno.serve(async (req) => {
         for (let i = 0; i < ids.length; i += PO_BUNDT) {
           if (!tid()) { stop("personoplysninger"); personoplysninger += rundens; break poloekke; }
           const { data: n, error: sErr } = await kald(() => tung.rpc("sb_slet_personoplysninger", { p_kilde: kilde, p_ids: ids.slice(i, i + PO_BUNDT) }));
-          if (sErr) { fejl.push("po_slet"); rester.personoplysninger = true; continue; }
+          // Slettefejl (error/exception/timeout = ukendt commit): stop HELE persondatatrinnet i denne kørsel.
+          // Ingen ny udvælgelse eller flere bundter; kun bekræftede returantal fra tidligere bundter tælles (én gang).
+          if (sErr) { fejl.push("po_slet"); rester.personoplysninger = true; personoplysninger += rundens; break poloekke; }
           rundens += typeof n === "number" ? n : 0;
         }
       }
