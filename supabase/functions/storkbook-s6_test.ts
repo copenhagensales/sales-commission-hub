@@ -888,3 +888,240 @@ test("§3 SDK 2.118.0 med mocket fetch: RPC/Storage {error} og exception, ingen 
   assertEquals(await ft.objektStoerrelse(c, "chat-attachments", "x/a.b.png"), 42); assertEquals(kald[0].sti, "/storage/v1/object/info/chat-attachments/x/a.b.png");
   ingenUkendte();
 });
+
+// ================================================================ A3
+// Syntetiske UUID'er og parameterkontrol for persondata-RPC'erne (SQL-kildeværdier fra 24d-vaern.sql).
+const PO_KILDER = new Set(["chat_messages", "pulsen_posts", "feed_comments"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function puid(n: number): string { return `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`; }
+/** Læser og validerer sb_slet_personoplysninger-parametre; ugyldige parametre registreres som ukendt kald (→ prøven fejler). */
+function sletParam(k: Kald): { p_kilde: string; p_ids: string[] } {
+  const b = JSON.parse(k.krop);
+  const gyldig = b && Object.keys(b).sort().join(",") === "p_ids,p_kilde" && PO_KILDER.has(b.p_kilde) && Array.isArray(b.p_ids)
+    && b.p_ids.length >= 1 && b.p_ids.length <= 100 && b.p_ids.every((x: unknown) => typeof x === "string" && UUID_RE.test(x));
+  if (!gyldig) ukendt.push("ugyldige sb_slet_personoplysninger-parametre");
+  return b;
+}
+const poRækker = (n: number, kilde = "chat_messages", fra = 0) => Array.from({ length: n }, (_, i) => ({ kilde, kilde_id: puid(fra + i + 1) }));
+const sletKald = () => kaldTil((k) => rpc(k, "sb_slet_personoplysninger"));
+const udvaelgKald = () => kaldTil((k) => rpc(k, "sb_personoplysninger_til_sletning"));
+
+// ---------------------------------------------------------------- §2 oprydning: stop persondatatrinnet ved slettefejl
+type FejlVariant = "error" | "exception" | "timeout";
+const fejlSvar = (v: FejlVariant, k: Kald): Response | Promise<Response> =>
+  v === "error" ? fejlR() : v === "exception" ? (() => { throw new Error("transport"); })() : hænger(k.signal) as Promise<Response>;
+
+for (const v of ["timeout", "error", "exception"] as FejlVariant[]) {
+  test(`§2 oprydning: 101 rækker, første bundt (100) fejler som ${v} → præcis ét slettekald, ingen ny udvælgelse, 0, po_slet`, async () => {
+    const time = new FakeTime(DAG);
+    try {
+      const alle = poRækker(101);
+      nulstil(oprRute({ udvaelg: () => jsonR(alle), slet: (k) => { sletParam(k); return fejlSvar(v, k); } }));
+      const { res } = await kørFake(hOpr, oprReq(), time);
+      assertEquals(res.status, 200);
+      const b = await res.json();
+      assertEquals(sletKald().length, 1); assertEquals(udvaelgKald().length, 1);
+      const p = sletParam(sletKald()[0]); assertEquals(p.p_kilde, "chat_messages"); assertEquals(p.p_ids, alle.slice(0, 100).map((r) => r.kilde_id));
+      assertEquals(b.personoplysninger, 0); assert(b.fejl.includes("po_slet")); assertEquals(b.rester.personoplysninger, true); assertEquals(b.ok, false);
+    } finally { time.restore(); }
+  });
+
+  test(`§2 oprydning: 201 rækker, første 100 bekræftet, næste 100 fejler som ${v} → to kald, sidste række forsøges ikke, 100`, async () => {
+    const time = new FakeTime(DAG);
+    try {
+      const alle = poRækker(201);
+      let n = 0;
+      nulstil(oprRute({ udvaelg: () => jsonR(alle), slet: (k) => { sletParam(k); return n++ === 0 ? jsonR(100) : fejlSvar(v, k); } }));
+      const { res } = await kørFake(hOpr, oprReq(), time);
+      const b = await res.json();
+      assertEquals(sletKald().length, 2); assertEquals(udvaelgKald().length, 1);
+      assertEquals(sletKald().map((k) => sletParam(k).p_ids.length), [100, 100]);
+      assert(!sletKald().some((k) => sletParam(k).p_ids.includes(alle[200].kilde_id)), "sidste række forsøgt");
+      assertEquals(b.personoplysninger, 100); assert(b.fejl.includes("po_slet")); assertEquals(b.rester.personoplysninger, true); assertEquals(b.ok, false);
+    } finally { time.restore(); }
+  });
+}
+
+test("§2 oprydning: bekræftet returantal mindre end bundtet tælles; fejlet bundt tælles ikke, selv om mocken modellerer senere commit", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    // Tre kilder (SQL-værdier), gruppering efter kilde; første bundt bekræfter 97 af 100, andet bundt "committer" men svarer fejl.
+    const alle = [...poRækker(100, "chat_messages"), ...poRækker(5, "pulsen_posts", 100), ...poRækker(3, "feed_comments", 200)];
+    let n = 0, senereCommittet = 0;
+    nulstil(oprRute({ udvaelg: () => jsonR(alle), slet: (k) => { const p = sletParam(k); if (n++ === 0) return jsonR(97); senereCommittet += p.p_ids.length; return fejlR(); } }));
+    const b = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(sletKald().map((k) => sletParam(k).p_kilde), ["chat_messages", "pulsen_posts"]);
+    assertEquals(senereCommittet, 5);
+    assertEquals(b.personoplysninger, 97); assert(b.fejl.includes("po_slet")); assertEquals(b.ok, false);
+  } finally { time.restore(); }
+});
+
+test("§2 oprydning: rent budgetstop efter vellykkede bundter bevarer antallet uden po_slet", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    const alle = poRækker(500);
+    nulstil(oprRute({ udvaelg: () => jsonR(alle), slet: async (k) => { const p = sletParam(k); await vent(14_000, k.signal); return jsonR(p.p_ids.length); } }));
+    const { res, ms } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assert(ms <= 58_100, `varighed ${ms}`);
+    assertEquals(sletKald().length, 4); // start ved ~0, 14, 28, 42 s; 5. bundt efter arbejdsfristen startes ikke
+    assertEquals(b.personoplysninger, 400); assert(!b.fejl.includes("po_slet")); assertEquals(b.rester.personoplysninger, true);
+  } finally { time.restore(); }
+});
+
+test("§2 oprydning: succesrunde genudvælger uden offset og tæller hver runde én gang", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ udvaelg: (_k, u) => jsonR(u === 0 ? poRækker(100) : u === 1 ? poRækker(30, "feed_comments", 100) : []),
+      slet: (k) => jsonR(sletParam(k).p_ids.length) }));
+    const b = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(udvaelgKald().length, 3); assertEquals(sletKald().length, 2);
+    assertEquals(b.personoplysninger, 130); assertEquals(b.fejl, []); assertEquals(b.ok, true);
+  } finally { time.restore(); }
+});
+
+// ---------------------------------------------------------------- §1 storkbook-tjek: fælles afslutning efter reservation
+const svcGenlaes = (k: Kald) => tabel(k, "chat_messages") && k.headers.get("authorization") === "Bearer svc-test";
+const RAEKKE = { id: TJEK_ID, sender_id: "e1", revision: 1, content: "hej kollega", attachment_path: null, conversation_id: "c", status: "tjekkes" };
+/** tjekRute med styret reservation og genlæsning (service-klientens læsning af chat_messages). */
+function tjekA3(o: { reserver?: (k: Kald) => Response | Promise<Response>; genlaes?: (k: Kald) => Response | Promise<Response>; afslut?: TjekOps["afslut"]; gateway?: TjekOps["gateway"] }): Rute {
+  const basis = tjekRute({ sti: null, afslut: o.afslut, gateway: o.gateway });
+  return (k) => {
+    if (rpc(k, "sb_tjek_reserver") && o.reserver) return o.reserver(k);
+    if (svcGenlaes(k) && o.genlaes) return o.genlaes(k);
+    return basis(k);
+  };
+}
+const forventAfslutParam = (u: unknown) => {
+  assertEquals(afslutKald().length, 1);
+  const b = JSON.parse(afslutKald()[0].krop);
+  assertEquals(b, { p_kilde: "besked", p_id: TJEK_ID, p_revision: 1, p_token: "tok", p_udfald: u });
+};
+
+for (const v of ["error", "exception"] as const) {
+  test(`§1 tjek: reservation ved 49 s, genlæsningsfejl (${v}) ved 50 s → præcis ét afslutningsforsøg med hele UKENDT, ingen gateway, 200`, async () => {
+    const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+    try {
+      const t0 = Date.now(); let genlaesT = -1, afslutT = -1;
+      nulstil(tjekA3({
+        reserver: async () => { await vent(49_000 - (Date.now() - t0), null); return jsonR("tok"); },
+        genlaes: async () => { await vent(50_000 - (Date.now() - t0) - 1, null); genlaesT = Date.now() - t0; return v === "error" ? fejlR() : (() => { throw new Error("transport"); })(); },
+        afslut: () => { afslutT = Date.now() - t0; return jsonR(true); },
+      }));
+      const { res } = await kørFake(hTjek, tjekReq(), time);
+      assertEquals(res.status, 200); assertEquals(await res.json(), { status: "tjekket" });
+      assert(genlaesT >= 49_900 && genlaesT < 50_100, `genlæsning ${genlaesT}`); assert(afslutT >= genlaesT && afslutT < 55_000, `afslut ${afslutT}`);
+      forventAfslutParam({ tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" });
+      assertEquals(gwKald().length, 0); assertEquals(kaldTil((k) => rpc(k, "sb_tjek_reserver")).length, 1);
+    } finally { time.restore(); }
+  });
+}
+
+test("§1 tjek: genlæsning hænger → afbrydes af arbejdsfristen (transportvej) → ét afslutningsforsøg med UKENDT", async () => {
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    nulstil(tjekA3({ reserver: async () => { await vent(45_000, null); return jsonR("tok"); }, genlaes: (k) => hænger(k.signal) as Promise<Response> }));
+    const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(await res.json(), { status: "tjekket" }); assert(ms < 55_000);
+    forventAfslutParam({ ...tjek.UKENDT }); assertEquals(gwKald().length, 0);
+  } finally { time.restore(); }
+});
+
+test("§1 tjek: genlæsningsfejl uden resterende tid → nul afslutningskald, 500 afslut_fejl", async () => {
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    // Ikke-samarbejdende transport, der ignorerer abort og svarer fejl efter den samlede slutfrist.
+    nulstil(tjekA3({ genlaes: async () => { await vent(56_000 - (Date.now() - t0), null); return fejlR(); } }));
+    const { res } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(res.status, 500); assertEquals(await res.json(), { kode: "afslut_fejl" });
+    assertEquals(afslutKald().length, 0); assertEquals(gwKald().length, 0);
+  } finally { time.restore(); }
+});
+
+test("§1 tjek: manglende række, forkert revision, afsender eller status → forældet uden afslutning/gateway", async () => {
+  for (const svar of [[], [{ ...RAEKKE, revision: 2 }], [{ ...RAEKKE, sender_id: "e2" }], [{ ...RAEKKE, status: "sendt" }]]) {
+    nulstil(tjekA3({ genlaes: () => jsonR(svar) }));
+    const r = await hTjek(tjekReq());
+    assertEquals(r.status, 200); assertEquals(await r.json(), { status: "forældet" });
+    assertEquals(afslutKald().length, 0); assertEquals(gwKald().length, 0);
+  }
+});
+
+test("§1 tjek: ændring efter genlæsning (RPC false) → forældet, oprindelig revision/token, intet genforsøg", async () => {
+  nulstil(tjekA3({ afslut: () => jsonR(false) }));
+  const r = await hTjek(tjekReq());
+  assertEquals(await r.json(), { status: "forældet" });
+  forventAfslutParam({ tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ok" });
+  assertEquals(kaldTil((k) => rpc(k, "sb_tjek_reserver")).length, 1);
+});
+
+test("§1 tjek: fejl og timeout i afslutningen → præcis ét forsøg og afslut_fejl", async () => {
+  for (const v of ["error", "exception"] as const) {
+    nulstil(tjekA3({ afslut: () => v === "error" ? fejlR() : (() => { throw new Error("transport"); })() }));
+    const r = await hTjek(tjekReq());
+    assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "afslut_fejl" }); assertEquals(afslutKald().length, 1);
+  }
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    nulstil(tjekA3({ afslut: (k) => hænger(k.signal) as Promise<Response> }));
+    const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(res.status, 500); assertEquals(await res.json(), { kode: "afslut_fejl" }); assertEquals(afslutKald().length, 1);
+    assert(ms >= 5_000 && ms < 5_200, `afslut-timeout ${ms}`);
+  } finally { time.restore(); }
+});
+
+test("§1 tjek: filfejl med tid til teksttjek → ingen filpayload, fil_tjekket=false, gyldig CPR-dom bevares", async () => {
+  const cprDom = () => jsonR({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ tone: "ok", personoplysninger: "fundet", type: "cpr", cpr: true }) } }] });
+  nulstil(tjekRute({ info: () => fejlR(), download: () => new Response(png(16)), gateway: cprDom }));
+  const r = await hTjek(tjekReq());
+  assertEquals(await r.json(), { status: "tjekket" });
+  assertEquals(gwKald().length, 1); assert(!harFilPayload());
+  assertEquals(udfaldSendt(), { tone: "ok", personoplysninger: "fundet", type: "cpr", cpr: true, fil_tjekket: false, udfald: "ok" });
+});
+
+test("§1 tjek: model uden gyldig dom → UKENDT via fælles afslutning", async () => {
+  nulstil(tjekA3({ gateway: () => jsonR({ choices: [{ finish_reason: "length", message: { content: "{" } }] }) }));
+  assertEquals(await (await hTjek(tjekReq())).json(), { status: "tjekket" });
+  forventAfslutParam({ ...tjek.UKENDT });
+});
+
+// ---------------------------------------------------------------- §4 0x0B og hele ASCII-whitespace-sættet
+const VT = 0x0b;
+const html = enc("<html><body>x</body></html>");
+const rtf = enc("{\\rtf1\\ansi hej}"); // bytes indeholder {\rtf (backslash), ikke carriage return
+const dokVarianter: [string, Uint8Array][] = [
+  ["0x0B+HTML", cat([VT], html)], ["0x0B+RTF", cat([VT], rtf)],
+  ["BOM+blandet+HTML", cat(BOM, [0x09, VT, 0x0c, 0x0d, 0x0a, 0x20], html)], ["BOM+blandet+RTF", cat(BOM, [0x20, VT, 0x09, 0x0c], rtf)],
+];
+
+test("§4 filtype: 0x09–0x0D og 0x20 springes over før dokumentpræfiks; RTF-bytes er korrekte", () => {
+  assertEquals(rtf[0], 0x7b); assertEquals(rtf[1], 0x5c); assert(!rtf.includes(0x0d));
+  for (const [n, b] of dokVarianter) assertEquals(ft.filtype(b), null, n);
+  assertEquals(ft.filtype(cat([VT], enc("almindelig prosa æøå"))), "text/plain");
+  assertEquals(ft.filtype(enc("Almindelig UTF-8-prosa – æøå 😀")), "text/plain");
+  assertEquals(ft.filtype(png(16)), "image/png");
+});
+
+klientTest("§4 sb-fil: 0x0B/BOM/blandet whitespace foran HTML og RTF → 410 {kode:'vaek'}; prosa og billede accepteres", async () => {
+  for (const [n, b] of dokVarianter) {
+    nulstil(laesRute({ sti: "c/e1/d.txt", navn: "d.txt", info: info(b.length), download: () => new Response(b.slice()) }));
+    const r = await hFil(laesReq());
+    assertEquals(r.status, 410, n); assertEquals(await r.json(), { kode: "vaek" });
+  }
+  const prosa = enc("Almindelig prosa æøå");
+  nulstil(laesRute({ sti: "c/e1/p.txt", navn: "p.txt", info: info(prosa.length), download: () => new Response(prosa.slice()) }));
+  const r = await hFil(laesReq()); assertEquals(r.status, 200); assertEquals(new Uint8Array(await r.arrayBuffer()), prosa);
+  nulstil(laesRute({ info: info(16), download: () => new Response(png(16)) }));
+  const r2 = await hFil(laesReq()); assertEquals(r2.status, 200); await r2.body?.cancel();
+});
+
+test("§4 tjek: 0x0B/BOM foran HTML og RTF → ingen filpayload, fil_tjekket=false, tekst tjekkes og afsluttes", async () => {
+  for (const [n, b] of dokVarianter) {
+    nulstil(tjekRute({ sti: "c/e1/d.txt", info: info(b.length), download: () => new Response(b.slice()) }));
+    const r = await hTjek(tjekReq());
+    assertEquals(await r.json(), { status: "tjekket" }, n);
+    assertEquals(gwKald().length, 1); assert(!harFilPayload(), n);
+    assertEquals(udfaldSendt().fil_tjekket, false); assertEquals(udfaldSendt().udfald, "ok"); assertEquals(afslutKald().length, 1);
+  }
+});
