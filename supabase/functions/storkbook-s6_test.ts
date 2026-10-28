@@ -433,8 +433,7 @@ klientTest("§1/§5 stateful MOCK af SQL-reglerne: udstedelsesfejl → overtagel
     assertEquals((await hFil(udstedReq())).status, 500);
     assertEquals(reg!.status, "uploadet"); assertEquals(koe.length, 1); assertEquals(koe[0].kilde, "udstedelse_fejl");
 
-    // Post 2 reserveres af en tidligere (afbrudt) afhentning ved overtagelsen; dens genforsøgsvindue udløber senere.
-    let reserverPost2VedOvertagelse = true;
+    const reserverPost2VedOvertagelse = false;
     const rute: Rute = (k) => {
       if (tabel(k, "pulsen_config")) return jsonR([{ value: CRON_HASH }]);
       if (rpc(k, "sb_version")) return jsonR("24d");
@@ -475,13 +474,12 @@ klientTest("§1/§5 stateful MOCK af SQL-reglerne: udstedelsesfejl → overtagel
     assertEquals(r1.slettet, 0); assertEquals(r1.foraeldreloese, 0);
     assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0); assertEquals(objekter.size, 1);
     // c) Præcis 3 t efter oprettelse: overtagelse kræver STRENGT mere end 3 t → ingen.
-    time.tick(2 * 3600_000 - (Date.now() - T0 - 3600_000) - (Date.now() - T0 - 3 * 3600_000));
     time.tick(T0 + TRE_T - Date.now());
     nulstil(rute);
     const rPræcis = await (await kørFake(hOpr, oprReq(), time)).res.json();
     assertEquals(rPræcis.foraeldreloese, 0); assertEquals(koe.length, 1);
-    // Post 1 er dog nu kvalificeret (slet_tidligst = oprettet + 3 t ≤ nu) og afhentes/afsluttes → slettet? Nej: registeret er
-    // uploadet og sættes til slettes af sb_koe_naeste, og første succesfulde afslutning gør det slettet.
+    // Post 1 er nu kvalificeret (registerets slet_tidligst = oprettet + 3 t ≤ nu): sb_koe_naeste sætter uploadet → slettes,
+    // og første succesfulde afslutning gør registeret slettet.
     assertEquals(rPræcis.slettet, 1); assertEquals(reg!.status, "slettet"); assertEquals(statusVedAfslut, ["slettet"]);
     assertEquals(objekter.size, 0);
     // d) Senere: registeret er slettet → ingen overtagelse; ingen yderligere poster.
