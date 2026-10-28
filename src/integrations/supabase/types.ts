@@ -3265,26 +3265,32 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          direct_key: string | null
           id: string
           is_group: boolean
           name: string | null
           updated_at: string
+          vaern_niveau: number
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          direct_key?: string | null
           id?: string
           is_group?: boolean
           name?: string | null
           updated_at?: string
+          vaern_niveau?: number
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          direct_key?: string | null
           id?: string
           is_group?: boolean
           name?: string | null
           updated_at?: string
+          vaern_niveau?: number
         }
         Relationships: [
           {
@@ -3415,7 +3421,10 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          afgjort_at: string | null
+          afventer_fra: string | null
           attachment_name: string | null
+          attachment_path: string | null
           attachment_type: string | null
           attachment_url: string | null
           content: string
@@ -3424,12 +3433,24 @@ export type Database = {
           deleted_at: string | null
           edited_at: string | null
           id: string
+          leveret_at: string | null
+          personoplysning: boolean
           reply_to_id: string | null
+          revision: number
           sender_id: string
+          slettes_efter: string | null
+          status: string
+          tjek_startet_at: string | null
+          tjekket_at: string | null
+          trukket_tilbage_at: string | null
           updated_at: string
+          vaern_niveau: number
         }
         Insert: {
+          afgjort_at?: string | null
+          afventer_fra?: string | null
           attachment_name?: string | null
+          attachment_path?: string | null
           attachment_type?: string | null
           attachment_url?: string | null
           content: string
@@ -3438,12 +3459,24 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          leveret_at?: string | null
+          personoplysning?: boolean
           reply_to_id?: string | null
+          revision?: number
           sender_id: string
+          slettes_efter?: string | null
+          status?: string
+          tjek_startet_at?: string | null
+          tjekket_at?: string | null
+          trukket_tilbage_at?: string | null
           updated_at?: string
+          vaern_niveau?: number
         }
         Update: {
+          afgjort_at?: string | null
+          afventer_fra?: string | null
           attachment_name?: string | null
+          attachment_path?: string | null
           attachment_type?: string | null
           attachment_url?: string | null
           content?: string
@@ -3452,9 +3485,18 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          leveret_at?: string | null
+          personoplysning?: boolean
           reply_to_id?: string | null
+          revision?: number
           sender_id?: string
+          slettes_efter?: string | null
+          status?: string
+          tjek_startet_at?: string | null
+          tjekket_at?: string | null
+          trukket_tilbage_at?: string | null
           updated_at?: string
+          vaern_niveau?: number
         }
         Relationships: [
           {
@@ -8766,34 +8808,67 @@ export type Database = {
       }
       feed_comments: {
         Row: {
+          afgjort_at: string | null
+          afventer_fra: string | null
           body: string
           created_at: string
           edited_at: string | null
           id: string
+          leveret_at: string | null
           mentions: Json
+          personoplysning: boolean
+          revision: number
+          slettes_efter: string | null
+          status: string
           target_key: string
           target_type: string
+          tjek_startet_at: string | null
+          tjekket_at: string | null
+          trukket_tilbage_at: string | null
           user_id: string
+          vaern_niveau: number
         }
         Insert: {
+          afgjort_at?: string | null
+          afventer_fra?: string | null
           body: string
           created_at?: string
           edited_at?: string | null
           id?: string
+          leveret_at?: string | null
           mentions?: Json
+          personoplysning?: boolean
+          revision?: number
+          slettes_efter?: string | null
+          status?: string
           target_key: string
           target_type: string
+          tjek_startet_at?: string | null
+          tjekket_at?: string | null
+          trukket_tilbage_at?: string | null
           user_id: string
+          vaern_niveau?: number
         }
         Update: {
+          afgjort_at?: string | null
+          afventer_fra?: string | null
           body?: string
           created_at?: string
           edited_at?: string | null
           id?: string
+          leveret_at?: string | null
           mentions?: Json
+          personoplysning?: boolean
+          revision?: number
+          slettes_efter?: string | null
+          status?: string
           target_key?: string
           target_type?: string
+          tjek_startet_at?: string | null
+          tjekket_at?: string | null
+          trukket_tilbage_at?: string | null
           user_id?: string
+          vaern_niveau?: number
         }
         Relationships: []
       }
@@ -13947,6 +14022,8 @@ export type Database = {
       }
       pulsen_posts: {
         Row: {
+          afgjort_at: string | null
+          afventer_fra: string | null
           audience: string
           author_employee_id: string
           best_answer_comment_id: string | null
@@ -13959,14 +14036,25 @@ export type Database = {
           hidden_by: string | null
           id: string
           image_path: string | null
+          leveret_at: string | null
           mentions: Json
+          personoplysning: boolean
           post_type: string
           praised_employee_id: string | null
           praised_employee_ids: string[]
+          revision: number
+          slettes_efter: string | null
+          status: string
           team_id: string | null
+          tjek_startet_at: string | null
+          tjekket_at: string | null
+          trukket_tilbage_at: string | null
           updated_at: string
+          vaern_niveau: number
         }
         Insert: {
+          afgjort_at?: string | null
+          afventer_fra?: string | null
           audience: string
           author_employee_id: string
           best_answer_comment_id?: string | null
@@ -13979,14 +14067,25 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           image_path?: string | null
+          leveret_at?: string | null
           mentions?: Json
+          personoplysning?: boolean
           post_type: string
           praised_employee_id?: string | null
           praised_employee_ids?: string[]
+          revision?: number
+          slettes_efter?: string | null
+          status?: string
           team_id?: string | null
+          tjek_startet_at?: string | null
+          tjekket_at?: string | null
+          trukket_tilbage_at?: string | null
           updated_at?: string
+          vaern_niveau?: number
         }
         Update: {
+          afgjort_at?: string | null
+          afventer_fra?: string | null
           audience?: string
           author_employee_id?: string
           best_answer_comment_id?: string | null
@@ -13999,12 +14098,21 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           image_path?: string | null
+          leveret_at?: string | null
           mentions?: Json
+          personoplysning?: boolean
           post_type?: string
           praised_employee_id?: string | null
           praised_employee_ids?: string[]
+          revision?: number
+          slettes_efter?: string | null
+          status?: string
           team_id?: string | null
+          tjek_startet_at?: string | null
+          tjekket_at?: string | null
+          trukket_tilbage_at?: string | null
           updated_at?: string
+          vaern_niveau?: number
         }
         Relationships: [
           {
@@ -15827,6 +15935,291 @@ export type Database = {
         Update: {
           last_number?: number
           year_month?: string
+        }
+        Relationships: []
+      }
+      sb_dagstal: {
+        Row: {
+          dag: string
+          filer_tilbageholdt: number
+          haarde: number
+          koefrist_overskredet: number
+          objekter_uden_register: number | null
+          opgjort_at: string | null
+          personoplysninger: number
+          tjek: number
+        }
+        Insert: {
+          dag: string
+          filer_tilbageholdt?: number
+          haarde?: number
+          koefrist_overskredet?: number
+          objekter_uden_register?: number | null
+          opgjort_at?: string | null
+          personoplysninger?: number
+          tjek?: number
+        }
+        Update: {
+          dag?: string
+          filer_tilbageholdt?: number
+          haarde?: number
+          koefrist_overskredet?: number
+          objekter_uden_register?: number | null
+          opgjort_at?: string | null
+          personoplysninger?: number
+          tjek?: number
+        }
+        Relationships: []
+      }
+      sb_filsletninger: {
+        Row: {
+          bucket: string
+          fejl: string | null
+          forsoegt_at: string | null
+          id: number
+          kilde: string
+          kilde_id: string | null
+          oprettet: string
+          slettet_at: string | null
+          sti: string
+        }
+        Insert: {
+          bucket: string
+          fejl?: string | null
+          forsoegt_at?: string | null
+          id?: number
+          kilde: string
+          kilde_id?: string | null
+          oprettet?: string
+          slettet_at?: string | null
+          sti: string
+        }
+        Update: {
+          bucket?: string
+          fejl?: string | null
+          forsoegt_at?: string | null
+          id?: number
+          kilde?: string
+          kilde_id?: string | null
+          oprettet?: string
+          slettet_at?: string | null
+          sti?: string
+        }
+        Relationships: []
+      }
+      sb_signaler: {
+        Row: {
+          audience: string | null
+          conversation_id: string | null
+          haendelse: string
+          id: number
+          kilde: string
+          kilde_id: string
+          post_id: string | null
+          privat: boolean
+          team_id: string | null
+          tid: string
+          til_employee_id: string | null
+        }
+        Insert: {
+          audience?: string | null
+          conversation_id?: string | null
+          haendelse: string
+          id?: number
+          kilde: string
+          kilde_id: string
+          post_id?: string | null
+          privat: boolean
+          team_id?: string | null
+          tid?: string
+          til_employee_id?: string | null
+        }
+        Update: {
+          audience?: string | null
+          conversation_id?: string | null
+          haendelse?: string
+          id?: number
+          kilde?: string
+          kilde_id?: string
+          post_id?: string | null
+          privat?: boolean
+          team_id?: string | null
+          tid?: string
+          til_employee_id?: string | null
+        }
+        Relationships: []
+      }
+      sb_sletninger: {
+        Row: {
+          aarsag_kode: string
+          id: number
+          kilde: string
+          kilde_id: string
+          slettet_at: string
+        }
+        Insert: {
+          aarsag_kode?: string
+          id?: number
+          kilde: string
+          kilde_id: string
+          slettet_at?: string
+        }
+        Update: {
+          aarsag_kode?: string
+          id?: number
+          kilde?: string
+          kilde_id?: string
+          slettet_at?: string
+        }
+        Relationships: []
+      }
+      sb_sti_spaerring: {
+        Row: {
+          bucket: string
+          spaerret_at: string
+          sti_hash: string
+        }
+        Insert: {
+          bucket: string
+          spaerret_at?: string
+          sti_hash: string
+        }
+        Update: {
+          bucket?: string
+          spaerret_at?: string
+          sti_hash?: string
+        }
+        Relationships: []
+      }
+      sb_stier: {
+        Row: {
+          besked_id: string | null
+          bucket: string
+          bundet_at: string | null
+          ejer_employee_id: string | null
+          oprettet: string
+          samtale_id: string | null
+          slet_tidligst: string | null
+          slettet_at: string | null
+          status: string
+          sti: string
+          udstedt_at: string | null
+          upload_udloeb_at: string | null
+        }
+        Insert: {
+          besked_id?: string | null
+          bucket: string
+          bundet_at?: string | null
+          ejer_employee_id?: string | null
+          oprettet?: string
+          samtale_id?: string | null
+          slet_tidligst?: string | null
+          slettet_at?: string | null
+          status?: string
+          sti: string
+          udstedt_at?: string | null
+          upload_udloeb_at?: string | null
+        }
+        Update: {
+          besked_id?: string | null
+          bucket?: string
+          bundet_at?: string | null
+          ejer_employee_id?: string | null
+          oprettet?: string
+          samtale_id?: string | null
+          slet_tidligst?: string | null
+          slettet_at?: string | null
+          status?: string
+          sti?: string
+          udstedt_at?: string | null
+          upload_udloeb_at?: string | null
+        }
+        Relationships: []
+      }
+      sb_tjek_begrundelser: {
+        Row: {
+          aarsag_kode: string
+          detalje_kode: string | null
+          kilde: string
+          kilde_id: string
+          oprettet: string
+          revision: number
+        }
+        Insert: {
+          aarsag_kode: string
+          detalje_kode?: string | null
+          kilde: string
+          kilde_id: string
+          oprettet?: string
+          revision: number
+        }
+        Update: {
+          aarsag_kode?: string
+          detalje_kode?: string | null
+          kilde?: string
+          kilde_id?: string
+          oprettet?: string
+          revision?: number
+        }
+        Relationships: []
+      }
+      sb_tjek_haendelser: {
+        Row: {
+          employee_id: string
+          id: string
+          kilde: string
+          kilde_id: string
+          oprettet: string
+          revision: number
+          type: string
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          kilde: string
+          kilde_id: string
+          oprettet?: string
+          revision: number
+          type: string
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          kilde?: string
+          kilde_id?: string
+          oprettet?: string
+          revision?: number
+          type?: string
+        }
+        Relationships: []
+      }
+      sb_tjek_job: {
+        Row: {
+          afsluttet_at: string | null
+          kilde: string
+          kilde_id: string
+          reserveret_at: string
+          revision: number
+          token: string
+          udfald_kode: string | null
+        }
+        Insert: {
+          afsluttet_at?: string | null
+          kilde: string
+          kilde_id: string
+          reserveret_at?: string
+          revision: number
+          token: string
+          udfald_kode?: string | null
+        }
+        Update: {
+          afsluttet_at?: string | null
+          kilde?: string
+          kilde_id?: string
+          reserveret_at?: string
+          revision?: number
+          token?: string
+          udfald_kode?: string | null
         }
         Relationships: []
       }
@@ -18160,6 +18553,7 @@ export type Database = {
           modtagerregel: string
           navn: string
           noegle: string
+          obligatorisk: boolean
           opdateret: string
           oprettet: string
           push_link: string | null
@@ -18184,6 +18578,7 @@ export type Database = {
           modtagerregel?: string
           navn: string
           noegle: string
+          obligatorisk?: boolean
           opdateret?: string
           oprettet?: string
           push_link?: string | null
@@ -18208,6 +18603,7 @@ export type Database = {
           modtagerregel?: string
           navn?: string
           noegle?: string
+          obligatorisk?: boolean
           opdateret?: string
           oprettet?: string
           push_link?: string | null
@@ -20359,6 +20755,157 @@ export type Database = {
         }
         Returns: Json
       }
+      sb_afgoer: {
+        Args: {
+          p_handling: string
+          p_id: string
+          p_kilde: string
+          p_revision: number
+        }
+        Returns: boolean
+      }
+      sb_bind_sti: {
+        Args: {
+          p_besked: string
+          p_bucket: string
+          p_samtale: string
+          p_sti: string
+        }
+        Returns: boolean
+      }
+      sb_chat_start_direkte: { Args: { p_anden: string }; Returns: string }
+      sb_chat_start_gruppe: {
+        Args: { p_medlemmer: string[]; p_navn: string }
+        Returns: string
+      }
+      sb_dagstal_objekter: { Args: { p_antal: number }; Returns: undefined }
+      sb_dagstal_tael: {
+        Args: {
+          p_fil: number
+          p_haarde: number
+          p_koe?: number
+          p_po: number
+          p_tjek: number
+        }
+        Returns: undefined
+      }
+      sb_direkte_noegle: { Args: { a: string; b: string }; Returns: string }
+      sb_er_afsender: {
+        Args: { p_kilde: string; p_kilde_id: string }
+        Returns: boolean
+      }
+      sb_find_personoplysning: { Args: { p: string }; Returns: string }
+      sb_fjern_fil: {
+        Args: { p_id: string; p_kilde: string; p_revision: number }
+        Returns: number
+      }
+      sb_flag: { Args: { p_noegle: string }; Returns: boolean }
+      sb_flag_laes: { Args: { p_noegle: string }; Returns: boolean }
+      sb_handling: { Args: never; Returns: string }
+      sb_kilde_for_tabel: { Args: { p_tabel: string }; Returns: string }
+      sb_kildetid: {
+        Args: { p_created: string; p_edited: string; p_leveret: string }
+        Returns: string
+      }
+      sb_koe_afslut: {
+        Args: { p_fejl?: string; p_id: number; p_ok: boolean }
+        Returns: boolean
+      }
+      sb_koe_fil: {
+        Args: {
+          p_bucket: string
+          p_kilde: string
+          p_kilde_id: string
+          p_sti: string
+        }
+        Returns: undefined
+      }
+      sb_koe_naeste: {
+        Args: { p_limit?: number }
+        Returns: {
+          bucket: string
+          id: number
+          sti: string
+        }[]
+      }
+      sb_laas_egen: {
+        Args: { p_id: string; p_kilde: string; p_revision: number }
+        Returns: Record<string, unknown>
+      }
+      sb_minimer_register: { Args: never; Returns: number }
+      sb_ny_status_efter_ret: {
+        Args: { p_kilde: string; p_status: string }
+        Returns: string
+      }
+      sb_overtag_foraeldreloese: { Args: { p_limit?: number }; Returns: number }
+      sb_personoplysninger_til_sletning: {
+        Args: never
+        Returns: {
+          kilde: string
+          kilde_id: string
+        }[]
+      }
+      sb_ret: {
+        Args: {
+          p_id: string
+          p_kilde: string
+          p_mentions?: Json
+          p_revision: number
+          p_tekst: string
+        }
+        Returns: number
+      }
+      sb_rolle: { Args: never; Returns: string }
+      sb_signal_skriv: {
+        Args: {
+          p_audience: string
+          p_conv: string
+          p_haendelse: string
+          p_id: string
+          p_kilde: string
+          p_post: string
+          p_privat: boolean
+          p_team: string
+          p_til: string
+        }
+        Returns: undefined
+      }
+      sb_slet_personoplysninger: {
+        Args: { p_ids: string[]; p_kilde: string }
+        Returns: number
+      }
+      sb_sti_hash: {
+        Args: { p_bucket: string; p_sti: string }
+        Returns: string
+      }
+      sb_tabel_for_kilde: { Args: { p_kilde: string }; Returns: string }
+      sb_tjek_afslut: {
+        Args: {
+          p_id: string
+          p_kilde: string
+          p_revision: number
+          p_token: string
+          p_udfald: Json
+        }
+        Returns: boolean
+      }
+      sb_tjek_reserver: {
+        Args: { p_id: string; p_kilde: string; p_revision: number }
+        Returns: string
+      }
+      sb_udloeb: { Args: never; Returns: number }
+      sb_udloeb_registrer: {
+        Args: {
+          p_aarsag: string
+          p_afsender: string
+          p_id: string
+          p_kilde: string
+          p_revision: number
+          p_type: string
+        }
+        Returns: undefined
+      }
+      sb_version: { Args: never; Returns: string }
       schedule_integration_sync: {
         Args: {
           p_anon_key: string
@@ -20549,6 +21096,18 @@ export type Database = {
           foerste_reaktor: string
           post_id: string
           reaktorer: string[]
+        }[]
+      }
+      udsendelse_kilde_tjek: {
+        Args: { p_id: string; p_limit: number; p_tid: string }
+        Returns: {
+          employee_id: string
+          id: string
+          kilde: string
+          kilde_id: string
+          revision: number
+          tid: string
+          type: string
         }[]
       }
       udsendelse_laas: { Args: { p_token: string }; Returns: boolean }
