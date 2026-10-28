@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 export interface Conversation {
   id: string;
@@ -147,14 +147,18 @@ async function iBlokke<T = Record<string, unknown>>(
   return ud;
 }
 
+/** Beskeder hentes nyeste først i blokke à 100; ældre historik hentes ved »Indlæs ældre«. */
+export const CHAT_PAGE_SIZE = 100;
+
 export function useMessages(conversationId: string | null) {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["chat-messages", conversationId],
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<Message[]> => {
       if (!conversationId) return [];
-      
+      const fra = pageParam * CHAT_PAGE_SIZE;
       // Use secure view for sender data
-      const { data, error } = await supabase
+      const { data: nyesteFoerst, error } = await supabase
         .from("chat_messages")
         .select(`
           *,
@@ -162,9 +166,13 @@ export function useMessages(conversationId: string | null) {
         `)
         .eq("conversation_id", conversationId)
         .is("deleted_at", null)
-        .order("created_at", { ascending: true }) as any;
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(fra, fra + CHAT_PAGE_SIZE - 1) as any;
 
       if (error) throw error;
+      // Vises stigende inden for blokken.
+      const data = [...(nyesteFoerst || [])].reverse();
       
       // Fetch reactions for all messages
       const messageIds = (data || []).map((m: any) => m.id);
@@ -240,8 +248,26 @@ export function useMessages(conversationId: string | null) {
         };
       }) as Message[];
     },
+    getNextPageParam: (last, all) => (last.length === CHAT_PAGE_SIZE ? all.length : undefined),
     enabled: !!conversationId,
   });
+  // Ældste blok først; dubletter (forskudte blokke efter nye beskeder) fjernes.
+  const data = useMemo(() => {
+    if (!query.data) return undefined;
+    const set = new Set<string>();
+    const ud: Message[] = [];
+    for (const page of [...query.data.pages].reverse()) {
+      for (const m of page) if (!set.has(m.id)) { set.add(m.id); ud.push(m); }
+    }
+    return ud;
+  }, [query.data]);
+  return {
+    data,
+    isLoading: query.isLoading,
+    hasOlder: !!query.hasNextPage,
+    isLoadingOlder: query.isFetchingNextPage,
+    loadOlder: () => { if (!query.isFetching) void query.fetchNextPage(); },
+  };
 }
 
 export function useMarkMessageAsRead() {
@@ -405,29 +431,13 @@ export function useMarkAsRead() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (conversationId: string) => {
+    // Kvitterer kun de beskeder, der er hentet og vist i tråden (ikke hele samtalen).
+    mutationFn: async ({ conversationId, messageIds }: { conversationId: string; messageIds: string[] }) => {
       const employeeId = await getCurrentEmployeeId();
       
       // Kvitterer kun, når vinduet er synligt og har fokus (aldrig massekvittering i baggrunden).
       if (!erSynligMedFokus() || !employeeId) return conversationId;
-      // Alle ulæste fra andre (pagineret i blokke à 1.000, ordnet efter id) – ikke kun de seneste.
-      const ids: string[] = [];
-      for (let fra = 0; ; fra += 1000) {
-        const { data: side, error: mErr } = await supabase
-          .from("chat_messages")
-          .select("id, chat_message_read_receipts!left(employee_id)")
-          .eq("conversation_id", conversationId)
-          .neq("sender_id", employeeId)
-          .is("deleted_at", null)
-          .eq("chat_message_read_receipts.employee_id", employeeId)
-          .order("id")
-          .range(fra, fra + 999);
-        if (mErr) throw mErr;
-        for (const m of side ?? []) {
-          if (!(m.chat_message_read_receipts as { employee_id: string }[] | null)?.length) ids.push(m.id);
-        }
-        if ((side ?? []).length < 1000) break;
-      }
+      const ids = [...new Set(messageIds)];
       const nu = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
         // Fokus kontrolleres før hver skrivning; falder det, afbrydes uden yderligere skrivning.
