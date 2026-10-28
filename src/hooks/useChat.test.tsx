@@ -512,6 +512,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
   });
 
   it("(c1 §1) manglende identitet: fastholdEjer giver null og ingen ejer starter ingen skrivning", async () => {
+    auth("SIGNED_OUT", null); // ingen aktiv auth-bruger at falde tilbage på (uafhængigt af prøverækkefølge)
     expect(fastholdEjer("e", "c", null)).toBeNull();
     expect(fastholdEjer(undefined, "c", "u")).toBeNull();
     expect(fastholdEjer("e", "", "u")).toBeNull();
