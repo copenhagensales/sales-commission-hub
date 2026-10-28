@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { useActiveColleagues, usePulsenTeams } from "@/hooks/usePulsen";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
   const ref = useRef<HTMLTextAreaElement>(null);
   const [aktiv, setAktiv] = useState<{ start: number; q: string } | null>(null);
   const [valgt, setValgt] = useState(0);
+  const [dublet, setDublet] = useState(false);
   const kolleger = useActiveColleagues(true);
   const teams = usePulsenTeams();
   const listeId = useMemo(() => `omtaler-${Math.random().toString(36).slice(2)}`, []);
@@ -54,13 +55,28 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
   }, [aktiv, teams.data, kolleger.data, mentions]);
 
   const fuld = mentions.length >= OMTALER_MAX;
-  const aaben = !!aktiv && (fuld || kandidater.length > 0);
+  const aaben = !!aktiv && (fuld || dublet || kandidater.length > 0);
 
   const opdaterAktiv = (tekst: string, caret: number) => {
     const a = findAktiv(tekst, caret);
-    setAktiv(a);
-    setValgt(0);
+    setAktiv((f) => (f && a && f.start === a.start && f.q === a.q ? f : a));
+    if (!a || !aktiv || a.start !== aktiv.start) setValgt(0);
+    setDublet(false);
   };
+
+  // Omtaleområdet følger markøren (piletaster, Home/End, klik, mobilmarkør).
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  useEffect(() => {
+    const vedSkift = () => {
+      const el = ref.current;
+      if (!el || document.activeElement !== el) return;
+      const a = findAktiv(valueRef.current, el.selectionStart ?? valueRef.current.length);
+      setAktiv((f) => (f && a && f.start === a.start && f.q === a.q ? f : a));
+    };
+    document.addEventListener("selectionchange", vedSkift);
+    return () => document.removeEventListener("selectionchange", vedSkift);
+  }, []);
 
   const skift = (tekst: string, caret: number) => {
     onChange(tekst, rensOmtaler(tekst, mentions));
@@ -71,6 +87,16 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
     if (!aktiv || fuld) return;
     const el = ref.current;
     const caret = el?.selectionStart ?? value.length;
+    // Validér umiddelbart før indsættelse: teksten fra start til markør skal stadig være »@præfiks«.
+    const nu = findAktiv(value, caret);
+    if (!nu || nu.start !== aktiv.start || (el && el.selectionEnd !== caret)) {
+      setAktiv(null);
+      return;
+    }
+    if (mentions.some((m) => m.navn === k.navn && !(m.t === k.t && m.id === k.id) && value.includes(`@${m.navn}`))) {
+      setDublet(true);
+      return;
+    }
     const indsat = `@${k.navn} `;
     const ny = value.slice(0, aktiv.start) + indsat + value.slice(caret);
     if (ny.length > maxLength) {
@@ -89,6 +115,8 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
   };
 
   const tast = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME/composition: ingen vælger- eller send-genveje.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (aaben) {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setAktiv(null); return; }
       if (!fuld && kandidater.length) {
@@ -115,10 +143,11 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
         aria-expanded={aaben}
         aria-controls={aaben ? listeId : undefined}
         aria-autocomplete="list"
-        aria-activedescendant={aaben && !fuld && kandidater[valgt] ? `${listeId}-${valgt}` : undefined}
+        aria-activedescendant={aaben && !fuld && !dublet && kandidater[valgt] ? `${listeId}-${valgt}` : undefined}
         onChange={(e) => skift(e.target.value, e.target.selectionStart ?? e.target.value.length)}
         onKeyDown={tast}
         onClick={(e) => opdaterAktiv(value, e.currentTarget.selectionStart ?? value.length)}
+        onKeyUp={(e) => { if (!e.nativeEvent.isComposing && !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key)) opdaterAktiv(value, e.currentTarget.selectionStart ?? value.length); }}
         onBlur={() => window.setTimeout(() => setAktiv(null), 150)}
         className={cn(
           "w-full resize-y rounded-[18px] bg-[hsl(var(--cph-light-blue))] px-4 py-3 text-[17px] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
@@ -126,8 +155,8 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
         )}
       />
       {aaben && (
-        fuld ? (
-          <p className="mt-1 rounded-[16px] bg-card px-4 py-3 text-[14px] text-muted-foreground" role="status">Højst 10 omtaler</p>
+        fuld || dublet ? (
+          <p className="mt-1 rounded-[16px] bg-card px-4 py-3 text-[14px] text-muted-foreground" role="status">{fuld ? "Højst 10 omtaler" : "Navnet er allerede omtalt"}</p>
         ) : (
           <ul id={listeId} role="listbox" aria-label="Vælg kollega eller team" className="mt-1 overflow-hidden rounded-[16px] border border-border bg-card">
             {kandidater.map((k, i) => (
