@@ -47,7 +47,9 @@ function StorkbookToggles() {
     const r = raekker.find((x) => x.noegle === t.noegle);
     return r ? [{ ...t, server: r.aktiv !== false }] : [];
   });
-  if (!synlige.length) return null;
+  // storkbook_tjek: låst »Altid til« (obligatorisk); ingen præferenceskrivning. Vises kun, når RPC'en returnerer typen.
+  const tjek = raekker.some((x) => x.noegle === "storkbook_tjek");
+  if (!synlige.length && !tjek) return null;
   const skift = (noegle: string, v: boolean) => {
     const bruger = user?.id;
     if (!bruger) return;
@@ -87,6 +89,15 @@ function StorkbookToggles() {
             </label>
           </li>
         ))}
+        {tjek && (
+          <li>
+            <div className="flex min-h-11 items-center justify-between gap-3 py-1">
+              <span className="text-sm">Altid til – tjek af dine beskeder</span>
+              <Switch checked disabled aria-label="Tjek af dine beskeder (altid til)" />
+            </div>
+            <p className="pb-1 text-[14px] text-muted-foreground">Kan ikke slås fra. Levering kræver stadig, at notifikationer er slået til på enheden.</p>
+          </li>
+        )}
       </ul>
     </div>
   );
