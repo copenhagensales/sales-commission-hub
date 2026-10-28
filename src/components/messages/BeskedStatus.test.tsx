@@ -143,6 +143,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
 
   it("dobbeltklik på Fjern fil giver ét sb_fjern_fil", async () => {
     render(ui(afventer(1, true)));
+    screen.debug(undefined, 3000);
     const k = styret();
     fireEvent.click(knap("Fjern fil")); fireEvent.click(knap("Fjern fil"));
     await flush();
