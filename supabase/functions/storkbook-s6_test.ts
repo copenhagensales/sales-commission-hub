@@ -30,6 +30,11 @@ const wrk = await import("./storkbook-udsendelser/index.ts");
 const ft = await import("./_shared/sb-filtype.ts");
 const bud = await import("./_shared/sb-budget.ts");
 
+// supabase-js' auth-klient starter et auto-refresh-interval i de eksisterende brugerklienter; derfor slås
+// ops-/resource-sanitizerne fra (ingen netværkskald følger af det – mocken registrerer alle kald).
+const test = (name: string, fn: () => void | Promise<void>) => Deno.test({ name, fn, sanitizeOps: false, sanitizeResources: false });
+const flush = async (time: FakeTime) => { for (let i = 0; i < 20; i++) await time.tickAsync(0); };
+
 // ---------------------------------------------------------------- mock-infrastruktur
 type Kald = { metode: string; sti: string; url: URL; krop: string; signal: AbortSignal | null; t: number };
 type Rute = (k: Kald) => Promise<Response | undefined> | Response | undefined;
@@ -85,14 +90,14 @@ async function kørFake(h: Handler, req: Request, time: FakeTime, maks = 120_000
 }
 
 // ---------------------------------------------------------------- eksisterende kontraktprøver (A)
-Deno.test("tjek: gyldige domme for alle fem begrundelsesveje", () => {
+test("tjek: gyldige domme for alle fem begrundelsesveje", () => {
   assertEquals(tjek.validerDom({ tone: "ok", personoplysninger: "ingen", cpr: false }), { tone: "ok", personoplysninger: "ingen", cpr: false });
   assert(tjek.validerDom({ tone: "haard", personoplysninger: "ingen", type: "truende", cpr: false }));
   assert(tjek.validerDom({ tone: "ok", personoplysninger: "fundet", type: "telefon", cpr: false }));
   assert(tjek.validerDom({ tone: "ok", personoplysninger: "fundet", type: "cpr", cpr: true }));
 });
 
-Deno.test("tjek: ugyldige/modstridende domme afvises (→ ukendt)", () => {
+test("tjek: ugyldige/modstridende domme afvises (→ ukendt)", () => {
   for (const x of [null, [], "ok", { tone: "ok" }, { tone: "ok", personoplysninger: "ingen", cpr: "false" },
     { tone: "ok", personoplysninger: "ingen", cpr: true }, { tone: "ok", personoplysninger: "fundet", type: "cpr", cpr: false },
     { tone: "ok", personoplysninger: "ingen", type: "chikane", cpr: false }, { tone: "haard", personoplysninger: "ingen", type: "email", cpr: false },
@@ -103,7 +108,7 @@ Deno.test("tjek: ugyldige/modstridende domme afvises (→ ukendt)", () => {
   assertEquals(tjek.MAKS_OUTPUT_TOKENS, 200);
 });
 
-Deno.test("Content-Disposition er sikker og tvinger faktisk endelse", () => {
+test("Content-Disposition er sikker og tvinger faktisk endelse", () => {
   const d = fil.disposition('ond"\r\nX: y.html', "text/plain");
   assert(!/[\r\n]/.test(d));
   assert(d.startsWith('attachment; filename="'));
@@ -112,7 +117,7 @@ Deno.test("Content-Disposition er sikker og tvinger faktisk endelse", () => {
   assert(fil.disposition(null, "image/png").startsWith('inline; filename="fil.png"'));
 });
 
-Deno.test("Range: 206-grænser og 416", () => {
+test("Range: 206-grænser og 416", () => {
   assertEquals(fil.range(null, 10), null);
   assertEquals(fil.range("bytes=0-3", 10), { start: 0, slut: 3 });
   assertEquals(fil.range("bytes=5-", 10), { start: 5, slut: 9 });
@@ -121,14 +126,14 @@ Deno.test("Range: 206-grænser og 416", () => {
   for (const h of ["bytes=10-", "bytes=5-2", "bytes=0-1,3-4", "items=0-1", "bytes=-", "bytes=-0"]) assertEquals(fil.range(h, 10), "ugyldig");
 });
 
-Deno.test("tokenudløb læses fra JWT-payload", () => {
+test("tokenudløb læses fra JWT-payload", () => {
   const p = btoa(JSON.stringify({ exp: 1900000000 })).replace(/=+$/, "");
   assertEquals(fil.tokenUdloeb(`x.${p}.y`), 1900000000);
   assertEquals(fil.tokenUdloeb("ugyldig"), null);
   assertEquals(fil.TYPER.pdf, undefined);
 });
 
-Deno.test("oprydning: konstant-tid og tidsvindue 03–04 dansk", () => {
+test("oprydning: konstant-tid og tidsvindue 03–04 dansk", () => {
   assert(opr.ensKonstantTid("abc", "abc"));
   assert(!opr.ensKonstantTid("abc", "abd"));
   assert(!opr.ensKonstantTid("abc", "abcd"));
@@ -136,7 +141,7 @@ Deno.test("oprydning: konstant-tid og tidsvindue 03–04 dansk", () => {
   assert(!opr.iOptaellingsvindue(new Date("2026-10-28T03:30:00Z")));
 });
 
-Deno.test("worker: tjek-mapping (kilde_type = underliggende indhold, modtager = afsender)", () => {
+test("worker: tjek-mapping (kilde_type = underliggende indhold, modtager = afsender)", () => {
   const k = wrk.tjekKandidater([
     { id: "h1", tid: "t", kilde: "besked", kilde_id: "m1", revision: 2, type: "afventer", employee_id: "e1" },
     { id: "h2", tid: "t", kilde: "tjek", kilde_id: "m2", revision: 1, type: "afventer", employee_id: "e1" },
@@ -154,7 +159,7 @@ Deno.test("worker: tjek-mapping (kilde_type = underliggende indhold, modtager = 
   assertEquals(k[1].kilde_type, "opslag");
 });
 
-Deno.test("worker: indhold med feltet status er ikke et Afslut", () => {
+test("worker: indhold med feltet status er ikke et Afslut", () => {
   assert(wrk.erAfslut({ status: "annulleret", aarsag: "x" }));
   assert(!wrk.erAfslut({ id: "p", status: "leveret" }));
   assert(!wrk.erAfslut({ title: "t", body: "b", status: "leveret" }));
@@ -168,7 +173,7 @@ const enc = (s: string) => new TextEncoder().encode(s);
 const cat = (...a: (Uint8Array | number[])[]) => { const ud: number[] = []; for (const x of a) ud.push(...x); return new Uint8Array(ud); };
 const BOM = [0xef, 0xbb, 0xbf];
 
-Deno.test("§4 filtype: billeder uændrede, tekst accepteres", () => {
+test("§4 filtype: billeder uændrede, tekst accepteres", () => {
   assertEquals(ft.filtype(new Uint8Array([0xff, 0xd8, 0xff, 0])), "image/jpeg");
   assertEquals(ft.filtype(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), "image/png");
   assertEquals(ft.filtype(enc("GIF89a")), "image/gif");
@@ -181,14 +186,14 @@ Deno.test("§4 filtype: billeder uændrede, tekst accepteres", () => {
   assertEquals(ft.filtype(new Uint8Array([0xc3, 0x28])), null);
 });
 
-Deno.test("§4 filtype: PDF afvises også uden NUL og efter indledende bytes", () => {
+test("§4 filtype: PDF afvises også uden NUL og efter indledende bytes", () => {
   assertEquals(ft.filtype(enc("%PDF-1.4\n1 0 obj << >> endobj\ntrailer\n%%EOF")), null);
   assertEquals(ft.filtype(cat(BOM, enc("\r\n\n  %PDF-1.7\n"))), null);
   assertEquals(ft.filtype(cat(enc("x".repeat(900)), enc("%PDF-1.3"))), null);
   assertEquals(ft.filtype(cat(enc("x".repeat(1100)), enc("%PDF-1.3"))), "text/plain"); // efter 1.024 bytes: prosa
 });
 
-Deno.test("§4 filtype: alle dokument-/arkivsignaturer afvises (byteværdier)", () => {
+test("§4 filtype: alle dokument-/arkivsignaturer afvises (byteværdier)", () => {
   for (const sig of [[0x50, 0x4b, 3, 4], [0x50, 0x4b, 5, 6], [0x50, 0x4b, 7, 8], [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
     [0x1f, 0x8b, 8], [0x52, 0x61, 0x72, 0x21, 0x1a, 7, 0], [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]]) {
     assertEquals(ft.filtype(cat(sig, enc("abc"))), null, `signatur ${sig}`);
@@ -197,7 +202,7 @@ Deno.test("§4 filtype: alle dokument-/arkivsignaturer afvises (byteværdier)", 
   for (const t of ["{\\rtf1\\ansi hej}", "  {\\RTF1 x}", "%!PS-Adobe-3.0", "%!ps"]) assertEquals(ft.filtype(enc(t)), null, t);
 });
 
-Deno.test("§4 filtype: markup ved begyndelsen afvises (kommentar, deklaration, fragment, XML uden <?xml)", () => {
+test("§4 filtype: markup ved begyndelsen afvises (kommentar, deklaration, fragment, XML uden <?xml)", () => {
   for (const t of ["<!-- k --><html></html>", "<!DOCTYPE html><p>x", "<?xml version='1.0'?><a/>", "<svg xmlns='x'></svg>",
     "<!-- kommentar -->\n<svg></svg>", "<div>fragment</div>", "<rod><barn/></rod>", "</p>", "<HTML>", "\n\t <Svg>"]) {
     assertEquals(ft.filtype(enc(t)), null, t);
@@ -208,7 +213,7 @@ Deno.test("§4 filtype: markup ved begyndelsen afvises (kommentar, deklaration, 
 });
 
 // ---------------------------------------------------------------- §5 Content-Disposition
-Deno.test("§5 disposition: kodepunkter, surrogater og RFC 5987", () => {
+test("§5 disposition: kodepunkter, surrogater og RFC 5987", () => {
   const d = fil.disposition("a".repeat(99) + "😀.png", "image/png");
   const enc5987 = /filename\*=UTF-8''([^;]+)$/.exec(d)![1];
   assertEquals(decodeURIComponent(enc5987), "a".repeat(99) + "😀.png");
@@ -235,7 +240,7 @@ const downloads = () => kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat
 const png = (n: number) => { const b = new Uint8Array(n); b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); return b; };
 const info = (size: unknown) => () => jsonR(size === undefined ? { name: "x" } : { name: "x", size });
 
-Deno.test("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download", async () => {
+test("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download", async () => {
   const N = 10 * 1024 * 1024;
   nulstil(laesRute({ info: info(N), download: () => new Response(png(N)) }));
   const r = await hFil(laesReq());
@@ -245,7 +250,7 @@ Deno.test("§2 sb-fil: præcis 10 MiB godkendes, 10 MiB+1 afvises uden download"
   assertEquals(r2.status, 410); assertEquals(await r2.json(), { kode: "vaek" }); assertEquals(downloads(), 0); ingenUkendte();
 });
 
-Deno.test("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden download", async () => {
+test("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden download", async () => {
   const N = 20 * 1024;
   nulstil(laesRute({ sti: "c/e1/n.txt", navn: "n.txt", info: info(N), download: () => new Response(enc("a".repeat(N))) }));
   const r = await hFil(laesReq());
@@ -255,7 +260,7 @@ Deno.test("§2 sb-fil: .txt på præcis 20 KiB godkendes, 20 KiB+1 afvises uden 
   assertEquals(r2.status, 410); assertEquals(downloads(), 0); ingenUkendte();
 });
 
-Deno.test("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt, 404, exception) → 410 uden download", async () => {
+test("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt, 404, exception) → 410 uden download", async () => {
   const varianter: (() => Response | Promise<Response>)[] = [info(null), info("5"), info(-1), info(undefined), info(1.5),
     () => jsonR({ statusCode: "404", error: "not_found", message: "Object not found" }, 404), () => { throw new Error("transport"); }];
   for (const v of varianter) {
@@ -265,7 +270,7 @@ Deno.test("§2 sb-fil: ukendt størrelse (null, streng, negativ, manglende felt,
   }
 });
 
-Deno.test("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size", async () => {
+test("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size", async () => {
   const sti = "c/e1/a.b.c.png";
   nulstil(laesRute({ sti, info: info(16), download: () => new Response(png(16)) }));
   const r = await hFil(laesReq());
@@ -273,7 +278,7 @@ Deno.test("§2 sb-fil: fuld sti med flere punktummer; info-respons med data.size
   assertEquals(kaldTil((k) => k.sti === `/storage/v1/object/info/chat-attachments/${sti}`).length, 1); ingenUkendte();
 });
 
-Deno.test("§2 sb-fil: lille metadata men for stor stream → reader annulleres tidligt, 410", async () => {
+test("§2 sb-fil: lille metadata men for stor stream → reader annulleres tidligt, 410", async () => {
   let træk = 0, annulleret = false;
   const strøm = () => new Response(new ReadableStream<Uint8Array>({
     pull(c) { træk++; c.enqueue(træk === 1 ? png(1024) : new Uint8Array(1024)); },
@@ -284,7 +289,7 @@ Deno.test("§2 sb-fil: lille metadata men for stor stream → reader annulleres 
   assertEquals(r.status, 410); assert(annulleret, "reader blev ikke annulleret"); assert(træk <= 3, `for mange træk: ${træk}`);
 });
 
-Deno.test("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410", async () => {
+test("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410", async () => {
   nulstil(laesRute({ info: info(100), download: () => new Response(png(50)) }));
   assertEquals((await hFil(laesReq())).status, 410);
   nulstil(laesRute({ info: info(100), download: () => new Response(new ReadableStream({ start(c) { c.enqueue(png(20)); c.error(new Error("afbrudt")); } })) }));
@@ -293,13 +298,13 @@ Deno.test("§2 sb-fil: for kort, afbrudt stream og størrelsesafvigelse → 410"
   assertEquals((await hFil(laesReq())).status, 410);
 });
 
-Deno.test("§2 sb-fil: faktisk tekst over 20 KiB med misvisende endelse → 410", async () => {
+test("§2 sb-fil: faktisk tekst over 20 KiB med misvisende endelse → 410", async () => {
   const N = 30 * 1024;
   nulstil(laesRute({ sti: "c/e1/x.png", info: info(N), download: () => new Response(enc("a".repeat(N))) }));
   assertEquals((await hFil(laesReq())).status, 410);
 });
 
-Deno.test("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", async () => {
+test("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", async () => {
   nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
   const r = await hFil(laesReq("bytes=0-7"));
   assertEquals(r.status, 206); assertEquals(r.headers.get("Content-Range"), "bytes 0-7/32"); assertEquals((await r.arrayBuffer()).byteLength, 8);
@@ -312,14 +317,14 @@ Deno.test("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil
   assertEquals(r3.status, 200); assertEquals(r3.headers.get("X-Content-Type-Options"), "nosniff"); await r3.body?.cancel();
 });
 
-Deno.test("§4 sb-fil: ASCII-PDF uden NUL som .txt → 410 type_afvist", async () => {
+test("§4 sb-fil: ASCII-PDF uden NUL som .txt → 410 type_afvist", async () => {
   const pdf = enc("%PDF-1.4\n1 0 obj << >> endobj\n%%EOF");
   nulstil(laesRute({ sti: "c/e1/d.txt", info: info(pdf.length), download: () => new Response(pdf) }));
   const r = await hFil(laesReq());
   assertEquals(r.status, 410); assertEquals(await r.json(), { kode: "vaek" });
 });
 
-Deno.test("§5 sb-fil: Content-Disposition gennem handleren (emoji, surrogater, '()*)", async () => {
+test("§5 sb-fil: Content-Disposition gennem handleren (emoji, surrogater, '()*)", async () => {
   for (const [navn, forventet] of [["a".repeat(99) + "😀.png", "a".repeat(99) + "😀.png"], ["x\uD800\uDC00\uDC00y.png", "x\u{10000}y.png"], ["Æ😀 ø.png", "Æ😀 ø.png"]] as const) {
     nulstil(laesRute({ navn, info: info(16), download: () => new Response(png(16)) }));
     const r = await hFil(laesReq());
@@ -349,20 +354,20 @@ function udstedRute(koe: (k: Kald) => Response | Promise<Response>, patch: (k: K
 }
 const statusPatches = () => kaldTil((k) => tabel(k, "sb_stier") && k.metode === "PATCH");
 
-Deno.test("§1 sb-fil: køfejl som {error} → ingen statusopdatering, 500 token_fejl, intet token", async () => {
+test("§1 sb-fil: køfejl som {error} → ingen statusopdatering, 500 token_fejl, intet token", async () => {
   nulstil(udstedRute(() => fejlR()));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); const b = await r.json(); assertEquals(b, { kode: "token_fejl" }); assert(!("token" in b));
   assertEquals(statusPatches().length, 0); ingenUkendte();
 });
 
-Deno.test("§1 sb-fil: køfejl som exception → ingen statusopdatering, 500 token_fejl", async () => {
+test("§1 sb-fil: køfejl som exception → ingen statusopdatering, 500 token_fejl", async () => {
   nulstil(udstedRute(() => { throw new Error("transport"); }));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" }); assertEquals(statusPatches().length, 0);
 });
 
-Deno.test("§1 sb-fil: køsucces med data=null (void) → statusopdatering forsøges på bucket/sti/uploadet", async () => {
+test("§1 sb-fil: køsucces med data=null (void) → statusopdatering forsøges på bucket/sti/uploadet", async () => {
   nulstil(udstedRute(() => tom(204)));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
@@ -374,7 +379,7 @@ Deno.test("§1 sb-fil: køsucces med data=null (void) → statusopdatering fors�
   assert(ik >= 0 && ik < ip);
 });
 
-Deno.test("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kompensation), 500", async () => {
+test("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kompensation), 500", async () => {
   nulstil(udstedRute(() => tom(204), () => fejlR()));
   const r = await hFil(udstedReq());
   assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
@@ -383,7 +388,7 @@ Deno.test("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen komp
 });
 
 // Stateful MOCK af SQL-protokollen (ikke kørt SQL): register + kø + slet_tidligst.
-Deno.test("§1 stateful mock: mislykket statusopdatering → senere overtagelse → to køposter afsluttes → slettet; intet før slet_tidligst", async () => {
+test("§1 stateful mock: mislykket statusopdatering → senere overtagelse → to køposter afsluttes → slettet; intet før slet_tidligst", async () => {
   const T0 = Date.parse("2026-10-28T10:00:00Z");
   const time = new FakeTime(T0);
   try {
@@ -476,13 +481,13 @@ const afslutKald = () => kaldTil((k) => rpc(k, "sb_tjek_afslut"));
 const udfaldSendt = () => JSON.parse(afslutKald()[0].krop).p_udfald;
 const harFilPayload = () => gwKald().some((k) => k.krop.includes("image_url") || k.krop.includes("<<<FIL>>>"));
 
-Deno.test("§2/§4 tjek: gyldigt billede sendes som filpayload, fil_tjekket=true", async () => {
+test("§2/§4 tjek: gyldigt billede sendes som filpayload, fil_tjekket=true", async () => {
   nulstil(tjekRute({ info: info(16), download: () => new Response(png(16)) }));
   const r = await hTjek(tjekReq());
   assertEquals(await r.json(), { status: "tjekket" }); assert(harFilPayload()); assertEquals(udfaldSendt().fil_tjekket, true); ingenUkendte();
 });
 
-Deno.test("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, markup) → ingen filpayload, fil_tjekket=false, tekst tjekkes", async () => {
+test("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, markup) → ingen filpayload, fil_tjekket=false, tekst tjekkes", async () => {
   const pdf = enc("%PDF-1.4\n%%EOF"), svg = enc("<!-- k --><svg></svg>");
   const varianter: TjekOps[] = [
     { info: info(10 * 1024 * 1024 + 1), download: () => new Response(png(16)) },
@@ -509,7 +514,7 @@ Deno.test("§2/§4 tjek: afvist fil (størrelse, ukendt, kort stream, PDF, marku
   assertEquals(kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")).length, 0);
 });
 
-Deno.test("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false og afslutning inden 55 s", async () => {
+test("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false og afslutning inden 55 s", async () => {
   for (const variant of ["før", "efter"] as const) {
     const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
     try {
@@ -523,7 +528,7 @@ Deno.test("§3 tjek: Storage hænger før og efter headers → fil_tjekket=false
   }
 });
 
-Deno.test("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; langsom request-body → intet efterfølgende arbejde", async () => {
+test("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; langsom request-body → intet efterfølgende arbejde", async () => {
   let time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
   try {
     nulstil(tjekRute({ auth: (k) => hænger(k.signal) as Promise<Response> }));
@@ -540,7 +545,7 @@ Deno.test("§3 tjek: langsom bruger-auth afbrydes af budget (15 s) → 401; lang
   } finally { time.restore(); }
 });
 
-Deno.test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver positiv afslut-timeout; 0 s → intet kald", async () => {
+test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver positiv afslut-timeout; 0 s → intet kald", async () => {
   // Ikke-samarbejdende transport, der ignorerer abort, flytter tiden forbi arbejdsfristen.
   let time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
   try {
@@ -567,7 +572,7 @@ Deno.test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver 
   } finally { time.restore(); }
 });
 
-Deno.test("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/optaget bevares", async () => {
+test("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/optaget bevares", async () => {
   nulstil(tjekRute({ sti: null, afslut: () => jsonR(false) }));
   assertEquals(await (await hTjek(tjekReq())).json(), { status: "forældet" });
   nulstil(tjekRute({ sti: null, afslut: () => fejlR() }));
@@ -608,7 +613,7 @@ const poster = (n: number, fra = 0) => Array.from({ length: n }, (_, i) => ({ id
 const DAG = Date.parse("2026-10-28T10:00:00Z"); // uden for optællingsvinduet
 const NAT = Date.parse("2026-10-28T02:30:00Z"); // 03:30 dansk
 
-Deno.test("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, rester synlige, ok=true", async () => {
+test("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, rester synlige, ok=true", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(50) : []), remove: async (k) => { await vent(7_000, k.signal); return jsonR([]); },
@@ -623,7 +628,7 @@ Deno.test("§3 oprydning: 13 grupper à 8 s uden kaldfejl → stop inden 58 s, r
   } finally { time.restore(); }
 });
 
-Deno.test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → ingen overskridelse, afbrudt afslut er fejl", async () => {
+test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → ingen overskridelse, afbrudt afslut er fejl", async () => {
   const time = new FakeTime(DAG);
   try {
     let gruppe = 0;
@@ -638,7 +643,7 @@ Deno.test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut �
   } finally { time.restore(); }
 });
 
-Deno.test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8 s-fejl)", async () => {
+test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8 s-fejl)", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ overtag: async (k) => { await vent(9_000, k.signal); return jsonR(3); },
@@ -650,7 +655,7 @@ Deno.test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kuns
   } finally { time.restore(); }
 });
 
-Deno.test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
+test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), afslut: (k) => hænger(k.signal) as Promise<Response> }));
@@ -662,7 +667,7 @@ Deno.test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, inte
   } finally { time.restore(); }
 });
 
-Deno.test("§3 oprydning: budgetstop midt i optælling og lige før dagstal → ingen dagstal; reel Storage-fejl skelnes", async () => {
+test("§3 oprydning: budgetstop midt i optælling og lige før dagstal → ingen dagstal; reel Storage-fejl skelnes", async () => {
   // a) midt i optælling
   let time = new FakeTime(NAT);
   try {
@@ -703,7 +708,7 @@ Deno.test("§3 oprydning: budgetstop midt i optælling og lige før dagstal → 
   } finally { time.restore(); }
 });
 
-Deno.test("§3 oprydning: dry_run er skrivefri og budgetbeskyttet", async () => {
+test("§3 oprydning: dry_run er skrivefri og budgetbeskyttet", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil((k) => tabel(k, "sb_filsletninger") ? hænger(k.signal) as Promise<Response> : oprRute({})(k) ?? (tabel(k, "sb_stier") ? jsonR([]) : undefined));
@@ -716,7 +721,7 @@ Deno.test("§3 oprydning: dry_run er skrivefri og budgetbeskyttet", async () => 
 });
 
 // ---------------------------------------------------------------- §3 budgethelper + SDK med mocket fetch
-Deno.test("§3 budgetFetch: ms<=0 → intet netværkskald; eksisterende abortsignal respekteres; timeout gælder body", async () => {
+test("§3 budgetFetch: ms<=0 → intet netværkskald; eksisterende abortsignal respekteres; timeout gælder body", async () => {
   nulstil(() => jsonR({}));
   let fejl: unknown = null;
   try { await bud.budgetFetch(() => Date.now() - 1, 8_000)(`${MOCK}/x`); } catch (e) { fejl = e; }
@@ -731,12 +736,12 @@ Deno.test("§3 budgetFetch: ms<=0 → intet netværkskald; eksisterende abortsig
     const res = await bud.budgetFetch(() => Date.now() + 60_000, 8_000)(`${MOCK}/x`);
     let færdig = false, bodyFejl: unknown = null;
     res.text().catch((e) => { bodyFejl = e; }).finally(() => { færdig = true; });
-    await time.tickAsync(7_000); assert(!færdig, "timeout ryddet ved headers");
-    await time.tickAsync(1_100); assert(færdig && bodyFejl, "body-timeout virkede ikke");
+    await time.tickAsync(7_000); await flush(time); assert(!færdig, "timeout ryddet ved headers");
+    await time.tickAsync(1_100); await flush(time); assert(færdig && bodyFejl, "body-timeout virkede ikke");
   } finally { time.restore(); }
 });
 
-Deno.test("§3 laesBegraenset: overskridelse annullerer, frist annullerer, ingen delvis fil", async () => {
+test("§3 laesBegraenset: overskridelse annullerer, frist annullerer, ingen delvis fil", async () => {
   let annulleret = 0;
   const s = () => new ReadableStream<Uint8Array>({ pull(c) { c.enqueue(new Uint8Array(10)); }, cancel() { annulleret++; } });
   assertEquals(await bud.laesBegraenset(s(), 25, Date.now() + 1000), { ok: false, grund: "for_stor" }); assertEquals(annulleret, 1);
@@ -744,12 +749,12 @@ Deno.test("§3 laesBegraenset: overskridelse annullerer, frist annullerer, ingen
   try {
     const p = bud.laesBegraenset(new ReadableStream<Uint8Array>({ cancel() { annulleret++; } }), 25, Date.now() + 5_000);
     let r: unknown = null; p.then((x) => { r = x; });
-    await time.tickAsync(5_100);
+    await time.tickAsync(5_100); await flush(time);
     assertEquals(r, { ok: false, grund: "frist" }); assertEquals(annulleret, 2);
   } finally { time.restore(); }
 });
 
-Deno.test("§3 SDK 2.118.0 med mocket fetch: RPC/Storage {error} og exception, ingen skjulte genforsøg", async () => {
+test("§3 SDK 2.118.0 med mocket fetch: RPC/Storage {error} og exception, ingen skjulte genforsøg", async () => {
   const c = createClient(MOCK, "svc-test", bud.budgetIndstillinger(() => Date.now() + 30_000, 8_000));
   nulstil(() => jsonR({ message: "x" }, 503));
   const r1 = await c.rpc("sb_version"); assert(r1.error); assertEquals(kald.length, 1);
