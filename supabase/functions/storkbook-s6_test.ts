@@ -313,13 +313,18 @@ klientTest("§2 sb-fil: faktisk tekst over 20 KiB med misvisende endelse → 410
 });
 
 klientTest("§2 sb-fil: gyldige 200/206/416-forløb bevares på den komplette fil", async () => {
-  nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
-  const r = await hFil(laesReq("bytes=0-7"));
-  assertEquals(r.status, 206); assertEquals(r.headers.get("Content-Range"), "bytes 0-7/32"); assertEquals((await r.arrayBuffer()).byteLength, 8);
-  assert(!kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")).some((k) => k.url.searchParams.has("range")));
-  nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
+  const fuld = png(32); for (let i = 8; i < 32; i++) fuld[i] = i;
+  const dl = () => kaldTil((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/"));
+  const metaFør = () => { const i = kald.findIndex((k) => k.sti.startsWith("/storage/v1/object/info/")), d = kald.findIndex((k) => k.sti.startsWith("/storage/v1/object/chat-attachments/")); assert(i >= 0 && d > i, "metadata før download"); };
+  nulstil(laesRute({ info: info(32), download: () => new Response(fuld.slice()) }));
+  const r = await hFil(laesReq("bytes=4-11"));
+  assertEquals(r.status, 206); assertEquals(r.headers.get("Content-Range"), "bytes 4-11/32"); assertEquals(r.headers.get("Content-Length"), "8");
+  assertEquals(new Uint8Array(await r.arrayBuffer()), fuld.slice(4, 12));
+  assertEquals(dl().length, 1); assertEquals(dl()[0].headers.get("range"), null, "klient-Range sendt videre til Storage"); assert(!dl()[0].url.searchParams.has("range")); metaFør();
+  nulstil(laesRute({ info: info(32), download: () => new Response(fuld.slice()) }));
   const r2 = await hFil(laesReq("bytes=40-"));
-  assertEquals(r2.status, 416); assertEquals(r2.headers.get("Content-Range"), "bytes */32");
+  assertEquals(r2.status, 416); assertEquals(r2.headers.get("Content-Range"), "bytes */32"); await r2.body?.cancel();
+  assertEquals(dl().length, 1); assertEquals(dl()[0].headers.get("range"), null, "klient-Range sendt videre til Storage (416)"); metaFør();
   nulstil(laesRute({ info: info(32), download: () => new Response(png(32)) }));
   const r3 = await hFil(laesReq());
   assertEquals(r3.status, 200); assertEquals(r3.headers.get("X-Content-Type-Options"), "nosniff"); await r3.body?.cancel();
@@ -661,8 +666,8 @@ test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ overtag: async (k) => { await vent(9_000, k.signal); return jsonR(3); },
-      udvaelg: (_k, u) => jsonR(u === 0 ? [{ kilde: "besked", kilde_id: "a" }] : []),
-      slet: async (k) => { await vent(9_000, k.signal); return jsonR(1); } }));
+      udvaelg: (_k, u) => jsonR(u === 0 ? [{ kilde: "chat_messages", kilde_id: puid(1) }] : []),
+      slet: async (k) => { const b = sletParam(k); assertEquals(b, { p_kilde: "chat_messages", p_ids: [puid(1)] }); await vent(9_000, k.signal); return jsonR(1); } }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
     assertEquals(b.ok, true); assertEquals(b.foraeldreloese, 3); assertEquals(b.personoplysninger, 1); assertEquals(b.fejl, []);
