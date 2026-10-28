@@ -165,6 +165,17 @@ async function vandmaerke(svc: Svc, kilde: string, signal: AbortSignal) {
   return data as { tid: string | null; id: string | null; blok: string | null; post_id: string | null };
 }
 
+/**
+ * Skelner kontrolleret fristudløb fra reelle fejl, FØR fejltypen ("kilde", "reserver" …) bruges:
+ * er signalet afbrudt, eller er fejlen AbortError/TimeoutError, er det "frist" uden fejltæller.
+ */
+function stopGrund(rap: KildeRapport, e: unknown, signal: AbortSignal) {
+  const navn = (e as Error)?.name ?? "";
+  if (signal.aborted || navn === "AbortError" || navn === "TimeoutError") { rap.stoppet = "frist"; return; }
+  rap.stoppet = (e as Error)?.message ?? "fejl";
+  rap.fejl = true;
+}
+
 /** Kører én tid/id-kilde side for side. */
 async function koerTidKilde(
   svc: Svc, kilde: "opslag" | "kommentarer" | "beskeder", rpc: string, dry: boolean, frist: number, signal: AbortSignal,
@@ -195,8 +206,7 @@ async function koerTidKilde(
       if (rows.length < RAEKKE_LIMIT) break;
     }
   } catch (e) {
-    rap.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
-    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) rap.fejl = true;
+    stopGrund(rap, e, signal);
   }
   return rap;
 }
@@ -290,8 +300,7 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
       if (rows.length < GRUPPE_LIMIT) break;
     }
   } catch (e) {
-    rr.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
-    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) rr.fejl = true;
+    stopGrund(rr, e, signal);
   }
   rapporter.push(rr);
 
@@ -311,8 +320,7 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
       br.kandidater = k.length; t(k);
       if (!dry) { const r = await reserver(svc, k, signal); br.indsat = r.indsat; br.opgraderet = r.opgraderet; br.afvist_loft = r.afvist_loft; }
     } catch (e) {
-      br.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
-      if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
+      stopGrund(br, e, signal);
     if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
     }
   } else br.stoppet = "uden for 17-24";
