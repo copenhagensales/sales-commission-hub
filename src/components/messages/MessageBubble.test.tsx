@@ -399,7 +399,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     let svar!: (v: unknown) => void;
     vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
     render(ui(m, "e"));
-    const aabn = async () => { const t = screen.getByRole("button", { name: "Flere handlinger" }); fireEvent.pointerDown(t, { button: 0, ctrlKey: false, pointerType: "mouse" }); await flush(); };
+    const aabn = async () => { const t = screen.getByRole("button", { name: "Flere handlinger" }); fireEvent.keyDown(t, { key: "Enter" }); await flush(); };
     await aabn();
     fireEvent.click(screen.getByRole("menuitem", { name: "Træk tilbage" }));
     await flush();
