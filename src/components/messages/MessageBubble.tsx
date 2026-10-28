@@ -17,7 +17,7 @@ import { useDraftGuard } from "@/components/mobile";
 import { ReadReceipts } from "./ReadReceipts";
 import { MessageWithLinks } from "./LinkPreview";
 import { renderMentions } from "./MentionInput";
-import { BeskedStatus } from "./BeskedStatus";
+import { BeskedStatus, UkendtUdfald } from "./BeskedStatus";
 import { FilVedhaeftning } from "./FilVedhaeftning";
 import { laesRetKladde, gemRetKladde, sletRetKladde, sletRetKladdeHvis, retKladdeVersion, harRetLagerFejl, fastholdEjer, ejerGyldig } from "@/lib/sbKladder";
 
