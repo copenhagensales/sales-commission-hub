@@ -255,3 +255,12 @@ verify_jwt = true
 
 [functions.storkbook-udsendelser]
 verify_jwt = false
+
+[functions.storkbook-tjek]
+verify_jwt = true
+
+[functions.sb-fil]
+verify_jwt = true
+
+[functions.beskeder-oprydning]
+verify_jwt = false

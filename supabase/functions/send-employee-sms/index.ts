@@ -37,6 +37,18 @@ serve(async (req) => {
       });
     }
 
+    // employee_sms-rettighed (server-side, aldrig fra body). Kun data===true giver adgang.
+    const { data: harRet, error: retFejl } = await supabase.rpc('has_page_permission', {
+      _user_id: user.id, _permission_key: 'employee_sms', _check_edit: false,
+    });
+    if (retFejl || harRet !== true) {
+      console.warn('[send-employee-sms] afvist', { kode: retFejl ? 'ret_rpc_fejl' : 'ingen_ret' });
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Get sender employee ID
     const { data: senderEmployee } = await supabase
       .from('employee_master_data')
@@ -69,7 +81,7 @@ serve(async (req) => {
       .single();
 
     if (targetError || !targetEmployee) {
-      console.error('[send-employee-sms] Target employee not found:', targetError);
+      console.error('[send-employee-sms] Target employee not found', { kode: targetError?.code ?? 'ingen_raekke' });
       return new Response(JSON.stringify({ error: 'Target employee not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -102,9 +114,7 @@ serve(async (req) => {
       });
     }
 
-    console.log('[send-employee-sms] Sending SMS:', {
-      from: fromNumber,
-      to: toNumber,
+    console.log('[send-employee-sms] Sending SMS', {
       senderEmployeeId: senderEmployee.id,
       targetEmployeeId: targetEmployee.id,
       messageLength: message.length
@@ -141,14 +151,14 @@ serve(async (req) => {
     const twilioResult = await twilioResponse.json();
 
     if (!twilioResponse.ok) {
-      console.error('[send-employee-sms] Twilio error:', twilioResult);
+      console.error('[send-employee-sms] Twilio error', { status: twilioResponse.status, kode: twilioResult?.code ?? null });
       return new Response(JSON.stringify({ error: 'Failed to send SMS', details: twilioResult }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log('[send-employee-sms] SMS sent successfully:', twilioResult.sid);
+    console.log('[send-employee-sms] SMS sent');
 
     // Store in communication_logs with employee context
     const { data: logEntry, error: logError } = await supabase
@@ -171,7 +181,7 @@ serve(async (req) => {
       .single();
 
     if (logError) {
-      console.error('[send-employee-sms] Error logging SMS:', logError);
+      console.error('[send-employee-sms] Error logging SMS', { kode: logError.code });
       // Don't fail - SMS was sent successfully
     }
 
@@ -184,7 +194,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('[send-employee-sms] Error:', error);
+    console.error('[send-employee-sms] Error', { kode: error instanceof Error ? error.name : 'ukendt' });
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -215,12 +215,13 @@ function evaluateFormula(formula: string, context: RichContext): number {
     
     return Math.round(result * 100) / 100;
   } catch (error) {
-    console.error("Formula evaluation error:", error, "Formula:", formula);
+    console.error("parse-expense-formula: formel_fejl");
     return 0;
   }
 }
 
 serve(async (req) => {
+  const t0 = Date.now();
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -248,7 +249,6 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Parsing expense formula for team ${team_id}: "${description}"`);
 
     // Fetch team data for context
     const { data: teamData } = await supabase
@@ -276,7 +276,6 @@ serve(async (req) => {
     const startDateStr = periodStart.toISOString().split("T")[0];
     const endDateStr = periodEnd.toISOString().split("T")[0];
     
-    console.log(`Payroll period: ${startDateStr} to ${endDateStr}`);
     
     // Calculate working days using shared helper
     const workingDaysInMonth = countWorkDaysInPeriod(periodStart, periodEnd);
@@ -337,10 +336,9 @@ serve(async (req) => {
       .gte("end_date", startDateStr);
 
     if (bookingsError) {
-      console.error("Error fetching bookings:", bookingsError);
+      console.error("parse-expense-formula: booking_fejl");
     }
 
-    console.log(`Found ${allBookings?.length || 0} bookings in period ${startDateStr} to ${endDateStr}`);
 
     if (allBookings && allBookings.length > 0) {
       bookingCount = allBookings.length;
@@ -419,8 +417,7 @@ serve(async (req) => {
         locationCostsTotal += locTotal;
       }
 
-      console.log(`Calculated location_costs_total: ${locationCostsTotal}`);
-      console.log(`Location details:`, JSON.stringify(locationDetails, null, 2));
+      
     }
 
     const avgLocationDailyRate = locationDetails.length > 0
@@ -446,7 +443,6 @@ serve(async (req) => {
       working_days_in_month: workingDaysInMonth,
     };
 
-    console.log("Rich context data:", JSON.stringify(contextData, null, 2));
 
     // Build location summary for AI
     const locationSummary = locationDetails.length > 0
@@ -553,7 +549,8 @@ Returnér ALTID valid JSON med denne struktur:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      void errorText;
+      console.error("parse-expense-formula: gateway_fejl", { status: response.status, varighed_ms: Date.now() - t0 });
       
       if (response.status === 429) {
         return new Response(
@@ -578,7 +575,6 @@ Returnér ALTID valid JSON med denne struktur:
       throw new Error("No content in AI response");
     }
 
-    console.log("AI response:", content);
 
     let result: FormulaResult;
     try {
@@ -604,7 +600,7 @@ Returnér ALTID valid JSON med denne struktur:
       formula_readable: result.formula_readable || result.explanation,
     };
 
-    console.log("Validated result:", validatedResult);
+    console.log("parse-expense-formula: ok", { varighed_ms: Date.now() - t0 });
 
     return new Response(
       JSON.stringify({
@@ -616,7 +612,7 @@ Returnér ALTID valid JSON med denne struktur:
     );
 
   } catch (error) {
-    console.error("Error in parse-expense-formula:", error);
+    console.error("parse-expense-formula: fejl", { kode: error instanceof Error ? error.name : "ukendt", varighed_ms: Date.now() - t0 });
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : "Unknown error",

@@ -27,6 +27,8 @@ interface Faelles {
   signal?: AbortSignal;
   /** Frist for logning efter afsendelse (worker). Ellers bruges `signal`. */
   logSignal?: () => AbortSignal;
+  /** Snævert flag: kun typen storkbook_tjek må springe udsendelser-loggen over (også i fejl-/gategrene). */
+  udenUdsendelseslog?: "storkbook_tjek";
 }
 
 export interface Udsendelse extends Faelles, Modtager {
@@ -55,10 +57,10 @@ function iStilleTimer(fra: string | null, til: string | null): boolean {
 }
 
 /** Afgør om en type/kanal må sende nu. Returnerer null = send. */
-async function typeGate(u: Faelles): Promise<"slaaet_fra" | "stille_timer" | "fejl" | null> {
+async function typeGate(u: Faelles, obl?: { v: boolean }): Promise<"slaaet_fra" | "stille_timer" | "fejl" | null> {
   try {
     const { data, error } = await sig(u, svc().from("udsendelsestyper")
-      .select("aktiv, stille_fra, stille_til").eq("noegle", u.type)).maybeSingle();
+      .select("aktiv, stille_fra, stille_til, obligatorisk").eq("noegle", u.type)).maybeSingle();
     if (error) throw error;
     // Push er fail-closed: ukendt type oprettes ikke og sendes ikke.
     if (!data && u.kanal === "push") return "fejl";
@@ -71,6 +73,8 @@ async function typeGate(u: Faelles): Promise<"slaaet_fra" | "stille_timer" | "fe
       return null;
     }
     if (data.aktiv === false) return "slaaet_fra";
+    // obligatorisk=true springer præferencer og stille timer over; aktiv, regler og fejlpolitik gælder stadig.
+    if (data.obligatorisk === true) { if (obl) obl.v = true; return null; }
     if (u.kanal === "push" && iStilleTimer(data.stille_fra, data.stille_til)) return "stille_timer";
     return null;
   } catch (e) {
@@ -93,6 +97,7 @@ async function fravalgt(u: Faelles, userId?: string): Promise<boolean | "fejl"> 
 }
 
 async function log(u: Faelles, m: Modtager, status: UdsendStatus, extra: { fejl?: string; reference?: string; metadata?: Record<string, unknown> } = {}) {
+  if (u.udenUdsendelseslog === "storkbook_tjek" && u.type === "storkbook_tjek") return;
   try {
     const ins = svc().from("udsendelser").insert({
       kanal: u.kanal,
@@ -148,7 +153,8 @@ const fejltekst = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Én udsendelse til én modtager. Kaster videre, hvis send() kaster. */
 export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
-  const gate = await typeGate(u);
+  const obl = { v: false };
+  const gate = await typeGate(u, obl);
   if (gate) { await log(u, u, gate); return gate; }
   const opslag = await brugerId(u, u);
   if (opslag === "fejl" && u.kanal === "push") { await log(u, u, "fejl", { fejl: "db" }); return "fejl"; }
@@ -158,7 +164,7 @@ export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
   const regel = await udenforRegel(u, uid);
   if (regel === "fejl") { await log(u, u, "fejl", { fejl: "db" }); return "fejl"; }
   if (regel) { await log(u, u, "udenfor_regel"); return "udenfor_regel"; }
-  const fra = await fravalgt(u, uid);
+  const fra = obl.v ? false : await fravalgt(u, uid);
   if (fra === "fejl") { await log(u, u, "fejl", { fejl: "db" }); return "fejl"; }
   if (fra) { await log(u, u, "fravalgt"); return "fravalgt"; }
   try {
@@ -180,7 +186,8 @@ export async function udsend(u: Udsendelse): Promise<UdsendStatus> {
 export async function udsendFlere(
   u: Faelles & { modtagere: Modtager[]; send: (tilladte: string[]) => Promise<{ reference?: string } | void> },
 ): Promise<UdsendStatus> {
-  const gate = await typeGate(u);
+  const obl = { v: false };
+  const gate = await typeGate(u, obl);
   if (gate) { for (const m of u.modtagere) await log(u, m, gate); return gate; }
   const tilladte: Modtager[] = [];
   let udenfor = 0;
@@ -195,7 +202,7 @@ export async function udsendFlere(
     const regel = await udenforRegel(u, uid);
     if (regel === "fejl") { await log(u, m, "fejl", { fejl: "db" }); fejl++; continue; }
     if (regel) { await log(u, m, "udenfor_regel"); udenfor++; continue; }
-    const fra = await fravalgt(u, uid);
+    const fra = obl.v ? false : await fravalgt(u, uid);
     if (fra === "fejl") { await log(u, m, "fejl", { fejl: "db" }); fejl++; continue; }
     if (fra) { await log(u, m, "fravalgt"); continue; }
     tilladte.push(m);
