@@ -74,7 +74,7 @@ async function koerForloeb(f: AfstemForloeb): Promise<void> {
   f.aktiv = true;
   aktiveAfstemninger++;
   let r: Awaited<ReturnType<typeof afstemKun>> = "ukendt";
-  try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: f.ejer }); }
+  try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: { ...f.ejer, op } }); }
   catch { r = "ukendt"; }
   finally { frigivLaas(f.noegle, op); f.aktiv = false; aktiveAfstemninger--; }
   pumpKoe();
@@ -296,9 +296,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const ejer = fastholdEjer(emp, conv, brugerRef.current);
     if (!ejer) return; // manglende identitet → ingen skrivende handling
     const gen = ejer.gen, op = ejer.op;
-    const kon = { vagt: () => ejerGyldig(ejer), bruger: ejer.bruger };
-    const fk = laasNoegle(gen, emp, conv, id);
     const vagt = () => ejerGyldig(ejer);
+    const kon = { vagt, bruger: ejer.bruger };
+    const fk = laasNoegle(gen, emp, conv, id);
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
     // §4/§8(4): højst ét netværksforløb pr. id – også mod baggrundsafstemning.
