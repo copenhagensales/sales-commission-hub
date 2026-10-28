@@ -55,6 +55,9 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
   }, [aktiv, teams.data, kolleger.data, mentions]);
 
   const fuld = mentions.length >= OMTALER_MAX;
+  // Ny kandidatliste (ændret præfiks) → markér første række; Enter vælger kun en synligt markeret række.
+  const kandidatNoegle = kandidater.map((k) => `${k.t}:${k.id}`).join(",");
+  useEffect(() => { setValgt(0); }, [kandidatNoegle]);
   const aaben = !!aktiv && (fuld || dublet || kandidater.length > 0);
 
   const opdaterAktiv = (tekst: string, caret: number) => {
@@ -119,10 +122,17 @@ export function OmtaleFelt({ value, mentions, onChange, maxLength, placeholder, 
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (aaben) {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setAktiv(null); return; }
-      if (!fuld && kandidater.length) {
+      // Listen er skjult (fuld/dublet): tastaturet vælger intet.
+      if (fuld || dublet) {
+        if (["ArrowDown", "ArrowUp", "Enter", "Tab"].includes(e.key)) { e.preventDefault(); return; }
+      } else if (kandidater.length) {
         if (e.key === "ArrowDown") { e.preventDefault(); setValgt((v) => (v + 1) % kandidater.length); return; }
         if (e.key === "ArrowUp") { e.preventDefault(); setValgt((v) => (v - 1 + kandidater.length) % kandidater.length); return; }
-        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); vaelg(kandidater[Math.min(valgt, kandidater.length - 1)]); return; }
+        if (e.key === "Enter" || e.key === "Tab") {
+          const k = kandidater[valgt];
+          if (!k) { e.preventDefault(); return; }
+          e.preventDefault(); vaelg(k); return;
+        }
       }
     }
     onKeyDown?.(e);

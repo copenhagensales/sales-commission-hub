@@ -48,8 +48,8 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [mode, setMode] = useState<Mode>(initialMode && initialMode !== "image" ? initialMode : "post");
   const [body, setBody] = useState(initialBody ?? "");
   const [mentions, setMentions] = useState<Omtale[]>([]);
-  /** Oprettet afstemning, hvis omtalerne ikke blev gemt; genforsøg opdaterer kun den. */
-  const [afstemningId, setAfstemningId] = useState<string | null>(null);
+  /** Oprettet afstemning, hvis omtalerne ikke blev gemt: formularen låses, og kun omtalerne (fra den sendte version) gemmes igen. */
+  const [genforsoeg, setGenforsoeg] = useState<{ id: string; body: string; mentions: Omtale[] } | null>(null);
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
   const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -82,7 +82,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
 
   const reset = () => {
     setBody(""); setMentions([]); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
-    setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false); setAfstemningId(null);
+    setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false); setGenforsoeg(null);
   };
 
   const pickMode = (m: Mode) => {
@@ -123,12 +123,11 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
         anonymous: pollAnonymous,
         dage: pollDage,
         mentions,
-        eksisterendeId: afstemningId ?? undefined,
       });
       reset();
     } catch (e) {
       if (e instanceof AfstemningOmtaleFejl) {
-        setAfstemningId(e.postId);
+        setGenforsoeg({ id: e.postId, body, mentions });
         toast.error("Afstemningen er delt, men omtalerne kunne ikke gemmes – prøv igen");
         return;
       }
@@ -140,7 +139,25 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
     }
   };
 
+  /** Gentager kun omtale-UPDATE på den allerede oprettede afstemning. */
+  const proevOmtalerIgen = async () => {
+    if (!genforsoeg || busy) return;
+    setBusy(true);
+    try {
+      await opretAfstemning.mutateAsync({
+        audience, teamId: null, body: genforsoeg.body, options: [], anonymous: false, dage: 0,
+        mentions: genforsoeg.mentions, eksisterendeId: genforsoeg.id,
+      });
+      reset();
+    } catch {
+      toast.error("Omtalerne kunne stadig ikke gemmes – prøv igen");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const send = async () => {
+    if (genforsoeg) return;
     if (mode === "poll") return sendPoll();
     if (!canSend) return;
     setBusy(true);
@@ -171,6 +188,21 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   return (
     <section aria-label="Skriv i Storkbook" className="rounded-[24px] bg-card p-5">
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+
+      {genforsoeg && (
+        <div role="alert" className="mb-3 rounded-[18px] bg-[hsl(var(--cph-light-blue))] p-4">
+          <p className="text-[16px] font-extrabold text-foreground">Afstemningen er delt – omtalerne mangler.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={proevOmtalerIgen} disabled={busy} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">
+              {busy ? "Gemmer …" : "Prøv igen"}
+            </button>
+            <button type="button" onClick={reset} disabled={busy} className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-foreground disabled:opacity-50">Fortsæt uden omtaler</button>
+          </div>
+        </div>
+      )}
+
+      {/* Låst under gemning og i genforsøgstilstand, så kladden ikke ændres efter afsendelse. */}
+      <fieldset disabled={busy || !!genforsoeg} className="m-0 min-w-0 border-0 p-0">
 
       {!open ? (
         <button type="button" onClick={() => setOpen(true)} className="flex min-h-[52px] w-full items-center rounded-[18px] bg-[hsl(var(--cph-light-blue))] px-4 text-left text-[16px] text-muted-foreground">
@@ -336,6 +368,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           </div>
         </div>
       )}
+      </fieldset>
     </section>
   );
 }
