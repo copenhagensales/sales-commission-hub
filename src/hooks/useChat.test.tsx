@@ -734,7 +734,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
   const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
   const invokes = () => vi.mocked(supabase.functions.invoke).mock.calls.length;
   beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); vi.mocked(supabase.functions.invoke).mockReset(); });
-  const slut = () => vi.useRealTimers();
+  const slut = () => { vi.useRealTimers(); vi.mocked(supabase.functions.invoke).mockReset().mockImplementation((async () => ({ error: null })) as never); };
 
   it("samme revision og stadig tjekkes efter transportfejl → præcis ét genforsøg (højst to kald i alt)", async () => {
     try {
