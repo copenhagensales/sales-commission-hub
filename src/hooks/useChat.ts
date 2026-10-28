@@ -1043,10 +1043,12 @@ export const erForaeldet = (e: unknown) => (e as { code?: string; message?: stri
 const vent = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét genforsøg efter 2 s ved transportfejl. */
-export async function startTjekHvisNoedvendigt(messageId: string): Promise<void> {
+export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean = () => true): Promise<void> {
+  if (!vagt()) return;
   const { data: r } = await supabase.from("chat_messages").select("status, revision").eq("id", messageId).maybeSingle();
   if (!r || r.status !== "tjekkes") return;
   for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
+    if (!vagt()) return;
     const { error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } });
     if (!error) return;
     const navn = (error as { name?: string }).name;
