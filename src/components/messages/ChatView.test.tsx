@@ -1321,8 +1321,15 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
       n++;
       if (n === 1) return Promise.resolve(new Response("filindhold", { status: 200, headers: { "Content-Type": "text/plain" } }));
       if (n === 2) return Promise.resolve(new Response(new Uint8Array([1, 2]), { status: 200, headers: { "Content-Type": "image/png" } }));
-      return new Promise(() => undefined); // pågående hentning, der skal aborteres
+      // Pågående hentning, der skal aborteres (afvises ved abort, så sbFil's plads frigives).
+      return new Promise((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
     }) as typeof fetch);
+    // jsdom mangler Blob.text(); læses via FileReader (kun prøvemiljø).
+    if (!Blob.prototype.text) {
+      Blob.prototype.text = function (this: Blob) {
+        return new Promise<string>((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsText(this); });
+      };
+    }
     const revoke = vi.fn();
     globalThis.URL.revokeObjectURL = revoke;
     beskeder.liste = [
