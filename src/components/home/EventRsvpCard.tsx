@@ -1,3 +1,4 @@
+import { relativDag } from "@/lib/dato";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { Check, Info, Pencil, Trash2 } from "lucide-react";
@@ -66,8 +67,8 @@ export function EventRsvpCard({
     .sort((a, b) => Number(!!lookupAvatar({ employeeId: b.id, name: b.name })) - Number(!!lookupAvatar({ employeeId: a.id, name: a.name })))
     .slice(0, 5);
   const date = parseISO(eventDate);
-  const days = differenceInCalendarDays(date, new Date());
-  const whenLabel = days <= 0 ? "I dag" : days === 1 ? "I morgen" : `Om ${days} dage`;
+  const rel = relativDag(eventDate);
+  const whenLabel = rel === "i dag" ? "I dag" : rel === "i morgen" ? "I morgen" : `Om ${rel.dage} dage`;
   const weekday = format(date, "EEE", { locale: da }).replace(".", "");
   const meta = [
     `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}${eventTime ? ` kl. ${eventTime.slice(0, 5)}` : ""}`,
