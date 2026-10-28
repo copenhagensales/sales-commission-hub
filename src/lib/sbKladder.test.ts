@@ -176,3 +176,40 @@ describe("§6 – hukommelseslager for skrive- og redigeringskladder (B2a-b1)", 
     expect(m.harKladdeLagerFejl("e", "A")).toBe(false);
   });
 });
+
+describe("§3 – kladdefilens uploadforløb ejes af lageret (B2a-b3)", () => {
+  const meta = { name: "x.txt", type: "text/plain", size: 1 };
+  it("nyt forsøg (også samme File) invaliderer det gamle; kun ejende forsøg opdaterer", async () => {
+    const m = await ny();
+    const f = new File(["x"], "x.txt");
+    const a = m.startKladdeUpload("e", "A", f, meta);
+    const b = m.startKladdeUpload("e", "A", f, meta);
+    expect(m.opdaterKladdeUpload("e", "A", a, m.sessionsGeneration(), { sti: "gammel", trin: "uploadet" })).toBe(false);
+    expect(m.opdaterKladdeUpload("e", "A", b, m.sessionsGeneration(), { sti: "ny", trin: "uploadet", aktiv: false })).toBe(true);
+    expect(m.kladdeFilTilstand("e", "A")).toMatchObject({ meta: { sti: "ny", trin: "uploadet" }, aktiv: false, file: f });
+  });
+  it("fjernelse invaliderer forsøget og genskaber ikke filen; tekst bevares", async () => {
+    const m = await ny();
+    m.gemKladde("e", "A", { tekst: "behold", svarId: "s" });
+    const a = m.startKladdeUpload("e", "A", new File(["x"], "x.txt"), meta);
+    m.fjernKladdeFil("e", "A");
+    expect(m.opdaterKladdeUpload("e", "A", a, m.sessionsGeneration(), { trin: "uploadet" })).toBe(false);
+    expect(m.kladdeFilTilstand("e", "A")).toBeNull();
+    expect(m.laesKladde("e", "A")).toMatchObject({ tekst: "behold", svarId: "s", fil: null });
+  });
+  it("efter reload: ingen levende forløb, ingen File; snapshot er stabil", async () => {
+    let m = await ny();
+    m.startKladdeUpload("e", "A", new File(["x"], "x.txt"), meta);
+    m = await ny();
+    const t = m.kladdeFilTilstand("e", "A");
+    expect(t).toMatchObject({ aktiv: false, file: null, meta: { trin: "valgt" } });
+    expect(m.kladdeFilTilstand("e", "A")).toBe(t);
+  });
+  it("filErSendeklar kræver trin=uploadet og ikke-tom sti", async () => {
+    const m = await ny();
+    expect(m.filErSendeklar({ ...meta, sti: "s", trin: "uploadet" })).toBe(true);
+    expect(m.filErSendeklar({ ...meta, sti: "", trin: "uploadet" })).toBe(false);
+    expect(m.filErSendeklar({ ...meta, sti: "s", trin: "uploader" })).toBe(false);
+    expect(m.filErSendeklar(null)).toBe(true);
+  });
+});
