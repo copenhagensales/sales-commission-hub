@@ -4,13 +4,35 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 const mutateAsync = vi.fn();
+const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
 const udstedUpload = vi.fn();
 const uploadTilSti = vi.fn();
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn() } },
-}));
+// Netværksgrænsen: supabase-klienten. maybeSingle-svar pr. tabel i kø; INSERT tælles. (Antagelser, ikke SQL-bevis.)
+const net = vi.hoisted(() => ({ svar: {} as Record<string, Array<{ data: unknown; error: unknown }>>, insert: vi.fn(), kald: [] as string[] }));
+vi.mock("@/integrations/supabase/client", () => {
+  const builder = (t: string) => {
+    const b: Record<string, unknown> = {};
+    Object.assign(b, {
+      select: () => b, eq: () => b,
+      insert: (row: unknown) => { net.kald.push(`insert:${t}`); return Promise.resolve(net.insert(row) ?? { error: null }); },
+      maybeSingle: () => { net.kald.push(`select:${t}`); return Promise.resolve(net.svar[t]?.shift() ?? { data: null, error: null }); },
+    });
+    return b;
+  };
+  return {
+    supabase: {
+      from: (t: string) => builder(t),
+      rpc: vi.fn(async () => ({ data: "e", error: null })),
+      functions: { invoke: vi.fn(async () => ({ error: null })) },
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
+        getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
+      },
+    },
+  };
+});
 vi.mock("@/lib/employeeLookup", () => ({ findEmployeeByAuth: vi.fn(async () => ({ data: { id: "e", first_name: "A", last_name: "B" } })) }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 // Rigtig useDraftGuard og rigtig MessageBubble (§9); kun skelet erstattes.
@@ -31,8 +53,9 @@ vi.mock("@/hooks/useChat", async (orig) => {
   const ægte = await orig<typeof import("@/hooks/useChat")>();
   return {
     ...ægte,
-    useMessages: () => ({ data: [], isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined }),
-    useSendMessage: () => ({ mutateAsync }),
+    useMessages: () => ({ data: beskeder.liste, isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined }),
+    // §9: rigtig useSendMessage (rigtige send-/afstemningsfunktioner) når ægteSend er sat; ellers kontrolleret mutateAsync.
+    useSendMessage: () => (beskeder.ægteSend ? ægte.useSendMessage() : { mutateAsync }),
     useRealtimeMessages: () => undefined,
     useMarkAsRead: () => ({ mutate: vi.fn(), isPending: false }),
     useTypingIndicator: () => ({ typingUsers: [], setTyping: vi.fn() }),
@@ -66,6 +89,8 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
+  beskeder.liste = []; beskeder.ægteSend = false;
+  net.insert.mockReset(); net.kald.length = 0; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
 
