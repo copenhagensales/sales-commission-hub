@@ -522,6 +522,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     expect(kald).toEqual([]);
     expect(insert).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
+    auth("SIGNED_IN", "u");
   });
 
   it("(c1 §1) forkert samtale i konteksten → ingen opslag, intet INSERT", async () => {
