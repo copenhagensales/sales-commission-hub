@@ -242,11 +242,7 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
   });
 
   it("editor startet på revision 1, server ændret til 2: Gem sender 1; kladde, fejl ved editor og én toast bevares", async () => {
-    const r = render(ui(m(1, "v1"), "e"));
-    fireEvent.click(screen.getByRole("button", { name: "Flere handlinger" }));
-    // Dropdown åbner via pointer; brug kladde-vej hvis menuen ikke er åben i jsdom.
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
-    r.unmount();
     const r2 = render(ui(m(1, "v1"), "e"));
     r2.rerender(ui(m(2, "v2 fra server"), "e"));
     konfliktSvar();
