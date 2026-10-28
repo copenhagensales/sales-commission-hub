@@ -2,6 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import { ejerGyldig, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -380,9 +381,10 @@ export async function laesRegister(sti: string, beskedId: string, conversationId
 
 export type Afstemning = "fundet" | "gemt_vaek" | "ikke_fundet" | "ukendt";
 /** Afstemmer et afsendelses-id. Et tomt SELECT er ikke bevis for, at beskeden aldrig blev gemt. */
-export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath">, employeeId: string): Promise<Afstemning> {
+export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath">, employeeId: string, vagt: () => boolean = () => true): Promise<Afstemning> {
   const r = await afstemBesked(v.id, v.conversationId);
   if (r === true) return "fundet";
+  if (!vagt()) return "ukendt";
   if (v.attachmentPath) {
     const reg = await laesRegister(v.attachmentPath, v.id, v.conversationId, employeeId);
     if (reg.art === "bundet_her") return "gemt_vaek";
@@ -416,7 +418,7 @@ const ukendt = () => new SendFejl("ukendt", "Ikke sendt – prøv igen");
  */
 export async function sendBesked(v: SendInput, employeeId: string, vagt: () => boolean = () => true): Promise<void> {
   if (!vagt()) throw foraeldet();
-  const foer = await afstemAfsendelse(v, employeeId);
+  const foer = await afstemAfsendelse(v, employeeId, vagt);
   if (!vagt()) throw foraeldet();
   if (foer === "fundet") return;
   if (foer === "gemt_vaek") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
@@ -487,7 +489,7 @@ export async function afstemKun(v: Pick<SendInput, "id" | "conversationId" | "at
   let emp: string;
   if (v.ejer) emp = v.ejer.emp;
   else { try { emp = await getCurrentEmployeeId(); } catch { return "ukendt"; } }
-  const r = await afstemAfsendelse(v, emp);
+  const r = await afstemAfsendelse(v, emp, () => !v.ejer || ejerGyldig(v.ejer));
   return v.ejer && !ejerGyldig(v.ejer) ? "ukendt" : r;
 }
 
