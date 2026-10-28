@@ -47,8 +47,9 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
     return { ejer: noegle, aaben: !!g, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
       lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false };
   });
-  const { aaben: isEditing, tekst: editContent, revision: retRevision, lagerFejl: retLagerFejl } = ret;
   const egenState = ret.ejer === noegle;
+  const { tekst: editContent, revision: retRevision, lagerFejl: retLagerFejl } = ret;
+  const isEditing = egenState && ret.aaben; // gammel nøgles state vises/gemmes aldrig
   const noegleRef = useRef(noegle);
   noegleRef.current = noegle;
   const [nu, setNu] = useState(() => Date.now());
