@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -537,4 +537,168 @@ describe("§9 – GET 403/404/410 gennem rigtig FilVedhaeftning (B2a-b3)", () =>
       f.mockRestore();
     });
   }
+});
+
+// ---------- B2a-b4: §4 fælles afstemningskø (kontrollerede timere) ----------
+describe("§4 – fælles afstemningskø (B2a-b4)", () => {
+  type V = { id: string; res: (s: { data: unknown; error: null }) => void };
+  let ventende: V[] = [];
+  let samtidige = 0, maks = 0;
+  const pr = new Map<string, number>(); let maksPrId = 0;
+  const afs = (id: string, fil: Record<string, unknown> | null = null) => ({
+    id, tekst: id, svarId: null, fil, tilstand: "afstemmer" as const, fejl: null, tidligereUkendt: true, oprettet: 1,
+  });
+  const fremad = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  const svarFor = (id: string, data: unknown) => {
+    const i = ventende.findIndex((x) => x.id === id);
+    if (i < 0) throw new Error(`intet ventende opslag for ${id}`);
+    const [x] = ventende.splice(i, 1);
+    return act(async () => { x.res({ data, error: null }); await vi.advanceTimersByTimeAsync(0); });
+  };
+  const opslag = (id: string) => net.kald.filter((k) => k === `select:chat_messages:${id}`).length;
+  async function klarFake(conv = "A") {
+    const r = render(wrap(<ChatView conversationId={conv} />));
+    await fremad(0); await fremad(0); await fremad(0);
+    return r;
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    beskeder.ægteSend = true;
+    ventende = []; samtidige = 0; maks = 0; pr.clear(); maksPrId = 0;
+    net.vent = (id) => {
+      net.kald.push(`select:chat_messages:${id}`);
+      samtidige++; maks = Math.max(maks, samtidige);
+      pr.set(id, (pr.get(id) ?? 0) + 1); maksPrId = Math.max(maksPrId, pr.get(id)!);
+      return new Promise((res) => ventende.push({ id, res: (s) => { samtidige--; pr.set(id, pr.get(id)! - 1); res(s); } }));
+    };
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("A afventer, B tilføjes → begge når afslutning", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    expect(opslag("A1")).toBe(1);
+    await act(async () => { tilfoejAfsendelse("e", "A", afs("B1")); });
+    await fremad(0);
+    expect(opslag("B1")).toBe(1);
+    await svarFor("B1", { id: "B1" });
+    await svarFor("A1", { id: "A1" });
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+  });
+
+  it("A afventer, B tilføjes → begge når udtømt serie og tilbyder »Prøv igen«", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    await act(async () => { tilfoejAfsendelse("e", "A", afs("B1")); });
+    await fremad(0);
+    for (let n = 0; n < 7; n++) {
+      for (const id of ["A1", "B1"]) if (ventende.some((x) => x.id === id)) await svarFor(id, null);
+      await fremad(30000);
+    }
+    expect(opslag("A1")).toBe(7);
+    expect(opslag("B1")).toBe(7);
+    expect(screen.getAllByRole("button", { name: "Prøv igen" })).toHaveLength(2);
+    expect(net.insert).not.toHaveBeenCalled();
+  });
+
+  it("mange pending id'er: målt maksimal samtidighed er 3", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    for (let i = 0; i < 8; i++) tilfoejAfsendelse("e", "A", afs(`P${i}`));
+    await klarFake();
+    expect(maks).toBe(3);
+    for (let runde = 0; runde < 4; runde++) {
+      for (const x of [...ventende]) await svarFor(x.id, { id: x.id });
+    }
+    expect(maks).toBe(3);
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+  });
+
+  it("gentagne online-/forgrundshændelser → højst én ventende genstart pr. id", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    // Under aktivt opslag: fem hændelser samles til én genstart.
+    for (let i = 0; i < 5; i++) { window.dispatchEvent(new Event("online")); document.dispatchEvent(new Event("visibilitychange")); }
+    await svarFor("A1", null);
+    await fremad(0);
+    expect(opslag("A1")).toBe(2);
+    await svarFor("A1", null);
+    // Under backoff: gentagne hændelser giver ét nyt opslag, ikke flere.
+    for (let i = 0; i < 5; i++) window.dispatchEvent(new Event("online"));
+    await fremad(0);
+    expect(opslag("A1")).toBe(3);
+    expect(maksPrId).toBe(1);
+  });
+
+  it("remount under aktiv promise og under backoff: ingen dubletter, backoff bevares", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    let r = await klarFake();
+    r.unmount();
+    r = await klarFake();
+    expect(opslag("A1")).toBe(1);
+    await svarFor("A1", null); // → backoff 1 s
+    r.unmount();
+    r = await klarFake();
+    expect(opslag("A1")).toBe(1);
+    await fremad(999);
+    expect(opslag("A1")).toBe(1);
+    await fremad(1);
+    expect(opslag("A1")).toBe(2);
+    expect(maksPrId).toBe(1);
+  });
+
+  it("manuelt genforsøg samtidig med timer: højst ét netværksforløb pr. id", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    for (let n = 0; n < 7; n++) { if (ventende.length) await svarFor("A1", null); await fremad(30000); }
+    const foer = opslag("A1");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
+    await fremad(0);
+    await fremad(1000); // køens timer når frem, mens den manuelle afsendelse holder låsen
+    expect(maksPrId).toBe(1);
+    expect(opslag("A1")).toBe(foer + 1);
+    await svarFor("A1", { id: "A1" });
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(net.insert).not.toHaveBeenCalled();
+  });
+
+  it("gammel afslutning efter overdragelse frigiver kun egen lås", async () => {
+    const { tagLaas, frigivLaas } = await import("./ChatView");
+    expect(tagLaas("k", "op1")).toBe(true);
+    frigivLaas("k", "op1");
+    expect(tagLaas("k", "op2")).toBe(true); // overdraget til ny operation
+    frigivLaas("k", "op1");                 // sen afslutning fra den gamle
+    expect(tagLaas("k", "op3")).toBe(false);
+    frigivLaas("k", "op2");
+    expect(tagLaas("k", "op3")).toBe(true);
+    frigivLaas("k", "op3");
+  });
+
+  it("§8 A: forhåndsopslag med overtaget sti → tilbud, nul INSERT; efter tryk én udstedelse og samme id", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const fil = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/gammel.txt", trin: "uploadet" };
+    tilfoejAfsendelse("e", "A", afs("F1", fil), new File(["x"], "x.txt", { type: "text/plain" }));
+    const reg = (sti: string, status: string) => ({ data: { bucket: "chat-attachments", sti, besked_id: null, status, samtale_id: "A", ejer_employee_id: "e" }, error: null });
+    net.svar.sb_stier = [reg("c/e/gammel.txt", "slettet")];
+    await klarFake();
+    await svarFor("F1", null);
+    expect(udstedUpload).not.toHaveBeenCalled(); // automatisk afstemning udfører aldrig genudstedelse
+    expect(net.insert).not.toHaveBeenCalled();
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/ny.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockResolvedValueOnce(undefined);
+    net.svar.sb_stier = [reg("c/e/ny.txt", "uploadet")];
+    net.insert.mockReturnValueOnce({ error: null });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    await fremad(0);
+    await svarFor("F1", null);
+    await fremad(0);
+    expect(udstedUpload).toHaveBeenCalledTimes(1);
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(net.insert.mock.calls[0][0]).toMatchObject({ id: "F1", attachment_path: "c/e/ny.txt" });
+  });
 });

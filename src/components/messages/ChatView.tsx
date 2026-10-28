@@ -33,9 +33,9 @@ const TOM: Afsendelse[] = [];
 /** Højst ét netværksforløb pr. (generation, medarbejder, samtale, id); låsen ejes af én operation. */
 const laase = new Map<string, string>();
 const laasNoegle = (gen: number, emp: string, conv: string, id: string) => `${gen}:${emp}:${conv}:${id}`;
-function tagLaas(k: string, op: string): boolean { if (laase.has(k)) return false; laase.set(k, op); return true; }
+export function tagLaas(k: string, op: string): boolean { if (laase.has(k)) return false; laase.set(k, op); return true; }
 /** b4 (iii): en gammel afslutning frigiver kun sin egen lås. */
-function frigivLaas(k: string, op: string): void { if (laase.get(k) === op) laase.delete(k); }
+export function frigivLaas(k: string, op: string): void { if (laase.get(k) === op) laase.delete(k); }
 
 export const MAKS_SAMTIDIGE_AFSTEMNINGER = 3;
 const LAAST_VENT_MS = 1000;
