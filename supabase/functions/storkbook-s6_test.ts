@@ -632,13 +632,18 @@ test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → in
   const time = new FakeTime(DAG);
   try {
     let gruppe = 0;
+    const langsomme = new Set<number>();
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(32) : []),
-      remove: async (k) => { const langsom = Date.now() - DAG >= 49_000; await vent(langsom ? 60_000 : 7_000, k.signal); return jsonR([]); },
-      afslut: async (k) => { if (Date.now() - DAG >= 49_000) return await hænger(k.signal); gruppe++; return jsonR(true); } }));
+      remove: async (k) => {
+        const langsom = Date.now() - DAG >= 49_000;
+        if (langsom) for (const s of JSON.parse(k.krop).prefixes as string[]) langsomme.add(Number(/(\d+)\.png$/.exec(s)![1]) + 1);
+        await vent(langsom ? 60_000 : 7_000, k.signal); return jsonR([]);
+      },
+      afslut: async (k) => { if (langsomme.has(JSON.parse(k.krop).p_id)) return await hænger(k.signal); gruppe++; return jsonR(true); } }));
     const { res, ms } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
-    console.log("49s", ms, b);
     assert(ms <= 58_100, `varighed ${ms} (må ikke nå 65 s)`);
+    assert(langsomme.size > 0, "gruppen ved 49 s startede ikke");
     assertEquals(b.ok, false); assert(b.fejl.includes("koe_afslut")); assert(b.fejl.includes("storage_fejl")); assertEquals(b.rester.koe, true);
     assertEquals(b.slettet, gruppe); // kun bekræftede
   } finally { time.restore(); }
