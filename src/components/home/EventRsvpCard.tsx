@@ -1,5 +1,5 @@
 import { relativDag } from "@/lib/dato";
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { Check, Info, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
