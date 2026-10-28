@@ -20,7 +20,7 @@ import { SkeletonList, useDraftGuard } from "@/components/mobile";
 import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, FIL_ACCEPT, FIL_GRAENSER_TEKST } from "@/lib/sbFil";
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
-  fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, kladdeFil, saetKladdeFil, harLagringsFejl, abonnerAfsendelser,
+  fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, harLagringsFejl, abonnerAfsendelser,
   sessionsGeneration, fastholdEjer, ejerGyldig, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
   erAktuelKladdeUpload, fjernKladdeFil, saetKladdeFilPost, filErSendeklar, type Afsendelse, type FilMeta,
 } from "@/lib/sbKladder";
