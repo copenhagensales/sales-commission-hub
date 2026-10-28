@@ -213,3 +213,19 @@ describe("§3 – kladdefilens uploadforløb ejes af lageret (B2a-b3)", () => {
     expect(m.filErSendeklar(null)).toBe(true);
   });
 });
+
+describe("b1-hensyn (i): auth-bruger i operationsejeren (B2a-b4)", () => {
+  it("ejer med anden auth-bruger end den aktive er ugyldig; samme bruger er gyldig", async () => {
+    const m = await ny();
+    const { supabase } = await import("@/integrations/supabase/client");
+    m.registrerKladdeOprydning();
+    const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls.at(-1)![0] as (e: string, s: unknown) => void;
+    cb("SIGNED_IN", { user: { id: "u1" } });
+    const egen = m.fastholdEjer("e", "A");
+    expect(egen.bruger).toBe("u1");
+    expect(egen.op).toBeTruthy();
+    expect(m.ejerGyldig(egen)).toBe(true);
+    expect(m.ejerGyldig({ ...egen, bruger: "u2" })).toBe(false);
+    expect(m.fastholdEjer("e", "A").op).not.toBe(egen.op);
+  });
+});

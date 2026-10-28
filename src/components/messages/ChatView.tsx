@@ -9,7 +9,7 @@ import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { findEmployeeByAuth } from "@/lib/employeeLookup";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { MessageSearch } from "./MessageSearch";
 import { AttachmentPreview, kraeverGenvalg, type LokalFil } from "./AttachmentPreview";
@@ -21,7 +21,7 @@ import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, FIL_ACCEPT, FI
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
   fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, harLagringsFejl, abonnerAfsendelser,
-  sessionsGeneration, fastholdEjer, ejerGyldig, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
+  sessionsGeneration, fastholdEjer, ejerGyldig, nytOperationsId, type OperationsEjer, harKladdeLagerFejl, kladdeFilTilstand, startKladdeUpload, opdaterKladdeUpload,
   erAktuelKladdeUpload, fjernKladdeFil, saetKladdeFilPost, filErSendeklar, type Afsendelse, type FilMeta,
 } from "@/lib/sbKladder";
 
@@ -29,17 +29,132 @@ registrerKladdeOprydning();
 
 const LAGER_FEJL = "Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben";
 const TOM: Afsendelse[] = [];
-const indsendes = new Set<string>(); // id'er med igangværende netværksforløb (delt på tværs af montering)
+// ---------- §4: netværkslås pr. id og fælles afstemningskø (delt på tværs af monteringer) ----------
+/** Højst ét netværksforløb pr. (generation, medarbejder, samtale, id); låsen ejes af én operation. */
+const laase = new Map<string, string>();
+const laasNoegle = (gen: number, emp: string, conv: string, id: string) => `${gen}:${emp}:${conv}:${id}`;
+export function tagLaas(k: string, op: string): boolean { if (laase.has(k)) return false; laase.set(k, op); return true; }
+/** b4 (iii): en gammel afslutning frigiver kun sin egen lås. */
+export function frigivLaas(k: string, op: string): void { if (laase.get(k) === op) laase.delete(k); }
+
+export const MAKS_SAMTIDIGE_AFSTEMNINGER = 3;
+const LAAST_VENT_MS = 1000;
+interface AfstemForloeb {
+  noegle: string; id: string; ejer: OperationsEjer; qc: QueryClient;
+  forsoeg: number; naeste: number; timer: ReturnType<typeof setTimeout> | null;
+  iKoe: boolean; aktiv: boolean; udtoemt: boolean; genstartVenter: boolean;
+}
+const forloeb = new Map<string, AfstemForloeb>();
+const koe: AfstemForloeb[] = [];
+let aktiveAfstemninger = 0;
+const koeLyttere = new Set<() => void>();
+let koeVersion = 0;
+const meldKoe = () => { koeVersion++; for (const l of koeLyttere) l(); };
+const abonnerKoe = (l: () => void) => { koeLyttere.add(l); return () => { koeLyttere.delete(l); }; };
+const gyldigt = (f: AfstemForloeb) => forloeb.get(f.noegle) === f && ejerGyldig(f.ejer);
+
+function planlaegForloeb(f: AfstemForloeb): void {
+  if (!gyldigt(f) || f.timer || f.iKoe || f.aktiv || f.udtoemt) return;
+  f.timer = setTimeout(() => { f.timer = null; if (!gyldigt(f)) return; f.iKoe = true; koe.push(f); pumpKoe(); }, Math.max(0, f.naeste - Date.now()));
+}
+function pumpKoe(): void {
+  while (aktiveAfstemninger < MAKS_SAMTIDIGE_AFSTEMNINGER && koe.length) {
+    const f = koe.shift()!;
+    f.iKoe = false;
+    if (gyldigt(f)) void koerForloeb(f);
+  }
+}
+async function koerForloeb(f: AfstemForloeb): Promise<void> {
+  const { emp, conv, gen } = f.ejer;
+  const a = hentAfsendelser(emp, conv).find((x) => x.id === f.id);
+  if (!a || a.tilstand !== "afstemmer") { stopForloeb(f.noegle); return; }
+  const op = nytOperationsId();
+  // Optaget af manuel afsendelse: planlæg fortsættelse i stedet for at opgive (§4).
+  if (!tagLaas(f.noegle, op)) { f.naeste = Date.now() + LAAST_VENT_MS; planlaegForloeb(f); return; }
+  f.aktiv = true;
+  aktiveAfstemninger++;
+  let r: Awaited<ReturnType<typeof afstemKun>> = "ukendt";
+  try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: f.ejer }); }
+  catch { r = "ukendt"; }
+  finally { frigivLaas(f.noegle, op); f.aktiv = false; aktiveAfstemninger--; }
+  pumpKoe();
+  if (!gyldigt(f)) return;
+  if (r === "fundet") {
+    fjernAfsendelse(emp, conv, f.id, gen);
+    stopForloeb(f.noegle);
+    if (ejerGyldig(f.ejer)) void f.qc.invalidateQueries({ queryKey: ["chat-messages", conv] });
+    return;
+  }
+  if (r === "stop") { opdaterAfsendelse(emp, conv, f.id, { tilstand: "afvist", fejl: IKKE_REGISTRERET_TEKST }, gen); stopForloeb(f.noegle); return; }
+  if (r === "gemt_vaek") {
+    saetAfsendelsesFil(emp, conv, f.id, null);
+    opdaterAfsendelse(emp, conv, f.id, { tilstand: "gemt_vaek", tekst: "", fil: null, svarId: null }, gen);
+    stopForloeb(f.noegle);
+    return;
+  }
+  if (r === "genudsted") {
+    // §8 A: kun et tilbud – automatisk afstemning udfører aldrig genudstedelse.
+    opdaterAfsendelse(emp, conv, f.id, { tilstand: afsendelsesFil(emp, conv, f.id) ? "genudsted" : "vaelg_fil", fejl: null }, gen);
+    stopForloeb(f.noegle);
+    return;
+  }
+  if (f.genstartVenter) { f.genstartVenter = false; f.forsoeg = 0; f.naeste = 0; planlaegForloeb(f); meldKoe(); return; }
+  if (f.forsoeg >= AFSTEM_BACKOFF_MS.length) { f.udtoemt = true; meldKoe(); return; }
+  f.naeste = Date.now() + AFSTEM_BACKOFF_MS[f.forsoeg];
+  f.forsoeg++;
+  planlaegForloeb(f);
+}
+function stopForloeb(k: string): void {
+  const f = forloeb.get(k);
+  if (!f) return;
+  if (f.timer) clearTimeout(f.timer);
+  forloeb.delete(k);
+  meldKoe();
+}
+/** Sikrer ét forløb pr. id; eksisterende forløb (med backoff) bevares ved remount. */
+function sikrForloeb(ejer: OperationsEjer, id: string, qc: QueryClient): void {
+  const k = laasNoegle(ejer.gen, ejer.emp, ejer.conv, id);
+  const f = forloeb.get(k);
+  if (f && gyldigt(f)) { f.qc = qc; planlaegForloeb(f); return; }
+  const ny: AfstemForloeb = { noegle: k, id, ejer, qc, forsoeg: 0, naeste: 0, timer: null, iKoe: false, aktiv: false, udtoemt: false, genstartVenter: false };
+  forloeb.set(k, ny);
+  planlaegForloeb(ny);
+}
+/** Online/forgrund: højst én ventende genstart pr. id (gentagne hændelser samles). */
+function genstartForloeb(): void {
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+  for (const f of forloeb.values()) {
+    if (!gyldigt(f)) continue;
+    if (f.aktiv || f.iKoe) { f.genstartVenter = true; continue; }
+    if (f.timer) { clearTimeout(f.timer); f.timer = null; }
+    f.forsoeg = 0; f.naeste = 0; f.udtoemt = false;
+    planlaegForloeb(f);
+  }
+  meldKoe();
+}
+/** Manuelt genforsøg (»Prøv igen«) nulstiller serien for id'et. */
+function nulstilForloeb(gen: number, emp: string, conv: string, id: string): void {
+  const f = forloeb.get(laasNoegle(gen, emp, conv, id));
+  if (!f) return;
+  if (f.timer) { clearTimeout(f.timer); f.timer = null; }
+  f.forsoeg = 0; f.naeste = 0; f.udtoemt = false;
+  meldKoe();
+}
+const erUdtoemt = (gen: number, emp: string, conv: string, id: string) => !!forloeb.get(laasNoegle(gen, emp, conv, id))?.udtoemt;
+if (typeof window !== "undefined") {
+  window.addEventListener("online", genstartForloeb);
+  document.addEventListener("visibilitychange", genstartForloeb);
+}
 
 interface ChatViewProps {
   conversationId: string;
 }
 
-async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string } | null> {
+async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string; authId: string } | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data } = await findEmployeeByAuth<{ id: string; first_name: string | null; last_name: string | null }>(user, "id, first_name, last_name");
-  return data ? { id: data.id, full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim() } : null;
+  return data ? { id: data.id, full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim(), authId: user.id } : null;
 }
 
 const metaFra = (f: LokalFil): FilMeta => ({ name: f.name, type: f.type, size: f.size, sti: f.sti ?? null, trin: f.trin });
@@ -72,6 +187,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const { data: currentEmployee } = useQuery({ queryKey: ["current-employee"], queryFn: fetchCurrentEmployee });
   const meId = currentEmployee?.id;
+  const brugerRef = useRef<string | null>(null);
+  brugerRef.current = currentEmployee?.authId ?? null;
   const meRef = useRef(meId);
   meRef.current = meId;
   const noegle = meId ? `${meId}:${conversationId}` : null;
@@ -175,14 +292,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   /** Ét afsendelsesforsøg for samme id. Bruger, samtale og sessionsgeneration fastholdes fra starten. */
   const deliver = useCallback(async (emp: string, conv: string, id: string, genudsted = false) => {
-    const fk = `${emp}:${conv}:${id}`;
-    if (indsendes.has(fk)) return;
     // §1: ejer fastholdes synkront før første await; alle efterfølgende trin tjekker ejerskabet.
-    const ejer = fastholdEjer(emp, conv), gen = ejer.gen;
+    const ejer = fastholdEjer(emp, conv, brugerRef.current), gen = ejer.gen, op = ejer.op!;
+    const fk = laasNoegle(gen, emp, conv, id);
     const vagt = () => ejerGyldig(ejer);
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
-    indsendes.add(fk);
+    // §4/§8(4): højst ét netværksforløb pr. id – også mod baggrundsafstemning.
+    if (!tagLaas(fk, op)) return;
+    nulstilForloeb(gen, emp, conv, id);
     opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
     let filMeta = a.fil;
     try {
@@ -232,68 +350,25 @@ export function ChatView({ conversationId }: ChatViewProps) {
         opdaterAfsendelse(emp, conv, id, { tilstand: "genudsted", fejl: udstedFejlTekst(e) }, gen);
       }
     } finally {
-      indsendes.delete(fk);
+      frigivLaas(fk, op);
     }
   }, [sendMessage]);
 
-  // §2: afstemning (kun læsning) af uafklarede afsendelser med backoff 1–30 s; derefter bruger/online/forgrund.
+  // §4: afstemning (kun læsning) via den fælles kø; listeændringer berører kun tilføjede/fjernede id'er.
   const afstemmer = afsendelser.filter((a) => a.tilstand === "afstemmer").map((a) => a.id).join(",");
-  const forsoeg = useRef(new Map<string, number>());
-  const [udtoemt, setUdtoemt] = useState<Set<string>>(new Set());
+  const koeV = useSyncExternalStore(abonnerKoe, () => koeVersion);
   useEffect(() => {
-    if (!meId || !afstemmer) return;
-    const emp = meId, conv = conversationId, gen = sessionsGeneration();
-    const ids = afstemmer.split(",");
-    const timere = new Map<string, ReturnType<typeof setTimeout>>();
-    let stoppet = false;
-    const tjek = async (id: string) => {
-      const fk = `${emp}:${conv}:${id}`;
-      if (stoppet || gen !== sessionsGeneration() || indsendes.has(fk)) return;
-      const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
-      if (!a || a.tilstand !== "afstemmer") return;
-      indsendes.add(fk);
-      let r: Awaited<ReturnType<typeof afstemKun>>;
-      try { r = await afstemKun({ id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: { emp, conv, gen } }); } finally { indsendes.delete(fk); }
-      if (stoppet || gen !== sessionsGeneration()) return;
-      if (r === "fundet") {
-        fjernAfsendelse(emp, conv, id, gen);
-        void queryClient.invalidateQueries({ queryKey: ["chat-messages", conv] });
-        return;
-      }
-      if (r === "stop") {
-        opdaterAfsendelse(emp, conv, id, { tilstand: "afvist", fejl: IKKE_REGISTRERET_TEKST }, gen);
-        return;
-      }
-      if (r === "gemt_vaek") {
-        saetAfsendelsesFil(emp, conv, id, null);
-        opdaterAfsendelse(emp, conv, id, { tilstand: "gemt_vaek", tekst: "", fil: null, svarId: null }, gen);
-        return;
-      }
-      const n = forsoeg.current.get(id) ?? 0;
-      if (n >= AFSTEM_BACKOFF_MS.length) { setUdtoemt((s) => new Set(s).add(id)); return; }
-      forsoeg.current.set(id, n + 1);
-      timere.set(id, setTimeout(() => void tjek(id), AFSTEM_BACKOFF_MS[n]));
-    };
-    const genstart = () => {
-      if (document.visibilityState !== "visible") return;
-      for (const id of ids) {
-        const t = timere.get(id);
-        if (t) clearTimeout(t);
-        forsoeg.current.set(id, 0);
-        void tjek(id);
-      }
-      setUdtoemt(new Set());
-    };
-    for (const id of ids) void tjek(id);
-    window.addEventListener("online", genstart);
-    document.addEventListener("visibilitychange", genstart);
-    return () => {
-      stoppet = true;
-      for (const t of timere.values()) clearTimeout(t);
-      window.removeEventListener("online", genstart);
-      document.removeEventListener("visibilitychange", genstart);
-    };
+    if (!meId) return;
+    const ejer = fastholdEjer(meId, conversationId, brugerRef.current);
+    const ids = new Set(afstemmer ? afstemmer.split(",") : []);
+    for (const id of ids) sikrForloeb(ejer, id, queryClient);
+    for (const f of [...forloeb.values()]) {
+      if (f.ejer.emp === meId && f.ejer.conv === conversationId && f.ejer.gen === ejer.gen && !ids.has(f.id) && !f.aktiv) stopForloeb(f.noegle);
+    }
   }, [meId, conversationId, afstemmer, queryClient]);
+  void koeV;
+  const gen = sessionsGeneration();
+  const udtoemt = { has: (id: string) => !!meId && erUdtoemt(gen, meId, conversationId, id) };
 
   const composerTom = !message.trim() && !fil && !retId && !svarId && !replyTo;
   const kanSende = !!meId && (!!message.trim() || !!fil) && !fil?.uploader && !fil?.fejl && !(fil && kraeverGenvalg(fil))

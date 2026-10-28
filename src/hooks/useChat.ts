@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, sessionsGeneration, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -387,7 +387,7 @@ export async function laesRegister(sti: string, beskedId: string, conversationId
  * ikke_fundet = fejlfrit tomt opslag (og for fil: gyldig egen ubundet sti med status uploadet) – ALDRIG bevis for »ikke gemt«;
  * stop = filstien er bundet til et andet id (ingen succes, INSERT eller genudstedelse); ukendt = uafklaret.
  */
-export type Afstemning = "fundet" | "gemt_vaek" | "ikke_fundet" | "stop" | "ukendt";
+export type Afstemning = "fundet" | "gemt_vaek" | "ikke_fundet" | "stop" | "genudsted" | "ukendt";
 /** Afstemmer et afsendelses-id (kun læsning). Et tomt SELECT er ikke bevis for, at beskeden aldrig blev gemt. */
 export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath">, employeeId: string, vagt: () => boolean = () => true): Promise<Afstemning> {
   const r = await afstemBesked(v.id, v.conversationId);
@@ -397,6 +397,10 @@ export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId
     const reg = await laesRegister(v.attachmentPath, v.id, v.conversationId, employeeId);
     if (reg.art === "bundet_her") return "gemt_vaek";
     if (reg.art === "bundet_andet") return "stop";
+    // §8 (afgørelse A): fejlfrit tomt beskedopslag + præcis egen ubundet sti med status slettes/slettet beviser,
+    // at det tidligere INSERT ikke blev gemt (binding sker i INSERT-transaktionen og kræver status uploadet).
+    // Giver kun et TILBUD om genudstedelse; udføres først efter brugertryk.
+    if (r === false && reg.art === "ubundet_overtaget") return "genudsted";
     if (r === null || reg.art !== "ubundet") return "ukendt"; // registerfejl/overtaget/ukendt → intet INSERT
     return "ikke_fundet";
   }
@@ -434,6 +438,7 @@ export async function sendBesked(v: SendInput, employeeId: string, vagt: () => b
   if (foer === "fundet") return;
   if (foer === "gemt_vaek") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
   if (foer === "stop") throw new SendFejl("stop", IKKE_REGISTRERET_TEKST, false);
+  if (foer === "genudsted") throw new SendFejl("genudsted", IKKE_REGISTRERET_TEKST, false);
   if (foer === "ukendt") throw new SendFejl("ukendt", "Ikke sendt – prøv igen", false);
   let error: { code?: string; message?: string } | null = null;
   try {
@@ -483,29 +488,39 @@ export function useSendMessage() {
   return useMutation({
     mutationFn: async (v: SendInput) => {
       // §1: med fastholdt ejer slås medarbejderen ikke op undervejs; sender_id er den fastholdte.
-      const vagt = () => !v.ejer || ejerGyldig(v.ejer);
+      // b4 (ii): uden ejer fastholdes generationen synkront her – aldrig en altid gyldig vagt.
+      const gen0 = sessionsGeneration();
+      const vagt = () => (v.ejer ? ejerGyldig(v.ejer) : gen0 === sessionsGeneration());
       const employeeId = v.ejer?.emp ?? await getCurrentEmployeeId().catch(() => { throw foraeldet(); });
+      const ejer: OperationsEjer = v.ejer ?? { emp: employeeId, conv: v.conversationId, gen: gen0 };
+      if (!vagt()) throw foraeldet();
       await sendBesked(v, employeeId, vagt);
-      return v;
+      return { ...v, ejer };
     },
     // Afstemningsforløbet ejer genforsøgene (App.tsx' mutations.retry=1 overstyres lokalt).
     retry: 0,
     onSuccess: (v) => {
-      if (v.ejer && !ejerGyldig(v.ejer)) return; // sent svar må ikke skrive til den nye session
-      efterHandling(queryClient, v.conversationId, v.id);
-      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      const ejer = v.ejer;
+      const vagt = () => ejerGyldig(ejer); // sent svar må ikke skrive til den nye session
+      if (!vagt()) return;
+      efterHandling(queryClient, v.conversationId, v.id, vagt);
+      if (vagt()) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
 }
 
 /** Ren afstemning (kun læsning) til backoff-løkken. */
 export async function afstemKun(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath" | "ejer">): Promise<Afstemning> {
-  if (v.ejer && !ejerGyldig(v.ejer)) return "ukendt";
+  // b4 (ii): uden ejer fastholdes generationen ved start (ingen altid gyldig vagt).
+  const gen0 = sessionsGeneration();
+  const vagt = () => (v.ejer ? ejerGyldig(v.ejer) : gen0 === sessionsGeneration());
+  if (!vagt()) return "ukendt";
   let emp: string;
   if (v.ejer) emp = v.ejer.emp;
   else { try { emp = await getCurrentEmployeeId(); } catch { return "ukendt"; } }
-  const r = await afstemAfsendelse(v, emp, () => !v.ejer || ejerGyldig(v.ejer));
-  return v.ejer && !ejerGyldig(v.ejer) ? "ukendt" : r;
+  if (!vagt()) return "ukendt";
+  const r = await afstemAfsendelse(v, emp, vagt);
+  return vagt() ? r : "ukendt";
 }
 
 /** Backoff for afstemning: 1, 2, 4, 8, 16, 30 s; derefter venter klienten på bruger/online/forgrund. */
@@ -1028,10 +1043,12 @@ export const erForaeldet = (e: unknown) => (e as { code?: string; message?: stri
 const vent = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét genforsøg efter 2 s ved transportfejl. */
-export async function startTjekHvisNoedvendigt(messageId: string): Promise<void> {
+export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean = () => true): Promise<void> {
+  if (!vagt()) return;
   const { data: r } = await supabase.from("chat_messages").select("status, revision").eq("id", messageId).maybeSingle();
   if (!r || r.status !== "tjekkes") return;
   for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
+    if (!vagt()) return;
     const { error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } });
     if (!error) return;
     const navn = (error as { name?: string }).name;
@@ -1040,10 +1057,14 @@ export async function startTjekHvisNoedvendigt(messageId: string): Promise<void>
   }
 }
 
-function efterHandling(qc: QueryClient, conversationId: string, messageId: string) {
+/** b4 (iv): med vagt kontrolleres ejerskabet før hvert kald og hver cache-sideeffekt (også i finally). */
+function efterHandling(qc: QueryClient, conversationId: string, messageId: string, vagt: () => boolean = () => true) {
+  if (!vagt()) return;
   void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
   void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
-  void startTjekHvisNoedvendigt(messageId).finally(() => {
+  if (!vagt()) return;
+  void startTjekHvisNoedvendigt(messageId, vagt).finally(() => {
+    if (!vagt()) return;
     void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
     void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
   });

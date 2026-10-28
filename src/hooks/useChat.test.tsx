@@ -442,11 +442,93 @@ describe("§2/§8 – registerafstemning og genudstedelse gennem rigtig useSendM
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("overtaget sti i forhåndsopslaget → intet INSERT (uafklaret)", async () => {
+  it("(rettet i b4, §8 A) overtaget sti i forhåndsopslaget → intet INSERT, men genudstedelse tilbydes", async () => {
     const send = opsaet();
-    svar.chat_messages = [msg(null)];
-    svar.sb_stier = [række({ status: "slettet" })];
-    expect((await send(vu))?.art).toBe("ukendt");
+    for (const status of ["slettes", "slettet"]) {
+      svar.chat_messages = [msg(null)];
+      svar.sb_stier = [række({ status })];
+      const e = await send(vu);
+      expect(e?.art).toBe("genudsted");
+      expect(e?.indsat).toBe(false);
+    }
     expect(insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
+  const kontrol = <T,>() => { let res!: (v: T) => void; const p = new Promise<T>((a) => { res = a; }); return { p, res }; };
+  const opsaet = () => {
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+    return { inv, ...renderHook(() => useSendMessage(), { wrapper }) };
+  };
+  const vu = { ...vf, tidligereUkendt: true };
+
+  it("§8 A betingelse 1: fejlet beskedopslag + overtaget register → uafklaret, ikke genudsted", async () => {
+    const { result } = opsaet();
+    svar.chat_messages = [msg(null, { message: "net" })];
+    svar.sb_stier = [række({ status: "slettet" })];
+    expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c") })))?.art).toBe("ukendt");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("§8 A betingelse 2: registerfejl, minimeret række, forkert ejer/samtale, anden sti/bucket, ukendt status → uafklaret", async () => {
+    const { result } = opsaet();
+    const cases = [msg(null, { message: "rls" }), msg({ besked_id: null, status: "slettet" }), række({ status: "slettet", ejer_employee_id: "x" }),
+      række({ status: "slettet", samtale_id: "x" }), række({ status: "slettet", sti: "c/e/andet.png" }), række({ status: "slettet", bucket: "x" }), række({ status: "mystisk" })];
+    for (const c of cases) {
+      svar.chat_messages = [msg(null)];
+      svar.sb_stier = [c];
+      expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c") })))?.art).toBe("ukendt");
+    }
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("§8 A: automatisk afstemning (afstemKun) giver kun tilbuddet – ingen skrivende kald", async () => {
+    const { afstemKun } = await import("./useChat");
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [række({ status: "slettes" })];
+    expect(await afstemKun({ id: v.id, conversationId: "c", attachmentPath: "c/e/x.png", ejer: fastholdEjer("e", "c") })).toBe("genudsted");
+    expect(kald.filter((k) => !k.startsWith("select"))).toEqual([]);
+  });
+
+  it("(ii) ejerløs send: logud under identitetsopslag → nul INSERT (ingen altid gyldig vagt)", async () => {
+    const { result } = opsaet();
+    const id = kontrol<{ data: unknown; error: null }>();
+    vi.mocked(supabase.rpc).mockReturnValueOnce(id.p as never);
+    const p = fejl(result.current.mutateAsync(v));
+    await vi.waitFor(() => expect(supabase.rpc).toHaveBeenCalled());
+    rydAlleKladder();
+    id.res({ data: "e", error: null });
+    await p;
+    expect(insert).not.toHaveBeenCalled();
+    expect(kald).toEqual([]);
+  });
+
+  it("(ii) ejerløs afstemKun: logud under opslag → ukendt", async () => {
+    const { afstemKun } = await import("./useChat");
+    const id = kontrol<{ data: unknown; error: null }>();
+    vi.mocked(supabase.rpc).mockReturnValueOnce(id.p as never);
+    const p = afstemKun({ id: v.id, conversationId: "c" });
+    rydAlleKladder();
+    id.res({ data: "e", error: null });
+    expect(await p).toBe("ukendt");
+    expect(kald).toEqual([]);
+  });
+
+  it("(iv) efterbehandling: logud under statusopslag → intet tjek-kald og ingen cacheændring derefter", async () => {
+    const { result, inv } = opsaet();
+    const status = kontrol<{ data: unknown; error: null }>();
+    svar.chat_messages = [msg(null), status.p];
+    insert.mockResolvedValueOnce({ error: null });
+    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") });
+    await vi.waitFor(() => expect(kald.filter((k) => k === "select:chat_messages")).toHaveLength(2));
+    const foer = inv.mock.calls.length;
+    rydAlleKladder();
+    status.res({ data: { status: "tjekkes", revision: 1 }, error: null });
+    await new Promise((x) => setTimeout(x, 0));
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    expect(inv.mock.calls.length).toBe(foer);
   });
 });
