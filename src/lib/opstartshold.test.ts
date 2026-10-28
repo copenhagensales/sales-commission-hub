@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bygHold } from "./opstartshold";
+import { bygHold, farveTrin } from "./opstartshold";
 import type { OpstartRaekke } from "@/hooks/useOpstartshold";
 
 const r = (emp: string, dag: number, dato: string, linjer: number, hiper = 0, slut: string | null = null): OpstartRaekke => ({
@@ -28,5 +28,20 @@ describe("bygHold", () => {
     expect(h.total.hiper).toBe(1);
     expect(h.total.prStarter).toBe(3);
     expect(h.total.tilbage).toBe(1);
+  });
+});
+
+describe("farveTrin (linjer pr. sælger)", () => {
+  it("5 trin med grænser 0,4 / 0,8 / 1,2 / 2,0", () => {
+    expect([0.3, 0.4, 0.7, 0.8, 1.1, 1.2, 1.9, 2.0].map(farveTrin)).toEqual([0, 1, 1, 2, 2, 3, 3, 4]);
+  });
+});
+
+describe("hold 20/10 dag 6 (14 linjer, 6 af 10 solgte)", () => {
+  const rows: OpstartRaekke[] = Array.from({ length: 10 }, (_, i) => r(`s${i}`, 6, "2026-10-27", i < 6 ? (i < 4 ? 3 : 1) : 0));
+  const [h] = bygHold(rows, "2026-10-28");
+  it("viser 14 (1,4) · 60 % · 6 af 10", () => {
+    const d = h.dage[0];
+    expect(`${d.linjer} (${d.prSaelger.toFixed(1).replace(".", ",")}) · ${Math.round(d.pct * 100)} % · ${d.solgte} af ${d.ansatte}`).toBe("14 (1,4) · 60 % · 6 af 10");
   });
 });

@@ -14,6 +14,8 @@ import { todayInCopenhagen } from "@/lib/qualityDates";
 
 const FARVER = ["hsl(var(--chart-2))", "hsl(var(--primary))", "hsl(var(--chart-1))", "hsl(var(--chart-3))", "hsl(var(--destructive))", "hsl(var(--chart-4))"];
 const datoTekst = (d: string) => { const [y, m, dd] = d.split("-"); return `${Number(dd)}/${Number(m)}-${y.slice(2)}`; };
+const dec = (x: number) => x.toFixed(1).replace(".", ",");
+const TRIN = [0, 0.15, 0.35, 0.6, 0.85];
 const pct = (x: number) => `${Math.round(x * 100)} %`;
 
 export default function Opstartshold() {
@@ -28,7 +30,7 @@ export default function Opstartshold() {
   const kohorter = valgt ?? startede.slice(0, 6).map((h) => h.noegle);
   const data = useOpstartsholdDage(kohorter, adHoc, dage);
   const hold = useMemo(() => bygHold(data.data ?? [], idag).sort((a, b) => b.start.localeCompare(a.start)), [data.data, idag]);
-  const maks = Math.max(1, ...hold.flatMap((h) => h.dage.map((d) => d.linjer)));
+  const kl = data.dataUpdatedAt ? new Date(data.dataUpdatedAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" }) : "";
 
   const skift = (id: string) => setValgt((v) => { const cur = v ?? kohorter; return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]; });
 
@@ -104,18 +106,18 @@ export default function Opstartshold() {
                     {Array.from({ length: dage }, (_, i) => i + 1).map((n) => (
                       <tr key={n} className="border-t">
                         <th className="sticky left-0 z-10 bg-card p-2 text-left font-medium">{n}</th>
-                        {hold.map((h) => <DagCelle key={h.noegle} d={h.dage.find((x) => x.dag === n)} maks={maks} startere={h.startere} />)}
+                        {hold.map((h) => <DagCelle key={h.noegle} d={h.dage.find((x) => x.dag === n)} kl={kl} />)}
                       </tr>
                     ))}
                     <tr className="border-t-2 bg-muted/30">
                       <th className="sticky left-0 z-10 bg-muted p-2 text-left font-medium">I alt</th>
                       {hold.map((h) => (
                         <td key={h.noegle} className="p-2 align-top">
-                          <div className="text-lg font-semibold tabular-nums">{h.total.linjer}</div>
-                          {h.total.hiper > 0 && <div className="text-muted-foreground">heraf H {h.total.hiper}</div>}
+                          <div className="tabular-nums"><span className="text-lg font-semibold">{h.total.linjer}</span>{h.total.hiper > 0 && <span className="text-muted-foreground"> ({h.total.hiper} H)</span>}</div>
+                          <div>{dec(h.total.prSaelgerSnit)} pr. sælger/dag</div>
                           <div>{pct(h.total.pctSnit)} i snit</div>
-                          <div>{h.total.prStarter.toFixed(1).replace(".", ",")} pr. starter</div>
                           <div className="text-muted-foreground">{h.total.tilbage} af {h.startere} tilbage</div>
+                          {h.total.dagIGang && <div className="font-medium text-success">dag {h.total.dagIGang} i gang</div>}
                         </td>
                       ))}
                     </tr>
@@ -126,14 +128,14 @@ export default function Opstartshold() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">Kumuleret</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Kumuleret pr. starter</CardTitle></CardHeader>
             <CardContent className="p-2 md:p-6">
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={kumuleret(hold, dage)} margin={{ left: -16, right: 8, top: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="dag" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                    <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     {hold.map((h, i) => (
@@ -154,22 +156,24 @@ export default function Opstartshold() {
   );
 }
 
-function DagCelle({ d, maks, startere }: { d: HoldData["dage"][number] | undefined; maks: number; startere: number }) {
+function DagCelle({ d, kl }: { d: HoldData["dage"][number] | undefined; kl: string }) {
   if (!d || d.fremtid) return <td className="p-2 text-muted-foreground">–</td>;
-  const styrke = d.linjer ? 0.12 + 0.7 * (d.linjer / maks) : 0;
-  const moerk = styrke > 0.5;
+  const styrke = TRIN[d.trin];
+  const moerk = d.trin >= 3;
+  const sek = moerk ? "text-success-foreground" : "text-muted-foreground";
   return (
-    <td className={cn("p-2 align-top", d.frafald > 0 && "ring-2 ring-inset ring-destructive")}
+    <td className={cn("p-2 align-top", d.frafald > 0 ? "ring-2 ring-inset ring-destructive" : d.foreloebig && "ring-2 ring-inset ring-success")}
       style={{ backgroundColor: styrke ? `hsl(var(--success) / ${styrke})` : undefined }}>
-      <div className={cn("text-lg font-semibold tabular-nums", moerk && "text-success-foreground")}>{d.linjer}</div>
-      <div className={cn("text-[14px]", moerk ? "text-success-foreground" : "text-muted-foreground")}>
-        {d.hiper > 0 && <span>heraf H {d.hiper} · </span>}{pct(d.pct)}
+      <div className={cn("tabular-nums whitespace-nowrap", moerk && "text-success-foreground")}>
+        <span className="text-lg font-semibold">{d.linjer}</span> <span>({dec(d.prSaelger)})</span>
+        {d.hiper > 0 && <span className={cn("ml-1 text-[14px]", sek)}>{d.hiper} H</span>}
       </div>
-      <div className={cn("text-[14px]", moerk ? "text-success-foreground" : "text-muted-foreground")}>
-        {d.ansatte} af {startere}
+      <div className={cn("text-[14px] tabular-nums", sek)}>{pct(d.pct)}</div>
+      <div className={cn("text-[14px] tabular-nums", sek)}>
+        {d.solgte} af {d.ansatte}
         {d.frafald > 0 && <span className="font-semibold text-destructive"> (−{d.frafald})</span>}
       </div>
-      {d.foreloebig && <div className="text-[14px] italic">foreløbig</div>}
+      {d.foreloebig && <div className={cn("text-[14px] italic", sek)}>i dag, kl. {kl}</div>}
     </td>
   );
 }
@@ -190,12 +194,18 @@ function SaelgerListe({ h }: { h: HoldData }) {
             {h.saelgere.map((s) => (
               <li key={s.id} className={cn("p-3 space-y-2", s.slut && "text-muted-foreground")}>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="min-w-0 truncate font-medium">{s.navn}</span>
+                  <span className="min-w-0 truncate font-medium">
+                    {s.flag && <span className="mr-1 font-semibold text-destructive" aria-label="Kræver opfølgning">⚑</span>}{s.navn}
+                  </span>
                   <span className="text-[14px] tabular-nums">
                     {s.linjer} linjer{s.hiper > 0 && ` · heraf H ${s.hiper}`} · {s.arbejdsdage} dage · {s.prDag.toFixed(1).replace(".", ",")}/dag
                   </span>
                 </div>
-                {s.slut && <p className="text-[14px]">Stoppet {datoTekst(s.slut)}</p>}
+                <p className={cn("text-[14px]", s.flag && "text-destructive")}>
+                  Sidste salg: {s.sidsteSalg ? datoTekst(s.sidsteSalg) : "intet"}
+                  {s.dageUdenSalg >= 3 && ` · ${s.dageUdenSalg} arbejdsdage uden salg`}
+                  {s.slut && ` · Stoppet ${datoTekst(s.slut)}`}
+                </p>
                 <div className="flex h-12 items-end gap-0.5" aria-label={`Linjer pr. dag for ${s.navn}`}>
                   {s.dage.map((d) => (
                     <div key={d.dag} className="flex flex-1 min-w-0 flex-col justify-end" title={`Dag ${d.dag}: ${d.eesy} Eesy, ${d.hiper} Hiper`}>
