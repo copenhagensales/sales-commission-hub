@@ -777,8 +777,8 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
   it("parallelle starter for samme bruger/id/revision deduplikeres; en nyere revision er et særskilt forløb", async () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2), tjekkes(3)];
-      let slip!: () => void;
-      vi.mocked(supabase.functions.invoke).mockImplementation((() => new Promise((r) => { slip = () => r({ error: null }); })) as never);
+      const slip: Array<() => void> = [];
+      vi.mocked(supabase.functions.invoke).mockImplementation((() => new Promise((r) => { slip.push(() => r({ error: null })); })) as never);
       const ejer = fastholdEjer("e", "c", "u")!;
       const a = startTjekHvisNoedvendigt("m", () => true, ejer);
       const b = startTjekHvisNoedvendigt("m", () => true, ejer);
@@ -788,9 +788,11 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(2);
       expect(vi.mocked(supabase.functions.invoke).mock.calls.map((x) => (x[1] as { body: { revision: number } }).body.revision)).toEqual([2, 3]);
-      slip(); await vi.advanceTimersByTimeAsync(0);
+      for (const f of slip) f();
+      await vi.advanceTimersByTimeAsync(0);
+      await Promise.all([a, b, c]); // alle forløb afsluttet før timerreset
+      expect(aktiveTjek()).toBe(0);
       vi.mocked(supabase.functions.invoke).mockReset();
-      await Promise.all([a, b, c].map((x) => Promise.race([x, Promise.resolve()])));
     } finally { slut(); }
   });
 
