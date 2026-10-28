@@ -1,5 +1,5 @@
 // Storkbook-udsendelser (S4a). Worker for push-notifikationer efter Messenger-modellen.
-// Kun cron (x-pulsen-cron-token, samme hemmelighed som pulsen-milestones). Kræver 24c (udsendelse_version() = '24c').
+// Kun cron (x-pulsen-cron-token, samme hemmelighed som pulsen-milestones). Kræver 24c (udsendelse_version() = '24c') og 24d (sb_version() = '24d').
 // Fase 1: kilder → kandidater → udsendelse_reserver + vandmærker. Fase 2: overtag → genvalidér → send → afslut.
 // Notifikationer viser aldrig beskedtekst eller kundeoplysninger – kun afsenderens fornavn og et antal.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -25,7 +25,7 @@ type Klar = { userId: string; title: string; body: string; url: string; tag: str
 
 const PRIO: Record<StorkbookType, number> = {
   storkbook_omtale: 60, storkbook_svar: 50, storkbook_kommentar: 40, storkbook_ros: 30,
-  storkbook_reaktion: 25, storkbook_besked: 20, storkbook_begivenhed: 10,
+  storkbook_reaktion: 25, storkbook_besked: 20, storkbook_begivenhed: 10, storkbook_tjek: 70,
 };
 const RAEKKE_LIMIT = 500;
 const GRUPPE_LIMIT = 100;
@@ -178,7 +178,7 @@ function stopGrund(rap: KildeRapport, e: unknown, signal: AbortSignal) {
 
 /** Kører én tid/id-kilde side for side. */
 async function koerTidKilde(
-  svc: Svc, kilde: "opslag" | "kommentarer" | "beskeder", rpc: string, dry: boolean, frist: number, signal: AbortSignal,
+  svc: Svc, kilde: "opslag" | "kommentarer" | "beskeder" | "tjek", rpc: string, dry: boolean, frist: number, signal: AbortSignal,
   udvid: (rows: Record<string, unknown>[]) => Promise<Kandidat[]>, tael: (k: Kandidat[]) => void,
 ): Promise<KildeRapport> {
   const rap: KildeRapport = { kilde, raekker: 0, kandidater: 0, indsat: 0, opgraderet: 0, afvist_loft: 0 };
@@ -209,6 +209,25 @@ async function koerTidKilde(
     stopGrund(rap, e, signal);
   }
   return rap;
+}
+
+const TJEK_KILDER = new Set(["besked", "opslag", "kommentar"]);
+const TJEK_TYPER = new Set(["afventer", "udloeb"]);
+/** Ren mapping (testet): hændelsesrække → kandidat. Ukendte kilder/typer springes over. */
+export function tjekKandidater(rows: Record<string, unknown>[]): Kandidat[] {
+  const ud: Kandidat[] = [];
+  for (const r of rows) {
+    const kilde = String(r.kilde), type = String(r.type), rev = Number(r.revision);
+    if (!TJEK_KILDER.has(kilde) || !TJEK_TYPER.has(type) || !Number.isInteger(rev) || rev < 1 || !r.employee_id || !r.kilde_id) continue;
+    const kid = String(r.kilde_id);
+    ud.push({
+      type_noegle: "storkbook_tjek", haendelse: `tjek:${kilde}:${kid}:${rev}:${type}`,
+      kilde_type: kilde as "besked" | "opslag" | "kommentar", kilde_id: kid, post_id: null, conversation_id: null, event_id: null, blok: null,
+      modtager_employee_id: String(r.employee_id), afsender_employee_id: null, prioritet: PRIO.storkbook_tjek,
+      metadata: { revision: rev, tjek_type: type },
+    });
+  }
+  return ud;
 }
 
 async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) {
@@ -271,6 +290,10 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
     }
     return ud;
   }, t));
+
+  // Tjek-hændelser (24d): cursor via udsendelse_kilde_tjek; modtager = afsenderen selv, afsender_employee_id = null.
+  // kilde_type = underliggende indhold (besked/opslag/kommentar), kilde_id = indholdets id; cursor-id = hændelsesrækkens id.
+  rapporter.push(await koerTidKilde(svc, "tjek", "udsendelse_kilde_tjek", dry, frist, signal, async (rows) => tjekKandidater(rows), t));
 
   // Reaktioner: vandmærke = sidste behandlede gruppe (blok, post_id).
   const rr: KildeRapport = { kilde: "reaktioner", raekker: 0, kandidater: 0, indsat: 0, opgraderet: 0, afvist_loft: 0 };
@@ -349,16 +372,20 @@ async function omtaleGrundlag(svc: Svc, mentions: Mention[], modtager: string, s
   return null;
 }
 
-type Post = { id: string; author_employee_id: string; audience: string; team_id: string | null; deleted_at: string | null; hidden_at: string | null; praised_employee_ids: string[] | null; mentions: unknown; post_type: string };
+type Post = { id: string; author_employee_id: string; audience: string; team_id: string | null; deleted_at: string | null; hidden_at: string | null; praised_employee_ids: string[] | null; mentions: unknown; post_type: string; status: string | null; slettes_efter: string | null };
+/** Servicebaseret synlighed (24d): kun status='leveret' og ikke-udløbet slettes_efter. */
+export const erLeveret = (x: { status?: string | null; slettes_efter?: string | null }, nu = Date.now()) =>
+  x.status === "leveret" && (!x.slettes_efter || new Date(x.slettes_efter).getTime() > nu);
 async function hentSynligtOpslag(svc: Svc, postId: string, modtager: string, signal: AbortSignal): Promise<Post | Afslut> {
-  const { data } = db(await s(svc.from("pulsen_posts").select("id, author_employee_id, audience, team_id, deleted_at, hidden_at, praised_employee_ids, mentions, post_type").eq("id", postId), signal).maybeSingle());
+  const { data } = db(await s(svc.from("pulsen_posts").select("id, author_employee_id, audience, team_id, deleted_at, hidden_at, praised_employee_ids, mentions, post_type, status, slettes_efter").eq("id", postId), signal).maybeSingle());
   const p = data as Post | null;
-  if (!p || p.deleted_at || p.hidden_at) return { status: "annulleret", aarsag: "kilde væk" };
+  if (!p || p.deleted_at || p.hidden_at || !erLeveret(p)) return { status: "annulleret", aarsag: "kilde væk" };
   const { data: ok } = db(await s(svc.rpc("pulsen_kan_se_opslag", { p_employee: modtager, p_audience: p.audience, p_team_id: p.team_id, p_author: p.author_employee_id, p_deleted_at: p.deleted_at, p_hidden_at: p.hidden_at }), signal));
   if (ok !== true) return { status: "annulleret", aarsag: "ikke synlig" };
   return p;
 }
-const erAfslut = (x: unknown): x is Afslut => !!x && typeof x === "object" && "status" in x;
+/** Afslut-resultat: har status, men aldrig indholdsfelter (id) eller notifikationsfelter (title). Et opslag/en besked med feltet status er IKKE et Afslut. */
+export const erAfslut = (x: unknown): x is Afslut => !!x && typeof x === "object" && "status" in x && !("id" in x) && !("title" in x) && !("userId" in x);
 
 async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promise<Afslut | Omit<Klar, "userId">> {
   const modtager = r.modtager_employee_id;
@@ -378,8 +405,8 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
       if (erAfslut(p)) return p;
       let mentions: unknown = p.mentions;
       if (r.kilde_type === "kommentar") {
-        const { data: c } = db(await s(svc.from("feed_comments").select("id, mentions").eq("id", r.kilde_id), signal).maybeSingle());
-        if (!c) return { status: "annulleret", aarsag: "kilde væk" };
+        const { data: c } = db(await s(svc.from("feed_comments").select("id, mentions, status, slettes_efter").eq("id", r.kilde_id), signal).maybeSingle());
+        if (!c || !erLeveret(c as { status: string | null; slettes_efter: string | null })) return { status: "annulleret", aarsag: "kilde væk" };
         mentions = (c as { mentions: unknown }).mentions;
       }
       const hvem = await navn(svc, r.afsender_employee_id, signal);
@@ -395,9 +422,9 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
         : { title: "Kommentar", body: `${hvem} kommenterede dit opslag`, url: opslagUrl(p.id), tag, ttl: dag };
     }
     case "storkbook_besked": {
-      const { data: m } = db(await s(svc.from("chat_messages").select("id, conversation_id, sender_id, deleted_at").eq("id", r.kilde_id), signal).maybeSingle());
-      const msg = m as { id: string; conversation_id: string; sender_id: string; deleted_at: string | null } | null;
-      if (!msg || msg.deleted_at) return { status: "annulleret", aarsag: "kilde væk" };
+      const { data: m } = db(await s(svc.from("chat_messages").select("id, conversation_id, sender_id, deleted_at, status, slettes_efter").eq("id", r.kilde_id), signal).maybeSingle());
+      const msg = m as { id: string; conversation_id: string; sender_id: string; deleted_at: string | null; status: string | null; slettes_efter: string | null } | null;
+      if (!msg || msg.deleted_at || !erLeveret(msg)) return { status: "annulleret", aarsag: "kilde væk" };
       const { data: mem } = db(await s(svc.from("chat_conversation_members").select("aktiv_til").eq("conversation_id", msg.conversation_id).eq("employee_id", modtager), signal).maybeSingle());
       if (!mem) return { status: "annulleret", aarsag: "ikke medlem" };
       const { count: laest } = db(await s(svc.from("chat_message_read_receipts").select("id", { count: "exact", head: true }).eq("message_id", msg.id).eq("employee_id", modtager), signal));
@@ -408,14 +435,40 @@ async function genvalider(svc: Svc, r: Reservation, signal: AbortSignal): Promis
       }
       // Ulæste = alle beskeder fra andre i samtalen \ modtagerens kvitteringer i samtalen (pagineret, ingen id-lister).
       const dbFejl = () => new DbFejl("db");
+      const nuIso = new Date().toISOString();
       const kvitteret = new Set((await alleSider<{ message_id: string }>((fra, til) =>
         s(svc.from("chat_message_read_receipts").select("message_id, chat_messages!inner(conversation_id)").eq("employee_id", modtager)
           .eq("chat_messages.conversation_id", msg.conversation_id).order("message_id").range(fra, til), signal), dbFejl)).map((x) => x.message_id));
       const andre = await alleSider<{ id: string }>((fra, til) =>
-        s(svc.from("chat_messages").select("id").eq("conversation_id", msg.conversation_id).neq("sender_id", modtager).is("deleted_at", null).order("id").range(fra, til), signal), dbFejl);
+        s(svc.from("chat_messages").select("id").eq("conversation_id", msg.conversation_id).neq("sender_id", modtager).is("deleted_at", null)
+          .eq("status", "leveret").or(`slettes_efter.is.null,slettes_efter.gt.${nuIso}`).order("id").range(fra, til), signal), dbFejl);
       const n = Math.max(1, andre.filter((x) => !kvitteret.has(x.id)).length);
       const body = n > 1 ? `${n} nye beskeder` : `${await navn(svc, msg.sender_id, signal)} har skrevet til dig`;
       return { title: "Ny besked", body, url: `/storkbook?tab=beskeder&samtale=${msg.conversation_id}`, tag: `samtale:${msg.conversation_id}`, ttl: 21600 };
+    }
+    case "storkbook_tjek": {
+      // Kun beskedhændelser i S6; tjek-hændelser går aldrig gennem den almindelige leveret-kontrol.
+      if (r.kilde_type !== "besked") return { status: "annulleret", aarsag: "ikke understøttet" };
+      const del = r.haendelse.split(":");
+      const rev = Number(del[3]);
+      const ttype = del[4];
+      if (!Number.isInteger(rev) || (ttype !== "afventer" && ttype !== "udloeb")) return { status: "annulleret", aarsag: "ugyldig hændelse" };
+      const { data: m } = db(await s(svc.from("chat_messages").select("id, conversation_id, sender_id, revision, status, trukket_tilbage_at, deleted_at").eq("id", r.kilde_id), signal).maybeSingle());
+      const msg = m as { id: string; conversation_id: string; sender_id: string; revision: number; status: string; trukket_tilbage_at: string | null; deleted_at: string | null } | null;
+      if (!msg || msg.deleted_at) return { status: "annulleret", aarsag: "kilde væk" };
+      if (msg.sender_id !== modtager) return { status: "annulleret", aarsag: "ikke afsender" };
+      if (msg.revision !== rev) return { status: "annulleret", aarsag: "forældet" };
+      if (ttype === "afventer" && msg.status !== "afventer_afsender") return { status: "annulleret", aarsag: "forældet" };
+      if (ttype === "udloeb") {
+        const tt = msg.trukket_tilbage_at ? new Date(msg.trukket_tilbage_at).getTime() : NaN;
+        if (msg.status !== "trukket_tilbage" || !(tt > Date.now() - dag * 1000)) return { status: "annulleret", aarsag: "forældet" };
+      }
+      const { data: mem } = db(await s(svc.from("chat_conversation_members").select("id").eq("conversation_id", msg.conversation_id).eq("employee_id", modtager), signal).maybeSingle());
+      if (!mem) return { status: "annulleret", aarsag: "ikke medlem" };
+      return {
+        title: "Din besked", body: ttype === "afventer" ? "Din besked afventer dig" : "Din besked blev trukket tilbage",
+        url: `/storkbook?tab=beskeder&samtale=${msg.conversation_id}`, tag: `tjek:${msg.id}`, ttl: dag,
+      };
     }
     case "storkbook_reaktion": {
       const postId = r.post_id ?? r.kilde_id;
@@ -490,11 +543,13 @@ async function forbered(svc: Svc, r: Reservation, signal: AbortSignal): Promise<
   const { data: em } = db(await s(svc.from("employee_master_data").select("auth_user_id").eq("id", r.modtager_employee_id), signal).maybeSingle());
   const userId = (em as { auth_user_id: string | null } | null)?.auth_user_id;
   if (!userId) return { status: "sprunget_over", aarsag: "ingen bruger" };
+  const { data: ty } = db(await s(svc.from("udsendelsestyper").select("stille_fra, stille_til, obligatorisk").eq("noegle", r.type_noegle), signal).maybeSingle());
+  const t = ty as { stille_fra: string | null; stille_til: string | null; obligatorisk: boolean | null } | null;
+  // obligatorisk=true: præferencer og stille timer springes over (aktiv/regler/abonnementer håndhæves fortsat i udsend/push).
+  if (t?.obligatorisk === true) return { userId, ...v };
   const pr = await s(svc.from("udsendelsespraeferencer").select("aktiv").eq("user_id", userId).eq("type_noegle", r.type_noegle).eq("kanal", "push"), signal).maybeSingle();
   if (pr.error) return { status: "ikke_sendt", aarsag: "præferencefejl", naeste: omMin(2), transport: false };
   if ((pr.data as { aktiv: boolean } | null)?.aktiv === false) return { status: "sprunget_over", aarsag: "fravalgt" };
-  const { data: ty } = db(await s(svc.from("udsendelsestyper").select("stille_fra, stille_til").eq("noegle", r.type_noegle), signal).maybeSingle());
-  const t = ty as { stille_fra: string | null; stille_til: string | null } | null;
   const nu = dkDele();
   if (t && iStille(t.stille_fra, t.stille_til, nu.hhmm)) {
     const slut = t.stille_til!.slice(0, 5);
@@ -572,6 +627,9 @@ Deno.serve(async (req) => {
     // (2) 24c skal være installeret
     const ver = await s(svc.rpc("udsendelse_version"), hoved.signal);
     if (ver.error || ver.data !== "24c") return json({ error: "24c mangler" }, 503);
+    // 24d skal være installeret, før der skrives eller sendes ('24d' er eneste gyldige værdi; manglende funktion = fejl).
+    const ver24d = await s(svc.rpc("sb_version"), hoved.signal);
+    if (ver24d.error || ver24d.data !== "24d") return json({ error: "24d mangler" }, 503);
 
     // (3) dry_run: skrivefri rapport
     if (dry) return json({ dry_run: true, ...(await fase1(svc, true, start, hoved.signal)) });
@@ -631,7 +689,9 @@ Deno.serve(async (req) => {
             if (klar) {
               const res = await sendPushUdfald(svc, [klar.userId], r.type_noegle, {
                 udsendType: r.type_noegle, tag: klar.tag, renotify: true, url: klar.url, tekst: { title: klar.title, body: klar.body },
-                ttlSekunder: klar.ttl, udloeberKl, afsenderfunktion: "storkbook-udsendelser", dedupeKey: r.haendelse, signal: hoved.signal, maksAbonnementer: 3,
+                ttlSekunder: klar.ttl, udloeberKl, afsenderfunktion: "storkbook-udsendelser",
+                dedupeKey: r.type_noegle === "storkbook_tjek" ? await sha256Hex(r.haendelse) : r.haendelse,
+                udenUdsendelseslog: r.type_noegle === "storkbook_tjek" ? "storkbook_tjek" : undefined, signal: hoved.signal, maksAbonnementer: 3,
                 faser: {
                   opslag: gv,
                   transport: () => (tSig ??= AbortSignal.any([hoved.signal, AbortSignal.timeout(TRANSPORT_MS)])),
