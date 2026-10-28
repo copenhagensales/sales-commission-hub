@@ -146,19 +146,30 @@ Deno.serve(async (req) => {
     if (rErr) { log("reserver_fejl"); return json({ kode: "reserver_fejl" }, 500); }
     if (!token) { log("optaget"); return json({ status: "optaget" }); }
 
-    // Indholdet, der tjekkes, skal tilhøre den reserverede revision.
-    const { data: akt, error: aErr } = await svc.from("chat_messages")
-      .select("id, sender_id, revision, content, attachment_path, conversation_id, status").eq("id", id).maybeSingle();
-    if (aErr) { log("db"); return json({ kode: "db" }, 500); }
-    if (!akt || akt.revision !== rev || akt.sender_id !== emp || akt.status !== "tjekkes") { log("foraeldet"); return json({ status: "forældet" }); }
+    // Fra her er reservationen bekræftet: alle forløb (undtagen verificeret forældet række) ender i
+    // ÉN fælles afslutning med den oprindelige kombination (besked, id, revision, token). Ingen ny reservation.
+    let udfald: Udfald = { ...UKENDT };
+    try {
+      // Indholdet, der tjekkes, skal tilhøre den reserverede revision. Genlæsningsfejl → UKENDT (intet modelkald).
+      let akt: { revision: number; sender_id: string; status: string; content: string | null; attachment_path: string | null; conversation_id: string } | null = null;
+      let laest = false;
+      try {
+        const r = await svc.from("chat_messages")
+          .select("id, sender_id, revision, content, attachment_path, conversation_id, status").eq("id", id).maybeSingle();
+        if (r.error) log("genlaes_fejl"); else { akt = r.data; laest = true; }
+      } catch { log("genlaes_fejl"); }
+      if (laest && (!akt || akt.revision !== rev || akt.sender_id !== emp || akt.status !== "tjekkes")) { log("foraeldet"); return json({ status: "forældet" }); }
+      if (laest && akt) udfald = await vurder(akt);
+    } catch { log("behandling_afbrudt"); udfald = { ...UKENDT }; }
+    return await afslut(udfald);
 
-    let udfald: Udfald = UKENDT;
-    const tekst = String(akt.content ?? "");
-    if (tekst.length <= MAKS_TEKST) {
+    async function vurder(akt: { content: string | null; attachment_path: string | null; conversation_id: string }): Promise<Udfald> {
+      const tekst = String(akt.content ?? "");
+      if (tekst.length > MAKS_TEKST || arbejdsFrist - Date.now() <= 0) return { ...UKENDT };
       const dele: Del[] = [{ type: "text", text: `<<<BESKED>>>\n${JSON.stringify(tekst)}\n<<<SLUT>>>` }];
       let filOk = !akt.attachment_path;
       if (akt.attachment_path) {
-        // Filopslag, streamlæsning og body-fejl fanges lokalt (fil_tjekket=false) og springer ikke afslutningen over.
+        // Filopslag, streamlæsning og body-fejl fanges lokalt (fil_tjekket=false); teksten tjekkes fortsat.
         try {
           const { data: reg, error: gErr } = await svc.from("sb_stier").select("status, besked_id, samtale_id, ejer_employee_id")
             .eq("bucket", "chat-attachments").eq("sti", akt.attachment_path).maybeSingle();
@@ -173,21 +184,23 @@ Deno.serve(async (req) => {
         } catch { filOk = false; log("fil_fejl"); }
       }
       const dom = await spoergModel(model, dele, arbejdsFrist);
-      if (dom) udfald = { ...dom, fil_tjekket: !!akt.attachment_path && filOk, udfald: "ok" };
-      else udfald = { ...UKENDT };
-      if (!akt.attachment_path) udfald.fil_tjekket = false;
+      if (!dom) return { ...UKENDT };
+      return { ...dom, fil_tjekket: !!akt.attachment_path && filOk, udfald: "ok" };
     }
 
-    // Positiv tid tilbage → forsøg (også < 5 s). Ingen tid → intet nyt kald; cron-fallback er nødvej, ikke succes.
-    if (samletSlut - Date.now() <= 0) { log("afslut_frist"); return json({ kode: "afslut_fejl" }, 500); }
-    let ok: unknown = null;
-    try {
-      const r = await svcAfslut.rpc("sb_tjek_afslut", { p_kilde: "besked", p_id: id, p_revision: rev, p_token: token, p_udfald: udfald });
-      if (r.error) { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
-      ok = r.data;
-    } catch { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
-    log(ok === true ? `tjekket_${udfald.udfald}` : "foraeldet");
-    return json({ status: ok === true ? "tjekket" : "forældet" });
+    async function afslut(u: Udfald): Promise<Response> {
+      // Højst ét forsøg. Positiv tid → min(5 s, samletSlut−nu), også < 5 s. Ingen tid → intet kald.
+      // Cron-fallback er nødvej, ikke succes. Fejl i afslutningen udløser aldrig et nyt forsøg.
+      if (samletSlut - Date.now() <= 0) { log("afslut_frist"); return json({ kode: "afslut_fejl" }, 500); }
+      let ok: unknown = null;
+      try {
+        const r = await svcAfslut.rpc("sb_tjek_afslut", { p_kilde: "besked", p_id: id, p_revision: rev, p_token: token, p_udfald: u });
+        if (r.error) { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
+        ok = r.data;
+      } catch { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
+      log(ok === true ? `tjekket_${u.udfald}` : "foraeldet");
+      return json({ status: ok === true ? "tjekket" : "forældet" });
+    }
   } catch {
     log("fejl");
     return json({ kode: "fejl" }, 500);
