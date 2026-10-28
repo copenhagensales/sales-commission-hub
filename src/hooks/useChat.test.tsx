@@ -320,7 +320,7 @@ describe("§2/§8 – registerafstemning og genudstedelse gennem rigtig useSendM
     const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     const { result } = renderHook(() => useSendMessage(), { wrapper });
-    return (x: Parameters<typeof result.current.mutateAsync>[0]) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c", "u")! }));
+    return (x: Omit<Parameters<typeof result.current.mutateAsync>[0], "ejer">) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c", "u")! }));
   };
   const vu = { ...vf, replyToId: "svar-1", tidligereUkendt: true };
   const P = (message: string) => ({ error: { code: "P0001", message } });
