@@ -201,6 +201,89 @@ export function saetKladdeFil(emp: string, conv: string, f: File | null): void {
   if (f) filer.set(fk(emp, conv, "_kladde"), f); else filer.delete(fk(emp, conv, "_kladde"));
 }
 
+// ---------- §3: skrivekladdens fil – lageret ejer uploadforløbet ----------
+// Filposten (metadata, trin) ligger i skrivekladden; uploadforløbet (forsøgs-id, aktiv, fejl) og File kun i hukommelsen.
+// Asynkrone afslutninger opdaterer kun den stadig ejede filpost og aldrig tekst/svar.
+
+interface UploadForloeb { id: string; gen: number; aktiv: boolean; fejl: string | null }
+const forloeb = new Map<string, UploadForloeb>();
+let forsoegNr = 0;
+
+export interface KladdeFilTilstand {
+  meta: FilMeta;
+  file: File | null;
+  /** Et levende uploadforløb i denne session (»Uploader …«). */
+  aktiv: boolean;
+  fejl: string | null;
+}
+const filSnapshots = new Map<string, { noegle: string; v: KladdeFilTilstand | null }>();
+
+function skrivKladdeFilMeta(emp: string, conv: string, meta: FilMeta | null): void {
+  const k = laesKladde(emp, conv) ?? { tekst: "", svarId: null, retId: null };
+  gemKladde(emp, conv, { ...k, fil: meta });
+}
+
+/** Stabil snapshot til useSyncExternalStore. */
+export function kladdeFilTilstand(emp: string, conv: string): KladdeFilTilstand | null {
+  const k = nk(emp, conv);
+  const meta = laesKladde(emp, conv)?.fil ?? null;
+  const f = forloeb.get(k);
+  const file = kladdeFil(emp, conv);
+  const sig = meta ? JSON.stringify([meta, f?.id ?? null, f?.aktiv ?? false, f?.fejl ?? null]) : "";
+  const gl = filSnapshots.get(k);
+  if (gl && gl.noegle === sig && (gl.v?.file ?? null) === file) return gl.v;
+  const v = meta ? { meta, file, aktiv: !!f?.aktiv && f.gen === generation, fejl: f?.fejl ?? null } : null;
+  filSnapshots.set(k, { noegle: sig, v });
+  return v;
+}
+
+/** Registrerer synkront et nyt uploadforsøg (før udstedelse). Invaliderer alle tidligere forsøg – også med samme File. */
+export function startKladdeUpload(emp: string, conv: string, file: File, meta: Omit<FilMeta, "sti" | "trin">): string {
+  const id = `u${++forsoegNr}`;
+  filer.set(fk(emp, conv, "_kladde"), file);
+  forloeb.set(nk(emp, conv), { id, gen: generation, aktiv: true, fejl: null });
+  skrivKladdeFilMeta(emp, conv, { ...meta, sti: null, trin: "valgt" });
+  meld();
+  return id;
+}
+
+/** Opdaterer kun den filpost, forsøget stadig ejer. false = forsøget er forældet (fjernet, genvalgt, logud). */
+export function opdaterKladdeUpload(emp: string, conv: string, forsoeg: string, gen: number,
+  ret: { sti?: string | null; trin?: FilMeta["trin"]; aktiv?: boolean; fejl?: string | null }): boolean {
+  const f = forloeb.get(nk(emp, conv));
+  if (gen !== generation || !f || f.id !== forsoeg) return false;
+  const meta = laesKladde(emp, conv)?.fil;
+  if (!meta) return false;
+  if (ret.aktiv !== undefined) f.aktiv = ret.aktiv;
+  if (ret.fejl !== undefined) f.fejl = ret.fejl;
+  if (ret.sti !== undefined || ret.trin !== undefined) {
+    skrivKladdeFilMeta(emp, conv, { ...meta, sti: ret.sti !== undefined ? ret.sti : meta.sti, trin: ret.trin ?? meta.trin });
+  }
+  meld();
+  return true;
+}
+export const erAktuelKladdeUpload = (emp: string, conv: string, forsoeg: string, gen: number) =>
+  gen === generation && forloeb.get(nk(emp, conv))?.id === forsoeg;
+
+/** Fjerner skrivekladdens fil og invaliderer et igangværende forsøg. */
+export function fjernKladdeFil(emp: string, conv: string): void {
+  forloeb.delete(nk(emp, conv));
+  filer.delete(fk(emp, conv, "_kladde"));
+  if (laesKladde(emp, conv)?.fil) skrivKladdeFilMeta(emp, conv, null);
+  meld();
+}
+
+/** Sætter en eksisterende filpost (fx fra Ret) uden levende forløb; invaliderer tidligere forsøg. */
+export function saetKladdeFilPost(emp: string, conv: string, meta: FilMeta | null, file: File | null): void {
+  forloeb.delete(nk(emp, conv));
+  if (file) filer.set(fk(emp, conv, "_kladde"), file); else filer.delete(fk(emp, conv, "_kladde"));
+  skrivKladdeFilMeta(emp, conv, meta);
+  meld();
+}
+
+/** Klar til afsendelse: bekræftet upload (trin=uploadet) med ikke-tom sti. Registerstatus beviser ikke bytes. */
+export const filErSendeklar = (m: FilMeta | null | undefined) => !m || (m.trin === "uploadet" && !!m.sti);
+
 export const harLagringsFejl = (emp: string, conv: string) => lagringsFejl.has(nk(emp, conv));
 
 export function abonnerAfsendelser(l: Lytter): () => void { lyttere.add(l); return () => { lyttere.delete(l); }; }
@@ -209,6 +292,8 @@ export function rydAlleKladder(): void {
   generation++;
   afsendelser.clear();
   filer.clear();
+  forloeb.clear();
+  filSnapshots.clear();
   lagringsFejl.clear();
   hukommelse.clear();
   noegleFejl.clear();
