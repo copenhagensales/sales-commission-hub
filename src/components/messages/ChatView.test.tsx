@@ -58,6 +58,9 @@ const skriv = (t: string) => fireEvent.change(screen.getByLabelText("besked"), {
 const send = () => screen.getByRole("button", { name: "Send" });
 
 beforeEach(() => {
+  Element.prototype.scrollIntoView = () => undefined;
+  globalThis.URL.createObjectURL = () => "blob:test";
+  globalThis.URL.revokeObjectURL = () => undefined;
   rydAlleKladder();
   sessionStorage.clear();
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
