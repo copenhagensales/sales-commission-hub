@@ -12,7 +12,7 @@
   .cell { background: #1c1c1c; padding: 10px; border-radius: 8px; }
   .label { font-size: 32px; font-weight: bold; margin-bottom: 4px; }
   video { width: 320px; height: 180px; background: #000; display: block; border: 1px solid #444; }
-  .status { font-size: 18px; margin-top: 8px; min-height: 130px; white-space: pre-line; }
+  .status { font-size: 18px; margin-top: 8px; min-height: 200px; white-space: pre-line; }
   .ok { color: #3f3; font-weight: bold; font-size: 22px; }
   .bad { color: #f44; font-weight: bold; font-size: 22px; }
   button { margin-top: 8px; width: 100%; font-size: 22px; padding: 14px; background: #333; color: #fff; border: 3px solid #555; border-radius: 8px; }
@@ -29,7 +29,10 @@
     { id: "A", src: "/tv/test/a-h264-base-noaudio.mp4", type: 'video/mp4; codecs="avc1.42E01E"' },
     { id: "B", src: "/tv/test/b-h264-main-aac.mp4", type: 'video/mp4; codecs="avc1.4D401F, mp4a.40.2"' },
     { id: "C", src: "/tv/test/c-vp9.webm", type: 'video/webm; codecs="vp9"' },
-    { id: "D", src: "/tv/test/d-h264-high-720p-aac.mp4", type: 'video/mp4; codecs="avc1.640028, mp4a.40.2"' }
+    { id: "D", src: "/tv/test/d-h264-high-720p-aac.mp4", type: 'video/mp4; codecs="avc1.640028, mp4a.40.2"' },
+    { id: "E", src: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type: 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"', mode: "direct" },
+    { id: "F", src: "/tv/test/a-h264-base-noaudio.mp4", type: 'video/mp4; codecs="avc1.42E01E"', mode: "blob" },
+    { id: "G", src: "/tv/test/g-h264-fmp4.mp4", type: 'video/mp4; codecs="avc1.42E01E"', mode: "mse" }
   ];
   function info() {
     document.getElementById("info").textContent =
@@ -44,7 +47,7 @@
     el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true; el.preload = "auto";
     el.setAttribute("muted", ""); el.setAttribute("loop", ""); el.setAttribute("autoplay", "");
     el.setAttribute("playsinline", ""); el.setAttribute("webkit-playsinline", ""); el.setAttribute("preload", "auto");
-    var s = document.createElement("source"); s.src = v.src; s.type = v.type.split(";")[0]; el.appendChild(s);
+    if (!v.mode) { var s = document.createElement("source"); s.src = v.src; s.type = v.type.split(";")[0]; el.appendChild(s); }
     var status = document.createElement("div"); status.className = "status";
     var btn = document.createElement("button"); btn.type = "button"; btn.textContent = "Fuld skærm " + v.id;
     btn.addEventListener("click", function () {
@@ -55,7 +58,54 @@
     });
     cell.appendChild(label); cell.appendChild(el); cell.appendChild(status); cell.appendChild(btn);
     grid.appendChild(cell);
-    return { v: v, el: el, status: status, btn: btn, last: -1 };
+    return { v: v, el: el, status: status, btn: btn, last: -1, extra: "" };
+  });
+  function fejl(e) { return (e && (e.name ? e.name + ": " : "") + (e.message || e)) || "ukendt"; }
+  items.forEach(function (it) {
+    var v = it.v, el = it.el;
+    if (v.mode === "direct") { el.src = v.src; }
+    else if (v.mode === "blob") {
+      it.extra = "fetch: henter…";
+      fetch(v.src).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.arrayBuffer();
+      }).then(function (buf) {
+        var blob = new Blob([buf], { type: "video/mp4" });
+        it.extra = "fetch: OK, " + buf.byteLength + " bytes";
+        el.src = URL.createObjectURL(blob); tryPlay(it);
+      }).catch(function (e) { it.extra = "fetch-fejl: " + fejl(e); });
+    } else if (v.mode === "mse") {
+      var MS = window.MediaSource || window.WebKitMediaSource;
+      var sup = false;
+      try { sup = !!(MS && MS.isTypeSupported(v.type)); } catch (e) {}
+      it.mseSup = MS ? String(sup) : "MediaSource findes ikke";
+      it.mseErr = "";
+      if (!MS) return;
+      var ms = new MS(); it.ms = ms;
+      el.src = URL.createObjectURL(ms);
+      ms.addEventListener("sourceopen", function () {
+        try {
+          var sb = ms.addSourceBuffer(v.type);
+          sb.addEventListener("updateend", function () {
+            try { if (ms.readyState === "open") ms.endOfStream(); } catch (e) { it.mseErr = "endOfStream: " + fejl(e); }
+          });
+          sb.addEventListener("error", function () { it.mseErr = "SourceBuffer error"; });
+          fetch(v.src).then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.arrayBuffer();
+          }).then(function (buf) {
+            it.mseBytes = buf.byteLength; sb.appendBuffer(buf);
+          }).catch(function (e) { it.mseErr = "fetch/append: " + fejl(e); });
+        } catch (e) { it.mseErr = "addSourceBuffer: " + fejl(e); }
+      });
+      function tilStart() {
+        try { el.currentTime = 0; var p = el.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+      }
+      el.addEventListener("ended", tilStart);
+      el.addEventListener("timeupdate", function () {
+        if (el.duration && isFinite(el.duration) && el.currentTime >= el.duration - 0.2) tilStart();
+      });
+    }
   });
   function tryPlay(it) {
     if (it.el.paused && !it.el.error) {
@@ -80,15 +130,22 @@
         "paused: " + el.paused + "\ncurrentTime: " + t.toFixed(1) +
         "\nreadyState: " + el.readyState + "\nvideo: " + el.videoWidth + "×" + el.videoHeight +
         "\nerror: " + (el.error ? el.error.code : "ingen") + "\ncanPlayType: " + cpt;
+      if (it.v.mode === "blob") body.textContent += "\n" + it.extra;
+      if (it.v.mode === "mse") body.textContent += "\nisTypeSupported: " + it.mseSup +
+        "\nMS readyState: " + (it.ms ? it.ms.readyState : "-") +
+        (it.mseBytes ? "\nhentet: " + it.mseBytes + " bytes" : "") +
+        (it.mseErr ? "\nfejl: " + it.mseErr : "");
       it.status.appendChild(head); it.status.appendChild(body);
     });
   }, 1000);
   // Piletaster flytter fokus mellem knapperne
+  var COLS = 4;
   document.addEventListener("keydown", function (e) {
     var idx = items.findIndex(function (it) { return it.btn === document.activeElement; });
     if (e.key === "ArrowRight" || e.keyCode === 39) { idx = Math.min(items.length - 1, idx + 1); }
     else if (e.key === "ArrowLeft" || e.keyCode === 37) { idx = Math.max(0, idx - 1); }
-    else if ((e.key === "ArrowDown" || e.key === "ArrowUp" || e.keyCode === 40 || e.keyCode === 38) && idx < 0) { idx = 0; }
+    else if (e.key === "ArrowDown" || e.keyCode === 40) { idx = idx < 0 ? 0 : Math.min(items.length - 1, idx + COLS); }
+    else if (e.key === "ArrowUp" || e.keyCode === 38) { idx = idx < 0 ? 0 : Math.max(0, idx - COLS); }
     else return;
     if (idx < 0) idx = 0;
     items[idx].btn.focus(); e.preventDefault();
