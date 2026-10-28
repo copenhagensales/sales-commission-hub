@@ -94,3 +94,85 @@ describe("T1 – holdbar afsendelses- og kladdetilstand (§1)", () => {
     expect(m.hentAfsendelser("e", "A").some((a) => a.id === "1")).toBe(false);
   });
 });
+
+describe("§6 – hukommelseslager for skrive- og redigeringskladder (B2a-b1)", () => {
+  const fil = { name: "x.png", type: "image/png", size: 3, sti: "c/e/x.png", trin: "uploadet" as const };
+  const fejlSet = () => vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
+
+  it("setItem fejler → A–B–A bevarer tekst, svar og fil-metadata samt åben redigering", async () => {
+    const m = await ny();
+    fejlSet();
+    expect(m.gemKladde("e", "A", { tekst: "til A", svarId: "s1", fil })).toBe(false);
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "rettet", revision: 4 });
+    m.gemKladde("e", "B", { tekst: "til B", svarId: null });
+    expect(m.laesKladde("e", "A")).toEqual({ tekst: "til A", svarId: "s1", fil, retId: null });
+    expect(m.laesRetKladde("e", "A", "m1")).toEqual({ beskedId: "m1", tekst: "rettet", revision: 4 });
+    expect(m.laesKladde("e", "B")?.tekst).toBe("til B");
+  });
+
+  it("gammel lagret værdi → fejlet ny skrivning → vellykket læsning giver den NYE tekst", async () => {
+    let m = await ny();
+    m.gemKladde("e", "A", { tekst: "gammel", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "gammel ret", revision: 1 });
+    m = await ny(); // ny session-hukommelse; lageret har de gamle værdier
+    const spy = fejlSet();
+    m.gemKladde("e", "A", { tekst: "ny", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "ny ret", revision: 2 });
+    spy.mockRestore();
+    expect(sessionStorage.getItem("sb-kladde:e:A")).toContain("gammel"); // lageret læses fint, men er forældet
+    expect(m.laesKladde("e", "A")?.tekst).toBe("ny");
+    expect(m.laesRetKladde("e", "A", "m1")).toMatchObject({ tekst: "ny ret", revision: 2 });
+  });
+
+  it("fejlet sletning efter Send/annulleret redigering genopliver ikke gammel tekst", async () => {
+    const m = await ny();
+    m.gemKladde("e", "A", { tekst: "sendt", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "annulleret", revision: 1 });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("låst"); });
+    m.sletKladde("e", "A");
+    m.sletRetKladde("e", "A", "m1");
+    expect(sessionStorage.getItem("sb-kladde:e:A")).toContain("sendt");
+    expect(m.laesKladde("e", "A")).toBeNull();
+    expect(m.laesRetKladde("e", "A", "m1")).toBeNull();
+  });
+
+  it("lageret bliver tilgængeligt igen → fejlstatus ryddes og værdien gemmes", async () => {
+    const m = await ny();
+    const spy = fejlSet();
+    m.gemKladde("e", "A", { tekst: "a", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "r", revision: 1 });
+    expect(m.harKladdeLagerFejl("e", "A")).toBe(true);
+    expect(m.harRetLagerFejl("e", "A", "m1")).toBe(true);
+    spy.mockRestore();
+    expect(m.gemKladde("e", "A", { tekst: "ab", svarId: null })).toBe(true);
+    expect(m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "rr", revision: 1 })).toBe(true);
+    expect(m.harKladdeLagerFejl("e", "A")).toBe(false);
+    expect(m.harRetLagerFejl("e", "A", "m1")).toBe(false);
+    expect(sessionStorage.getItem("sb-kladde:e:A")).toContain("ab");
+  });
+
+  it("fejl på én kladde skjules ikke af vellykket lagring af en anden (begge kladdetyper)", async () => {
+    const m = await ny();
+    const spy = fejlSet();
+    m.gemKladde("e", "A", { tekst: "a", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "r", revision: 1 });
+    spy.mockRestore();
+    m.gemKladde("e", "B", { tekst: "b", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m2", tekst: "r2", revision: 1 });
+    expect(m.harKladdeLagerFejl("e", "A")).toBe(true);
+    expect(m.harKladdeLagerFejl("e", "B")).toBe(false);
+    expect(m.harRetLagerFejl("e", "A", "m1")).toBe(true);
+    expect(m.harRetLagerFejl("e", "A", "m2")).toBe(false);
+  });
+
+  it("brugerskift rydder hukommelse og lager; ryddede værdier genindlæses ikke selv ved fejlet removeItem", async () => {
+    const m = await ny();
+    m.gemKladde("e", "A", { tekst: "gammel bruger", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "m1", tekst: "gammel ret", revision: 1 });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("låst"); });
+    m.rydAlleKladder();
+    expect(m.laesKladde("e", "A")).toBeNull();
+    expect(m.laesRetKladde("e", "A", "m1")).toBeNull();
+    expect(m.harKladdeLagerFejl("e", "A")).toBe(false);
+  });
+});

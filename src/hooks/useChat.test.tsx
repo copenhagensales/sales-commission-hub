@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { fastholdEjer, rydAlleKladder } from "@/lib/sbKladder";
 
 // Kø af svar pr. tabel for maybeSingle(); insert har egen kø. Ingen netværk.
-const svar: Record<string, Array<{ data: unknown; error: unknown } | Error>> = {};
+const svar: Record<string, Array<{ data: unknown; error: unknown } | Error | Promise<{ data: unknown; error: unknown }>>> = {};
 const insert = vi.fn();
 const kald: string[] = [];
 function builder(tabel: string) {
@@ -18,7 +20,7 @@ function builder(tabel: string) {
     maybeSingle: () => {
       kald.push(`select:${tabel}`);
       const r = svar[tabel]?.shift() ?? { data: null, error: null };
-      return r instanceof Error ? Promise.reject(r) : Promise.resolve(r);
+      return r instanceof Error ? Promise.reject(r) : r instanceof Promise ? r : Promise.resolve(r);
     },
   };
   return b;
@@ -237,5 +239,74 @@ describe("samtaleregler", () => {
     expect(serverTekst({ code: "P0001", message: "X" }, "fast")).toBe("X");
     expect(serverTekst({ code: "42501", message: "X" }, "fast")).toBe("fast");
     expect(erForaeldet({ code: "P0001", message: "Forældet revision" })).toBe(true);
+  });
+});
+
+describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", () => {
+  const kontrol = <T,>() => { let res!: (v: T) => void; const p = new Promise<T>((a) => { res = a; }); return { p, res }; };
+  const opsaet = () => {
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+    return { inv, ...renderHook(() => useSendMessage(), { wrapper }) };
+  };
+  beforeEach(() => { vi.mocked(supabase.rpc).mockClear(); });
+
+  it("fastholdt ejer: ingen identitetsopslag undervejs, sender_id er den fastholdte", async () => {
+    const { result } = opsaet();
+    insert.mockResolvedValueOnce({ error: null });
+    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("fast", "c") });
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(insert.mock.calls[0][0]).toMatchObject({ sender_id: "fast" });
+  });
+
+  it("logud under forhåndsopslag → nul INSERT og ingen cacheændring", async () => {
+    const { result, inv } = opsaet();
+    const foer = kontrol<{ data: unknown; error: unknown }>();
+    svar.chat_messages = [foer.p];
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    rydAlleKladder(); // logud/brugerskift
+    foer.res(msg(null));
+    expect((await p)?.indsat).toBe(false);
+    expect(insert).not.toHaveBeenCalled();
+    expect(inv).not.toHaveBeenCalled();
+  });
+
+  it("logud og genlogin som SAMME bruger under forhåndsopslag → nul INSERT", async () => {
+    const { result } = opsaet();
+    const foer = kontrol<{ data: unknown; error: unknown }>();
+    svar.chat_messages = [foer.p];
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    rydAlleKladder(); // SIGNED_OUT → ny generation; genlogin som "e" giver ikke den gamle generation tilbage
+    foer.res(msg(null));
+    await p;
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("skift under igangværende INSERT → ét INSERT, ingen efterfølgende afstemning, ingen cacheændring", async () => {
+    const { result, inv } = opsaet();
+    const ins = kontrol<{ error: unknown }>();
+    insert.mockReturnValueOnce(ins.p);
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    await vi.waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    const foerAntal = kald.length;
+    rydAlleKladder();
+    ins.res({ error: { message: "Failed to fetch" } });
+    await p;
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(kald.slice(foerAntal)).toEqual([]);
+    expect(inv).not.toHaveBeenCalled();
+  });
+
+  it("vellykket INSERT med sent svar efter logud → onSuccess skriver ikke til cachen", async () => {
+    const { result, inv } = opsaet();
+    const ins = kontrol<{ error: unknown }>();
+    insert.mockReturnValueOnce(ins.p);
+    const p = result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") });
+    await vi.waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    rydAlleKladder();
+    ins.res({ error: null });
+    await p;
+    expect(inv).not.toHaveBeenCalled();
   });
 });

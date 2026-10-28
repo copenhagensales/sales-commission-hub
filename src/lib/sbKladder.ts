@@ -41,17 +41,33 @@ function lager(): Storage | null {
   try { return typeof window !== "undefined" ? window.sessionStorage : null; } catch { return null; }
 }
 
-/** true = gemt (eller fjernet); false = lagringsfejl (kladden findes kun i hukommelsen). */
+// §6: autoritativt hukommelseslager pr. nøgle i den levende session. Ny tilstand skrives først her, derefter
+// forsøges sessionStorage. En kendt hukommelsesværdi (også en eksplicit slettet = null) har forrang for lageret.
+// Overlever ikke rigtig reload.
+const hukommelse = new Map<string, string | null>();
+const noegleFejl = new Set<string>();
+let ignorerLager = false; // rydning kunne ikke gennemføres → lageret læses ikke i denne generation
+
+/** true = gemt (eller fjernet); false = lagringsfejl (værdien findes kun i hukommelsen). */
 function skriv(k: string, v: unknown | null): boolean {
+  hukommelse.set(k, v === null ? null : JSON.stringify(v));
   const l = lager();
-  if (!l) return false;
-  try {
-    if (v === null) l.removeItem(k); else l.setItem(k, JSON.stringify(v));
-    return true;
-  } catch { return false; }
+  let ok = false;
+  if (l) {
+    try {
+      if (v === null) l.removeItem(k); else l.setItem(k, JSON.stringify(v));
+      ok = true;
+    } catch { ok = false; }
+  }
+  // En fejlet sletning lader ikke en fejlstatus hænge på en ryddet kladde; tombstone forhindrer genoplivning.
+  if (ok || v === null) noegleFejl.delete(k); else noegleFejl.add(k);
+  return ok;
 }
 function laes(k: string): unknown {
-  try { const s = lager()?.getItem(k); return s ? JSON.parse(s) : null; } catch { return null; }
+  try {
+    const s = hukommelse.has(k) ? hukommelse.get(k) : ignorerLager ? null : lager()?.getItem(k);
+    return s ? JSON.parse(s) : null;
+  } catch { return null; }
 }
 
 const TRIN = new Set(["valgt", "udstedt", "uploader", "uploadet"]);
@@ -88,6 +104,10 @@ export function gemRetKladde(emp: string, conv: string, k: RetKladde): boolean {
 }
 export function sletRetKladde(emp: string, conv: string, msg: string): void { skriv(retNoegle(emp, conv, msg), null); }
 
+/** Fejlstatus følger den berørte kladde (bevares over navigation, ryddes ved næste vellykkede skrivning). */
+export const harKladdeLagerFejl = (emp: string, conv: string) => noegleFejl.has(noegle(emp, conv));
+export const harRetLagerFejl = (emp: string, conv: string, msg: string) => noegleFejl.has(retNoegle(emp, conv, msg));
+
 // ---------- Afsendelser (hukommelse + sessionStorage) ----------
 
 type Lytter = () => void;
@@ -104,6 +124,12 @@ const meld = () => { for (const l of lyttere) l(); };
 
 /** Sessionsgeneration; øges ved logud/brugerskift, så gamle forløb ikke skriver videre. */
 export const sessionsGeneration = () => generation;
+
+/** §1: Operationens ejer, fastholdt synkront ved brugerhandlingens start (før første await). */
+export interface OperationsEjer { emp: string; conv: string; gen: number }
+export const fastholdEjer = (emp: string, conv: string): OperationsEjer => ({ emp, conv, gen: generation });
+/** Ejerskab gælder stadig: samme sessionsgeneration (samtaleskift/afmontering ændrer ikke ejeren). */
+export const ejerGyldig = (e: OperationsEjer | null | undefined) => !!e && e.gen === generation;
 
 function laesAfsendelser(emp: string, conv: string): Afsendelse[] {
   const o = laes(afsNoegle(emp, conv));
@@ -184,9 +210,19 @@ export function rydAlleKladder(): void {
   afsendelser.clear();
   filer.clear();
   lagringsFejl.clear();
+  hukommelse.clear();
+  noegleFejl.clear();
+  ignorerLager = false;
   const l = lager();
   if (l) {
-    try { for (let i = l.length - 1; i >= 0; i--) { const k = l.key(i); if (k?.startsWith(PREFIX)) l.removeItem(k); } } catch { /* lager utilgængeligt */ }
+    try {
+      for (let i = l.length - 1; i >= 0; i--) {
+        const k = l.key(i);
+        if (!k?.startsWith(PREFIX)) continue;
+        // Fejlet sletning → tombstone, så ryddede værdier ikke genindlæses i den nye generation.
+        try { l.removeItem(k); } catch { hukommelse.set(k, null); }
+      }
+    } catch { ignorerLager = true; }
   }
   meld();
 }

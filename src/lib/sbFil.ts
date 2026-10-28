@@ -36,8 +36,16 @@ export class SbFilFejl extends Error {
 
 const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sb-fil`;
 
-async function hoveder(): Promise<Record<string, string>> {
+/** §1: kaldes efter asynkrone opslag og umiddelbart før næste netværkstrin; false = operationen er forældet. */
+export type Vagt = () => boolean;
+/** Operationen tilhører ikke længere den aktive session (logud/brugerskift); intet netværkskald er sendt. */
+export const erForaeldetOperation = (e: unknown) => e instanceof SbFilFejl && e.kode === "foraeldet";
+const tjekVagt = (vagt?: Vagt) => { if (vagt && !vagt()) throw new SbFilFejl(0, "foraeldet"); };
+
+async function hoveder(vagt?: Vagt): Promise<Record<string, string>> {
+  tjekVagt(vagt);
   const { data } = await supabase.auth.getSession();
+  tjekVagt(vagt);
   const t = data.session?.access_token;
   if (!t) throw new SbFilFejl(401, "jwt");
   return { Authorization: `Bearer ${t}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY };
@@ -52,8 +60,8 @@ async function fejlFra(res: Response): Promise<SbFilFejl> {
 
 export interface Udstedt { sti: string; token: string; conversationId: string }
 
-export async function udstedUpload(conversationId: string, file: { name: string; size: number }, type: string): Promise<Udstedt> {
-  const h = await hoveder();
+export async function udstedUpload(conversationId: string, file: { name: string; size: number }, type: string, vagt?: Vagt): Promise<Udstedt> {
+  const h = await hoveder(vagt);
   let res: Response;
   try {
     res = await fetch(BASE, {
@@ -64,13 +72,16 @@ export async function udstedUpload(conversationId: string, file: { name: string;
   } catch { throw new SbFilFejl(0, "net"); }
   if (!res.ok) throw await fejlFra(res);
   const b = await res.json().catch(() => null);
+  tjekVagt(vagt);
   if (!b || typeof b.sti !== "string" || typeof b.token !== "string") throw new SbFilFejl(500, "svar");
   return { sti: b.sti, token: b.token, conversationId };
 }
 
-export async function uploadTilSti(u: Udstedt, file: File, type: string): Promise<void> {
+export async function uploadTilSti(u: Udstedt, file: File, type: string, vagt?: Vagt): Promise<void> {
+  tjekVagt(vagt);
   const { error } = await supabase.storage.from("chat-attachments").uploadToSignedUrl(u.sti, u.token, file, { contentType: type, upsert: false });
   if (error) throw new SbFilFejl(0, "upload");
+  tjekVagt(vagt);
 }
 
 export function udstedFejlTekst(e: unknown): string {

@@ -13,10 +13,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/lib/employeeLookup", () => ({ findEmployeeByAuth: vi.fn(async () => ({ data: { id: "e", first_name: "A", last_name: "B" } })) }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
-vi.mock("@/components/mobile", () => ({ SkeletonList: () => null, useDraftGuard: () => undefined }));
+// Rigtig useDraftGuard og rigtig MessageBubble (§9); kun skelet erstattes.
+vi.mock("@/components/mobile", async (orig) => ({ ...(await orig<typeof import("@/components/mobile")>()), SkeletonList: () => null }));
 vi.mock("./MessageSearch", () => ({ MessageSearch: () => null }));
 vi.mock("./TypingIndicator", () => ({ TypingIndicator: () => null }));
-vi.mock("./MessageBubble", () => ({ MessageBubble: () => null }));
 vi.mock("./MentionInput", () => ({
   MentionInput: ({ value, onChange, onKeyDown }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void }) => (
     <textarea aria-label="besked" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} />
@@ -45,7 +45,9 @@ import { ChatView } from "./ChatView";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
 import { rydAlleKladder, hentAfsendelser } from "@/lib/sbKladder";
 
-const wrap = (n: ReactNode) => <QueryClientProvider client={new QueryClient()}>{n}</QueryClientProvider>;
+// Én stabil QueryClient pr. prøve (også gennem rerender/navigation), mutations.retry=1 som App.tsx.
+let qc: QueryClient;
+const wrap = (n: ReactNode) => <QueryClientProvider client={qc}>{n}</QueryClientProvider>;
 const kontrol = <T,>() => { let res!: (v: T) => void; let rej!: (e: unknown) => void; const p = new Promise<T>((a, b) => { res = a; rej = b; }); return { p, res, rej }; };
 
 async function klar(conv = "A") {
@@ -61,6 +63,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = () => undefined;
   globalThis.URL.createObjectURL = () => "blob:test";
   globalThis.URL.revokeObjectURL = () => undefined;
+  qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
@@ -204,5 +207,37 @@ describe("T10 – Ret og genudstedelse", () => {
     expect(await screen.findAllByText("Vælg filen igen")).not.toHaveLength(0);
     expect(hentAfsendelser("e", "A")[0]).toMatchObject({ tekst: "bevar", tilstand: "vaelg_fil" });
     expect(udstedUpload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("§1 – sessionsskift i ChatView (B2a-b1)", () => {
+  it("logud under upload-udstedelse → intet efterfølgende upload/INSERT og ingen lagerændring", async () => {
+    const u = kontrol<unknown>();
+    udstedUpload.mockReturnValueOnce(u.p);
+    const { container } = await klar();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
+    const vagt = udstedUpload.mock.calls[0][3] as () => boolean;
+    expect(vagt()).toBe(true);
+    act(() => { rydAlleKladder(); });
+    expect(vagt()).toBe(false);
+    await act(async () => { u.res({ sti: "c/e/x.txt", token: "t", conversationId: "A" }); await u.p; });
+    expect(uploadTilSti).not.toHaveBeenCalled();
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("sb-kladde:e:A")).toBeNull();
+  });
+
+  it("logud under igangværende afsendelse → ét kald, sent svar ændrer ikke den nye sessions lager", async () => {
+    const a = kontrol<unknown>();
+    mutateAsync.mockReturnValueOnce(a.p);
+    await klar();
+    skriv("hej"); await act(async () => { fireEvent.click(send()); });
+    const input = mutateAsync.mock.calls[0][0] as { ejer: { emp: string; conv: string } };
+    expect(input.ejer).toMatchObject({ emp: "e", conv: "A" });
+    act(() => { rydAlleKladder(); });
+    await act(async () => { a.rej(new SendFejl("ukendt", "Ikke sendt – prøv igen")); await a.p.catch(() => undefined); });
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(afstemKun).not.toHaveBeenCalled();
+    expect(hentAfsendelser("e", "A")).toEqual([]);
   });
 });

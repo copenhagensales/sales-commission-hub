@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, useAfgoer,
@@ -18,7 +18,7 @@ import { MessageWithLinks } from "./LinkPreview";
 import { renderMentions } from "./MentionInput";
 import { BeskedStatus } from "./BeskedStatus";
 import { FilVedhaeftning } from "./FilVedhaeftning";
-import { laesRetKladde, gemRetKladde, sletRetKladde } from "@/lib/sbKladder";
+import { laesRetKladde, gemRetKladde, sletRetKladde, harRetLagerFejl } from "@/lib/sbKladder";
 
 interface MessageBubbleProps {
   message: Message;
@@ -39,12 +39,19 @@ export function slettesTekst(slettesEfter: string, nu = Date.now()): string {
 }
 
 export function MessageBubble({ message, isOwn, currentEmployeeId, conversationId, onReply }: MessageBubbleProps) {
-  // Uafsendt redigeringskladde (§1): besked-id, tekst og revisionen, redigeringen begyndte fra.
-  const gemtRet = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
-  const [isEditing, setIsEditing] = useState(!!gemtRet);
-  const [editContent, setEditContent] = useState(gemtRet?.tekst ?? message.content);
-  const [retRevision, setRetRevision] = useState(gemtRet?.revision ?? message.revision);
-  const [retLagerFejl, setRetLagerFejl] = useState(false);
+  // Uafsendt redigeringskladde: besked-id, tekst og revisionen, redigeringen begyndte fra.
+  // §1/§7: redigeringsstate ejes af nøglen (medarbejder, samtale, besked), den blev startet/gendannet under.
+  const noegle = currentEmployeeId ? `${currentEmployeeId}\u0000${conversationId}\u0000${message.id}` : null;
+  const [ret, setRet] = useState(() => {
+    const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
+    return { ejer: noegle, aaben: !!g, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+      lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false };
+  });
+  const egenState = ret.ejer === noegle;
+  const { tekst: editContent, revision: retRevision, lagerFejl: retLagerFejl } = ret;
+  const isEditing = egenState && ret.aaben; // gammel nøgles state vises/gemmes aldrig
+  const noegleRef = useRef(noegle);
+  noegleRef.current = noegle;
   const [nu, setNu] = useState(() => Date.now());
 
   const editMessage = useEditMessage();
@@ -52,15 +59,27 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
   const toggleReaction = useToggleReaction();
   const markAsRead = useMarkMessageAsRead();
   const afgoer = useAfgoer();
-  useDraftGuard(isEditing && editContent !== message.content);
+  useDraftGuard(egenState && isEditing && editContent !== message.content);
+  // §7: når identiteten ankommer eller nøglen skifter, gendannes gemt tekst og startrevision én gang.
+  // Gammel state skrives aldrig under den nye nøgle; serverteksten overskriver ikke en gemt kladde.
   useEffect(() => {
-    if (!isEditing || !currentEmployeeId) return;
-    setRetLagerFejl(!gemRetKladde(currentEmployeeId, conversationId, { beskedId: message.id, tekst: editContent, revision: retRevision }));
-  }, [isEditing, editContent, retRevision, currentEmployeeId, conversationId, message.id]);
-  const afslutRet = () => {
-    setIsEditing(false);
-    setRetLagerFejl(false);
-    if (currentEmployeeId) sletRetKladde(currentEmployeeId, conversationId, message.id);
+    if (ret.ejer === noegle) return;
+    const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
+    setRet({ ejer: noegle, aaben: !!g, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+      lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noegle]);
+  useEffect(() => {
+    if (!egenState || !isEditing || !currentEmployeeId) return;
+    gemRetKladde(currentEmployeeId, conversationId, { beskedId: message.id, tekst: editContent, revision: retRevision });
+    const fejl = harRetLagerFejl(currentEmployeeId, conversationId, message.id);
+    setRet((r) => (r.ejer === noegle && r.lagerFejl !== fejl ? { ...r, lagerFejl: fejl } : r));
+  }, [egenState, isEditing, editContent, retRevision, currentEmployeeId, conversationId, message.id, noegle]);
+  const setEditContent = (tekst: string) => setRet((r) => (r.ejer === noegle ? { ...r, tekst } : r));
+  /** Afslutter redigeringen for den nøgle, den tilhører; berører ikke en anden nøgles state. */
+  const afslutRet = (ejer = noegle, emp = currentEmployeeId, conv = conversationId, msg = message.id) => {
+    if (emp) sletRetKladde(emp, conv, msg);
+    setRet((r) => (r.ejer === ejer ? { ...r, aaben: false, lagerFejl: false } : r));
   };
 
   const trukket = message.status === "trukket_tilbage";
@@ -92,14 +111,17 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id, isOwn, currentEmployeeId, hasRead, leveret]);
 
-  const startRet = () => { setEditContent(message.content); setRetRevision(message.revision); setIsEditing(true); };
+  const startRet = () => setRet({ ejer: noegle, aaben: true, tekst: message.content, revision: message.revision, lagerFejl: false });
 
   const handleSaveEdit = async () => {
     if (!editContent.trim() || editMessage.isPending) return;
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
+    // Ejer fastholdes før første await; en sen afslutning rydder kun sin egen kladde.
+    const ejer = noegle, emp = currentEmployeeId, conv = conversationId, msg = message.id;
     try {
-      await editMessage.mutateAsync({ messageId: message.id, content: editContent, conversationId, revision: retRevision });
-      afslutRet();
+      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: retRevision });
+      if (noegleRef.current === ejer) afslutRet(ejer, emp, conv, msg);
+      else if (emp) sletRetKladde(emp, conv, msg);
     } catch (e) {
       // Kladden bevares ved fejl.
       toast.error(erForaeldet(e) ? "Beskeden er ændret – prøv igen" : serverTekst(e, "Kunne ikke gemme ændringen"));
@@ -178,7 +200,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
                 <Button size="sm" className="max-md:min-h-11 max-md:min-w-11" onClick={handleSaveEdit} disabled={editMessage.isPending} aria-label="Gem ændring">
                   <Check className="h-3 w-3" />
                 </Button>
-                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={afslutRet} disabled={editMessage.isPending} aria-label="Annullér">
+                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={() => afslutRet()} disabled={editMessage.isPending} aria-label="Annullér">
                   <X className="h-3 w-3" />
                 </Button>
               </div>

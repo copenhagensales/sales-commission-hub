@@ -33,3 +33,41 @@ describe("filfejl", () => {
     expect(udstedFejlTekst(new SbFilFejl(400, "pdf_udskudt"))).toBe("PDF understøttes ikke endnu");
   });
 });
+
+describe("§1 – identitets-/generationsværn i udstedelse og upload (B2a-b1)", () => {
+  it("sessionsskift under uploadhjælperens sessionsopslag → nul POST", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { udstedUpload, erForaeldetOperation } = await import("./sbFil");
+    let svar!: (v: unknown) => void;
+    vi.mocked(supabase.auth.getSession).mockReturnValueOnce(new Promise((r) => { svar = r; }) as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    let gyldig = true;
+    const p = udstedUpload("c", { name: "x.png", size: 1 }, "image/png", () => gyldig);
+    gyldig = false; // logud/brugerskift mens sessionen slås op
+    svar({ data: { session: { access_token: "t" } } });
+    const e = await p.catch((x) => x);
+    expect(erForaeldetOperation(e)).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("forældet før upload → intet uploadToSignedUrl", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { uploadTilSti } = await import("./sbFil");
+    const up = vi.fn();
+    vi.mocked(supabase.storage.from).mockReturnValue({ uploadToSignedUrl: up } as never);
+    await expect(uploadTilSti({ sti: "s", token: "t", conversationId: "c" }, new File(["x"], "x.png"), "image/png", () => false)).rejects.toBeInstanceOf(SbFilFejl);
+    expect(up).not.toHaveBeenCalled();
+  });
+
+  it("gyldig vagt: HTTP-kontrakten er uændret (ét POST med samme felter)", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { udstedUpload } = await import("./sbFil");
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: { access_token: "t" } } } as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ sti: "s", token: "k" }), { status: 200 }));
+    await expect(udstedUpload("c", { name: "x.png", size: 1 }, "image/png", () => true)).resolves.toEqual({ sti: "s", token: "k", conversationId: "c" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String((fetchSpy.mock.calls[0][1] as RequestInit).body))).toEqual({ action: "udsted", conversation_id: "c", filnavn: "x.png", type: "image/png", size: 1 });
+    fetchSpy.mockRestore();
+  });
+});
