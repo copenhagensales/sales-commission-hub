@@ -124,15 +124,15 @@ export function usePulsenTeams() {
         if (error) throw error;
         return data ?? [];
       }
-      const { data, error } = await supabase
-        .from("team_members")
-        .select("team:teams(id, name)")
-        .eq("employee_id", employeeId as string);
+      // Samme synlighed som RLS: medlemskab + ledede teams + assistent.
+      const { data: ids, error: idErr } = await supabase.rpc("pulsen_visible_team_ids");
+      if (idErr) throw idErr;
+      const teamIds = (ids ?? []).filter((x): x is string => typeof x === "string");
+      if (teamIds.length === 0) return [];
+      const { data, error } = await supabase.from("teams").select("id, name").in("id", teamIds);
       if (error) throw error;
-      const list = (data ?? [])
-        .map((r) => (r as { team: { id: string; name: string } | null }).team)
-        .filter((t): t is { id: string; name: string } => !!t);
-      return list.sort((a, b) => a.name.localeCompare(b.name, "da"));
+      const list = (data ?? []) as { id: string; name: string }[];
+      return list.sort((a, b) => a.name.localeCompare(b.name, "da-DK"));
     },
     enabled: !!employeeId,
     staleTime: 300000,
