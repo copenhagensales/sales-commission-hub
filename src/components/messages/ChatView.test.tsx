@@ -1019,7 +1019,7 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     tilfoejAfsendelse("e", "A", afs("A1"));
     await klarFake();
     for (let n = 0; n < 7; n++) { if (ventende.some((x) => x.id === "A1")) await svarFor("A1", null); await fremad(30000); }
-    expect(vi.getTimerCount()).toBe(0); // udtømt: ingen baggrundstimer
+    const t0 = vi.getTimerCount(); // udtømt: ingen afstemningstimer (øvrige komponenttimere tælles med i t0)
     net.insert.mockReturnValueOnce({ error: { message: "transport" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
     await fremad(0);
@@ -1028,7 +1028,7 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     await svarFor("A1", null);
     await fremad(0);
     const n0 = opslag("A1");
-    expect(vi.getTimerCount()).toBeGreaterThan(0); // den planlagte fortsættelse
+    expect(vi.getTimerCount()).toBe(t0 + 1); // netop den planlagte fortsættelse
     await fremad(999);
     expect(opslag("A1")).toBe(n0);
     await fremad(1); // netop timerens udløb (fjernes planlægningen, sker intet opslag her)
