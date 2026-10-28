@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, useAfgoer,
   erSynligMedFokus, handlingsTekst, HandlingsFejl, tagHandling, overtagTilGem, frigivRet, useHandling,
+  useFristUr, erUdloebet, svarUtilgaengeligt,
 } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -210,7 +211,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   return (
     <div className={cn("flex group", isOwn ? "justify-end" : "justify-start")}>
       <div className={cn("flex min-w-0 flex-col max-w-[85%] md:max-w-[70%]", isOwn ? "items-end" : "items-start")}>
-        {message.reply_to && !trukket && (
+        {message.reply_to && !trukket && !udloebet && (
           <div className={cn(
             "text-xs px-2 md:px-3 py-1 rounded-t-lg border-l-2 mb-1 max-w-full min-w-0",
             isOwn ? "bg-primary/10 border-primary ml-auto" : "bg-muted border-muted-foreground"
@@ -354,7 +355,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
           )}
         </div>
 
-        {isOwn && !isEditing && !trukket && (
+        {isOwn && !isEditing && !trukket && !udloebet && (
           <BeskedStatus message={message} conversationId={conversationId} currentEmployeeId={currentEmployeeId} authBrugerId={authBrugerId} onRet={startRet} />
         )}
 
