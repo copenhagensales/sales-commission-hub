@@ -10,14 +10,24 @@ const udstedUpload = vi.fn();
 const uploadTilSti = vi.fn();
 
 // Netværksgrænsen: supabase-klienten. maybeSingle-svar pr. tabel i kø; INSERT tælles. (Antagelser, ikke SQL-bevis.)
-const net = vi.hoisted(() => ({ svar: {} as Record<string, Array<{ data: unknown; error: unknown }>>, insert: vi.fn(), kald: [] as string[] }));
+type Svar = { data: unknown; error: unknown };
+const net = vi.hoisted(() => ({
+  svar: {} as Record<string, Array<Svar>>, insert: vi.fn(), kald: [] as string[],
+  /** §4: valgfri kontrol af beskedopslag pr. id (kontrollerede promises). */
+  vent: null as null | ((id: string) => Promise<Svar>),
+}));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (t: string) => {
     const b: Record<string, unknown> = {};
+    let id = "";
     Object.assign(b, {
-      select: () => b, eq: () => b,
+      select: () => b, eq: (kol: string, v: string) => { if (kol === "id") id = v; return b; },
       insert: (row: unknown) => { net.kald.push(`insert:${t}`); return Promise.resolve(net.insert(row) ?? { error: null }); },
-      maybeSingle: () => { net.kald.push(`select:${t}`); return Promise.resolve(net.svar[t]?.shift() ?? { data: null, error: null }); },
+      maybeSingle: () => {
+        net.kald.push(`select:${t}`);
+        if (t === "chat_messages" && net.vent) return net.vent(id);
+        return Promise.resolve(net.svar[t]?.shift() ?? { data: null, error: null });
+      },
     });
     return b;
   };
@@ -61,7 +71,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
     useMarkAsRead: () => ({ mutate: vi.fn(), isPending: false }),
     useTypingIndicator: () => ({ typingUsers: [], setTyping: vi.fn() }),
     useChatAktiv: () => undefined,
-    afstemKun: () => afstemKun(),
+    afstemKun: (...a: Parameters<typeof ægte.afstemKun>) => (beskeder.ægteSend ? ægte.afstemKun(...a) : afstemKun()),
   };
 });
 
@@ -92,7 +102,7 @@ beforeEach(() => {
   rydAlleKladder();
   sessionStorage.clear();
   beskeder.liste = []; beskeder.ægteSend = false;
-  net.insert.mockReset(); net.kald.length = 0; for (const k of Object.keys(net.svar)) delete net.svar[k];
+  net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
 
