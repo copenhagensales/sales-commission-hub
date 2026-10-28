@@ -71,7 +71,7 @@ export async function laesBegraenset(body: ReadableStream<Uint8Array> | null, ma
     while (true) {
       const ms = slut - Date.now();
       if (ms <= 0) { await annuller(); return { ok: false, grund: "frist" }; }
-      let t: number | undefined;
+      let t: ReturnType<typeof setTimeout> | undefined;
       const frist = new Promise<"frist">((r) => { t = setTimeout(() => r("frist"), ms); });
       const r = await Promise.race([reader.read(), frist]).finally(() => clearTimeout(t));
       if (r === "frist") { await annuller(); return { ok: false, grund: "frist" }; }

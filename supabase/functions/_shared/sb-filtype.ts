@@ -20,10 +20,10 @@ const BINAERE: number[][] = [
 ];
 const PDF = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
 
-/** Indeks for første ikke-BOM/ikke-ASCII-whitespace byte. */
+/** Indeks for første byte efter evt. UTF-8 BOM og ASCII-whitespace (0x09–0x0D, 0x20). */
 function tekstStart(b: Uint8Array): number {
   let i = starter(b, [0xef, 0xbb, 0xbf]) ? 3 : 0;
-  while (i < b.length && (b[i] === 0x20 || b[i] === 0x09 || b[i] === 0x0a || b[i] === 0x0d || b[i] === 0x0c)) i++;
+  while (i < b.length && (b[i] === 0x20 || b[i] === 0x09 || b[i] === 0x0a || b[i] === 0x0d || b[i] === 0x0c || b[i] === 0x0b)) i++;
   return i;
 }
 const lille = (x: number) => (x >= 0x41 && x <= 0x5a ? x + 0x20 : x);
