@@ -258,7 +258,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
   it("fastholdt ejer: ingen identitetsopslag undervejs, sender_id er den fastholdte", async () => {
     const { result } = opsaet();
     insert.mockResolvedValueOnce({ error: null });
-    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("fast", "c") });
+    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("fast", "c", "u")! });
     expect(supabase.rpc).not.toHaveBeenCalled();
     expect(insert.mock.calls[0][0]).toMatchObject({ sender_id: "fast" });
   });
@@ -267,7 +267,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const foer = kontrol<{ data: unknown; error: unknown }>();
     svar.chat_messages = [foer.p];
-    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     rydAlleKladder(); // logud/brugerskift
     foer.res(msg(null));
     expect((await p)?.indsat).toBe(false);
@@ -279,7 +279,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result } = opsaet();
     const foer = kontrol<{ data: unknown; error: unknown }>();
     svar.chat_messages = [foer.p];
-    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     rydAlleKladder(); // SIGNED_OUT → ny generation; genlogin som "e" giver ikke den gamle generation tilbage
     foer.res(msg(null));
     await p;
@@ -290,7 +290,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const ins = kontrol<{ error: unknown }>();
     insert.mockReturnValueOnce(ins.p);
-    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") }));
+    const p = fejl(result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! }));
     await vi.waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     const foerAntal = kald.length;
     rydAlleKladder();
@@ -305,7 +305,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const { result, inv } = opsaet();
     const ins = kontrol<{ error: unknown }>();
     insert.mockReturnValueOnce(ins.p);
-    const p = result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") });
+    const p = result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
     await vi.waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     rydAlleKladder();
     ins.res({ error: null });
@@ -320,7 +320,7 @@ describe("§2/§8 – registerafstemning og genudstedelse gennem rigtig useSendM
     const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     const { result } = renderHook(() => useSendMessage(), { wrapper });
-    return (x: Parameters<typeof result.current.mutateAsync>[0]) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c") }));
+    return (x: Parameters<typeof result.current.mutateAsync>[0]) => fejl(result.current.mutateAsync({ ...x, ejer: fastholdEjer("e", "c", "u")! }));
   };
   const vu = { ...vf, replyToId: "svar-1", tidligereUkendt: true };
   const P = (message: string) => ({ error: { code: "P0001", message } });
@@ -469,7 +469,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     const { result } = opsaet();
     svar.chat_messages = [msg(null, { message: "net" })];
     svar.sb_stier = [række({ status: "slettet" })];
-    expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c") })))?.art).toBe("ukendt");
+    expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c", "u")! })))?.art).toBe("ukendt");
     expect(insert).not.toHaveBeenCalled();
   });
 
@@ -480,7 +480,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     for (const c of cases) {
       svar.chat_messages = [msg(null)];
       svar.sb_stier = [c];
-      expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c") })))?.art).toBe("ukendt");
+      expect((await fejl(result.current.mutateAsync({ ...vu, ejer: fastholdEjer("e", "c", "u")! })))?.art).toBe("ukendt");
     }
     expect(insert).not.toHaveBeenCalled();
   });
@@ -489,7 +489,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     const { afstemKun } = await import("./useChat");
     svar.chat_messages = [msg(null)];
     svar.sb_stier = [række({ status: "slettes" })];
-    expect(await afstemKun({ id: v.id, conversationId: "c", attachmentPath: "c/e/x.png", ejer: fastholdEjer("e", "c") })).toBe("genudsted");
+    expect(await afstemKun({ id: v.id, conversationId: "c", attachmentPath: "c/e/x.png", ejer: fastholdEjer("e", "c", "u")! })).toBe("genudsted");
     expect(kald.filter((k) => !k.startsWith("select"))).toEqual([]);
   });
 
@@ -522,7 +522,7 @@ describe("§8 A og b1-hensyn (ii)/(iv) (B2a-b4)", () => {
     const status = kontrol<{ data: unknown; error: null }>();
     svar.chat_messages = [msg(null), status.p];
     insert.mockResolvedValueOnce({ error: null });
-    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c") });
+    await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
     await vi.waitFor(() => expect(kald.filter((k) => k === "select:chat_messages")).toHaveLength(2));
     const foer = inv.mock.calls.length;
     rydAlleKladder();

@@ -431,7 +431,7 @@ const ukendt = () => new SendFejl("ukendt", "Ikke sendt – prøv igen");
  * Indsætter én besked med stabilt id. INSERT sker kun efter et fejlfrit forhåndsopslag;
  * ukendt udfald afstemmes, og en bekræftet række genindsættes aldrig.
  */
-export async function sendBesked(v: SendInput, employeeId: string, vagt: () => boolean = () => true): Promise<void> {
+export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string, vagt: () => boolean = () => true): Promise<void> {
   if (!vagt()) throw foraeldet();
   const foer = await afstemAfsendelse(v, employeeId, vagt);
   if (!vagt()) throw foraeldet();
