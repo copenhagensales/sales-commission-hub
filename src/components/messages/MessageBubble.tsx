@@ -45,17 +45,20 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // §1/§7: redigeringsstate ejes af nøglen (medarbejder, samtale, besked), den blev startet/gendannet under.
   const noegle = currentEmployeeId ? `${currentEmployeeId}\u0000${conversationId}\u0000${message.id}` : null;
   const trukket = message.status === "trukket_tilbage";
+  // B2c-1 §5: lokalt udløbet indhold (klientens ur) – visningsværn, intet skrives.
+  const fristNu = useFristUr([message.slettes_efter, message.reply_to?.slettes_efter]);
+  const udloebet = erUdloebet(message.slettes_efter, fristNu);
   const leveret = message.status === "leveret";
   // B2b-1 §3: kladde gendannes med sin egen startrevision; tilbagetrukket indhold genskabes aldrig i editoren.
   const gendan = () => {
     const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
-    return { ejer: noegle, aaben: !!g && !trukket, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+    return { ejer: noegle, aaben: !!g && !trukket && !erUdloebet(message.slettes_efter, Date.now()), tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
       lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false, konflikt: false, ukendt: false };
   };
   const [ret, setRet] = useState(gendan);
   const egenState = ret.ejer === noegle;
   const { tekst: editContent, revision: retRevision, lagerFejl: retLagerFejl } = ret;
-  const isEditing = egenState && ret.aaben && !trukket; // gammel nøgles state vises/gemmes aldrig
+  const isEditing = egenState && ret.aaben && !trukket && !udloebet; // gammel nøgles state vises/gemmes aldrig
   const konflikt = egenState && ret.konflikt;
   const noegleRef = useRef(noegle);
   noegleRef.current = noegle;
@@ -91,7 +94,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   /** B2b-1 §3: eksplicit brugerhandling – nyeste servertekst og -revision bliver nyt redigeringsgrundlag (ny lokal kladdeændring). */
   const brugNyeste = () => setRet((r) => (r.ejer === noegle ? { ...r, tekst: message.content, revision: message.revision, konflikt: false } : r));
   // Gem tilbydes kun, når serverrækken stadig kan rettes (ikke under tjek og ikke tilbagetrukket).
-  const kanGemme = !trukket && message.status !== "tjekkes";
+  const kanGemme = !trukket && !udloebet && message.status !== "tjekkes";
   const nyereServer = message.revision !== retRevision;
   // B2b-2 §4: åben editor (også gendannet efter navigation/reload eller efter afsluttet Gem) holder låsen som 'ret'.
   useEffect(() => {
@@ -110,7 +113,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // Kvittering kun for leverede beskeder fra andre, når vinduet er synligt og har fokus.
   const hasRead = !!message.read_receipts?.some(r => r.employee_id === currentEmployeeId);
   useEffect(() => {
-    if (isOwn || !currentEmployeeId || hasRead || !leveret) return;
+    if (isOwn || !currentEmployeeId || hasRead || !leveret || udloebet) return;
     const kvitter = () => {
       if (erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ messageId: message.id, conversationId });
     };
@@ -122,7 +125,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
       document.removeEventListener("visibilitychange", kvitter);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message.id, isOwn, currentEmployeeId, hasRead, leveret]);
+  }, [message.id, isOwn, currentEmployeeId, hasRead, leveret, udloebet]);
 
   /** B2b-1 §3: Ret (boble og statuskort) fastholder den viste rækkes revision; en eksisterende kladde gendannes med sin startrevision. */
   const startRet = () => {
@@ -199,7 +202,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const otherReadReceipts = (message.read_receipts || []).filter(r => r.employee_id !== message.sender_id);
   const isImage = message.attachment_type?.startsWith("image/");
   const hasUrls = /https?:\/\/[^\s]+/.test(message.content);
-  const visHandlinger = !isEditing && !trukket && (leveret || !isOwn);
+  const visHandlinger = !isEditing && !trukket && !udloebet && (leveret || !isOwn);
+  const svarVaek = !!message.reply_to && svarUtilgaengeligt(message.reply_to, fristNu);
   const btn = "h-7 w-7 md:h-6 md:w-6 max-md:h-11 max-md:w-11";
   const ico = "h-3.5 w-3.5 md:h-3 md:w-3 max-md:h-4 max-md:w-4";
 
@@ -212,7 +216,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
             isOwn ? "bg-primary/10 border-primary ml-auto" : "bg-muted border-muted-foreground"
           )}>
             <span className="font-medium">{message.reply_to.sender?.full_name}</span>
-            <p className="truncate text-muted-foreground">{message.reply_to.content}</p>
+            <p className="truncate text-muted-foreground">{svarVaek ? "Beskeden er ikke længere tilgængelig" : message.reply_to.content}</p>
           </div>
         )}
 
@@ -226,6 +230,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
 
           {trukket ? (
             <p className="italic">{message.content || "Trukket tilbage"}</p>
+          ) : udloebet ? (
+            <p className="italic">Beskeden er ikke længere tilgængelig</p>
           ) : isEditing ? (
             <div className="space-y-2">
               <Textarea

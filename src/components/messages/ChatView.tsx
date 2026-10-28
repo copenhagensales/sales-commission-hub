@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, FRIST_GENHENT_MS, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -284,7 +284,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   convRef.current = conversationId;
   const queryClient = useQueryClient();
 
-  const { data: messages, isLoading, hasOlder, isLoadingOlder, loadOlder } = useMessages(conversationId);
+  const { data: messages, isLoading, hasOlder, isLoadingOlder, loadOlder, opdateret } = useMessages(conversationId);
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
   const { typingUsers, setTyping } = useTypingIndicator(conversationId);
@@ -338,23 +338,47 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // Send-låsen frigives først, når den ryddede kladde er renderet.
   useEffect(() => { sendLaas.current = false; }, [kladdeVersion, conversationId]);
 
-  // Genskab/ryd svaruddrag ud fra den aktuelle tråd (aldrig originaltekst, når tråden viser pladsholder).
+  // B2c-1 §5: valgt svar – fra tråden, ellers et afgrænset RLS-opslag (fravær i siden er ikke bevis for sletning).
+  const svarRef = svarId ?? replyTo?.id ?? null;
+  const svarITraad = svarRef && messages ? messages.find((x) => x.id === svarRef) : undefined;
+  const svarOpslag = useSvarOriginal(svarRef && messages && !svarITraad ? svarRef : null);
+
+  // Lokal fristkontrol (klientens ur) på tværs af tråd, svaruddrag og valgt svar. Kun visning – intet skrives.
+  const fristNu = useFristUr([
+    ...(messages ?? []).flatMap((m) => [m.slettes_efter, m.reply_to?.slettes_efter]),
+    svarITraad?.slettes_efter, svarOpslag.data?.slettes_efter,
+  ]);
+  const visBeskeder = useMemo(() => (messages ?? []).filter((m) => !erUdloebet(m.slettes_efter, fristNu)), [messages, fristNu]);
+
+  // Ryd valgt svar, når originalen er tilbagetrukket, slettet, udløbet eller bevist utilgængelig (tomt RLS-opslag).
   useEffect(() => {
-    // §5: svarId er kladdens svarreference; replyTo er kun dens visning.
-    const id = svarId ?? replyTo?.id;
-    if (!id || !messages) return;
-    const m = messages.find((x) => x.id === id);
-    if (!m || m.status === "trukket_tilbage") { setReplyTo(null); setSvarId(null); return; }
-    if (!replyTo || replyTo.id !== m.id || replyTo.content !== m.content) setReplyTo(m);
-  }, [messages, svarId, replyTo]);
+    if (!svarRef || !messages) return;
+    const vaek = svarITraad
+      ? svarUtilgaengeligt(svarITraad, fristNu)
+      : svarOpslag.isSuccess && (!svarOpslag.data || svarUtilgaengeligt(svarOpslag.data, fristNu));
+    if (vaek) { setReplyTo(null); setSvarId(null); return; }
+    if (svarITraad && (!replyTo || replyTo.id !== svarITraad.id || replyTo.content !== svarITraad.content)) setReplyTo(svarITraad);
+  }, [messages, svarRef, svarITraad, svarOpslag.isSuccess, svarOpslag.data, fristNu, replyTo]);
   useEffect(() => onChatSignal((s) => {
     if (["trukket", "slettet", "udloeb"].includes(s.haendelse) && (replyTo?.id === s.kildeId || svarId === s.kildeId)) {
       setReplyTo(null); setSvarId(null);
     }
   }), [replyTo, svarId]);
+  // Signal, forgrund og genforbindelse genvaliderer det valgte svars opslag (300 ms debounce).
+  useEffect(() => {
+    const gv = () => planlaeg(queryClient, ["chat-svar-original"]);
+    const synlig = () => { if (document.visibilityState === "visible") gv(); };
+    const af = onChatSignal(gv);
+    window.addEventListener("online", gv);
+    document.addEventListener("visibilitychange", synlig);
+    return () => { af(); window.removeEventListener("online", gv); document.removeEventListener("visibilitychange", synlig); };
+  }, [queryClient]);
+  const visSvar = svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) ? svarITraad
+    : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) ? svarOpslag.data : null;
 
   // Kvitterer kun hentede/viste LEVEREDE beskeder fra andre uden egen kvittering – kun ved synligt vindue med fokus.
-  const ukvitterede = (messages ?? [])
+  // B2c-1: skjulte (lokalt udløbne) rækker kvitteres aldrig.
+  const ukvitterede = visBeskeder
     .filter((m) => meId && m.sender_id !== meId && m.status === "leveret" && !m.read_receipts?.some((rr) => rr.employee_id === meId))
     .map((m) => m.id);
   const ukvitteretNoegle = ukvitterede.join(",");
@@ -371,18 +395,20 @@ export function ChatView({ conversationId }: ChatViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, ukvitteretNoegle]);
 
-  // Fristudløb (slettes_efter): genhent ved den nærmeste frist, også uden signal.
-  const naesteFrist = (messages ?? []).reduce((min, m) => {
-    if (!m.slettes_efter) return min;
-    const t = new Date(m.slettes_efter).getTime();
-    return t < min ? t : min;
-  }, Infinity);
+  // B2c-1 §5: lokalt udløbne rækker genhentes (frist + 500 ms). Returnerer serveren stadig rækken med samme frist
+  // (ure kan afvige), planlægges én ny genhentning med voksende ventetid 2/4/8/16/32 s – højst fem gange.
+  const udloebne = (messages ?? []).filter((m) => erUdloebet(m.slettes_efter, fristNu)).map((m) => `${m.id}@${m.slettes_efter}`).join(",");
+  const genhent = useRef({ noegle: "", n: 0, opd: 0 });
   useEffect(() => {
-    if (!Number.isFinite(naesteFrist)) return;
-    const ms = Math.min(Math.max(0, naesteFrist - Date.now()) + 500, 2 ** 31 - 1);
-    const t = setTimeout(() => queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] }), ms);
+    const r = genhent.current;
+    if (!udloebne) { genhent.current = { noegle: "", n: 0, opd: opdateret }; return; }
+    if (r.noegle !== udloebne) genhent.current = { noegle: udloebne, n: 0, opd: opdateret };
+    else if (r.opd !== opdateret) { r.n++; r.opd = opdateret; }
+    const n = genhent.current.n;
+    if (n >= FRIST_GENHENT_MS.length) return;
+    const t = setTimeout(() => void queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] }), FRIST_GENHENT_MS[n]);
     return () => clearTimeout(t);
-  }, [naesteFrist, conversationId, queryClient]);
+  }, [udloebne, opdateret, conversationId, queryClient]);
 
   const nyesteId = messages?.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
@@ -610,7 +636,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               </Button>
             </div>
           )}
-          {messages?.map((msg) => (
+          {visBeskeder.map((msg) => (
             <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === meId} currentEmployeeId={meId} authBrugerId={currentEmployee?.authId ?? null}
               conversationId={conversationId} onReply={(m) => { setReplyTo(m); setSvarId(m.id); }} />
           ))}
@@ -673,7 +699,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               </div>
             </div>
           ))}
-          {messages?.length === 0 && afsendelser.length === 0 && (
+          {visBeskeder.length === 0 && !afsendelser.some((p) => !messages?.some((m) => m.id === p.id)) && (
             <div className="text-center text-muted-foreground py-8">Ingen beskeder endnu. Start samtalen!</div>
           )}
         </div>
@@ -681,12 +707,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
         <div ref={bottomRef} aria-hidden="true" />
       </ScrollArea>
 
-      {replyTo && (
+      {svarRef && (visSvar || svarOpslag.isError) && (
         <div className="px-2 md:px-4 py-2 bg-muted/50 border-t flex items-center justify-between gap-2">
           <div className="text-sm min-w-0 flex-1">
             <span className="text-muted-foreground">Svarer på: </span>
-            <span className="font-medium">{replyTo.sender?.full_name}</span>
-            <p className="text-muted-foreground truncate">{replyTo.content}</p>
+            {visSvar ? (
+              <>
+                <span className="font-medium">{visSvar.sender?.full_name}</span>
+                <p className="text-muted-foreground truncate">{visSvar.content}</p>
+              </>
+            ) : (
+              <span className="text-muted-foreground">Svaret kan ikke vises lige nu</span>
+            )}
           </div>
           <Button variant="ghost" size="sm" onClick={() => { setReplyTo(null); setSvarId(null); }} className="flex-shrink-0 h-8 w-8 p-0 max-md:h-11 max-md:w-11" aria-label="Fjern svar">
             <X className="h-4 w-4" />
