@@ -29,7 +29,8 @@ export function iOptaellingsvindue(d = new Date()): boolean {
   return h === 3;
 }
 
-type Svc = ReturnType<typeof createClient>;
+const lavKlient = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+type Svc = ReturnType<typeof lavKlient>;
 
 /** Fuldstændig, pagineret og rekursiv optælling af objekter (mapper tælles ikke). null = ufuldstændig/fejl. */
 async function alleObjekter(svc: Svc, frist: number): Promise<string[] | null> {
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const start = Date.now();
   const frist = start + FRIST_MS;
-  const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const svc = lavKlient();
   try {
     const hdr = req.headers.get("x-pulsen-cron-token") ?? "";
     if (!hdr) return json({ error: "Ingen adgang" }, 403);
