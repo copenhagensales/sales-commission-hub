@@ -358,3 +358,14 @@ describe("c2 §4 – rydning tåler fejl på selve sessionStorage-getteren", () 
     expect(m.harKladdeLagerFejl("e", "B")).toBe(false);
   });
 });
+
+describe("B2a-d1 §2 – annullerOperation", () => {
+  it("ugyldiggør kun den annullerede operation; andre operationer i samme session forbliver gyldige", async () => {
+    const m = await import("./sbKladder");
+    const a = m.fastholdEjer("e", "A", "u"), b = m.fastholdEjer("e", "A", "u");
+    expect(m.ejerGyldig(a) && m.ejerGyldig(b)).toBe(true);
+    m.annullerOperation(a!.op);
+    expect(m.ejerGyldig(a)).toBe(false);
+    expect(m.ejerGyldig(b)).toBe(true);
+  });
+});
