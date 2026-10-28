@@ -99,10 +99,24 @@ export function laesRetKladde(emp: string, conv: string, msg: string): RetKladde
   if (!o || typeof o.tekst !== "string" || typeof o.revision !== "number" || o.beskedId !== msg) return null;
   return { beskedId: msg, tekst: o.tekst, revision: o.revision };
 }
+// §2 (c1): hver skrivning af en redigeringskladde får en ny, globalt stigende version (kun i hukommelsen).
+const retVersioner = new Map<string, number>();
+let retVersionNr = 0;
+/** Aktuel version af redigeringskladden (0 = ingen kendt skrivning i denne session). */
+export const retKladdeVersion = (emp: string, conv: string, msg: string) => retVersioner.get(retNoegle(emp, conv, msg)) ?? 0;
+/** Sletter kun, hvis kladden stadig er netop den version, Gem-forsøget blev startet fra, i samme generation. */
+export function sletRetKladdeHvis(emp: string, conv: string, msg: string, version: number, gen: number): boolean {
+  const k = retNoegle(emp, conv, msg);
+  if (gen !== generation || (retVersioner.get(k) ?? 0) !== version) return false;
+  retVersioner.set(k, ++retVersionNr);
+  skriv(k, null);
+  return true;
+}
 export function gemRetKladde(emp: string, conv: string, k: RetKladde): boolean {
+  retVersioner.set(retNoegle(emp, conv, k.beskedId), ++retVersionNr);
   return skriv(retNoegle(emp, conv, k.beskedId), { beskedId: k.beskedId, tekst: k.tekst.slice(0, 4000), revision: k.revision });
 }
-export function sletRetKladde(emp: string, conv: string, msg: string): void { skriv(retNoegle(emp, conv, msg), null); }
+export function sletRetKladde(emp: string, conv: string, msg: string): void { retVersioner.set(retNoegle(emp, conv, msg), ++retVersionNr); skriv(retNoegle(emp, conv, msg), null); }
 
 /** Fejlstatus følger den berørte kladde (bevares over navigation, ryddes ved næste vellykkede skrivning). */
 export const harKladdeLagerFejl = (emp: string, conv: string) => noegleFejl.has(noegle(emp, conv));
@@ -118,6 +132,7 @@ const filer = new Map<string, File>();
 const TOM: Afsendelse[] = [];
 let generation = 0;
 let aktivBruger: string | null = null;
+let lytterAktiv = false;
 
 const nk = (emp: string, conv: string) => `${emp}:${conv}`;
 const fk = (emp: string, conv: string, id: string) => `${emp}:${conv}:${id}`;
@@ -126,21 +141,28 @@ const meld = () => { for (const l of lyttere) l(); };
 /** Sessionsgeneration; øges ved logud/brugerskift, så gamle forløb ikke skriver videre. */
 export const sessionsGeneration = () => generation;
 
-/** §1: Operationens ejer, fastholdt synkront ved brugerhandlingens start (før første await). */
+/** §1 (c1): fuld, obligatorisk operationskontekst, fastholdt synkront ved brugerhandlingen (før første await). */
 export interface OperationsEjer {
   emp: string; conv: string; gen: number;
-  /** Auth-bruger-id ved handlingens start (b4 (i)). */
-  bruger?: string | null;
-  /** Særskilt operations-id; låse frigives kun af deres egen operation (b4 (iii)). */
-  op?: string;
+  /** Auth-bruger-id ved handlingens start. */
+  bruger: string;
+  /** Særskilt operations-id for netop dette arbejde (aldrig beskedens UUID eller uploadforsøgets id). */
+  op: string;
 }
 let opNr = 0;
 export const nytOperationsId = () => `op${++opNr}`;
-export const fastholdEjer = (emp: string, conv: string, bruger: string | null = null): OperationsEjer =>
-  ({ emp, conv, gen: generation, bruger: bruger ?? aktivBruger ?? null, op: nytOperationsId() });
-/** Ejerskab gælder stadig: samme sessionsgeneration og (når kendt) samme auth-bruger. Samtaleskift/afmontering ændrer ikke ejeren. */
+/** null = manglende identitet → ingen skrivende handling må startes. */
+export function fastholdEjer(emp: string | null | undefined, conv: string | null | undefined, bruger: string | null = null): OperationsEjer | null {
+  const b = bruger ?? aktivBruger;
+  if (!emp || !conv || !b) return null;
+  if (lytterAktiv && aktivBruger !== null && aktivBruger !== b) return null;
+  return { emp, conv, gen: generation, bruger: b, op: nytOperationsId() };
+}
+/** Ejerskab gælder: samme sessionsgeneration og – når auth-lytteren kører – samme auth-bruger. Navigation ændrer ikke ejeren. */
 export const ejerGyldig = (e: OperationsEjer | null | undefined) =>
-  !!e && e.gen === generation && (!e.bruger || !aktivBruger || e.bruger === aktivBruger);
+  !!e && !!e.bruger && !!e.op && e.gen === generation && (!lytterAktiv || aktivBruger === e.bruger);
+/** Konteksten passer til input (samtale) og er stadig gyldig. */
+export const ejerPasser = (e: OperationsEjer | null | undefined, conv: string) => !!e && e.conv === conv && ejerGyldig(e);
 
 function laesAfsendelser(emp: string, conv: string): Afsendelse[] {
   const o = laes(afsNoegle(emp, conv));
@@ -216,7 +238,7 @@ export function saetKladdeFil(emp: string, conv: string, f: File | null): void {
 // Filposten (metadata, trin) ligger i skrivekladden; uploadforløbet (forsøgs-id, aktiv, fejl) og File kun i hukommelsen.
 // Asynkrone afslutninger opdaterer kun den stadig ejede filpost og aldrig tekst/svar.
 
-interface UploadForloeb { id: string; gen: number; aktiv: boolean; fejl: string | null }
+interface UploadForloeb { id: string; gen: number; op: string; bruger: string; aktiv: boolean; fejl: string | null }
 const forloeb = new Map<string, UploadForloeb>();
 let forsoegNr = 0;
 
@@ -249,20 +271,23 @@ export function kladdeFilTilstand(emp: string, conv: string): KladdeFilTilstand 
 }
 
 /** Registrerer synkront et nyt uploadforsøg (før udstedelse). Invaliderer alle tidligere forsøg – også med samme File. */
-export function startKladdeUpload(emp: string, conv: string, file: File, meta: Omit<FilMeta, "sti" | "trin">): string {
+export function startKladdeUpload(ejer: OperationsEjer, file: File, meta: Omit<FilMeta, "sti" | "trin">): string | null {
+  if (!ejerGyldig(ejer)) return null;
+  const { emp, conv } = ejer;
   const id = `u${++forsoegNr}`;
   filer.set(fk(emp, conv, "_kladde"), file);
-  forloeb.set(nk(emp, conv), { id, gen: generation, aktiv: true, fejl: null });
+  forloeb.set(nk(emp, conv), { id, gen: ejer.gen, op: ejer.op, bruger: ejer.bruger, aktiv: true, fejl: null });
   skrivKladdeFilMeta(emp, conv, { ...meta, sti: null, trin: "valgt" });
   meld();
   return id;
 }
 
 /** Opdaterer kun den filpost, forsøget stadig ejer. false = forsøget er forældet (fjernet, genvalgt, logud). */
-export function opdaterKladdeUpload(emp: string, conv: string, forsoeg: string, gen: number,
+export function opdaterKladdeUpload(ejer: OperationsEjer, forsoeg: string,
   ret: { sti?: string | null; trin?: FilMeta["trin"]; aktiv?: boolean; fejl?: string | null }): boolean {
-  const f = forloeb.get(nk(emp, conv));
-  if (gen !== generation || !f || f.id !== forsoeg) return false;
+  if (!erAktuelKladdeUpload(ejer, forsoeg)) return false;
+  const { emp, conv } = ejer;
+  const f = forloeb.get(nk(emp, conv))!;
   const meta = laesKladde(emp, conv)?.fil;
   if (!meta) return false;
   if (ret.aktiv !== undefined) f.aktiv = ret.aktiv;
@@ -273,8 +298,11 @@ export function opdaterKladdeUpload(emp: string, conv: string, forsoeg: string, 
   meld();
   return true;
 }
-export const erAktuelKladdeUpload = (emp: string, conv: string, forsoeg: string, gen: number) =>
-  gen === generation && forloeb.get(nk(emp, conv))?.id === forsoeg;
+/** Forsøget ejes stadig af denne operation (samme forsøgs-id, operations-id og gyldig kontekst). */
+export function erAktuelKladdeUpload(ejer: OperationsEjer, forsoeg: string): boolean {
+  const f = forloeb.get(nk(ejer.emp, ejer.conv));
+  return ejerGyldig(ejer) && !!f && f.id === forsoeg && f.op === ejer.op && f.gen === ejer.gen && f.bruger === ejer.bruger;
+}
 
 /** Fjerner skrivekladdens fil og invaliderer et igangværende forsøg. */
 export function fjernKladdeFil(emp: string, conv: string): void {
@@ -301,6 +329,7 @@ export function abonnerAfsendelser(l: Lytter): () => void { lyttere.add(l); retu
 
 export function rydAlleKladder(): void {
   generation++;
+  retVersioner.clear();
   afsendelser.clear();
   filer.clear();
   forloeb.clear();
@@ -333,6 +362,8 @@ export function registrerKladdeOprydning(): void {
     const bruger = s?.user?.id ?? null;
     if (e === "SIGNED_OUT" || (sidsteBruger && bruger && bruger !== sidsteBruger)) rydAlleKladder();
     if (bruger) sidsteBruger = bruger;
+    // TOKEN_REFRESHED/USER_UPDATED for samme bruger ændrer hverken generation eller kladder.
     aktivBruger = bruger;
+    lytterAktiv = true;
   });
 }

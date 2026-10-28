@@ -40,12 +40,16 @@ const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sb-fil`;
 export type Vagt = () => boolean;
 /** Operationen tilhører ikke længere den aktive session (logud/brugerskift); intet netværkskald er sendt. */
 export const erForaeldetOperation = (e: unknown) => e instanceof SbFilFejl && e.kode === "foraeldet";
+/** §3 (c1): operationens kontekst til udstedelse/upload: vagt + auth-bruger, sessionen skal tilhøre. */
+export interface SbKontekst { vagt: Vagt; bruger: string }
 const tjekVagt = (vagt?: Vagt) => { if (vagt && !vagt()) throw new SbFilFejl(0, "foraeldet"); };
 
-async function hoveder(vagt?: Vagt): Promise<Record<string, string>> {
+async function hoveder(vagt?: Vagt, bruger?: string): Promise<Record<string, string>> {
   tjekVagt(vagt);
   const { data } = await supabase.auth.getSession();
   tjekVagt(vagt);
+  // Sessionen skal tilhøre operationens auth-bruger; ellers er operationen forældet (intet netværkskald).
+  if (bruger !== undefined && data.session?.user?.id !== bruger) throw new SbFilFejl(0, "foraeldet");
   const t = data.session?.access_token;
   if (!t) throw new SbFilFejl(401, "jwt");
   return { Authorization: `Bearer ${t}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY };
@@ -60,8 +64,10 @@ async function fejlFra(res: Response): Promise<SbFilFejl> {
 
 export interface Udstedt { sti: string; token: string; conversationId: string }
 
-export async function udstedUpload(conversationId: string, file: { name: string; size: number }, type: string, vagt?: Vagt): Promise<Udstedt> {
-  const h = await hoveder(vagt);
+export async function udstedUpload(conversationId: string, file: { name: string; size: number }, type: string, k: SbKontekst): Promise<Udstedt> {
+  const h = await hoveder(k.vagt, k.bruger);
+  // Sidste await-hul: kontrollér umiddelbart før POST.
+  tjekVagt(k.vagt);
   let res: Response;
   try {
     res = await fetch(BASE, {
@@ -72,12 +78,13 @@ export async function udstedUpload(conversationId: string, file: { name: string;
   } catch { throw new SbFilFejl(0, "net"); }
   if (!res.ok) throw await fejlFra(res);
   const b = await res.json().catch(() => null);
-  tjekVagt(vagt);
+  tjekVagt(k.vagt);
   if (!b || typeof b.sti !== "string" || typeof b.token !== "string") throw new SbFilFejl(500, "svar");
   return { sti: b.sti, token: b.token, conversationId };
 }
 
-export async function uploadTilSti(u: Udstedt, file: File, type: string, vagt?: Vagt): Promise<void> {
+export async function uploadTilSti(u: Udstedt, file: File, type: string, k: SbKontekst): Promise<void> {
+  const vagt = k.vagt;
   tjekVagt(vagt);
   const { error } = await supabase.storage.from("chat-attachments").uploadToSignedUrl(u.sti, u.token, file, { contentType: type, upsert: false });
   if (error) throw new SbFilFejl(0, "upload");
