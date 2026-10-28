@@ -430,15 +430,15 @@ klientTest("§1/§5 stateful MOCK af SQL-reglerne: udstedelsesfejl → overtagel
       : k.sti.startsWith("/storage/v1/object/upload/sign/") ? fejlR()
       : rpc(k, "sb_koe_fil") ? (() => { const b = JSON.parse(k.krop); koe.push({ id: koe.length + 1, sti: b.p_sti, kilde: b.p_kilde, reserveret_til: 0, afsluttet: false }); return tom(204); })()
       : undefined));
-    assertEquals((await hFil(udstedReq())).status, 500);
-    assertEquals(reg!.status, "uploadet"); assertEquals(koe.length, 1); assertEquals(koe[0].kilde, "udstedelse_fejl");
+    assertEquals((await hFil(udstedReq())).status, 500, "A1");
+    assertEquals(reg!.status, "uploadet", "A2"); assertEquals(koe.length, 1, "A3"); assertEquals(koe[0].kilde, "udstedelse_fejl", "A4");
 
     const reserverPost2VedOvertagelse = false;
     const rute: Rute = (k) => {
       if (tabel(k, "pulsen_config")) return jsonR([{ value: CRON_HASH }]);
       if (rpc(k, "sb_version")) return jsonR("24d");
       if (rpc(k, "sb_overtag_foraeldreloese")) {
-        assertEquals(JSON.parse(k.krop), { p_limit: 100 });
+        assertEquals(JSON.parse(k.krop), { p_limit: 100 }, "A5");
         let n = 0;
         if (reg && reg.status === "uploadet" && Date.now() - reg.oprettet > TRE_T) {
           reg.status = "slettes";
@@ -471,22 +471,22 @@ klientTest("§1/§5 stateful MOCK af SQL-reglerne: udstedelsesfejl → overtagel
     time.tick(3600_000);
     nulstil(rute);
     const r1 = await (await kørFake(hOpr, oprReq(), time)).res.json();
-    assertEquals(r1.slettet, 0); assertEquals(r1.foraeldreloese, 0);
-    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0); assertEquals(objekter.size, 1);
+    assertEquals(r1.slettet, 0, "A6"); assertEquals(r1.foraeldreloese, 0, "A7");
+    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0, "A8"); assertEquals(objekter.size, 1, "A9");
     // c) Præcis 3 t efter oprettelse: overtagelse kræver STRENGT mere end 3 t → ingen.
     time.tick(T0 + TRE_T - Date.now());
     nulstil(rute);
     const rPræcis = await (await kørFake(hOpr, oprReq(), time)).res.json();
-    assertEquals(rPræcis.foraeldreloese, 0); assertEquals(koe.length, 1);
+    assertEquals(rPræcis.foraeldreloese, 0, "A10"); assertEquals(koe.length, 1, "A11");
     // Post 1 er nu kvalificeret (registerets slet_tidligst = oprettet + 3 t ≤ nu): sb_koe_naeste sætter uploadet → slettes,
     // og første succesfulde afslutning gør registeret slettet.
-    assertEquals(rPræcis.slettet, 1); assertEquals(reg!.status, "slettet"); assertEquals(statusVedAfslut, ["slettet"]);
-    assertEquals(objekter.size, 0);
+    assertEquals(rPræcis.slettet, 1, "A12"); assertEquals(reg!.status, "slettet", "A13"); assertEquals(statusVedAfslut, ["slettet"], "A14");
+    assertEquals(objekter.size, 0, "A15");
     // d) Senere: registeret er slettet → ingen overtagelse; ingen yderligere poster.
     time.tick(60_000);
     nulstil(rute);
     const r3 = await (await kørFake(hOpr, oprReq(), time)).res.json();
-    assertEquals(r3.foraeldreloese, 0); assertEquals(r3.ok, true);
+    assertEquals(r3.foraeldreloese, 0, "A16"); assertEquals(r3.ok, true, "A17");
   } finally { time.restore(); }
 });
 
