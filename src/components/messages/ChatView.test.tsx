@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor, within, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 
 const mutateAsync = vi.fn();
 const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false, ægteFil: false }));
@@ -976,6 +977,66 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
   });
 
+  // ---------- B2b-2: stophul 1 og sene svar efter stop (rigtig kø, rigtig afstemKun) ----------
+  it("B2b-2 stophul 1: aktiv filafstemning stoppes før tomt beskedsvar → intet registeropslag, ingen lager-/cacheeffekt", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
+    const fil: FilMeta = { name: "x.txt", type: "text/plain", size: 1, sti: "A/e/x.txt", trin: "uploadet" };
+    tilfoejAfsendelse("e", "A", afs("A1", fil));
+    await klarFake();
+    expect(opslag("A1")).toBe(1); // beskedopslaget er startet (aktiv afstemKun)
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    stopAfstemninger("e", "A", "A1");
+    await svarFor("A1", null); // sent, fejlfrit tomt beskedsvar
+    await fremad(60000);
+    expect(net.kald.filter((k) => k === "select:sb_stier")).toEqual([]);
+    expect(opslag("A1")).toBe(1);
+    expect(inv).not.toHaveBeenCalled();
+    expect(hentAfsendelser("e", "A")[0]).toMatchObject({ id: "A1", tilstand: "afstemmer" }); // stop fjerner ikke pending
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+  });
+
+  for (const [navn, data] of [["sen succes", { id: "A1" }], ["sen fejl/tom", null]] as const) {
+    it(`B2b-2: ${navn} efter stop med en nyere pending post på samme id rører ikke den nye post`, async () => {
+      const { tilfoejAfsendelse, fjernAfsendelse } = await import("@/lib/sbKladder");
+      const { stopAfstemninger } = await import("./ChatView");
+      tilfoejAfsendelse("e", "A", afs("A1"));
+      await klarFake();
+      expect(opslag("A1")).toBe(1);
+      stopAfstemninger("e", "A", "A1");
+      await act(async () => { fjernAfsendelse("e", "A", "A1"); tilfoejAfsendelse("e", "A", { ...afs("A1"), tekst: "ny", tilstand: "afvist", fejl: "x" }); });
+      const inv = vi.spyOn(qc, "invalidateQueries");
+      await svarFor("A1", data);
+      await fremad(0);
+      expect(hentAfsendelser("e", "A")).toEqual([expect.objectContaining({ id: "A1", tekst: "ny", tilstand: "afvist" })]);
+      expect(inv).not.toHaveBeenCalled();
+      expect(opslag("A1")).toBe(1);
+    });
+  }
+
+  it("B2b-2 (d2-rettelse): efter uafklaret manuel genafsendelse er netop 1 s-timeren aktiv og udløser præcis ét opslag", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    for (let n = 0; n < 7; n++) { if (ventende.some((x) => x.id === "A1")) await svarFor("A1", null); await fremad(30000); }
+    expect(vi.getTimerCount()).toBe(0); // udtømt: ingen baggrundstimer
+    net.insert.mockReturnValueOnce({ error: { message: "transport" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
+    await fremad(0);
+    await svarFor("A1", null);
+    await fremad(0);
+    await svarFor("A1", null);
+    await fremad(0);
+    const n0 = opslag("A1");
+    expect(vi.getTimerCount()).toBeGreaterThan(0); // den planlagte fortsættelse
+    await fremad(999);
+    expect(opslag("A1")).toBe(n0);
+    await fremad(1); // netop timerens udløb (fjernes planlægningen, sker intet opslag her)
+    expect(opslag("A1")).toBe(n0 + 1);
+    await svarFor("A1", { id: "A1" });
+    expect(net.insert).toHaveBeenCalledTimes(1);
+  });
+
   // d2 §5: negative bevisbetingelser gennem komponentforløbet – ingen skrivende sideeffekter.
   for (const [navn, afv] of [
     ["binding til andet id", { besked_id: "ANDET" }], ["fremmed ejer", { ejer_employee_id: "x" }], ["fremmed samtale", { samtale_id: "Z" }],
@@ -1147,7 +1208,10 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
   beforeEach(async () => {
     beskeder.ægteSend = true;
     const { supabase } = await import("@/integrations/supabase/client");
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
+    // B2b-2: typet sessionsfixture uden as-never-omgåelse.
+    const session: Session = { access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
+      user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" } };
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session }, error: null });
     auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
   });
