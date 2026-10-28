@@ -680,6 +680,140 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     frigivLaas("k", "op3");
   });
 
+  const udtoem = async (id: string) => {
+    for (let n = 0; n < 7; n++) { if (ventende.some((x) => x.id === id)) await svarFor(id, null); await fremad(30000); }
+    expect(screen.getByRole("button", { name: "Prøv igen" })).toBeTruthy();
+  };
+  const svarFejlFor = (id: string) => {
+    const i = ventende.findIndex((x) => x.id === id);
+    const [x] = ventende.splice(i, 1);
+    return act(async () => { (x.res as (s: { data: unknown; error: unknown }) => void)({ data: null, error: { message: "net" } }); await vi.advanceTimersByTimeAsync(0); });
+  };
+
+  for (const scenarie of ["forhåndsopslag fejler", "tabt INSERT-svar + tom efterafstemning", "registerfejl"] as const) {
+    it(`c2 §5: udtømt → Prøv igen → ${scenarie} → forløbet fortsætter og ender i afslutning eller ny brugerhandling`, async () => {
+      const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+      const { afstemningsKapacitet } = await import("./ChatView");
+      const fil: FilMeta = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/x.txt", trin: "uploadet" };
+      const a = scenarie === "registerfejl" ? afs("A1", fil) : scenarie === "tabt INSERT-svar + tom efterafstemning" ? { ...afs("A1"), tidligereUkendt: false } : afs("A1");
+      tilfoejAfsendelse("e", "A", a);
+      await klarFake();
+      await udtoem("A1");
+      const foer = opslag("A1");
+      if (scenarie === "registerfejl") net.svar.sb_stier = [{ data: null, error: { message: "rls" } }];
+      if (scenarie === "tabt INSERT-svar + tom efterafstemning") net.insert.mockReturnValueOnce({ error: { message: "Failed to fetch" } });
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
+      await fremad(0);
+      if (scenarie === "forhåndsopslag fejler") await svarFejlFor("A1");
+      else if (scenarie === "registerfejl") await svarFor("A1", null);
+      else { await svarFor("A1", null); await fremad(0); await svarFor("A1", null); } // forhåndsopslag, INSERT tabt, efterafstemning tom
+      await fremad(0);
+      const insertsEfterManuel = net.insert.mock.calls.length;
+      expect(insertsEfterManuel).toBeLessThanOrEqual(1);
+      expect(hentAfsendelser("e", "A")[0]?.tilstand).toBe("afstemmer");
+      // Eksplicit fortsættelse uden listeændring/remount: næste opslag efter 1 s.
+      const efterManuel = opslag("A1");
+      await fremad(1000);
+      expect(opslag("A1")).toBe(efterManuel + 1);
+      // Hele afslutningen: serien udtømmes igen og tilbyder brugerhandlingen; ingen automatisk skrivning.
+      for (let n = 0; n < 8; n++) { if (ventende.some((x) => x.id === "A1")) await svarFor("A1", null); await fremad(30000); }
+      expect(screen.getByRole("button", { name: "Prøv igen" })).toBeTruthy();
+      expect(net.insert.mock.calls.length).toBe(insertsEfterManuel);
+      expect(opslag("A1")).toBeGreaterThan(foer);
+      expect(ventende).toEqual([]);
+      expect(afstemningsKapacitet().aktive).toBe(0);
+      expect(maksPrId).toBe(1);
+    });
+  }
+
+  it("c2 §5: manuel handling under aktivt promise og online-hændelse → ét forløb, fuld afslutning", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { afstemningsKapacitet } = await import("./ChatView");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    await klarFake();
+    await udtoem("A1");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
+    await fremad(0);
+    expect(ventende.filter((x) => x.id === "A1")).toHaveLength(1); // manuelt promise er aktivt
+    for (let i = 0; i < 3; i++) window.dispatchEvent(new Event("online"));
+    await fremad(5000); // ingen baggrundsafstemning konkurrerer
+    expect(maksPrId).toBe(1);
+    await svarFor("A1", { id: "A1" });
+    await fremad(0);
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    await fremad(60000);
+    expect(ventende).toEqual([]);
+    expect(afstemningsKapacitet().aktive).toBe(0);
+    expect(net.insert).not.toHaveBeenCalled();
+  });
+
+  it("c2 §6: tre uafsluttede gamle opslag + faktisk logud/genlogin → ny post afstemmes straks; gamle svar ændrer intet", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { afstemningsKapacitet } = await import("./ChatView");
+    const { supabase } = await import("@/integrations/supabase/client");
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+    for (const id of ["G1", "G2", "G3"]) tilfoejAfsendelse("e", "A", afs(id));
+    await klarFake();
+    expect(ventende).toHaveLength(3);
+    const gamleSession = afstemningsKapacitet().gen;
+    act(() => { auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } }); });
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, iKoe: 0, ventende: 0 });
+    expect(afstemningsKapacitet().gen).not.toBe(gamleSession);
+    await act(async () => { tilfoejAfsendelse("e", "A", afs("N1")); });
+    await fremad(0);
+    expect(opslag("N1")).toBe(1); // venter ikke på gamle svar
+    expect(afstemningsKapacitet().aktive).toBe(1);
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    for (const id of ["G1", "G2", "G3"]) await svarFor(id, { id });
+    expect(afstemningsKapacitet().aktive).toBe(1);
+    expect(hentAfsendelser("e", "A").map((x) => x.id)).toEqual(["N1"]);
+    expect(inv).not.toHaveBeenCalled();
+    await svarFor("N1", { id: "N1" });
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(afstemningsKapacitet().aktive).toBe(0);
+  });
+
+  it("c2 §6: tre baggrundsforløb + manuel Send deler kapaciteten (målt maks 3) og alle afslutter", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { afstemningsKapacitet } = await import("./ChatView");
+    for (const id of ["P0", "P1", "P2"]) tilfoejAfsendelse("e", "A", afs(id));
+    await klarFake();
+    expect(maks).toBe(3);
+    skriv("hej");
+    await act(async () => { fireEvent.click(send()); });
+    await fremad(0);
+    expect(samtidige).toBe(3); // den manuelle afsendelse venter på en plads
+    expect(afstemningsKapacitet().ventende).toBe(1);
+    await svarFor("P0", { id: "P0" });
+    await fremad(0);
+    expect(maks).toBe(3);
+    const ny = ventende.find((x) => !["P1", "P2"].includes(x.id))!;
+    net.insert.mockReturnValueOnce({ error: null });
+    await svarFor(ny.id, null);
+    await fremad(0);
+    for (const x of [...ventende]) await svarFor(x.id, { id: x.id });
+    await fremad(0);
+    expect(maks).toBe(3);
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+  });
+
+  it("c2 §6: stopAfstemninger stopper kun den angivne samtales timere; andre forløb fortsætter", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const { stopAfstemninger } = await import("./ChatView");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    tilfoejAfsendelse("e", "A", afs("A2"));
+    await klarFake();
+    await svarFor("A1", null); await svarFor("A2", null); // begge i backoff
+    stopAfstemninger("e", "A", "A1");
+    await fremad(1000);
+    expect(opslag("A1")).toBe(1);
+    expect(opslag("A2")).toBe(2);
+    await svarFor("A2", { id: "A2" });
+  });
+
   it("§8 A: forhåndsopslag med overtaget sti → tilbud, nul INSERT; efter tryk én udstedelse og samme id", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     const fil: FilMeta = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/gammel.txt", trin: "uploadet" };
