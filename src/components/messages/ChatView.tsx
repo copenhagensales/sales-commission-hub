@@ -21,7 +21,7 @@ import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, FIL_ACCEPT, FI
 import {
   laesKladde, gemKladde, sletKladde, registrerKladdeOprydning, hentAfsendelser, tilfoejAfsendelse, opdaterAfsendelse,
   fjernAfsendelse, afsendelsesFil, saetAfsendelsesFil, kladdeFil, saetKladdeFil, harLagringsFejl, abonnerAfsendelser,
-  sessionsGeneration, type Afsendelse, type FilMeta,
+  sessionsGeneration, fastholdEjer, ejerGyldig, harKladdeLagerFejl, type Afsendelse, type FilMeta,
 } from "@/lib/sbKladder";
 
 registrerKladdeOprydning();
@@ -100,11 +100,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
       if (gammel?.previewUrl) URL.revokeObjectURL(gammel.previewUrl);
       return k?.fil ? lokalFra(k.fil, kladdeFil(meId, conversationId)) : null;
     });
+    setKladdeLagerFejl(harKladdeLagerFejl(meId, conversationId));
     setKladdeEjer(`${meId}:${conversationId}`);
   }, [meId, conversationId]);
   useEffect(() => {
     if (!meId || !noegle || kladdeEjer !== noegle) return;
-    setKladdeLagerFejl(!gemKladde(meId, conversationId, { tekst: message, svarId: replyTo?.id ?? svarId, fil: fil ? metaFra(fil) : null, retId }));
+    gemKladde(meId, conversationId, { tekst: message, svarId: replyTo?.id ?? svarId, fil: fil ? metaFra(fil) : null, retId });
+    setKladdeLagerFejl(harKladdeLagerFejl(meId, conversationId));
   }, [meId, noegle, kladdeEjer, conversationId, message, replyTo, svarId, fil, retId]);
   useEffect(() => () => { setFil((f) => { if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl); return f; }); }, []);
   // Send-låsen frigives først, når den ryddede kladde er renderet.
@@ -171,7 +173,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const deliver = useCallback(async (emp: string, conv: string, id: string, genudsted = false) => {
     const fk = `${emp}:${conv}:${id}`;
     if (indsendes.has(fk)) return;
-    const gen = sessionsGeneration();
+    // §1: ejer fastholdes synkront før første await; alle efterfølgende trin tjekker ejerskabet.
+    const ejer = fastholdEjer(emp, conv), gen = ejer.gen;
+    const vagt = () => ejerGyldig(ejer);
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
     indsendes.add(fk);
@@ -182,11 +186,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
         // §10: genudstedelse fra den bevarede File (kun dokumenteret ubundet overtaget sti, kun brugerudløst, én gang).
         const file = afsendelsesFil(emp, conv, id);
         if (!file) { opdaterAfsendelse(emp, conv, id, { tilstand: "vaelg_fil" }, gen); return; }
-        const u = await udstedUpload(conv, file, filMeta.type);
-        if (gen !== sessionsGeneration()) return;
+        const u = await udstedUpload(conv, file, filMeta.type, vagt);
+        if (!vagt()) return;
         filMeta = { ...filMeta, sti: u.sti, trin: "uploader" };
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
-        await uploadTilSti(u, file, filMeta.type);
+        await uploadTilSti(u, file, filMeta.type, vagt);
         if (gen !== sessionsGeneration()) return;
         filMeta = { ...filMeta, trin: "uploadet" };
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
@@ -194,7 +198,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       await sendMessage.mutateAsync({
         id, conversationId: conv, content: a.tekst, replyToId: a.svarId ?? undefined,
         attachmentPath: filMeta?.sti ?? undefined, attachmentType: filMeta?.type, attachmentName: filMeta?.name,
-        tidligereUkendt: a.tidligereUkendt,
+        tidligereUkendt: a.tidligereUkendt, ejer,
       });
       fjernAfsendelse(emp, conv, id, gen);
     } catch (e) {
@@ -234,12 +238,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
     let stoppet = false;
     const tjek = async (id: string) => {
       const fk = `${emp}:${conv}:${id}`;
-      if (stoppet || indsendes.has(fk)) return;
+      if (stoppet || gen !== sessionsGeneration() || indsendes.has(fk)) return;
       const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
       if (!a || a.tilstand !== "afstemmer") return;
       indsendes.add(fk);
       let r: Awaited<ReturnType<typeof afstemKun>>;
-      try { r = await afstemKun({ id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined }); } finally { indsendes.delete(fk); }
+      try { r = await afstemKun({ id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: { emp, conv, gen } }); } finally { indsendes.delete(fk); }
       if (stoppet || gen !== sessionsGeneration()) return;
       if (r === "fundet") {
         fjernAfsendelse(emp, conv, id, gen);
@@ -333,13 +337,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const upload = async (file: File, type: string, previewUrl: string | null) => {
     if (!meId) return;
     const emp = meId, conv = conversationId, gen = sessionsGeneration();
+    const vagt = () => gen === sessionsGeneration();
     saetKladdeFil(emp, conv, file);
     setFil({ name: file.name, type, size: file.size, previewUrl, uploader: true, file, trin: "valgt" });
     try {
-      const u = await udstedUpload(conv, file, type);
+      const u = await udstedUpload(conv, file, type, vagt);
       if (gen !== sessionsGeneration()) return;
       markerKladdeFil(emp, conv, file, { sti: u.sti, trin: "uploader" });
-      await uploadTilSti(u, file, type);
+      await uploadTilSti(u, file, type, vagt);
       if (gen !== sessionsGeneration()) return;
       markerKladdeFil(emp, conv, file, { uploader: false, trin: "uploadet" });
     } catch (e) {
