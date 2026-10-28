@@ -82,6 +82,10 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     const fejl = harRetLagerFejl(currentEmployeeId, conversationId, message.id);
     setRet((r) => (r.ejer === noegle && r.lagerFejl !== fejl ? { ...r, lagerFejl: fejl } : r));
   }, [egenState, isEditing, editContent, retRevision, currentEmployeeId, conversationId, message.id, noegle]);
+  // B2b-2 §4: åben editor (også gendannet efter navigation/reload eller efter afsluttet Gem) holder låsen som 'ret'.
+  useEffect(() => {
+    if (isEditing && !laas.art && kanGemme) tagHandling(fastholdEjer(currentEmployeeId, conversationId, authBrugerId), message.id, "ret");
+  }, [isEditing, laas.art, kanGemme, currentEmployeeId, conversationId, authBrugerId, message.id]);
   const setEditContent = (tekst: string) => setRet((r) => (r.ejer === noegle ? { ...r, tekst } : r));
   /** Afslutter redigeringen for den nøgle, den tilhører; berører ikke en anden nøgles state. */
   const afslutRet = (ejer = noegle, emp = currentEmployeeId, conv = conversationId, msg = message.id) => {
@@ -131,7 +135,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   };
 
   const handleSaveEdit = async () => {
-    if (!kanGemme || !editContent.trim() || editMessage.isPending) return;
+    if (!kanGemme || !editContent.trim() || laas.art === "gem") return;
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     // §1/§2 (c1): fuld kontekst og kladdeversion fastholdes synkront før mutateAsync.
     const ejerNoegle = noegle, conv = conversationId, msg = message.id;
@@ -229,7 +233,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
                 onChange={(e) => setEditContent(e.target.value)}
                 className="min-h-[60px] bg-background text-foreground text-[16px]"
                 maxLength={4000}
-                disabled={editMessage.isPending}
+                disabled={laas.art === "gem"}
                 autoFocus
               />
               <p className="text-[14px] opacity-80">{editContent.length}/4.000</p>
@@ -244,11 +248,11 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
                   </Button>
                 )}
                 {kanGemme && nyereServer && (
-                  <Button size="sm" variant="outline" className="max-md:min-h-11 text-foreground" onClick={brugNyeste} disabled={editMessage.isPending}>
+                  <Button size="sm" variant="outline" className="max-md:min-h-11 text-foreground" onClick={brugNyeste} disabled={laas.art === "gem"}>
                     Brug nyeste tekst
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={() => afslutRet()} disabled={editMessage.isPending} aria-label="Annullér">
+                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={() => afslutRet()} disabled={laas.art === "gem"} aria-label="Annullér">
                   <X className="h-3 w-3" />
                 </Button>
               </div>
