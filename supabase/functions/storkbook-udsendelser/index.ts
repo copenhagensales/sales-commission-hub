@@ -196,7 +196,7 @@ async function koerTidKilde(
     }
   } catch (e) {
     rap.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
-    if ((e as Error)?.name !== "AbortError") rap.fejl = true;
+    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) rap.fejl = true;
   }
   return rap;
 }
@@ -291,7 +291,7 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
     }
   } catch (e) {
     rr.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
-    if ((e as Error)?.name !== "AbortError") rr.fejl = true;
+    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) rr.fejl = true;
   }
   rapporter.push(rr);
 
@@ -312,8 +312,8 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
       if (!dry) { const r = await reserver(svc, k, signal); br.indsat = r.indsat; br.opgraderet = r.opgraderet; br.afvist_loft = r.afvist_loft; }
     } catch (e) {
       br.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
-      if ((e as Error)?.name !== "AbortError") br.fejl = true;
-    if ((e as Error)?.name !== "AbortError") br.fejl = true;
+      if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
+    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
     }
   } else br.stoppet = "uden for 17-24";
   rapporter.push(br);
@@ -590,8 +590,9 @@ Deno.serve(async (req) => {
         rapport.oprydning = op.error ? "fejl" : op.data;
         if (op.error) fejlT.oprydning_fejl++;
         // (6) fase 1
-        rapport.fase1 = await fase1(svc, false, start, hoved.signal);
-        fejlT.fase1_fejl += rapport.fase1.fase1_fejl;
+        const f1 = await fase1(svc, false, start, hoved.signal);
+        rapport.fase1 = f1;
+        fejlT.fase1_fejl += f1.fase1_fejl;
         // (7) fase 2
         const frist2 = start + FASE2_FRIST_MS;
         let stop = false;
