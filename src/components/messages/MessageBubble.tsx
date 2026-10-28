@@ -228,10 +228,19 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               />
               <p className="text-[14px] opacity-80">{editContent.length}/4.000</p>
               {retLagerFejl && <p className="text-[14px]" role="status">Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben</p>}
-              <div className="flex gap-1">
-                <Button size="sm" className="max-md:min-h-11 max-md:min-w-11" onClick={handleSaveEdit} disabled={editMessage.isPending} aria-label="Gem ændring">
-                  <Check className="h-3 w-3" />
-                </Button>
+              {konflikt && <p className="text-[14px]" role="alert">Beskeden er ændret – prøv igen</p>}
+              {!kanGemme && <p className="text-[14px]" role="status">Beskeden kan ikke rettes lige nu</p>}
+              <div className="flex flex-wrap gap-1">
+                {kanGemme && (
+                  <Button size="sm" className="max-md:min-h-11 max-md:min-w-11" onClick={handleSaveEdit} disabled={editMessage.isPending} aria-label="Gem ændring">
+                    <Check className="h-3 w-3" />
+                  </Button>
+                )}
+                {kanGemme && nyereServer && (
+                  <Button size="sm" variant="outline" className="max-md:min-h-11 text-foreground" onClick={brugNyeste} disabled={editMessage.isPending}>
+                    Brug nyeste tekst
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={() => afslutRet()} disabled={editMessage.isPending} aria-label="Annullér">
                   <X className="h-3 w-3" />
                 </Button>
@@ -329,7 +338,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
         </div>
 
         {isOwn && !isEditing && !trukket && (
-          <BeskedStatus message={message} conversationId={conversationId} currentEmployeeId={currentEmployeeId} onRet={startRet} />
+          <BeskedStatus message={message} conversationId={conversationId} currentEmployeeId={currentEmployeeId} authBrugerId={authBrugerId} onRet={startRet} />
         )}
 
         {!trukket && Object.keys(groupedReactions).length > 0 && (
