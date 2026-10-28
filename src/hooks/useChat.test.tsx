@@ -42,7 +42,9 @@ import {
 
 const v = { id: "11111111-1111-1111-1111-111111111111", conversationId: "c", content: "hej" };
 const vf = { ...v, attachmentPath: "c/e/x.png", attachmentType: "image/png", attachmentName: "x.png" };
-const egen = (besked_id: string | null, status = "bundet") => ({ data: { besked_id, status, samtale_id: "c", ejer_employee_id: "e" }, error: null });
+// Antagelse (ikke SQL-bevis): sb_stier-rækken som 24d-vaern.sql v4 beskriver den, set gennem eksisterende RLS.
+const række = (o: Record<string, unknown> = {}) => ({ data: { bucket: "chat-attachments", sti: "c/e/x.png", besked_id: null, status: "uploadet", samtale_id: "c", ejer_employee_id: "e", ...o }, error: null });
+const egen = (besked_id: string | null, status = "bundet") => række({ besked_id, status });
 const msg = (data: unknown, error: unknown = null) => ({ data, error });
 const fejl = (p: Promise<unknown>) => p.then(() => null, (x) => x as SendFejl);
 
@@ -185,16 +187,17 @@ describe("T10 – genudstedelse kun ved dokumenteret ubundet overtaget sti (§10
     expect((await fejl(sendBesked(vf, "e")))?.art).toBe("genudsted");
   });
 
-  it("bundet til andet id → ingen genudstedelse (ordret afvisning)", async () => {
-    svar.chat_messages = [msg(null), msg(null)];
-    svar.sb_stier = [egen("andet", "bundet"), egen("andet", "bundet")];
-    insert.mockResolvedValueOnce({ error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } });
-    expect((await fejl(sendBesked(vf, "e")))?.art).toBe("server");
+  it("bundet til andet id → stop før INSERT (ingen succes, INSERT eller genudstedelse)", async () => {
+    svar.chat_messages = [msg(null)];
+    svar.sb_stier = [egen("andet", "bundet")];
+    const e = await fejl(sendBesked(vf, "e"));
+    expect(e?.art).toBe("stop");
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("fremmed ejer/samtale tæller som ukendt register", async () => {
     svar.chat_messages = [msg(null), msg(null)];
-    svar.sb_stier = [egen(null), { data: { besked_id: null, status: "slettes", samtale_id: "anden", ejer_employee_id: "e" }, error: null }];
+    svar.sb_stier = [egen(null), række({ status: "slettes", samtale_id: "anden" })];
     insert.mockResolvedValueOnce({ error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } });
     expect((await fejl(sendBesked(vf, "e")))?.art).toBe("ukendt");
   });
