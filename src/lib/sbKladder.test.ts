@@ -182,24 +182,26 @@ describe("§3 – kladdefilens uploadforløb ejes af lageret (B2a-b3)", () => {
   it("nyt forsøg (også samme File) invaliderer det gamle; kun ejende forsøg opdaterer", async () => {
     const m = await ny();
     const f = new File(["x"], "x.txt");
-    const a = m.startKladdeUpload("e", "A", f, meta);
-    const b = m.startKladdeUpload("e", "A", f, meta);
-    expect(m.opdaterKladdeUpload("e", "A", a, m.sessionsGeneration(), { sti: "gammel", trin: "uploadet" })).toBe(false);
-    expect(m.opdaterKladdeUpload("e", "A", b, m.sessionsGeneration(), { sti: "ny", trin: "uploadet", aktiv: false })).toBe(true);
+    const ea = m.fastholdEjer("e", "A", "u")!, eb = m.fastholdEjer("e", "A", "u")!;
+    const a = m.startKladdeUpload(ea, f, meta)!;
+    const b = m.startKladdeUpload(eb, f, meta)!;
+    expect(m.opdaterKladdeUpload(ea, a, { sti: "gammel", trin: "uploadet" })).toBe(false);
+    expect(m.opdaterKladdeUpload(eb, b, { sti: "ny", trin: "uploadet", aktiv: false })).toBe(true);
     expect(m.kladdeFilTilstand("e", "A")).toMatchObject({ meta: { sti: "ny", trin: "uploadet" }, aktiv: false, file: f });
   });
   it("fjernelse invaliderer forsøget og genskaber ikke filen; tekst bevares", async () => {
     const m = await ny();
     m.gemKladde("e", "A", { tekst: "behold", svarId: "s" });
-    const a = m.startKladdeUpload("e", "A", new File(["x"], "x.txt"), meta);
+    const ea = m.fastholdEjer("e", "A", "u")!;
+    const a = m.startKladdeUpload(ea, new File(["x"], "x.txt"), meta)!;
     m.fjernKladdeFil("e", "A");
-    expect(m.opdaterKladdeUpload("e", "A", a, m.sessionsGeneration(), { trin: "uploadet" })).toBe(false);
+    expect(m.opdaterKladdeUpload(ea, a, { trin: "uploadet" })).toBe(false);
     expect(m.kladdeFilTilstand("e", "A")).toBeNull();
     expect(m.laesKladde("e", "A")).toMatchObject({ tekst: "behold", svarId: "s", fil: null });
   });
   it("efter reload: ingen levende forløb, ingen File; snapshot er stabil", async () => {
     let m = await ny();
-    m.startKladdeUpload("e", "A", new File(["x"], "x.txt"), meta);
+    m.startKladdeUpload(m.fastholdEjer("e", "A", "u")!, new File(["x"], "x.txt"), meta);
     m = await ny();
     const t = m.kladdeFilTilstand("e", "A");
     expect(t).toMatchObject({ aktiv: false, file: null, meta: { trin: "valgt" } });
@@ -221,11 +223,63 @@ describe("b1-hensyn (i): auth-bruger i operationsejeren (B2a-b4)", () => {
     m.registrerKladdeOprydning();
     const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls.at(-1)![0] as (e: string, s: unknown) => void;
     cb("SIGNED_IN", { user: { id: "u1" } });
-    const egen = m.fastholdEjer("e", "A", "u")!;
+    const egen = m.fastholdEjer("e", "A")!;
     expect(egen.bruger).toBe("u1");
+    // c1 §1: en eksplicit anden bruger end den aktive giver ingen kontekst.
+    expect(m.fastholdEjer("e", "A", "u2")).toBeNull();
     expect(egen.op).toBeTruthy();
     expect(m.ejerGyldig(egen)).toBe(true);
     expect(m.ejerGyldig({ ...egen, bruger: "u2" })).toBe(false);
-    expect(m.fastholdEjer("e", "A", "u")!.op).not.toBe(egen.op);
+    expect(m.fastholdEjer("e", "A")!.op).not.toBe(egen.op);
+  });
+});
+
+describe("c1 §1/§2: fuld kontekst, uploadejerskab og redigeringsversion", () => {
+  it("uploadforsøget ejes af sin operation: anden operation med samme forsøgs-id kan ikke opdatere", async () => {
+    const m = await ny();
+    const ejer = m.fastholdEjer("e", "A", "u")!;
+    const id = m.startKladdeUpload(ejer, new File(["x"], "x.txt"), { name: "x.txt", type: "text/plain", size: 1 })!;
+    expect(id).not.toBe(ejer.op);
+    const fremmed = { ...ejer, op: m.nytOperationsId() };
+    expect(m.erAktuelKladdeUpload(fremmed, id)).toBe(false);
+    expect(m.opdaterKladdeUpload(fremmed, id, { trin: "uploadet" })).toBe(false);
+    expect(m.erAktuelKladdeUpload(ejer, id)).toBe(true);
+  });
+  it("forældet kontekst kan ikke starte et uploadforsøg", async () => {
+    const m = await ny();
+    const ejer = m.fastholdEjer("e", "A", "u")!;
+    m.rydAlleKladder();
+    expect(m.startKladdeUpload(ejer, new File(["x"], "x.txt"), { name: "x.txt", type: "text/plain", size: 1 })).toBeNull();
+  });
+  it("TOKEN_REFRESHED for samme bruger bevarer kladder og kontekst; logud/genlogin som samme bruger invaliderer", async () => {
+    const m = await ny();
+    const { supabase } = await import("@/integrations/supabase/client");
+    m.registrerKladdeOprydning();
+    const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls.at(-1)![0] as (e: string, s: unknown) => void;
+    cb("SIGNED_IN", { user: { id: "u1" } });
+    m.gemKladde("e", "A", { tekst: "t", svarId: null });
+    const ejer = m.fastholdEjer("e", "A")!;
+    cb("TOKEN_REFRESHED", { user: { id: "u1" } });
+    expect(m.laesKladde("e", "A")?.tekst).toBe("t");
+    expect(m.ejerGyldig(ejer)).toBe(true);
+    cb("SIGNED_OUT", null);
+    cb("SIGNED_IN", { user: { id: "u1" } });
+    expect(m.ejerGyldig(ejer)).toBe(false);
+    expect(m.laesKladde("e", "A")).toBeNull();
+  });
+  it("redigeringskladde: sen sletning rydder kun den oprindelige version og generation", async () => {
+    const m = await ny();
+    m.gemRetKladde("e", "A", { beskedId: "m", tekst: "v1", revision: 1 });
+    const v1 = m.retKladdeVersion("e", "A", "m"), g = m.sessionsGeneration();
+    m.gemRetKladde("e", "A", { beskedId: "m", tekst: "v2", revision: 1 });
+    expect(m.sletRetKladdeHvis("e", "A", "m", v1, g)).toBe(false);
+    expect(m.laesRetKladde("e", "A", "m")?.tekst).toBe("v2");
+    const v2 = m.retKladdeVersion("e", "A", "m");
+    m.rydAlleKladder();
+    m.gemRetKladde("e", "A", { beskedId: "m", tekst: "ny session", revision: 1 });
+    expect(m.sletRetKladdeHvis("e", "A", "m", v2, g)).toBe(false);
+    expect(m.laesRetKladde("e", "A", "m")?.tekst).toBe("ny session");
+    expect(m.sletRetKladdeHvis("e", "A", "m", m.retKladdeVersion("e", "A", "m"), m.sessionsGeneration())).toBe(true);
+    expect(m.laesRetKladde("e", "A", "m")).toBeNull();
   });
 });
