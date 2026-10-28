@@ -44,14 +44,19 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // Uafsendt redigeringskladde: besked-id, tekst og revisionen, redigeringen begyndte fra.
   // §1/§7: redigeringsstate ejes af nøglen (medarbejder, samtale, besked), den blev startet/gendannet under.
   const noegle = currentEmployeeId ? `${currentEmployeeId}\u0000${conversationId}\u0000${message.id}` : null;
-  const [ret, setRet] = useState(() => {
+  const trukket = message.status === "trukket_tilbage";
+  const leveret = message.status === "leveret";
+  // B2b-1 §3: kladde gendannes med sin egen startrevision; tilbagetrukket indhold genskabes aldrig i editoren.
+  const gendan = () => {
     const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
-    return { ejer: noegle, aaben: !!g, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
-      lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false };
-  });
+    return { ejer: noegle, aaben: !!g && !trukket, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+      lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false, konflikt: false };
+  };
+  const [ret, setRet] = useState(gendan);
   const egenState = ret.ejer === noegle;
   const { tekst: editContent, revision: retRevision, lagerFejl: retLagerFejl } = ret;
-  const isEditing = egenState && ret.aaben; // gammel nøgles state vises/gemmes aldrig
+  const isEditing = egenState && ret.aaben && !trukket; // gammel nøgles state vises/gemmes aldrig
+  const konflikt = egenState && ret.konflikt;
   const noegleRef = useRef(noegle);
   noegleRef.current = noegle;
   const [nu, setNu] = useState(() => Date.now());
@@ -66,9 +71,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // Gammel state skrives aldrig under den nye nøgle; serverteksten overskriver ikke en gemt kladde.
   useEffect(() => {
     if (ret.ejer === noegle) return;
-    const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
-    setRet({ ejer: noegle, aaben: !!g, tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
-      lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false });
+    setRet(gendan());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noegle]);
   useEffect(() => {
@@ -81,11 +84,13 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   /** Afslutter redigeringen for den nøgle, den tilhører; berører ikke en anden nøgles state. */
   const afslutRet = (ejer = noegle, emp = currentEmployeeId, conv = conversationId, msg = message.id) => {
     if (emp) sletRetKladde(emp, conv, msg);
-    setRet((r) => (r.ejer === ejer ? { ...r, aaben: false, lagerFejl: false } : r));
+    setRet((r) => (r.ejer === ejer ? { ...r, aaben: false, lagerFejl: false, konflikt: false } : r));
   };
-
-  const trukket = message.status === "trukket_tilbage";
-  const leveret = message.status === "leveret";
+  /** B2b-1 §3: eksplicit brugerhandling – nyeste servertekst og -revision bliver nyt redigeringsgrundlag (ny lokal kladdeændring). */
+  const brugNyeste = () => setRet((r) => (r.ejer === noegle ? { ...r, tekst: message.content, revision: message.revision, konflikt: false } : r));
+  // Gem tilbydes kun, når serverrækken stadig kan rettes (ikke under tjek og ikke tilbagetrukket).
+  const kanGemme = !trukket && message.status !== "tjekkes";
+  const nyereServer = message.revision !== retRevision;
 
   // Træk tilbage på leverede beskeder kun inden for én time fra leveret_at; synligheden opdateres ved grænsen.
   const traekGraense = leveret && message.leveret_at ? new Date(message.leveret_at).getTime() + TIME : 0;
