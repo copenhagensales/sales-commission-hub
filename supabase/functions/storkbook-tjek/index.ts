@@ -4,14 +4,19 @@
 // modelsvar eller rå fejl i logs – kun faste koder, id, revision og varighed.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { budgetFetch, budgetIndstillinger, laesBegraenset } from "../_shared/sb-budget.ts";
+import { hentBegraenset } from "../_shared/sb-filtype.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAKS_TEKST = 4000;
-const MAKS_BILLEDE = 10 * 1024 * 1024;
-const MAKS_TXT = 20 * 1024;
 const GATEWAY_MS = 45_000;
 const SAMLET_MS = 55_000;
 const AFSLUT_RESERVE_MS = 5_000;
+/** Arbejdsfrist = start + SAMLET_MS − AFSLUT_RESERVE_MS (50 s). */
+const ARBEJDE_MS = SAMLET_MS - AFSLUT_RESERVE_MS;
+const KALD_MS = 15_000;
+const AFSLUT_MS = 5_000;
+const MAKS_KROP = 4096;
 /** Eksplicit outputgrænse: det lukkede skema fylder < 80 tokens. */
 export const MAKS_OUTPUT_TOKENS = 200;
 
@@ -45,16 +50,6 @@ export function validerDom(x: unknown): ModelDom | null {
 
 export const UKENDT: Udfald = { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" };
 
-/** Filtype fra indhold (magic bytes) – stoler ikke på attachment_type. */
-export function filtype(b: Uint8Array): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "text/plain" | null {
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
-  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
-  if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "image/gif";
-  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp";
-  if (b.includes(0)) return null;
-  try { new TextDecoder("utf-8", { fatal: true }).decode(b); return "text/plain"; } catch { return null; }
-}
-
 function stubAktiv(): boolean {
   if (Deno.env.get("SB_TJEK_STUB") !== "1") return false;
   try {
@@ -73,17 +68,18 @@ const SYSTEM = [
 
 type Del = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
-async function spoergModel(model: string, dele: Del[], frist: number): Promise<ModelDom | null> {
+async function spoergModel(model: string, dele: Del[], arbejdsFrist: number): Promise<ModelDom | null> {
   if (stubAktiv()) {
     try { return validerDom(JSON.parse(Deno.env.get("SB_TJEK_STUB_UDFALD") ?? "null")); } catch { return null; }
   }
   const key = Deno.env.get("LOVABLE_API_KEY");
   if (!key) return null;
-  const ms = Math.min(GATEWAY_MS, frist - Date.now() - AFSLUT_RESERVE_MS);
-  if (ms <= 0) return null;
+  // min(45 s, arbejdsfrist−nu), inkl. svarbody; ingen gateway efter arbejdsfristen (→ UKENDT).
+  if (arbejdsFrist - Date.now() <= 0) return null;
+  const gw = budgetFetch(() => arbejdsFrist, GATEWAY_MS);
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST", signal: AbortSignal.timeout(ms),
+    const res = await gw("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model, temperature: 0, stream: false, max_tokens: MAKS_OUTPUT_TOKENS, response_format: { type: "json_object" },
@@ -106,21 +102,25 @@ function b64(b: Uint8Array): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const start = Date.now();
-  const frist = start + SAMLET_MS;
+  const samletSlut = start + SAMLET_MS;
+  const arbejdsFrist = start + ARBEJDE_MS;
   let id = "", rev = 0;
   const log = (kode: string) => console.log("storkbook-tjek", { kode, id, revision: rev, varighed_ms: Date.now() - start });
   try {
     if (req.method !== "POST") return json({ kode: "metode" }, 405);
-    const body = await req.json().catch(() => null);
+    const krop = await laesBegraenset(req.body, MAKS_KROP, arbejdsFrist);
+    if (!krop.ok && krop.grund === "frist") { log("budget"); return json({ kode: "fejl" }, 500); }
+    let body: Record<string, unknown> | null = null;
+    if (krop.ok) { try { body = JSON.parse(new TextDecoder().decode(krop.bytes)); } catch { body = null; } }
     if (!body || typeof body !== "object" || Object.keys(body).some((k) => !["type", "id", "revision"].includes(k))
       || body.type !== "besked" || typeof body.id !== "string" || !UUID.test(body.id)
       || typeof body.revision !== "number" || !Number.isInteger(body.revision) || body.revision < 1) return json({ kode: "ugyldig" }, 400);
-    id = body.id; rev = body.revision;
+    id = body.id as string; rev = body.revision as number;
 
     const auth = req.headers.get("Authorization") ?? "";
     if (!auth.startsWith("Bearer ")) return json({ kode: "jwt" }, 401);
     const url = Deno.env.get("SUPABASE_URL")!;
-    const bruger = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
+    const bruger = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, budgetIndstillinger(() => arbejdsFrist, KALD_MS, { headers: { Authorization: auth } }));
     const { data: u, error: uErr } = await bruger.auth.getUser(auth.slice(7));
     if (uErr || !u?.user) { log("jwt"); return json({ kode: "jwt" }, 401); }
     const { data: emp, error: eErr } = await bruger.rpc("get_current_employee_id");
@@ -130,7 +130,10 @@ Deno.serve(async (req) => {
     if (mErr || !m || m.sender_id !== emp) { log("ingen_adgang"); return json({ kode: "ingen_adgang" }, 403); }
 
     // Serviceklienten bruges først efter bruger- og rækkekontrol.
-    const svc = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+    const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const svc = createClient(url, svcKey, budgetIndstillinger(() => arbejdsFrist, KALD_MS));
+    // Afslutning: særskilt budget min(5 s, samletSlut−nu) uden reservefradrag.
+    const svcAfslut = createClient(url, svcKey, budgetIndstillinger(() => samletSlut, AFSLUT_MS));
     const { data: em, error: amErr } = await svc.from("employee_master_data").select("is_active").eq("id", emp).maybeSingle();
     if (amErr || em?.is_active !== true) { log("inaktiv"); return json({ kode: "inaktiv" }, 403); }
 
@@ -155,29 +158,34 @@ Deno.serve(async (req) => {
       const dele: Del[] = [{ type: "text", text: `<<<BESKED>>>\n${JSON.stringify(tekst)}\n<<<SLUT>>>` }];
       let filOk = !akt.attachment_path;
       if (akt.attachment_path) {
-        const { data: reg } = await svc.from("sb_stier").select("status, besked_id, samtale_id, ejer_employee_id")
-          .eq("bucket", "chat-attachments").eq("sti", akt.attachment_path).maybeSingle();
-        if (reg && reg.status === "bundet" && reg.besked_id === id && reg.samtale_id === akt.conversation_id && reg.ejer_employee_id === emp) {
-          const { data: blob, error: dErr } = await svc.storage.from("chat-attachments").download(akt.attachment_path);
-          if (!dErr && blob) {
-            const b = new Uint8Array(await blob.arrayBuffer());
-            const ft = b.length === blob.size ? filtype(b) : null;
-            if (ft && ft.startsWith("image/") && b.length <= MAKS_BILLEDE) {
-              dele.push({ type: "image_url", image_url: { url: `data:${ft};base64,${b64(b)}` } }); filOk = true;
-            } else if (ft === "text/plain" && b.length <= MAKS_TXT) {
-              dele.push({ type: "text", text: `<<<FIL>>>\n${JSON.stringify(new TextDecoder().decode(b))}\n<<<SLUT>>>` }); filOk = true;
-            }
+        // Filopslag, streamlæsning og body-fejl fanges lokalt (fil_tjekket=false) og springer ikke afslutningen over.
+        try {
+          const { data: reg, error: gErr } = await svc.from("sb_stier").select("status, besked_id, samtale_id, ejer_employee_id")
+            .eq("bucket", "chat-attachments").eq("sti", akt.attachment_path).maybeSingle();
+          if (!gErr && reg && reg.status === "bundet" && reg.besked_id === id && reg.samtale_id === akt.conversation_id && reg.ejer_employee_id === emp) {
+            const h = await hentBegraenset(svc, "chat-attachments", akt.attachment_path, arbejdsFrist);
+            if (h.ok && h.type.startsWith("image/")) {
+              dele.push({ type: "image_url", image_url: { url: `data:${h.type};base64,${b64(h.bytes)}` } }); filOk = true;
+            } else if (h.ok && h.type === "text/plain") {
+              dele.push({ type: "text", text: `<<<FIL>>>\n${JSON.stringify(new TextDecoder().decode(h.bytes))}\n<<<SLUT>>>` }); filOk = true;
+            } else if (!h.ok) log(`fil_${h.grund}`);
           }
-        }
+        } catch { filOk = false; log("fil_fejl"); }
       }
-      const dom = await spoergModel(model, dele, frist);
+      const dom = await spoergModel(model, dele, arbejdsFrist);
       if (dom) udfald = { ...dom, fil_tjekket: !!akt.attachment_path && filOk, udfald: "ok" };
       else udfald = { ...UKENDT };
       if (!akt.attachment_path) udfald.fil_tjekket = false;
     }
 
-    const { data: ok, error: fErr } = await svc.rpc("sb_tjek_afslut", { p_kilde: "besked", p_id: id, p_revision: rev, p_token: token, p_udfald: udfald });
-    if (fErr) { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
+    // Positiv tid tilbage → forsøg (også < 5 s). Ingen tid → intet nyt kald; cron-fallback er nødvej, ikke succes.
+    if (samletSlut - Date.now() <= 0) { log("afslut_frist"); return json({ kode: "afslut_fejl" }, 500); }
+    let ok: unknown = null;
+    try {
+      const r = await svcAfslut.rpc("sb_tjek_afslut", { p_kilde: "besked", p_id: id, p_revision: rev, p_token: token, p_udfald: udfald });
+      if (r.error) { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
+      ok = r.data;
+    } catch { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
     log(ok === true ? `tjekket_${udfald.udfald}` : "foraeldet");
     return json({ status: ok === true ? "tjekket" : "forældet" });
   } catch {
