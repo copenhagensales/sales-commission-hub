@@ -264,7 +264,7 @@ function PulsenFeed() {
                   <span aria-hidden="true" className="text-[#146c3c]">book</span>
                 </h1>
               </div>
-              <div role="tablist" aria-label="Feed" className="flex min-w-0 rounded-full bg-card p-1">
+              <div role="tablist" aria-label="Feed" className="flex min-w-0 overflow-hidden rounded-full bg-card p-1">
                 <button type="button" role="tab" aria-selected={isHouse} onClick={() => setTab("house")}
                   className={cn("min-h-[40px] rounded-full px-4 text-[14px] font-extrabold", isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                   Huset
@@ -273,7 +273,7 @@ function PulsenFeed() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button type="button" role="tab" aria-selected={!isHouse} aria-label={`Team: ${team.name}. Vælg team`}
-                        className={cn("flex min-h-[40px] max-w-[44vw] md:max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                        className={cn("flex min-w-0 overflow-hidden min-h-[40px] max-w-[45%] md:max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                         <span className="truncate">{team.name}</span><ChevronDown className="h-4 w-4 flex-none" aria-hidden="true" />
                       </button>
                     </DropdownMenuTrigger>
@@ -285,7 +285,7 @@ function PulsenFeed() {
                   </DropdownMenu>
                 ) : team && (
                   <button type="button" role="tab" aria-selected={!isHouse} onClick={() => setTab("team")}
-                    className={cn("min-h-[40px] max-w-[44vw] md:max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                    className={cn("min-w-0 overflow-hidden min-h-[40px] max-w-[45%] md:max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                     {team.name}
                   </button>
                 )}

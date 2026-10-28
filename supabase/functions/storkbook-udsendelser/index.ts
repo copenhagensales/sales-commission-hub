@@ -321,7 +321,6 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
       if (!dry) { const r = await reserver(svc, k, signal); br.indsat = r.indsat; br.opgraderet = r.opgraderet; br.afvist_loft = r.afvist_loft; }
     } catch (e) {
       stopGrund(br, e, signal);
-    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
     }
   } else br.stoppet = "uden for 17-24";
   rapporter.push(br);

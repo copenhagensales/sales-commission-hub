@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { EyeOff, Link2, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -235,17 +235,26 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
   const visible = showAll ? rest : rest.slice(0, 1);
   const canPickBest = isMine && post.post_type === "question";
 
+  const savingRef = useRef(false);
+  const latestValue = useRef(value);
+  latestValue.current = value;
   const submit = async () => {
-    if (!value.trim()) return;
+    if (savingRef.current || !value.trim()) return;
+    savingRef.current = true;
+    const sent = value;
     setSaving(true);
     try {
-      await interactions.onComment(value, valueMentions);
-      setValue("");
-      setValueMentions([]);
-      setComposing(false);
+      await interactions.onComment(sent, valueMentions);
+      // Nulstil kun, hvis feltet stadig rummer den sendte version.
+      if (latestValue.current === sent) {
+        setValue("");
+        setValueMentions([]);
+        setComposing(false);
+      }
     } catch (e) {
       toast.error(erOmtaleFejl(e) ? "Omtalen kunne ikke gemmes" : "Kommentaren blev ikke gemt");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -308,6 +317,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
           <div className="min-w-0 flex-1">
             <OmtaleFelt
               autoFocus
+              disabled={saving}
               value={value}
               mentions={valueMentions}
               maxLength={200}
