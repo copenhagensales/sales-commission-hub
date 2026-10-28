@@ -66,6 +66,7 @@ beforeEach(() => {
   for (const k of Object.keys(svar)) delete svar[k];
   for (const k of Object.keys(dyn)) delete dyn[k];
   dynInsert.fn = undefined;
+  auth("SIGNED_IN", "u"); // fast udgangspunkt: aktiv auth-bruger "u" (uafhængigt af prøverækkefølge)
 });
 
 describe("sendBesked – stabilt id og afstemning", () => {
