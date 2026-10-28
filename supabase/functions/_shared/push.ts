@@ -70,6 +70,8 @@ export type PushOpts = {
   faser?: PushFaser;
   /** Kaldes én gang, umiddelbart før første fetch til et abonnement. */
   paaTransportStart?: () => void;
+  /** Kun for storkbook_tjek: ingen række i udsendelser (heller ikke i fejl-/gategrene). Ignoreres for andre typer. */
+  udenUdsendelseslog?: "storkbook_tjek";
 };
 
 type RequestDetails = { endpoint: string; method?: string; headers: Record<string, string>; body: BodyInit | null };
@@ -230,6 +232,7 @@ export async function sendPushUdfald(svc: PushKlient, userIds: string[], type: P
         type: udsendType, kanal: "push", modtager: opts.navne?.[userId] ?? userId, modtagerUserId: userId,
         emne: msg.title, afsenderfunktion: afsender, metadata: { push_type: type, dedupe_key: opts.dedupeKey ?? null },
         signal: sOpslag(), logSignal: opts.faser ? () => opts.faser!.log() : undefined,
+        udenUdsendelseslog: opts.udenUdsendelseslog === "storkbook_tjek" && type === "storkbook_tjek" && udsendType === "storkbook_tjek" ? "storkbook_tjek" : undefined,
         send: async () => {
           if (type in PREF_COLUMN) {
             const { data: pref, error: pErr } = await med(svc.from("push_preferences").select("*").eq("user_id", userId), sOpslag()).maybeSingle();

@@ -4,7 +4,7 @@
  */
 export const STORKBOOK_TYPER = [
   "storkbook_besked", "storkbook_ros", "storkbook_svar", "storkbook_kommentar",
-  "storkbook_reaktion", "storkbook_omtale", "storkbook_begivenhed",
+  "storkbook_reaktion", "storkbook_omtale", "storkbook_begivenhed", "storkbook_tjek",
 ] as const;
 export type StorkbookType = (typeof STORKBOOK_TYPER)[number];
 export type PushType = "klub" | "opstart_flag" | "missing_one_on_one" | "compliance" | "test" | StorkbookType;
@@ -22,4 +22,5 @@ export const PUSH_TEXT: Record<PushType, { title: string; body: string; url: str
   storkbook_reaktion: { title: "Reaktion", body: "Der er nye reaktioner på dit opslag.", url: "/storkbook" },
   storkbook_omtale: { title: "Omtale", body: "Du er nævnt i Storkbook.", url: "/storkbook" },
   storkbook_begivenhed: { title: "Begivenhed i morgen", body: "Begivenhed i morgen", url: "/storkbook?tab=begivenheder" },
+  storkbook_tjek: { title: "Din besked", body: "Din besked afventer dig", url: "/storkbook?tab=beskeder" },
 };
