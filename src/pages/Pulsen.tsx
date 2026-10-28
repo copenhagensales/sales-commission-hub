@@ -1,4 +1,4 @@
-import { StickyOnPhone, useIsPhone } from "@/components/mobile";
+import { BOTTOM_NAV_HEIGHT, useIsPhone } from "@/components/mobile";
 import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
@@ -65,6 +65,15 @@ function PulsenFeed() {
   }, [feed.data]);
   const isPhone = useIsPhone();
   const composerRef = useRef<HTMLDivElement | null>(null);
+  // Flydende »Nyt indlæg« skjules, mens skrivefeltet er synligt.
+  const [composerSynlig, setComposerSynlig] = useState(true);
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setComposerSynlig(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  });
   const pull = usePullToRefresh(isPhone, () => feed.refetch());
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -244,18 +253,18 @@ function PulsenFeed() {
       <EditEventDialog event={editEventId ? events.find((e) => e.id === editEventId) ?? null : null} open={!!editEventId} onOpenChange={(o) => !o && setEditEventId(null)} />
       <AddEventDialog open={addEventOpen} onOpenChange={setAddEventOpen} />
 
-      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8">
+      <div className={cn("min-h-screen bg-background px-4 pt-6 md:px-8", isPhone ? "pb-[76px]" : "pb-16")}>
         <div className="mx-auto grid w-full max-w-[1004px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,680px)_320px]">
           <div className="flex min-w-0 flex-col gap-4">
-            <header className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <StorkbookMark variant="full" tone="light" size={44} />
-                <h1 aria-label="Storkbook" className="font-['Figtree'] text-[32px] font-black lowercase leading-none tracking-[-0.045em]">
+            <header className={cn("flex items-center", isPhone ? "flex-nowrap gap-2" : "flex-wrap gap-4")}>
+              <div className="flex min-w-0 flex-none items-center gap-2">
+                <StorkbookMark variant="full" tone="light" size={isPhone ? 28 : 44} />
+                <h1 aria-label="Storkbook" className={cn("font-['Figtree'] font-black lowercase leading-none tracking-[-0.045em]", isPhone ? "text-[18px]" : "text-[32px]")}>
                   <span aria-hidden="true" className="text-[hsl(var(--cph-onyx))]">stork</span>
                   <span aria-hidden="true" className="text-[#146c3c]">book</span>
                 </h1>
               </div>
-              <div role="tablist" aria-label="Feed" className="flex rounded-full bg-card p-1">
+              <div role="tablist" aria-label="Feed" className="flex min-w-0 rounded-full bg-card p-1">
                 <button type="button" role="tab" aria-selected={isHouse} onClick={() => setTab("house")}
                   className={cn("min-h-[40px] rounded-full px-4 text-[14px] font-extrabold", isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                   Huset
@@ -264,7 +273,7 @@ function PulsenFeed() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button type="button" role="tab" aria-selected={!isHouse} aria-label={`Team: ${team.name}. Vælg team`}
-                        className={cn("flex min-h-[40px] max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                        className={cn("flex min-h-[40px] max-w-[44vw] md:max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                         <span className="truncate">{team.name}</span><ChevronDown className="h-4 w-4 flex-none" aria-hidden="true" />
                       </button>
                     </DropdownMenuTrigger>
@@ -276,7 +285,7 @@ function PulsenFeed() {
                   </DropdownMenu>
                 ) : team && (
                   <button type="button" role="tab" aria-selected={!isHouse} onClick={() => setTab("team")}
-                    className={cn("min-h-[40px] max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                    className={cn("min-h-[40px] max-w-[44vw] md:max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                     {team.name}
                   </button>
                 )}
@@ -306,16 +315,15 @@ function PulsenFeed() {
               />
               </div>
             )}
-            {me.employeeId && isPhone && !composerOpen && (
-              <StickyOnPhone>
-                <button type="button" onClick={() => {
-                    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    composerRef.current?.querySelector<HTMLElement>("textarea, [contenteditable=true], button")?.focus({ preventScroll: true });
-                  }}
-                  className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[16px] font-extrabold text-[hsl(var(--cph-light-blue))] active:opacity-80">
-                  Nyt indlæg
-                </button>
-              </StickyOnPhone>
+            {me.employeeId && isPhone && !composerOpen && !composerSynlig && (
+              <button type="button" onClick={() => {
+                  composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  composerRef.current?.querySelector<HTMLElement>("textarea, [contenteditable=true], button")?.focus({ preventScroll: true });
+                }}
+                style={{ bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px) + 16px)` }}
+                className="fixed right-4 z-30 min-h-[44px] w-auto rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[16px] font-extrabold text-[hsl(var(--cph-light-blue))] shadow-lg active:opacity-80">
+                Nyt indlæg
+              </button>
             )}
 
             {me.employeeId && (
