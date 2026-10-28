@@ -851,3 +851,41 @@ describe("B2b-2 – auth-skift efter mutate, men før mutationFn", () => {
     unmount(); qc.clear();
   });
 });
+
+// ---------- B2c-1 §5: pagination bevares (lokal fristfiltrering sker kun i visningen) ----------
+import { useMessages, CHAT_PAGE_SIZE } from "./useChat";
+import { waitFor } from "@testing-library/react";
+describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
+  it("fuld serverside med udløbne rækker: InfiniteData uændret, alle rækker returneres, hasOlder sand", async () => {
+    const fortid = new Date(Date.now() - 60_000).toISOString();
+    const raekker = Array.from({ length: CHAT_PAGE_SIZE }, (_, i) => ({
+      id: `m${String(i).padStart(3, "0")}`, conversation_id: "c", sender_id: "s", content: "x", status: "leveret", revision: 1,
+      created_at: new Date(2026, 9, 1, 0, i).toISOString(), slettes_efter: i % 2 ? fortid : null, reply_to_id: null,
+    }));
+    const thenable = (data: unknown) => {
+      const b: Record<string, unknown> = {};
+      for (const k of ["select", "eq", "is", "order", "in", "range", "neq"]) b[k] = () => b;
+      b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok);
+      return b;
+    };
+    let foerste = true;
+    const spy = vi.spyOn(supabase, "from").mockImplementation(((t: string) => {
+      if (t === "chat_messages" && foerste) { foerste = false; return thenable(raekker); }
+      return thenable([]);
+    }) as never);
+    try {
+      const qcP = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } } });
+      const w = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qcP }, children);
+      const { result } = renderHook(() => useMessages("c"), { wrapper: w });
+      await waitFor(() => expect(result.current.data).toBeDefined());
+      expect(result.current.data).toHaveLength(CHAT_PAGE_SIZE); // udløbne rækker filtreres ikke i cachen
+      expect(result.current.hasOlder).toBe(true);
+      const cache = qcP.getQueryData<{ pages: unknown[][]; pageParams: unknown[] }>(["chat-messages", "c"]);
+      expect(cache?.pages).toHaveLength(1);
+      expect(cache?.pages[0]).toHaveLength(CHAT_PAGE_SIZE);
+      expect(cache?.pageParams).toEqual([0]);
+      expect(typeof result.current.opdateret).toBe("number");
+      qcP.clear();
+    } finally { spy.mockRestore(); }
+  });
+});
