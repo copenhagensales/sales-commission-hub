@@ -42,7 +42,9 @@ describe("T5 (B2c-1 §5) – søgning", () => {
     soeg.fn.mockReturnValueOnce(a.p).mockReturnValueOnce(b.p);
     vis();
     await soegEfter("a");
-    await soegEfter("b");
+    // Søg-knappen viser spinner under hentning; ny søgning startes med Enter.
+    fireEvent.change(felt(), { target: { value: "b" } });
+    await act(async () => { fireEvent.keyDown(felt(), { key: "Enter" }); });
     await act(async () => { b.res([r("2", "nyt")]); await b.p; });
     await act(async () => { a.res([r("1", "gammelt")]); await a.p; });
     expect(screen.getByText("nyt")).toBeTruthy();
