@@ -85,7 +85,7 @@ export async function objektStoerrelse(svc: StorageKlient, bucket: string, sti: 
 }
 
 export type HentUdfald =
-  | { ok: true; bytes: Uint8Array; type: FilType }
+  | { ok: true; bytes: Uint8Array<ArrayBuffer>; type: FilType }
   | { ok: false; grund: "stoerrelse_ukendt" | "for_stor" | "frist" | "fejl" | "ufuldstaendig" | "type_afvist" };
 
 /**

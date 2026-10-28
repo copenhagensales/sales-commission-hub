@@ -54,7 +54,7 @@ export const budgetIndstillinger = (slut: () => number, maksMs: number, ekstra: 
 });
 
 export type LaesUdfald =
-  | { ok: true; bytes: Uint8Array }
+  | { ok: true; bytes: Uint8Array<ArrayBuffer> }
   | { ok: false; grund: "for_stor" | "frist" | "fejl" };
 
 /**
