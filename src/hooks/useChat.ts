@@ -331,16 +331,62 @@ export function useMarkMessageAsRead() {
   });
 }
 
-/** Fejl ved afsendelse: `server` = afvist af serveren (tekst vises), `ukendt` = udfald ukendt (afstemmes før nyt forsøg). */
+/**
+ * Fejl ved afsendelse (S6/B2a §2):
+ * - `server`: kendt afvist/ikke gennemført (P0001 vises ordret);
+ * - `ukendt`: udfaldet er uafklaret – samme id afstemmes, ingen Ret som ny besked;
+ * - `gemt_vaek`: tidligere gemning er bevist, men rækken er ikke længere tilgængelig;
+ * - `genudsted`: dokumenteret ubundet sti overtaget af oprydningen – brugerudløst genudstedelse er tilladt.
+ */
 export class SendFejl extends Error {
-  constructor(public art: "server" | "ukendt", tekst: string) { super(tekst); this.name = "SendFejl"; }
+  constructor(public art: "server" | "ukendt" | "gemt_vaek" | "genudsted", tekst: string) { super(tekst); this.name = "SendFejl"; }
 }
 
+export const GEMT_VAEK_TEKST = "Beskeden blev gemt, men er ikke længere tilgængelig";
+export const IKKE_REGISTRERET_TEKST = "Filen er ikke registreret til dig i denne samtale";
+const CHAT_BUCKET = "chat-attachments";
+
 /** Findes beskeden med dette id allerede (egen række)? null = kunne ikke afgøres. */
-export async function afstemBesked(id: string): Promise<boolean | null> {
-  const { data, error } = await supabase.from("chat_messages").select("id").eq("id", id).maybeSingle();
-  if (error) return null;
-  return !!data;
+export async function afstemBesked(id: string, conversationId?: string): Promise<boolean | null> {
+  try {
+    let q = supabase.from("chat_messages").select("id, conversation_id").eq("id", id);
+    if (conversationId) q = q.eq("conversation_id", conversationId);
+    const { data, error } = await q.maybeSingle();
+    if (error) return null;
+    return !!data;
+  } catch { return null; }
+}
+
+/** Egen registerrække for stien (eksisterende RLS); kun læsning. */
+export type RegisterUdfald =
+  | { art: "bundet_her" }                // binding til netop dette besked-id (beviser gemning)
+  | { art: "bundet_andet" }              // binding til et andet id – aldrig denne afsendelses succes
+  | { art: "ubundet_overtaget" }         // besked_id=null og status slettes/slettet
+  | { art: "ubundet" }                   // besked_id=null, endnu ikke overtaget
+  | { art: "ukendt" };                   // manglende række, fejl, fremmed ejer/samtale
+export async function laesRegister(sti: string, beskedId: string, conversationId: string, employeeId: string): Promise<RegisterUdfald> {
+  try {
+    const { data, error } = await supabase.from("sb_stier").select("besked_id, status, samtale_id, ejer_employee_id")
+      .eq("bucket", CHAT_BUCKET).eq("sti", sti).maybeSingle();
+    if (error || !data) return { art: "ukendt" };
+    if (data.ejer_employee_id !== employeeId || data.samtale_id !== conversationId) return { art: "ukendt" };
+    if (data.besked_id === beskedId) return { art: "bundet_her" };
+    if (data.besked_id) return { art: "bundet_andet" };
+    if (data.status === "slettes" || data.status === "slettet") return { art: "ubundet_overtaget" };
+    return { art: "ubundet" };
+  } catch { return { art: "ukendt" }; }
+}
+
+export type Afstemning = "fundet" | "gemt_vaek" | "ikke_fundet" | "ukendt";
+/** Afstemmer et afsendelses-id. Et tomt SELECT er ikke bevis for, at beskeden aldrig blev gemt. */
+export async function afstemAfsendelse(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath">, employeeId: string): Promise<Afstemning> {
+  const r = await afstemBesked(v.id, v.conversationId);
+  if (r === true) return "fundet";
+  if (v.attachmentPath) {
+    const reg = await laesRegister(v.attachmentPath, v.id, v.conversationId, employeeId);
+    if (reg.art === "bundet_her") return "gemt_vaek";
+  }
+  return r === null ? "ukendt" : "ikke_fundet";
 }
 
 export interface SendInput {
@@ -352,29 +398,55 @@ export interface SendInput {
   attachmentPath?: string;
   attachmentType?: string;
   attachmentName?: string;
+  /** Mindst ét tidligere forsøg med samme id havde ukendt udfald. */
+  tidligereUkendt?: boolean;
 }
 
-/** Indsætter én besked med stabilt id. Ukendt udfald afstemmes med serveren; en bekræftet række genindsættes aldrig. */
+const ukendt = () => new SendFejl("ukendt", "Ikke sendt – prøv igen");
+
+/**
+ * Indsætter én besked med stabilt id. INSERT sker kun efter et fejlfrit forhåndsopslag;
+ * ukendt udfald afstemmes, og en bekræftet række genindsættes aldrig.
+ */
 export async function sendBesked(v: SendInput, employeeId: string): Promise<void> {
-  const foer = await afstemBesked(v.id);
-  if (foer === true) return;
-  const { error } = await supabase.from("chat_messages").insert({
-    id: v.id,
-    conversation_id: v.conversationId,
-    sender_id: employeeId,
-    content: v.content,
-    reply_to_id: v.replyToId || null,
-    attachment_path: v.attachmentPath || null,
-    attachment_type: v.attachmentType || null,
-    attachment_name: v.attachmentName || null,
-  });
+  const foer = await afstemAfsendelse(v, employeeId);
+  if (foer === "fundet") return;
+  if (foer === "gemt_vaek") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
+  if (foer === "ukendt") throw ukendt();
+  let error: { code?: string; message?: string } | null = null;
+  try {
+    const r = await supabase.from("chat_messages").insert({
+      id: v.id,
+      conversation_id: v.conversationId,
+      sender_id: employeeId,
+      content: v.content,
+      reply_to_id: v.replyToId || null,
+      attachment_path: v.attachmentPath || null,
+      attachment_type: v.attachmentType || null,
+      attachment_name: v.attachmentName || null,
+    });
+    error = r.error;
+  } catch { error = { message: "transport" }; }
   if (!error) return;
-  if (error.code === "P0001") throw new SendFejl("server", error.message || "Beskeden blev afvist");
-  // 23505 (samme id) eller transportfejl: afstem samme id.
-  const efter = await afstemBesked(v.id);
+
+  // Afstem altid samme id før endelig klassifikation (P0001 fra sb_fil_vaern kan komme før 23505).
+  const efter = await afstemBesked(v.id, v.conversationId);
   if (efter === true) return;
-  if (efter === false && error.code && error.code !== "23505") throw new SendFejl("server", "Beskeden kunne ikke sendes");
-  throw new SendFejl("ukendt", "Ikke sendt – prøv igen");
+  const reg = v.attachmentPath ? await laesRegister(v.attachmentPath, v.id, v.conversationId, employeeId) : null;
+  if (reg?.art === "bundet_her") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
+  if (efter === null) throw ukendt();
+
+  if (error.code === "P0001") {
+    if (v.tidligereUkendt) throw ukendt();
+    if (v.attachmentPath) {
+      if (reg?.art === "ubundet_overtaget" && error.message === IKKE_REGISTRERET_TEKST) throw new SendFejl("genudsted", IKKE_REGISTRERET_TEKST);
+      if (reg?.art === "ukendt" && error.message === IKKE_REGISTRERET_TEKST) throw ukendt();
+    }
+    throw new SendFejl("server", error.message || "Beskeden blev afvist");
+  }
+  // 23505 uden synlig række eller transportfejl: uafklaret.
+  if (error.code === "23505" || !error.code || v.tidligereUkendt) throw ukendt();
+  throw new SendFejl("server", "Beskeden kunne ikke sendes");
 }
 
 export function useSendMessage() {
@@ -382,16 +454,28 @@ export function useSendMessage() {
 
   return useMutation({
     mutationFn: async (v: SendInput) => {
-      const employeeId = await getCurrentEmployeeId();
+      const employeeId = await getCurrentEmployeeId().catch(() => { throw ukendt(); });
       await sendBesked(v, employeeId);
       return v;
     },
+    // Afstemningsforløbet ejer genforsøgene (App.tsx' mutations.retry=1 overstyres lokalt).
+    retry: 0,
     onSuccess: (v) => {
       efterHandling(queryClient, v.conversationId, v.id);
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
 }
+
+/** Ren afstemning (kun læsning) til backoff-løkken. */
+export async function afstemKun(v: Pick<SendInput, "id" | "conversationId" | "attachmentPath">): Promise<Afstemning> {
+  let emp: string;
+  try { emp = await getCurrentEmployeeId(); } catch { return "ukendt"; }
+  return afstemAfsendelse(v, emp);
+}
+
+/** Backoff for afstemning: 1, 2, 4, 8, 16, 30 s; derefter venter klienten på bruger/online/forgrund. */
+export const AFSTEM_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000] as const;
 
 /** Redigering via sb_ret (ingen direkte content-UPDATE). Starter tjek for den nye revision. */
 export function useEditMessage() {
