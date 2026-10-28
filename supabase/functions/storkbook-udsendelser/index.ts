@@ -112,7 +112,7 @@ async function sha256Hex(t: string) {
 }
 
 // ---------- fase 1 ----------
-type KildeRapport = { kilde: string; raekker: number; kandidater: number; indsat: number; opgraderet: number; afvist_loft: number; stoppet?: string };
+type KildeRapport = { kilde: string; raekker: number; kandidater: number; indsat: number; opgraderet: number; afvist_loft: number; stoppet?: string; fejl?: boolean };
 
 async function teamMedlemmer(svc: Svc, teamIds: string[], signal: AbortSignal): Promise<Map<string, string[]>> {
   const m = new Map<string, string[]>();
@@ -196,6 +196,7 @@ async function koerTidKilde(
     }
   } catch (e) {
     rap.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
+    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) rap.fejl = true;
   }
   return rap;
 }
@@ -290,6 +291,7 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
     }
   } catch (e) {
     rr.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
+    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) rr.fejl = true;
   }
   rapporter.push(rr);
 
@@ -310,10 +312,13 @@ async function fase1(svc: Svc, dry: boolean, start: number, hoved: AbortSignal) 
       if (!dry) { const r = await reserver(svc, k, signal); br.indsat = r.indsat; br.opgraderet = r.opgraderet; br.afvist_loft = r.afvist_loft; }
     } catch (e) {
       br.stoppet = (e as Error)?.name === "AbortError" ? "frist" : (e as Error)?.message ?? "fejl";
+      if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
+    if (!["AbortError", "TimeoutError"].includes((e as Error)?.name ?? "")) br.fejl = true;
     }
   } else br.stoppet = "uden for 17-24";
   rapporter.push(br);
-  return { kilder: rapporter, kandidater_pr_type: tael };
+  // Reelle fejl (DB i kilde-RPC/udvidelse/reserver/vandmærke) tæller; frist og "uden for 17-24" er normal standsning.
+  return { kilder: rapporter, kandidater_pr_type: tael, fase1_fejl: rapporter.filter((r) => r.fejl).length };
 }
 
 // ---------- fase 2: genvalidering ----------
@@ -572,7 +577,7 @@ Deno.serve(async (req) => {
     const ejede = new Map<string, Ejet>();
     let fikLaas = false;
     let frigivet = 0;
-    const fejlT = { afslut_fejl: 0, frigiv_fejl: 0, laas_fejl: 0, afstemning_fejl: 0, overtag_fejl: 0, oprydning_fejl: 0, koersel_fejl: 0 };
+    const fejlT = { afslut_fejl: 0, frigiv_fejl: 0, laas_fejl: 0, afstemning_fejl: 0, overtag_fejl: 0, oprydning_fejl: 0, koersel_fejl: 0, fase1_fejl: 0 };
     const trin: Record<string, string> = {};
     try {
       const laas = await s(svc.rpc("udsendelse_laas", { p_token: token }), hoved.signal);
@@ -585,7 +590,9 @@ Deno.serve(async (req) => {
         rapport.oprydning = op.error ? "fejl" : op.data;
         if (op.error) fejlT.oprydning_fejl++;
         // (6) fase 1
-        rapport.fase1 = await fase1(svc, false, start, hoved.signal);
+        const f1 = await fase1(svc, false, start, hoved.signal);
+        rapport.fase1 = f1;
+        fejlT.fase1_fejl += f1.fase1_fejl;
         // (7) fase 2
         const frist2 = start + FASE2_FRIST_MS;
         let stop = false;

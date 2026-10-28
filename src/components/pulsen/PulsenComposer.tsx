@@ -3,7 +3,7 @@ import { BarChart3, CalendarPlus, Plus, HandHeart, HelpCircle, ImagePlus, PenLin
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useActiveColleagues, useOpretAfstemning, type NewPulsenPost } from "@/hooks/usePulsen";
+import { AfstemningOmtaleFejl, useActiveColleagues, useOpretAfstemning, type NewPulsenPost } from "@/hooks/usePulsen";
 import { PULSEN_IMAGE_MAX_BYTES, PULSEN_MAX_CHARS, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
 import { OmtaleFelt } from "./OmtaleFelt";
@@ -48,6 +48,8 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [mode, setMode] = useState<Mode>(initialMode && initialMode !== "image" ? initialMode : "post");
   const [body, setBody] = useState(initialBody ?? "");
   const [mentions, setMentions] = useState<Omtale[]>([]);
+  /** Oprettet afstemning, hvis omtalerne ikke blev gemt; genforsøg opdaterer kun den. */
+  const [afstemningId, setAfstemningId] = useState<string | null>(null);
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
   const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -80,7 +82,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
 
   const reset = () => {
     setBody(""); setMentions([]); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
-    setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false);
+    setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false); setAfstemningId(null);
   };
 
   const pickMode = (m: Mode) => {
@@ -121,9 +123,15 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
         anonymous: pollAnonymous,
         dage: pollDage,
         mentions,
+        eksisterendeId: afstemningId ?? undefined,
       });
       reset();
     } catch (e) {
+      if (e instanceof AfstemningOmtaleFejl) {
+        setAfstemningId(e.postId);
+        toast.error("Afstemningen er delt, men omtalerne kunne ikke gemmes – prøv igen");
+        return;
+      }
       if (erOmtaleFejl(e)) { toast.error("Omtalen kunne ikke gemmes"); return; }
       const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "Prøv igen";
       toast.error("Afstemningen blev ikke delt", { description: msg });
@@ -146,20 +154,13 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
       mentions,
     };
     const localUrl = preview;
-    reset();
     try {
       await onSubmit(input, localUrl);
+      // Kladden nulstilles først efter vellykket gem.
+      reset();
     } catch (e) {
-      if (erOmtaleFejl(e)) {
-        // Feltet beholder teksten.
-        setOpen(true); setMode(input.postType === "image" ? "post" : input.postType); setBody(input.body); setMentions(input.mentions ?? []);
-        if (input.praised) setPraised(input.praised);
-        toast.error("Omtalen kunne ikke gemmes");
-        if (localUrl) URL.revokeObjectURL(localUrl);
-        return;
-      }
-      toast.error("Indlægget blev ikke delt", { description: e instanceof Error ? e.message : "Prøv igen" });
-      if (localUrl) URL.revokeObjectURL(localUrl);
+      // Kladden (tekst, omtaler, billede) bevares, så brugeren kan prøve igen.
+      toast.error(erOmtaleFejl(e) ? "Omtalen kunne ikke gemmes" : "Indlægget blev ikke delt", erOmtaleFejl(e) ? undefined : { description: e instanceof Error ? e.message : "Prøv igen" });
     } finally {
       setBusy(false);
     }
