@@ -117,6 +117,7 @@ const lagringsFejl = new Set<string>();
 const filer = new Map<string, File>();
 const TOM: Afsendelse[] = [];
 let generation = 0;
+let aktivBruger: string | null = null;
 
 const nk = (emp: string, conv: string) => `${emp}:${conv}`;
 const fk = (emp: string, conv: string, id: string) => `${emp}:${conv}:${id}`;
@@ -126,10 +127,20 @@ const meld = () => { for (const l of lyttere) l(); };
 export const sessionsGeneration = () => generation;
 
 /** §1: Operationens ejer, fastholdt synkront ved brugerhandlingens start (før første await). */
-export interface OperationsEjer { emp: string; conv: string; gen: number }
-export const fastholdEjer = (emp: string, conv: string): OperationsEjer => ({ emp, conv, gen: generation });
-/** Ejerskab gælder stadig: samme sessionsgeneration (samtaleskift/afmontering ændrer ikke ejeren). */
-export const ejerGyldig = (e: OperationsEjer | null | undefined) => !!e && e.gen === generation;
+export interface OperationsEjer {
+  emp: string; conv: string; gen: number;
+  /** Auth-bruger-id ved handlingens start (b4 (i)). */
+  bruger?: string | null;
+  /** Særskilt operations-id; låse frigives kun af deres egen operation (b4 (iii)). */
+  op?: string;
+}
+let opNr = 0;
+export const nytOperationsId = () => `op${++opNr}`;
+export const fastholdEjer = (emp: string, conv: string, bruger: string | null = null): OperationsEjer =>
+  ({ emp, conv, gen: generation, bruger: bruger ?? aktivBruger ?? null, op: nytOperationsId() });
+/** Ejerskab gælder stadig: samme sessionsgeneration og (når kendt) samme auth-bruger. Samtaleskift/afmontering ændrer ikke ejeren. */
+export const ejerGyldig = (e: OperationsEjer | null | undefined) =>
+  !!e && e.gen === generation && (!e.bruger || !aktivBruger || e.bruger === aktivBruger);
 
 function laesAfsendelser(emp: string, conv: string): Afsendelse[] {
   const o = laes(afsNoegle(emp, conv));
@@ -322,5 +333,6 @@ export function registrerKladdeOprydning(): void {
     const bruger = s?.user?.id ?? null;
     if (e === "SIGNED_OUT" || (sidsteBruger && bruger && bruger !== sidsteBruger)) rydAlleKladder();
     if (bruger) sidsteBruger = bruger;
+    aktivBruger = bruger;
   });
 }
