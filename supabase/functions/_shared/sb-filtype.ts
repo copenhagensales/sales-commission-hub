@@ -100,7 +100,8 @@ export async function hentBegraenset(svc: StorageKlient, bucket: string, sti: st
   let s: { data: ReadableStream<Uint8Array> | null; error: unknown };
   try { s = await svc.storage.from(bucket).download(sti).asStream(); } catch { return { ok: false, grund: "fejl" }; }
   if (s.error || !s.data) return { ok: false, grund: "fejl" };
-  const l: LaesUdfald = await laesBegraenset(s.data, loft, slut);
+  // Readeren annulleres ved første byte ud over den opslåede størrelse (og aldrig over loftet).
+  const l: LaesUdfald = await laesBegraenset(s.data, Math.min(loft, size), slut);
   if (!l.ok) return { ok: false, grund: l.grund };
   if (l.bytes.length !== size) return { ok: false, grund: "ufuldstaendig" };
   const type = filtype(l.bytes);
