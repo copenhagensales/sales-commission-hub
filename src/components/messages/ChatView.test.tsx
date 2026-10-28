@@ -110,7 +110,7 @@ beforeEach(() => {
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
 // d2 §4: afmontér komponenter og ryd QueryClient efter hver prøve (ikke kun generationsreset).
-afterEach(() => { cleanup(); qc.clear(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); qc.clear(); });
 
 describe("T1 – ChatView afsendelse", () => {
   it("dobbelt Send og Enter+klik giver én afsendelse", async () => {
@@ -989,7 +989,6 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     await svarFor("F1", null);
     await fremad(0);
     expect(hentAfsendelser("e", "A")[0]?.tilstand).not.toBe("genudsted");
-    expect(screen.queryByRole("button", { name: "Ikke sendt – prøv igen" }) && hentAfsendelser("e", "A")[0]?.tilstand).not.toBe("genudsted");
     expect(udstedUpload).not.toHaveBeenCalled();
     expect(uploadTilSti).not.toHaveBeenCalled();
     expect(net.insert).not.toHaveBeenCalled();
