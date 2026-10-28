@@ -354,6 +354,9 @@ klientTest("§5 sb-fil: Content-Disposition gennem handleren (emoji, surrogater,
   await r.body?.cancel();
 });
 
+const CRON = "cron-test";
+const CRON_HASH = await (async () => [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc(CRON)))].map((b) => b.toString(16).padStart(2, "0")).join(""))();
+const oprReq = (body = "{}") => new Request(`${MOCK}/functions/v1/beskeder-oprydning`, { method: "POST", headers: { "x-pulsen-cron-token": CRON }, body });
 // ---------------------------------------------------------------- §1 sb-fil udsted/opryd (handler)
 const KONV = "22222222-3333-4444-8555-666666666666";
 const udstedReq = () => new Request(`${MOCK}/functions/v1/sb-fil`, { method: "POST", headers: { Authorization: "Bearer jwt-test", "Content-Type": "application/json" },
@@ -401,68 +404,161 @@ klientTest("§1 sb-fil: køsucces + statusfejl → køhensigt bevares (ingen kom
 });
 
 // Stateful MOCK af SQL-protokollen (ikke kørt SQL): register + kø + slet_tidligst.
-klientTest("§1 stateful mock: mislykket statusopdatering → senere overtagelse → to køposter afsluttes → slettet; intet før slet_tidligst", async () => {
+klientTest("§1/§5 stateful MOCK af SQL-reglerne: udstedelsesfejl → overtagelse > 3 t → post 1 afsluttes (slettet ved første succes) → særskilt afhentning af post 2 bevarer slettet; intet før slet_tidligst", async () => {
+  // MOCK af SQL-protokollen i JS (ikke kørt SQL/samtidighed). Regler modelleret:
+  // - slet_tidligst tilhører registerrækken og deles af køposter for samme sti; uden finaliseret uploadudløb = oprettet + 3 t.
+  // - sb_overtag_foraeldreloese: uploadet og oprettet STRENGT mere end 3 t siden → slettes + ny køpost.
+  // - sb_koe_naeste: ikke-afsluttede poster, hvis reservation er udløbet (genforsøgsvindue), og registerets slet_tidligst <= nu;
+  //   sætter selv slettes for uploadet/bundet; må afhente en kvalificeret post, selv om registeret allerede er slettet.
+  // - sb_koe_afslut(p_ok=true): afslutter posten; registeret slettes → slettet ved FØRSTE succes; senere afslutning bevarer slettet.
   const T0 = Date.parse("2026-10-28T10:00:00Z");
   const time = new FakeTime(T0);
   try {
-    type Reg = { sti: string; status: string; oprettet: number };
-    type Post = { id: number; sti: string; kilde: string; slet_tidligst: number; reserveret: boolean; afsluttet: boolean };
+    type Reg = { sti: string; status: string; oprettet: number; slet_tidligst: number };
+    type Post = { id: number; sti: string; kilde: string; reserveret_til: number; afsluttet: boolean };
     let reg: Reg | null = null;
     const koe: Post[] = [];
     const objekter = new Set<string>();
-    const SLET_EFTER = 3600_000;
+    const TRE_T = 3 * 3600_000;
+    const VINDUE = 10 * 60_000; // genforsøgsvindue for en reservation
+    const afhentet: number[][] = [];
+    const statusVedAfslut: string[] = [];
     // a) Udstedelse fejler: koe_fil lykkes, statusopdatering fejler.
     nulstil((k) => fælles(k) ?? (tabel(k, "chat_conversation_members") ? jsonR([{ id: "m" }])
-      : tabel(k, "sb_stier") && k.metode === "POST" ? (() => { const b = JSON.parse(k.krop); reg = { sti: b.sti, status: "uploadet", oprettet: Date.now() }; objekter.add(b.sti); return tom(201); })()
+      : tabel(k, "sb_stier") && k.metode === "POST" ? (() => { const b = JSON.parse(k.krop); reg = { sti: b.sti, status: "uploadet", oprettet: Date.now(), slet_tidligst: Date.now() + TRE_T }; objekter.add(b.sti); return tom(201); })()
       : tabel(k, "sb_stier") && k.metode === "PATCH" ? fejlR()
       : k.sti.startsWith("/storage/v1/object/upload/sign/") ? fejlR()
-      : rpc(k, "sb_koe_fil") ? (() => { const b = JSON.parse(k.krop); koe.push({ id: koe.length + 1, sti: b.p_sti, kilde: b.p_kilde, slet_tidligst: Date.now() + SLET_EFTER, reserveret: false, afsluttet: false }); return tom(204); })()
+      : rpc(k, "sb_koe_fil") ? (() => { const b = JSON.parse(k.krop); koe.push({ id: koe.length + 1, sti: b.p_sti, kilde: b.p_kilde, reserveret_til: 0, afsluttet: false }); return tom(204); })()
       : undefined));
     assertEquals((await hFil(udstedReq())).status, 500);
-    assertEquals(reg!.status, "uploadet"); assertEquals(koe.length, 1);
+    assertEquals(reg!.status, "uploadet"); assertEquals(koe.length, 1); assertEquals(koe[0].kilde, "udstedelse_fejl");
 
-    const token = "cron-test";
-    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc(token)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-    const oprRute: Rute = (k) => {
-      if (tabel(k, "pulsen_config")) return jsonR([{ value: hash }]);
+    // Post 2 reserveres af en tidligere (afbrudt) afhentning ved overtagelsen; dens genforsøgsvindue udløber senere.
+    let reserverPost2VedOvertagelse = true;
+    const rute: Rute = (k) => {
+      if (tabel(k, "pulsen_config")) return jsonR([{ value: CRON_HASH }]);
       if (rpc(k, "sb_version")) return jsonR("24d");
       if (rpc(k, "sb_overtag_foraeldreloese")) {
+        assertEquals(JSON.parse(k.krop), { p_limit: 100 });
         let n = 0;
-        if (reg && reg.status === "uploadet" && Date.now() - reg.oprettet > 3 * 3600_000) {
-          koe.push({ id: koe.length + 1, sti: reg.sti, kilde: "foraeldreloes", slet_tidligst: Date.now(), reserveret: false, afsluttet: false }); n++;
+        if (reg && reg.status === "uploadet" && Date.now() - reg.oprettet > TRE_T) {
+          reg.status = "slettes";
+          koe.push({ id: koe.length + 1, sti: reg.sti, kilde: "foraeldreloes", reserveret_til: reserverPost2VedOvertagelse ? Date.now() + VINDUE : 0, afsluttet: false }); n++;
         }
         return jsonR(n);
       }
       if (rpc(k, "sb_koe_naeste")) {
-        const klar = koe.filter((p) => !p.afsluttet && !p.reserveret && p.slet_tidligst <= Date.now());
-        for (const p of klar) { p.reserveret = true; if (reg && (reg.status === "uploadet" || reg.status === "bundet")) reg.status = "slettes"; }
+        const nu = Date.now();
+        const klar = koe.filter((p) => !p.afsluttet && p.reserveret_til <= nu && reg && reg.sti === p.sti && reg.slet_tidligst <= nu);
+        for (const p of klar) { p.reserveret_til = nu + VINDUE; if (reg && (reg.status === "uploadet" || reg.status === "bundet")) reg.status = "slettes"; }
+        afhentet.push(klar.map((p) => p.id));
         return jsonR(klar.map((p) => ({ id: p.id, bucket: "chat-attachments", sti: p.sti })));
       }
-      if (k.metode === "DELETE" && k.sti === "/storage/v1/object/chat-attachments") { for (const s of JSON.parse(k.krop).prefixes) objekter.delete(s); return jsonR([]); }
+      if (k.metode === "DELETE" && k.sti === "/storage/v1/object/chat-attachments") {
+        assert(reg && Date.now() >= reg.slet_tidligst, "fysisk sletning før slet_tidligst");
+        for (const x of JSON.parse(k.krop).prefixes) objekter.delete(x); return jsonR([]);
+      }
       if (rpc(k, "sb_koe_afslut")) {
-        const b = JSON.parse(k.krop); const p = koe.find((x) => x.id === b.p_id)!; p.afsluttet = b.p_ok;
-        if (reg && koe.filter((x) => x.sti === reg!.sti).every((x) => x.afsluttet)) reg.status = "slettet";
+        const b = JSON.parse(k.krop); const p = koe.find((x) => x.id === b.p_id)!;
+        if (b.p_ok === true) { p.afsluttet = true; if (reg && reg.status === "slettes") reg.status = "slettet"; }
+        statusVedAfslut.push(reg!.status);
         return jsonR(true);
       }
       if (rpc(k, "sb_personoplysninger_til_sletning")) return jsonR([]);
       if (rpc(k, "sb_minimer_register")) return jsonR(0);
       return undefined;
     };
-    const oprReq = () => new Request(`${MOCK}/functions/v1/beskeder-oprydning`, { method: "POST", headers: { "x-pulsen-cron-token": token }, body: "{}" });
-    // b) Kørsel efter 1 t: rækken er endnu ikke overtaget (≤ 3 t), og køposten er ikke klar (slet_tidligst) → ingen fysisk sletning.
-    time.tick(3600_000 - 60_000);
-    nulstil(oprRute);
-    const r1 = await kørFake(hOpr, oprReq(), time);
-    assertEquals((await r1.res.json()).slettet, 0);
-    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0); assert(objekter.size === 1);
-    // c) Efter > 3 t: overtagelse giver post 2; begge afhentes og afsluttes; registeret ender slettet.
-    time.tick(3 * 3600_000);
-    nulstil(oprRute);
-    const r2 = await kørFake(hOpr, oprReq(), time);
-    const b2 = await r2.res.json();
-    assertEquals(b2.foraeldreloese, 1); assertEquals(koe.length, 2); assertEquals(koe.map((p) => p.kilde), ["udstedelse_fejl", "foraeldreloes"]);
-    assert(koe.every((p) => p.afsluttet)); assertEquals(reg!.status, "slettet"); assertEquals(objekter.size, 0); assertEquals(b2.ok, true);
-    ingenUkendte();
+    // b) Efter 1 t: ingen overtagelse (≤ 3 t) og slet_tidligst ikke nået → ingen afhentning/sletning.
+    time.tick(3600_000);
+    nulstil(rute);
+    const r1 = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(r1.slettet, 0); assertEquals(r1.foraeldreloese, 0);
+    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0); assertEquals(objekter.size, 1);
+    // c) Præcis 3 t efter oprettelse: overtagelse kræver STRENGT mere end 3 t → ingen.
+    time.tick(2 * 3600_000 - (Date.now() - T0 - 3600_000) - (Date.now() - T0 - 3 * 3600_000));
+    time.tick(T0 + TRE_T - Date.now());
+    nulstil(rute);
+    const rPræcis = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(rPræcis.foraeldreloese, 0); assertEquals(koe.length, 1);
+    // Post 1 er dog nu kvalificeret (slet_tidligst = oprettet + 3 t ≤ nu) og afhentes/afsluttes → slettet? Nej: registeret er
+    // uploadet og sættes til slettes af sb_koe_naeste, og første succesfulde afslutning gør det slettet.
+    assertEquals(rPræcis.slettet, 1); assertEquals(reg!.status, "slettet"); assertEquals(statusVedAfslut, ["slettet"]);
+    assertEquals(objekter.size, 0);
+    // d) Senere: registeret er slettet → ingen overtagelse; ingen yderligere poster.
+    time.tick(60_000);
+    nulstil(rute);
+    const r3 = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(r3.foraeldreloese, 0); assertEquals(r3.ok, true);
+  } finally { time.restore(); }
+});
+
+klientTest("§5 stateful MOCK: overtagelse > 3 t → post 1 afsluttes først (slettet), post 2 afhentes SÆRSKILT efter genforsøgsvinduet og bevarer slettet", async () => {
+  // MOCK (ikke kørt SQL). Samme regler som ovenfor; her sker overtagelsen før post 1 er afhentet.
+  const T0 = Date.parse("2026-10-28T10:00:00Z");
+  const time = new FakeTime(T0);
+  try {
+    const TRE_T = 3 * 3600_000, VINDUE = 10 * 60_000;
+    const reg = { sti: "c/e1/u.png", status: "uploadet", oprettet: T0, slet_tidligst: T0 + TRE_T };
+    type Post = { id: number; sti: string; kilde: string; reserveret_til: number; afsluttet: boolean };
+    // Post 1 (udstedelse_fejl) er oprettet ved udstedelsesfejlen; reserveres ikke af naeste før registeret er kvalificeret.
+    const koe: Post[] = [{ id: 1, sti: reg.sti, kilde: "udstedelse_fejl", reserveret_til: 0, afsluttet: false }];
+    const objekter = new Set([reg.sti]);
+    const afhentet: number[][] = [];
+    const statusEfterAfslut: [number, string][] = [];
+    const rute: Rute = (k) => {
+      if (tabel(k, "pulsen_config")) return jsonR([{ value: CRON_HASH }]);
+      if (rpc(k, "sb_version")) return jsonR("24d");
+      if (rpc(k, "sb_overtag_foraeldreloese")) {
+        let n = 0;
+        if (reg.status === "uploadet" && Date.now() - reg.oprettet > TRE_T) {
+          reg.status = "slettes";
+          // Post 2 er reserveret af en tidligere, afbrudt afhentning; vinduet udløber om 10 min.
+          koe.push({ id: 2, sti: reg.sti, kilde: "foraeldreloes", reserveret_til: Date.now() + VINDUE, afsluttet: false }); n++;
+        }
+        return jsonR(n);
+      }
+      if (rpc(k, "sb_koe_naeste")) {
+        const nu = Date.now();
+        const klar = koe.filter((p) => !p.afsluttet && p.reserveret_til <= nu && reg.slet_tidligst <= nu);
+        for (const p of klar) { p.reserveret_til = nu + VINDUE; if (reg.status === "uploadet" || reg.status === "bundet") reg.status = "slettes"; }
+        afhentet.push(klar.map((p) => p.id));
+        return jsonR(klar.map((p) => ({ id: p.id, bucket: "chat-attachments", sti: p.sti })));
+      }
+      if (k.metode === "DELETE" && k.sti === "/storage/v1/object/chat-attachments") {
+        assert(Date.now() >= reg.slet_tidligst, "fysisk sletning før slet_tidligst");
+        for (const x of JSON.parse(k.krop).prefixes) objekter.delete(x); return jsonR([]);
+      }
+      if (rpc(k, "sb_koe_afslut")) {
+        const b = JSON.parse(k.krop); const p = koe.find((x) => x.id === b.p_id)!;
+        if (b.p_ok === true) { p.afsluttet = true; if (reg.status === "slettes") reg.status = "slettet"; }
+        statusEfterAfslut.push([p.id, reg.status]);
+        return jsonR(true);
+      }
+      if (rpc(k, "sb_personoplysninger_til_sletning")) return jsonR([]);
+      if (rpc(k, "sb_minimer_register")) return jsonR(0);
+      return undefined;
+    };
+    // Før slet_tidligst: intet afhentes eller slettes.
+    time.tick(TRE_T - 60_000);
+    nulstil(rute);
+    assertEquals((await (await kørFake(hOpr, oprReq(), time)).res.json()).slettet, 0);
+    assertEquals(kaldTil((k) => k.metode === "DELETE").length, 0); assertEquals(objekter.size, 1);
+    // Strengt mere end 3 t: overtagelse opretter post 2 (reserveret); kun post 1 afhentes og afsluttes → slettet ved første succes.
+    time.tick(2 * 60_000);
+    nulstil(rute);
+    const r1 = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(r1.foraeldreloese, 1); assertEquals(r1.slettet, 1);
+    assertEquals(statusEfterAfslut, [[1, "slettet"]]); assertEquals(koe[1].afsluttet, false);
+    // Særskilt afhentning af post 2 EFTER første afslutning (vinduet udløbet): registeret er allerede slettet, post 2 afhentes
+    // stadig, og dens afslutning bevarer slettet.
+    time.tick(VINDUE + 60_000);
+    nulstil(rute);
+    const r2 = await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(r2.slettet, 1); assertEquals(r2.ok, true);
+    assertEquals(statusEfterAfslut, [[1, "slettet"], [2, "slettet"]]);
+    assert(koe.every((p) => p.afsluttet)); assertEquals(reg.status, "slettet");
+    const ikkeTomme = afhentet.filter((x) => x.length);
+    assertEquals(ikkeTomme, [[1], [2]], "post 2 skal afhentes i en særskilt afhentning efter post 1's afslutning");
   } finally { time.restore(); }
 });
 
@@ -598,9 +694,6 @@ test("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/opta
 });
 
 // ---------------------------------------------------------------- beskeder-oprydning (handler, kontrolleret tid)
-const CRON = "cron-test";
-const CRON_HASH = await (async () => [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc(CRON)))].map((b) => b.toString(16).padStart(2, "0")).join(""))();
-const oprReq = (body = "{}") => new Request(`${MOCK}/functions/v1/beskeder-oprydning`, { method: "POST", headers: { "x-pulsen-cron-token": CRON }, body });
 type OprOps = { naeste?: (k: Kald, n: number) => Response | Promise<Response>; remove?: (k: Kald) => Response | Promise<Response>; afslut?: (k: Kald) => Response | Promise<Response>;
   overtag?: (k: Kald) => Response | Promise<Response>; slet?: (k: Kald) => Response | Promise<Response>; udvaelg?: (k: Kald, n: number) => Response | Promise<Response>;
   minimer?: (k: Kald) => Response | Promise<Response>; list?: (k: Kald) => Response | Promise<Response>; register?: (k: Kald) => Response | Promise<Response>; dagstal?: (k: Kald) => Response };
