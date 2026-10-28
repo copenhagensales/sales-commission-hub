@@ -32,7 +32,8 @@ function StorkbookToggles() {
   useEffect(() => { brugerRef.current = user?.id; setLokalt({}); seq.current = {}; bekraeftet.current = {}; }, [user?.id]);
   // Kun Storkbook-typer, som RPC'en faktisk returnerer for push.
   const raekker = (praef.data ?? []).filter((x) => x.kanal === "push");
-  for (const r of raekker) if (!(r.noegle in bekraeftet.current)) bekraeftet.current[r.noegle] = r.aktiv !== false;
+  // Følger altid seneste RPC-værdi; et ventende valg ligger i `lokalt` og overskrives ikke herfra.
+  for (const r of raekker) bekraeftet.current[r.noegle] = r.aktiv !== false;
   if (praef.isError) {
     return (
       <div className="space-y-2">
@@ -68,8 +69,9 @@ function StorkbookToggles() {
         // Succes: fjern override, så friske RPC-værdier vises (listen er gen-hentet i onSuccess).
         setLokalt((p) => { const n = { ...p }; delete n[noegle]; return n; });
       } else {
-        const b = bekraeftet.current[noegle];
-        setLokalt((p) => { const n = { ...p }; if (b === undefined) delete n[noegle]; else n[noegle] = b; return n; });
+        // Fejl: fjern override og hent igen, så den friske serverværdi vises.
+        setLokalt((p) => { const n = { ...p }; delete n[noegle]; return n; });
+        void praef.refetch();
       }
     });
   };
