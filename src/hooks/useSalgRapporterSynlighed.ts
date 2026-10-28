@@ -40,6 +40,8 @@ export function useSalgRapporterSynlighed() {
     "revenue-by-client": led && v("menu_reports_revenue_by_client") && !!isSuperadmin,
     "weekly-lead-closure": led && v("menu_reports_weekly_lead_closure"),
     cancellations: rap && v("menu_cancellations"),
+    // Opstartshold genbruger Dagsrapporters eksisterende rettighed (admin og teamledere).
+    opstartshold: rap && v("menu_reports_daily"),
   };
   const powerdag = {
     powerdag: v("menu_dashboard_powerdag"),

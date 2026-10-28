@@ -6,7 +6,7 @@ import {
   VagtFlowIndex, VagtBookingManagement, VagtBilling, VagtEesyFmDeviations, VagtLocations,
   TdcErhvervEditSales, TrygEditSales, VagtEditSalesRegistrations,
   FiberRegistrering, TdcIdriftsaettelse, TdcOpsummering, MgTest, CustomerInquiries,
-  ReportsAdmin, ReportsManagement, DailyReports, RevenueByClient, WeeklyLeadClosureReport, Cancellations,
+  ReportsAdmin, ReportsManagement, DailyReports, Opstartshold, RevenueByClient, WeeklyLeadClosureReport, Cancellations,
   PowerdagBoard, PowerdagInput, PowerdagAdmin,
 } from "@/routes/pages";
 
@@ -65,6 +65,7 @@ export function RapporterSamleside() {
       { id: "daily", label: "Dagsrapporter", element: <DailyReports />, synlig: s.daily },
       { id: "revenue-by-client", label: "Omsætning pr. opgave", element: <RevenueByClient />, synlig: s["revenue-by-client"] },
       { id: "weekly-lead-closure", label: "Tryg-kampagner", element: <WeeklyLeadClosureReport />, synlig: s["weekly-lead-closure"] },
+      { id: "opstartshold", label: "Opstartshold", element: <Opstartshold />, synlig: s.opstartshold },
       { id: "cancellations", label: "Annulleringer", element: <Cancellations />, synlig: s.cancellations },
     ]} />
   );

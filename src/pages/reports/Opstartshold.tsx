@@ -104,7 +104,7 @@ export default function Opstartshold() {
                     {Array.from({ length: dage }, (_, i) => i + 1).map((n) => (
                       <tr key={n} className="border-t">
                         <th className="sticky left-0 z-10 bg-card p-2 text-left font-medium">{n}</th>
-                        {hold.map((h) => <DagCelle key={h.noegle} d={h.dage.find((x) => x.dag === n)} maks={maks} />)}
+                        {hold.map((h) => <DagCelle key={h.noegle} d={h.dage.find((x) => x.dag === n)} maks={maks} startere={h.startere} />)}
                       </tr>
                     ))}
                     <tr className="border-t-2 bg-muted/30">
@@ -154,7 +154,7 @@ export default function Opstartshold() {
   );
 }
 
-function DagCelle({ d, maks }: { d: HoldData["dage"][number] | undefined; maks: number }) {
+function DagCelle({ d, maks, startere }: { d: HoldData["dage"][number] | undefined; maks: number; startere: number }) {
   if (!d || d.fremtid) return <td className="p-2 text-muted-foreground">–</td>;
   const styrke = d.linjer ? 0.12 + 0.7 * (d.linjer / maks) : 0;
   const moerk = styrke > 0.5;
@@ -166,7 +166,7 @@ function DagCelle({ d, maks }: { d: HoldData["dage"][number] | undefined; maks: 
         {d.hiper > 0 && <span>heraf H {d.hiper} · </span>}{pct(d.pct)}
       </div>
       <div className={cn("text-[14px]", moerk ? "text-success-foreground" : "text-muted-foreground")}>
-        {d.ansatte} af {d.ansatte + 0 > 0 ? d.ansatte + 0 : 0}
+        {d.ansatte} af {startere}
         {d.frafald > 0 && <span className="font-semibold text-destructive"> (−{d.frafald})</span>}
       </div>
       {d.foreloebig && <div className="text-[14px] italic">foreløbig</div>}
@@ -199,7 +199,7 @@ function SaelgerListe({ h }: { h: HoldData }) {
                 <div className="flex h-12 items-end gap-0.5" aria-label={`Linjer pr. dag for ${s.navn}`}>
                   {s.dage.map((d) => (
                     <div key={d.dag} className="flex flex-1 min-w-0 flex-col justify-end" title={`Dag ${d.dag}: ${d.eesy} Eesy, ${d.hiper} Hiper`}>
-                      {d.hiper > 0 && <div className="bg-chart-3 rounded-t-sm" style={{ height: `${(d.hiper / maks) * 48}px`, backgroundColor: "hsl(var(--chart-3))" }} />}
+                      {d.hiper > 0 && <div className="rounded-t-sm" style={{ height: `${(d.hiper / maks) * 48}px`, backgroundColor: "hsl(var(--chart-3))" }} />}
                       <div style={{ height: `${(d.eesy / maks) * 48}px`, backgroundColor: "hsl(var(--success))" }} className={cn(d.hiper === 0 && "rounded-t-sm")} />
                     </div>
                   ))}
