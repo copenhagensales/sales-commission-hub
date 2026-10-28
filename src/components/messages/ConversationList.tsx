@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SkeletonList } from "@/components/mobile";
-import { useConversations, useOnlineStatus, useDeleteConversation, Conversation } from "@/hooks/useChat";
+import { useConversations, useOnlineStatus, useDeleteConversation, kanSletteSamtale, Conversation } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Badge } from "@/components/ui/badge";
@@ -127,12 +127,13 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
   const unreadCount = conversation.unread_count || 0;
 
   const handleDelete = async () => {
+    if (!kanSletteSamtale(conversation)) { setShowDeleteDialog(false); return; }
     try {
       await deleteConversation.mutateAsync(conversation.id);
       onDelete();
       toast.success(conversation.is_group ? "Du har forladt gruppen" : "Samtalen er slettet");
     } catch (error) {
-      toast.error("Kunne ikke slette samtalen");
+      toast.error(conversation.is_group ? "Kunne ikke forlade gruppen" : "Kunne ikke slette samtalen");
     }
     setShowDeleteDialog(false);
   };
@@ -213,6 +214,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
         </div>
 
         {/* Delete/Leave button - shows on hover */}
+        {kanSletteSamtale(conversation) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -250,6 +252,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
