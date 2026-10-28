@@ -222,3 +222,114 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessage, mocket rpc)", () => {
+  let auth!: (e: string, s: unknown) => void;
+  const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
+  const gem = () => fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
+  const konfliktSvar = () => vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } } as never);
+  const okSvar = (rev: number) => vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: rev, error: null } as never);
+  const sendtRevision = (i: number) => (vi.mocked(supabase.rpc).mock.calls[i][1] as { p_revision: number }).p_revision;
+  const m = (rev: number, content = "server", status = "leveret") => ({ ...besked("m1", content, rev), status } as Message);
+
+  beforeEach(() => {
+    aegte.brug = true;
+    vi.mocked(supabase.rpc).mockReset();
+    vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
+    vi.mocked(toast.error).mockReset();
+    auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    auth("SIGNED_IN", { user: { id: "u" } });
+  });
+
+  it("editor startet på revision 1, server ændret til 2: Gem sender 1; kladde, fejl ved editor og én toast bevares", async () => {
+    const r = render(ui(m(1, "v1"), "e"));
+    fireEvent.click(screen.getByRole("button", { name: "Flere handlinger" }));
+    // Dropdown åbner via pointer; brug kladde-vej hvis menuen ikke er åben i jsdom.
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
+    r.unmount();
+    const r2 = render(ui(m(1, "v1"), "e"));
+    r2.rerender(ui(m(2, "v2 fra server"), "e"));
+    konfliktSvar();
+    await act(async () => { gem(); });
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(sendtRevision(0)).toBe(1);
+    expect(felt()?.value).toBe("min rettelse");
+    expect(laesRetKladde("e", "c", "m1")).toMatchObject({ tekst: "min rettelse", revision: 1 });
+    expect(screen.getByRole("alert").textContent).toBe("Beskeden er ændret – prøv igen");
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Beskeden er ændret – prøv igen");
+  });
+
+  it("genhentning ændrer ikke grundlaget; gentaget Gem sender fortsat den gamle revision (ingen tavs omsætning)", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "k", revision: 1 });
+    const r = render(ui(m(1), "e"));
+    r.rerender(ui(m(2), "e"));
+    konfliktSvar();
+    await act(async () => { gem(); });
+    r.rerender(ui(m(3, "endnu nyere"), "e"));
+    konfliktSvar();
+    await act(async () => { gem(); });
+    expect([sendtRevision(0), sendtRevision(1)]).toEqual([1, 1]);
+    expect(laesRetKladde("e", "c", "m1")?.revision).toBe(1);
+    expect(toast.error).toHaveBeenCalledTimes(2); // én pr. handling
+  });
+
+  it("eksplicit »Brug nyeste tekst« gør servertekst og -revision til nyt grundlag; først da sendes 2", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "gammel kladde", revision: 1 });
+    const r = render(ui(m(1), "e"));
+    r.rerender(ui(m(2, "server v2"), "e"));
+    expect(felt()?.value).toBe("gammel kladde"); // ikke kasseret uden brugerhandling
+    fireEvent.click(screen.getByRole("button", { name: "Brug nyeste tekst" }));
+    expect(felt()?.value).toBe("server v2");
+    expect(laesRetKladde("e", "c", "m1")).toMatchObject({ tekst: "server v2", revision: 2 });
+    okSvar(3);
+    await act(async () => { gem(); });
+    expect(sendtRevision(0)).toBe(2);
+  });
+
+  it("statusændring uden revisionsændring: tjekkes → ingen Gem-handling, kladden bevares", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "k", revision: 1 });
+    const r = render(ui(m(1), "e"));
+    r.rerender(ui(m(1, "server", "tjekkes"), "e"));
+    expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+    expect(screen.getByText("Beskeden kan ikke rettes lige nu")).toBeTruthy();
+    expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("k");
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("tilbagetrukket række: editoren lukkes og kladden genskabes ikke ved genåbning", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "k", revision: 1 });
+    const r = render(ui(m(1), "e"));
+    r.rerender(ui(m(1, "", "trukket_tilbage"), "e"));
+    expect(felt()).toBeNull();
+    r.unmount();
+    render(ui(m(1, "", "trukket_tilbage"), "e"));
+    expect(felt()).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+  });
+
+  it("genåbning efter navigation gendanner kladdetekst og startrevision, ikke senest hentede revision", async () => {
+    const r = render(ui(m(1, "v1"), "e"));
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "før navigation", revision: 1 });
+    r.unmount();
+    render(ui(m(4, "v4"), "e"));
+    expect(felt()?.value).toBe("før navigation");
+    okSvar(5);
+    await act(async () => { gem(); });
+    expect(sendtRevision(0)).toBe(1);
+  });
+
+  it("4.000 tegn sendes; 4.001 tegn afvises lokalt uden sb_ret", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "a", revision: 1 });
+    render(ui(m(1), "e"));
+    fireEvent.change(felt()!, { target: { value: "x".repeat(4001) } });
+    await act(async () => { gem(); });
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Beskeden må højst være 4.000 tegn");
+    fireEvent.change(felt()!, { target: { value: "y".repeat(4000) } });
+    okSvar(2);
+    await act(async () => { gem(); });
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect((vi.mocked(supabase.rpc).mock.calls[0][1] as { p_tekst: string }).p_tekst.length).toBe(4000);
+  });
+});
