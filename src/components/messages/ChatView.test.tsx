@@ -456,6 +456,79 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
   });
 });
 
+describe("c3 §7 – uploadnavigation gennem rigtig sbFil (fetch/storage ved grænsen)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(async () => {
+    beskeder.ægteSend = true; beskeder.ægteFil = true;
+    const { supabase } = await import("@/integrations/supabase/client");
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+  });
+  afterEach(() => { fetchSpy?.mockRestore(); });
+
+  it("A–B–A under rigtig udstedelse og upload → sti bevares, ét POST, ét upload, INSERT med stien", async () => {
+    const post = kontrol<Response>();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValueOnce(post.p);
+    const up = kontrol<{ error: unknown }>();
+    const upFn = vi.fn(() => up.p);
+    lagerUpload.fn = upFn;
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1)); // POST er startet
+    await navigér(r, "B"); await navigér(r, "A");
+    await act(async () => { post.res(new Response(JSON.stringify({ sti: "c/e/x.txt", token: "k" }), { status: 200 })); });
+    await waitFor(() => expect(upFn).toHaveBeenCalledTimes(1));
+    await navigér(r, "B"); await navigér(r, "A");
+    expect(send()).toBeDisabled();
+    await act(async () => { up.res({ error: null }); });
+    await tick();
+    expect(gemtFil()).toMatchObject({ sti: "c/e/x.txt", trin: "uploadet" });
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/x.txt", besked_id: null, status: "uploadet", samtale_id: "A", ejer_employee_id: "e" }, error: null }];
+    net.insert.mockReturnValueOnce({ error: null });
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    await act(async () => { fireEvent.click(send()); });
+    await tick(); await tick();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(net.insert.mock.calls[0][0]).toMatchObject({ attachment_path: "c/e/x.txt" });
+    expect(JSON.stringify(sessionStorage)).not.toContain("\"k\"");
+  });
+
+  it("faktisk logud (auth-callback) efter startet POST → intet upload, intet INSERT, ingen lagerændring", async () => {
+    const post = kontrol<Response>();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValueOnce(post.p);
+    const upFn = vi.fn(async () => ({ error: null }));
+    lagerUpload.fn = upFn;
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    const { supabase } = await import("@/integrations/supabase/client");
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { auth("SIGNED_OUT", null); });
+    await act(async () => { post.res(new Response(JSON.stringify({ sti: "c/e/x.txt", token: "k" }), { status: 200 })); });
+    await tick();
+    expect(upFn).not.toHaveBeenCalled();
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("sb-kladde:e:A")).toBeNull();
+    act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
+  });
+
+  it("fjern fil under rigtig sessionsopslag → nul POST", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const sess = kontrol<unknown>();
+    vi.mocked(supabase.auth.getSession).mockReturnValueOnce(sess.p as never);
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await klar();
+    await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
+    await waitFor(() => expect(supabase.auth.getSession).toHaveBeenCalled()); // sessionsopslaget er startet
+    fireEvent.click(screen.getByRole("button", { name: "Fjern fil" }));
+    await act(async () => { sess.res({ data: { session: { access_token: "t", user: { id: "u" } } } }); });
+    await tick();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("§5 – Ret med svarreference (B2a-b3)", () => {
   beforeEach(() => {
     beskeder.ægteSend = true;
