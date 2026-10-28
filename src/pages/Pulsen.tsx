@@ -10,7 +10,7 @@ import { ChevronDown, Lock, Sun, Users } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CelebrationLines } from "@/components/pulsen/CelebrationLine";
-import { TodayMilestonesCard, milestoneNumber, milestoneUnit } from "@/components/pulsen/TodayMilestones";
+import { TodayMilestonesCard, isHeroMilestone, milestoneNumber, milestoneUnit } from "@/components/pulsen/TodayMilestones";
 import { fillMilestoneDay } from "@/lib/pulsen/format";
 import { MilestoneHeroCard } from "@/components/pulsen/MilestoneHeroCard";
 import { EventRsvpCard } from "@/components/home/EventRsvpCard";
@@ -99,7 +99,7 @@ function PulsenFeed() {
 
   // Dagens højdepunkt: kun husrekord/teamrekord, højst ét (samme hook som højrekolonnen).
   const today = usePulsenMilestonesToday(scope, !!me.employeeId);
-  const highlight = (today.data?.items ?? []).find((m) => m.milestone_type === "house_record" || m.milestone_type === "team_record") ?? null;
+  const highlight = (today.data?.items ?? []).find(isHeroMilestone) ?? null;
   // Indlæg har reaktioner i både Huset og team; milepæle kun i Huset.
   const reactionKeys = [
     ...posts.filter((p) => !p.pending).map((p) => postTargetKey(p.id)),
