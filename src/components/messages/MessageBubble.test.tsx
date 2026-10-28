@@ -192,14 +192,15 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("anden brugers");
   });
 
-  it("transportfejl i samme session: præcis ét sb_ret (retry 0 trods mutations.retry=1), kladden bevares, én toast", async () => {
+  it("transportfejl i samme session: præcis ét sb_ret (retry 0 trods mutations.retry=1), kladden bevares; usynlig række = ukendt udfald ved editoren uden toast (B2b-2)", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "behold", revision: 1 });
     kontrolRet();
     render(ui(besked("m1", "a"), "e"));
     await act(async () => { gem(); });
     await act(async () => { afvis(new TypeError("Failed to fetch")); await new Promise((x) => setTimeout(x, 10)); });
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
-    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("behold");
   });
 
@@ -327,5 +328,88 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
     await act(async () => { gem(); });
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
     expect((vi.mocked(supabase.rpc).mock.calls[0][1] as { p_tekst: string }).p_tekst.length).toBe(4000);
+  });
+});
+
+describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (rigtige hooks, mocket rpc/rækker)", () => {
+  let raekke: { data: unknown; error: unknown } = { data: null, error: null };
+  const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => raekke; return b; };
+  const flush = () => act(async () => { await new Promise((x) => setTimeout(x, 5)); });
+  beforeEach(() => {
+    aegte.brug = true;
+    raekke = { data: null, error: null };
+    vi.mocked(supabase.rpc).mockReset();
+    vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
+    vi.mocked(supabase.functions.invoke).mockResolvedValue({ data: null, error: null } as never);
+    vi.mocked(toast.error).mockReset();
+    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } });
+  });
+
+  it("dobbeltklik på Gem giver ét sb_ret", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny", revision: 1 });
+    let svar!: (v: unknown) => void;
+    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
+    render(ui(besked("m1", "gammel"), "e"));
+    const gem = screen.getByRole("button", { name: "Gem ændring" });
+    fireEvent.click(gem); fireEvent.click(gem);
+    await flush();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    await act(async () => { svar({ data: 2, error: null }); });
+    await flush();
+    expect(felt()).toBeNull();
+  });
+
+  it("tabt succes-svar på Gem afstemmes mod rækken (tekst og ny revision) → editor lukkes uden toast", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny tekst", revision: 1 });
+    raekke = { data: { status: "tjekkes", revision: 2, content: "ny tekst", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await flush();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(felt()).toBeNull();
+    expect(laesRetKladde("e", "c", "m1")).toBeNull();
+  });
+
+  it("forældet svar, men rækken har en anden tekst i nyere revision → konflikt vises, kladden bevares", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    raekke = { data: { status: "leveret", revision: 2, content: "en andens", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } } as never);
+    render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await flush();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("min");
+  });
+
+  it("uventet null fra sb_ret er ikke succes: kladden bevares, ukendt udfald ved editoren", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as never);
+    render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("min");
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("boblens Træk tilbage: dobbeltklik giver ét sb_afgoer", async () => {
+    const nu = new Date().toISOString();
+    const m = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu } as Message;
+    let svar!: (v: unknown) => void;
+    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
+    render(ui(m, "e"));
+    const aabn = async () => { const t = screen.getByRole("button", { name: "Flere handlinger" }); fireEvent.keyDown(t, { key: "Enter" }); await flush(); };
+    await aabn();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Træk tilbage" }));
+    await flush();
+    await aabn();
+    const punkt = screen.queryByRole("menuitem", { name: "Træk tilbage" });
+    if (punkt) fireEvent.click(punkt);
+    await flush();
+    expect(vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === "sb_afgoer")).toHaveLength(1);
+    await act(async () => { svar({ data: true, error: null }); });
+    await flush();
   });
 });

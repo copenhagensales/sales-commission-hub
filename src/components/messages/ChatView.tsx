@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,8 @@ interface AfstemForloeb {
   noegle: string; id: string; ejer: OperationsEjer; qc: QueryClient; session: KoeSession;
   forsoeg: number; naeste: number; timer: ReturnType<typeof setTimeout> | null;
   iKoe: boolean; aktiv: boolean; udtoemt: boolean; genstartVenter: boolean;
+  /** B2b-2 §9: operationen, der netop nu er ført ind i afstemKun (stopvejen invaliderer den). */
+  aktivOp: string | null;
   /** Manuel handling ejer id'et lige nu; baggrunden venter på dens eksplicitte fortsættelse. */
   manuel: boolean;
 }
@@ -131,11 +133,11 @@ async function koerForloeb(f: AfstemForloeb, s: KoeSession): Promise<void> {
   const op = nytOperationsId();
   // Optaget af manuel afsendelse: planlæg fortsættelse i stedet for at opgive (§4).
   if (!tagLaas(f.noegle, op)) { frigivPlads(s); f.naeste = Date.now() + LAAST_VENT_MS; planlaegForloeb(f); return; }
-  f.aktiv = true;
+  f.aktiv = true; f.aktivOp = op;
   let r: Awaited<ReturnType<typeof afstemKun>> = "ukendt";
   try { r = await afstemKun({ id: f.id, conversationId: conv, attachmentPath: a.fil?.sti ?? undefined, ejer: { ...f.ejer, op } }); }
   catch { r = "ukendt"; }
-  finally { frigivLaas(f.noegle, op); f.aktiv = false; frigivPlads(s); }
+  finally { frigivLaas(f.noegle, op); f.aktiv = false; if (f.aktivOp === op) f.aktivOp = null; frigivPlads(s); }
   if (!gyldigt(f)) return;
   if (r === "fundet") {
     fjernAfsendelse(emp, conv, f.id, gen);
@@ -179,7 +181,7 @@ function sikrForloeb(ejer: OperationsEjer, id: string, qc: QueryClient): AfstemF
   const k = laasNoegle(ejer.gen, ejer.emp, ejer.conv, id);
   const f = forloeb.get(k);
   if (f && gyldigt(f)) { f.qc = qc; planlaegForloeb(f); return f; }
-  const ny: AfstemForloeb = { noegle: k, id, ejer, qc, session: s, forsoeg: 0, naeste: 0, timer: null, iKoe: false, aktiv: false, udtoemt: false, genstartVenter: false, manuel: false };
+  const ny: AfstemForloeb = { noegle: k, id, ejer, qc, session: s, forsoeg: 0, naeste: 0, timer: null, iKoe: false, aktiv: false, udtoemt: false, genstartVenter: false, manuel: false, aktivOp: null };
   forloeb.set(k, ny);
   planlaegForloeb(ny);
   return ny;
@@ -228,12 +230,22 @@ export function stopAfstemninger(emp: string, conv: string, id?: string): void {
   const ramt = (k: string) => (id === undefined ? k.startsWith(laasNoegle(s.gen, emp, conv, "")) : k === laasNoegle(s.gen, emp, conv, id));
   // d1 §2: 1) invalidér operationerne, 2) annullér deres ventende pladsanmodninger, 3) stop timere/køposter.
   for (const [k, op] of [...afsOps]) if (ramt(k)) { annullerOperation(op); afsOps.delete(k); }
+  // B2b-2 stophul 1: den operation, der er ført ind i en aktiv afstemKun, invalideres, så et sent svar ikke starter registeropslag.
+  for (const f of forloeb.values()) if (f.session === s && ramt(f.noegle) && f.aktivOp) annullerOperation(f.aktivOp);
+  // B2b-2 stophul 2: detached efterbehandling, statusopslag og tjek-genforsøg efter bekræftet INSERT.
+  stopEfterbehandling(emp, conv, id);
   for (const v of [...s.venter]) {
     if (v.noegle && ramt(v.noegle)) { s.venter.splice(s.venter.indexOf(v), 1); if (v.op) annullerOperation(v.op); v.r(false); }
   }
   for (const f of [...forloeb.values()]) if (f.session === s && ramt(f.noegle)) stopForloeb(f.noegle);
   meldKoe();
 }
+/** B2b-2 §4: serverhandlinger på et id samordnes med manuel afsendelse, netværkslås, aktiv afstemning og pending post. */
+registrerAfsendelsesKoordinering((gen, emp, conv, id) => {
+  const k = laasNoegle(gen, emp, conv, id);
+  if (afsOps.has(k) || laase.has(k) || forloeb.get(k)?.aktiv) return true;
+  return hentAfsendelser(emp, conv).some((a) => a.id === id && (a.tilstand === "sender" || a.tilstand === "afstemmer"));
+});
 const erUdtoemt = (gen: number, emp: string, conv: string, id: string) => !!forloeb.get(laasNoegle(gen, emp, conv, id))?.udtoemt;
 if (typeof window !== "undefined") {
   window.addEventListener("online", genstartForloeb);

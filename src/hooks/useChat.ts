@@ -1,8 +1,8 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, ejerPasser, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, annullerOperation, sessionsGeneration, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -500,7 +500,7 @@ export function useSendMessage() {
       const ejer = v.ejer;
       const vagt = () => ejerGyldig(ejer); // sent svar må ikke skrive til den nye session
       if (!vagt()) return;
-      efterHandling(queryClient, v.conversationId, v.id, vagt);
+      efterHandling(queryClient, ejer, v.conversationId, v.id);
       if (vagt()) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
@@ -525,27 +525,34 @@ export interface RetInput {
   ejer: OperationsEjer;
 }
 
-/** Ejerskab kontrolleres før sb_ret, efter svaret og før hver efterbehandling. */
+/** Ejerskab kontrolleres før sb_ret, efter svaret og før hver efterbehandling; låsen holdes gennem resultatafstemningen. */
 export function useEditMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ messageId, content, conversationId, revision, ejer }: RetInput) => {
-      if (!ejerPasser(ejer, conversationId)) throw foraeldet();
-      if (content.length > 4000) throw Object.assign(new Error("Højst 4.000 tegn"), { code: "P0001" });
-      const { data, error } = await supabase.rpc("sb_ret", { p_kilde: "besked", p_id: messageId, p_revision: revision, p_tekst: content });
-      if (!ejerPasser(ejer, conversationId)) throw foraeldet();
-      if (error) throw error;
-      return { revision: data, conversationId, messageId, ejer };
+      try {
+        const vagt = () => ejerPasser(ejer, conversationId) && ejerHandling(ejer, messageId);
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        if (content.length > 4000) throw Object.assign(new Error("Højst 4.000 tegn"), { code: "P0001" });
+        const res = await kaldRpc(() => supabase.rpc("sb_ret", { p_kilde: "besked", p_id: messageId, p_revision: revision, p_tekst: content }));
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        // §4: sb_ret returnerer den nye revision; alt andet er ikke succes.
+        if (!res.error && typeof res.data === "number" && res.data > revision) return { revision: res.data, conversationId, messageId, ejer };
+        const raek = await laesRaekke(messageId);
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        const ok = (r: Raekke) => r.content === content && r.revision > revision;
+        if (raek !== "fejl" && raek && ok(raek)) return { revision: raek.revision, conversationId, messageId, ejer };
+        throw klassificer(res, raek);
+      } finally { frigivHandling(ejer, messageId); }
     },
     // §2 (c1): ingen automatisk genkørsel af sb_ret (App.tsx' mutations.retry=1 overstyres lokalt).
     retry: 0,
     onSuccess: (r) => {
-      const vagt = () => ejerGyldig(r.ejer);
-      if (!vagt()) return;
-      efterHandling(queryClient, r.conversationId, r.messageId, vagt);
+      if (!ejerGyldig(r.ejer)) return;
+      efterHandling(queryClient, r.ejer, r.conversationId, r.messageId);
     },
-    onError: (_e, v) => { if (ejerGyldig(v.ejer)) void queryClient.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
+    onError: (e, v) => efterFejl(queryClient, e, v.ejer, v.conversationId, v.messageId),
   });
 }
 
@@ -1049,28 +1056,201 @@ export const erForaeldet = (e: unknown) => (e as { code?: string; message?: stri
 
 const vent = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét genforsøg efter 2 s ved transportfejl. */
-export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean = () => true): Promise<void> {
-  if (!vagt()) return;
-  const { data: r } = await supabase.from("chat_messages").select("status, revision").eq("id", messageId).maybeSingle();
-  if (!r || r.status !== "tjekkes") return;
-  for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
-    if (!vagt()) return;
-    const { error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } });
-    if (!error) return;
-    const navn = (error as { name?: string }).name;
-    if (navn !== "FunctionsFetchError" && navn !== "FunctionsRelayError") return;
-    if (forsoeg === 0) await vent(2000);
+// ---------- B2b-2 §4: fælles handlingslås pr. (generation, medarbejder, samtale, besked) ----------
+export type HandlingsArt = "send" | "traek" | "fjern" | "ret" | "gem";
+interface Handling { ejer: OperationsEjer; art: HandlingsArt }
+const handlinger = new Map<string, Handling>();
+/** Lokal markering af ukendt udfald pr. besked (overlever afmontering; ryddes ved næste accepterede handling). */
+const ukendte = new Map<string, HandlingsArt>();
+const hNoegle = (gen: number, emp: string, conv: string, id: string) => `${gen}:${emp}:${conv}:${id}`;
+const hLyttere = new Set<() => void>();
+let hVersion = 0;
+const hMeld = () => { hVersion++; for (const l of hLyttere) l(); };
+/** Kobling til ChatViews afsendelsesejerskab (afsOps/netværkslås/pending) uden cirkulær import. */
+type AfsKoordinering = (gen: number, emp: string, conv: string, id: string) => boolean;
+let afsKoordinering: AfsKoordinering = () => false;
+export function registrerAfsendelsesKoordinering(fn: AfsKoordinering): void { afsKoordinering = fn; }
+
+/**
+ * Tager låsen synkront for den accepterede operation. Optaget lås, igangværende manuel/baggrunds-afsendelse
+ * på samme id eller ugyldig ejer → false (klikket ignoreres: ingen mutation, ingen toast).
+ * Låsen frigives kun af sin egen operation (mutationFn's finally eller editorens afslutning) – aldrig af afmontering.
+ */
+export function tagHandling(ejer: OperationsEjer | null, id: string, art: HandlingsArt): boolean {
+  if (!ejer || !ejerGyldig(ejer)) return false;
+  rydGamleGenerationer();
+  const k = hNoegle(ejer.gen, ejer.emp, ejer.conv, id);
+  if (handlinger.has(k) || afsKoordinering(ejer.gen, ejer.emp, ejer.conv, id)) return false;
+  handlinger.set(k, { ejer, art });
+  ukendte.delete(k);
+  hMeld();
+  return true;
+}
+/** Låse og ukendt-markeringer fra en tidligere sessionsgeneration kan aldrig matche igen (nøglen indeholder generationen). */
+function rydGamleGenerationer(): void {
+  const pre = `${sessionsGeneration()}:`;
+  for (const k of [...handlinger.keys()]) if (!k.startsWith(pre)) handlinger.delete(k);
+  for (const k of [...ukendte.keys()]) if (!k.startsWith(pre)) ukendte.delete(k);
+}
+/** Atomisk overgang editor → Gem: kun hvis låsen er editorens (art 'ret') eller fri. */
+export function overtagTilGem(ejer: OperationsEjer | null, id: string): boolean {
+  if (!ejer || !ejerGyldig(ejer)) return false;
+  const k = hNoegle(ejer.gen, ejer.emp, ejer.conv, id);
+  const h = handlinger.get(k);
+  if (h && h.art !== "ret") return false;
+  if (!h && afsKoordinering(ejer.gen, ejer.emp, ejer.conv, id)) return false;
+  handlinger.set(k, { ejer, art: "gem" });
+  ukendte.delete(k);
+  hMeld();
+  return true;
+}
+/** Gamle afslutninger frigiver kun deres egen lås. */
+export function frigivHandling(ejer: OperationsEjer, id: string): void {
+  const k = hNoegle(ejer.gen, ejer.emp, ejer.conv, id);
+  if (handlinger.get(k)?.ejer.op === ejer.op) { handlinger.delete(k); hMeld(); }
+}
+/** Frigiver editorens lås (art 'ret') for beskeden i aktuel generation. */
+export function frigivRet(emp: string, conv: string, id: string): void {
+  const k = hNoegle(sessionsGeneration(), emp, conv, id);
+  if (handlinger.get(k)?.art === "ret") { handlinger.delete(k); hMeld(); }
+}
+/** Ejer operationen stadig låsen for netop denne besked? */
+export const ejerHandling = (ejer: OperationsEjer, id: string) =>
+  handlinger.get(hNoegle(ejer.gen, ejer.emp, ejer.conv, id))?.ejer.op === ejer.op;
+export function handlingFor(emp: string | undefined, conv: string, id: string): { art: HandlingsArt | null; ukendt: HandlingsArt | null } {
+  if (!emp) return { art: null, ukendt: null };
+  const k = hNoegle(sessionsGeneration(), emp, conv, id);
+  return { art: handlinger.get(k)?.art ?? null, ukendt: ukendte.get(k) ?? null };
+}
+export function rydUkendt(emp: string, conv: string, id: string): void {
+  if (ukendte.delete(hNoegle(sessionsGeneration(), emp, conv, id))) hMeld();
+}
+/** Abonnement for UI (deaktivering, ukendt-tilstand). */
+export function useHandling(emp: string | undefined, conv: string, id: string) {
+  useSyncExternalStore((l) => { hLyttere.add(l); return () => { hLyttere.delete(l); }; }, () => hVersion);
+  return handlingFor(emp, conv, id);
+}
+/** Til prøver: antal holdte låse (kun tal). */
+export const aktiveHandlinger = () => { const pre = `${sessionsGeneration()}:`; return [...handlinger.keys()].filter((k) => k.startsWith(pre)).length; };
+
+/** Klassificeret udfald af en serverhandling efter resultatafstemning. */
+export class HandlingsFejl extends Error {
+  constructor(public art: "konflikt" | "afvist" | "ukendt" | "stoppet", public kilde: unknown = null) { super(art); this.name = "HandlingsFejl"; }
+}
+/** Tekst til én fejltoast; null = ingen toast (ukendt udfald vises lokalt, stoppet/forældet vises aldrig). */
+export function handlingsTekst(e: unknown, fast: string): string | null {
+  if (e instanceof HandlingsFejl) {
+    if (e.art === "konflikt") return "Beskeden er ændret – prøv igen";
+    if (e.art === "afvist") return serverTekst(e.kilde, fast);
+    return null;
   }
+  if (erForaeldet(e)) return "Beskeden er ændret – prøv igen";
+  return serverTekst(e, fast);
+}
+interface RpcSvar { data: unknown; error: { code?: string; message?: string } | null }
+/** Fejlobjekt uden cast: kun code/message læses. */
+function tilFejl(e: unknown): RpcSvar["error"] {
+  if (!e) return null;
+  if (typeof e !== "object") return { message: "ukendt" };
+  return {
+    code: "code" in e && typeof e.code === "string" ? e.code : undefined,
+    message: "message" in e && typeof e.message === "string" ? e.message : undefined,
+  };
+}
+async function kaldRpc(f: () => PromiseLike<{ data: unknown; error: unknown }>): Promise<RpcSvar> {
+  try { const r = await f(); return { data: r.data, error: tilFejl(r.error) }; }
+  catch { return { data: null, error: { message: "transport" } }; }
+}
+interface Raekke { status: string; revision: number; content: string; attachment_path: string | null }
+/** Aktuel række (kun læsning). null = ikke synlig; "fejl" = kunne ikke læses. */
+async function laesRaekke(id: string): Promise<Raekke | null | "fejl"> {
+  try {
+    const { data, error } = await supabase.from("chat_messages").select("status, revision, content, attachment_path").eq("id", id).maybeSingle();
+    if (error) return "fejl";
+    if (!data) return null;
+    return { status: String(data.status), revision: Number(data.revision), content: String(data.content ?? ""), attachment_path: (data.attachment_path as string | null) ?? null };
+  } catch { return "fejl"; }
+}
+/** Ikke-bekræftet resultat: konflikt kun ved reel revisionskonflikt mod en læsbar række; ulæselig/usynlig række = ukendt. */
+function klassificer(res: RpcSvar, raek: Raekke | null | "fejl"): HandlingsFejl {
+  if (raek === "fejl") return new HandlingsFejl("ukendt");
+  if (!res.error) return new HandlingsFejl("ukendt"); // uventet false/null/ugyldig revision er ikke succes
+  if (res.error.code === "P0001" && erForaeldet(res.error)) return new HandlingsFejl("konflikt", res.error);
+  if (!raek) return new HandlingsFejl("ukendt");
+  if (res.error.code === "P0001") return new HandlingsFejl("afvist", res.error);
+  return new HandlingsFejl("afvist", null); // transport/andet: rækken viser, at handlingen ikke er gennemført
+}
+function efterFejl(qc: QueryClient, e: unknown, ejer: OperationsEjer, conv: string, id: string) {
+  if (!ejerGyldig(ejer)) return;
+  if (e instanceof HandlingsFejl && e.art === "ukendt") {
+    const k = hNoegle(ejer.gen, ejer.emp, ejer.conv, id);
+    if (!handlinger.has(k)) { ukendte.set(k, "send"); hMeld(); }
+  }
+  void qc.invalidateQueries({ queryKey: ["chat-messages", conv] });
 }
 
-/** b4 (iv): med vagt kontrolleres ejerskabet før hvert kald og hver cache-sideeffekt (også i finally). */
-function efterHandling(qc: QueryClient, conversationId: string, messageId: string, vagt: () => boolean = () => true) {
+// ---------- §9: tjek for den rigtige revision ----------
+/** Aktive tjekforløb pr. (bruger, generation, id, revision): parallelle starter deduplikeres. */
+const tjekAktive = new Set<string>();
+export const aktiveTjek = () => tjekAktive.size;
+const erTransport = (error: unknown) => {
+  const navn = (error as { name?: string } | null)?.name;
+  return navn === "FunctionsFetchError" || navn === "FunctionsRelayError";
+};
+async function laesStatus(id: string): Promise<{ status: string; revision: number } | null> {
+  try {
+    const { data, error } = await supabase.from("chat_messages").select("status, revision").eq("id", id).maybeSingle();
+    if (error || !data) return null;
+    return { status: String(data.status), revision: Number(data.revision) };
+  } catch { return null; }
+}
+/**
+ * Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét transportgenforsøg efter 2 s, kun hvis
+ * genlæsningen viser samme revision og stadig 'tjekkes'. Edge-resultatet ændrer aldrig klientstatus direkte.
+ */
+export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean = () => true, ejer?: OperationsEjer): Promise<void> {
   if (!vagt()) return;
+  const r = await laesStatus(messageId);
+  if (!vagt() || !r || r.status !== "tjekkes") return;
+  const k = `${ejer?.bruger ?? ""}:${ejer?.gen ?? sessionsGeneration()}:${messageId}:${r.revision}`;
+  if (tjekAktive.has(k)) return;
+  tjekAktive.add(k);
+  try {
+    for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
+      if (!vagt()) return;
+      let error: unknown = null;
+      try { ({ error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } })); }
+      catch { return; } // uventet kast: intet genforsøg; klienten læser altid faktisk DB-status
+      if (!error || !erTransport(error) || forsoeg === 1) return;
+      await vent(2000);
+      if (!vagt()) return;
+      const r2 = await laesStatus(messageId);
+      // Ændret revision/status, utilgængelig række eller læsefejl stopper det gamle forløb.
+      if (!vagt() || !r2 || r2.status !== "tjekkes" || r2.revision !== r.revision) return;
+    }
+  } finally { tjekAktive.delete(k); }
+}
+
+/** Registreret efterbehandling (bruger, generation, samtale, id, operation), synlig for stopvejen til den er afsluttet. */
+const efterOps = new Map<string, { ejer: OperationsEjer; conv: string; id: string }>();
+export const aktiveEfterbehandlinger = () => efterOps.size;
+/** Stopvej: invaliderer efterbehandling/statusopslag/tjek-genforsøg for (medarbejder, samtale[, id]) i aktuel generation. */
+export function stopEfterbehandling(emp: string, conv: string, id?: string): void {
+  const gen = sessionsGeneration();
+  for (const [k, e] of [...efterOps]) {
+    if (e.ejer.gen === gen && e.ejer.emp === emp && e.conv === conv && (id === undefined || e.id === id)) { annullerOperation(e.ejer.op); efterOps.delete(k); }
+  }
+}
+/** Efter bekræftet INSERT/sb_ret/sb_fjern_fil: genhent og tjek rigtig revision; ejerskab før hvert kald og cachetrin. */
+function efterHandling(qc: QueryClient, ejer: OperationsEjer, conversationId: string, messageId: string) {
+  const vagt = () => ejerGyldig(ejer);
+  if (!vagt()) return;
+  const k = `${ejer.op}:${messageId}`;
+  efterOps.set(k, { ejer, conv: conversationId, id: messageId });
   void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
   void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
-  if (!vagt()) return;
-  void startTjekHvisNoedvendigt(messageId, vagt).finally(() => {
+  void startTjekHvisNoedvendigt(messageId, vagt, ejer).finally(() => {
+    efterOps.delete(k);
     if (!vagt()) return;
     void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
     void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
@@ -1081,18 +1261,29 @@ function efterHandling(qc: QueryClient, conversationId: string, messageId: strin
 export interface AfgoerInput { messageId: string; revision: number; handling: "send" | "traek"; conversationId: string; ejer: OperationsEjer }
 export interface FjernFilInput { messageId: string; revision: number; conversationId: string; ejer: OperationsEjer }
 
+/** Kalderen har taget låsen med tagHandling; mutationFn holder den gennem resultatafstemning og frigiver den selv. */
 export function useAfgoer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: AfgoerInput) => {
-      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
-      const { error } = await supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling });
-      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
-      if (error) throw error;
-      return v;
+      try {
+        const vagt = () => ejerPasser(v.ejer, v.conversationId) && ejerHandling(v.ejer, v.messageId);
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        const res = await kaldRpc(() => supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling }));
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        // 24d: true eller exception. sb_afgoer øger ikke revisionen.
+        if (!res.error && res.data === true) return v;
+        const raek = await laesRaekke(v.messageId);
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        const maal = v.handling === "send" ? "leveret" : "trukket_tilbage";
+        // Kun en fejl (ikke uventet false/null) kan afstemmes til succes: samme revision i målstatus.
+        if (res.error && raek !== "fejl" && raek && raek.revision === v.revision && raek.status === maal) return v;
+        throw klassificer(res, raek);
+      } finally { frigivHandling(v.ejer, v.messageId); }
     },
     // B2b-1: ingen automatisk genkørsel af sb_afgoer (App.tsx' mutations.retry=1 overstyres lokalt).
     retry: 0,
+    onError: (e, v) => efterFejl(qc, e, v.ejer, v.conversationId, v.messageId),
     onSettled: (_d, _e, v) => {
       if (!ejerGyldig(v.ejer)) return;
       void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] });
@@ -1106,16 +1297,22 @@ export function useFjernFil() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: FjernFilInput) => {
-      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
-      const { error } = await supabase.rpc("sb_fjern_fil", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision });
-      if (!ejerPasser(v.ejer, v.conversationId)) throw foraeldet();
-      if (error) throw error;
-      return v;
+      try {
+        const vagt = () => ejerPasser(v.ejer, v.conversationId) && ejerHandling(v.ejer, v.messageId);
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        const res = await kaldRpc(() => supabase.rpc("sb_fjern_fil", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision }));
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        if (!res.error && typeof res.data === "number" && res.data > v.revision) return v;
+        const raek = await laesRaekke(v.messageId);
+        if (!vagt()) throw new HandlingsFejl("stoppet");
+        if (res.error && raek !== "fejl" && raek && raek.attachment_path === null && raek.revision > v.revision) return v;
+        throw klassificer(res, raek);
+      } finally { frigivHandling(v.ejer, v.messageId); }
     },
     // B2b-1: ingen automatisk genkørsel af sb_fjern_fil.
     retry: 0,
-    onSuccess: (v) => { const vagt = () => ejerGyldig(v.ejer); if (vagt()) efterHandling(qc, v.conversationId, v.messageId, vagt); },
-    onError: (_e, v) => { if (ejerGyldig(v.ejer)) void qc.invalidateQueries({ queryKey: ["chat-messages", v.conversationId] }); },
+    onSuccess: (v) => { if (ejerGyldig(v.ejer)) efterHandling(qc, v.ejer, v.conversationId, v.messageId); },
+    onError: (e, v) => efterFejl(qc, e, v.ejer, v.conversationId, v.messageId),
   });
 }
 
