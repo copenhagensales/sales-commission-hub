@@ -2,8 +2,9 @@ import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Message, useBegrundelse, useAfgoer, useFjernFil, BEGRUNDELSE_TEKST, serverTekst, erForaeldet,
+  Message, useBegrundelse, useAfgoer, useFjernFil, BEGRUNDELSE_TEKST, handlingsTekst, tagHandling, useHandling, rydUkendt,
 } from "@/hooks/useChat";
+import { useQueryClient } from "@tanstack/react-query";
 import { fastholdEjer, ejerGyldig, type OperationsEjer } from "@/lib/sbKladder";
 
 interface Props {
@@ -21,7 +22,10 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
   const begr = useBegrundelse(currentEmployeeId, message.id, message.revision, afventer);
   const afgoer = useAfgoer();
   const fjern = useFjernFil();
-  const optaget = afgoer.isPending || fjern.isPending;
+  const qc = useQueryClient();
+  // B2b-2 §4: fælles lås pr. bruger/besked (også for boblen); overlever kortets afmontering.
+  const laas = useHandling(currentEmployeeId, conversationId, message.id);
+  const optaget = !!laas.art;
 
   if (message.status === "tjekkes") {
     return (
@@ -35,8 +39,8 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
   // Fejl vises kun i den session/kontekst, handlingen blev startet i.
   const fejl = (ejer: OperationsEjer, e: unknown, fast: string) => {
     if (!ejerGyldig(ejer)) return;
-    if (erForaeldet(e)) toast.error("Beskeden er ændret – prøv igen");
-    else toast.error(serverTekst(e, fast));
+    const t = handlingsTekst(e, fast);
+    if (t) toast.error(t);
   };
   /** B2b-1 §3: kontekst og den viste rækkes revision fastholdes synkront ved trykket; uden ejer ingen handling. */
   const start = () => {
@@ -47,12 +51,12 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
   const kanSende = !!kode && kode !== "cpr_fil" && kode !== "ikke_tjekket_fil";
   const afgoerKlik = (handling: "send" | "traek", fast: string) => {
     const s = start();
-    if (!s) return;
+    if (!s || !tagHandling(s.ejer, message.id, handling)) return; // ignoreret klik: ingen mutation, ingen toast
     afgoer.mutate({ ...s.vars, handling }, { onError: (e) => fejl(s.ejer, e, fast) });
   };
   const fjernKlik = () => {
     const s = start();
-    if (!s) return;
+    if (!s || !tagHandling(s.ejer, message.id, "fjern")) return;
     fjern.mutate(s.vars, { onError: (e) => fejl(s.ejer, e, "Kunne ikke fjerne filen") });
   };
 
@@ -69,22 +73,31 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
       ) : (
         <p className="mt-1 text-[14px]">{BEGRUNDELSE_TEKST[kode]}</p>
       )}
+      {laas.ukendt && !laas.art && currentEmployeeId && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-[14px]" role="alert">Udfaldet kunne ikke bekræftes</p>
+          <Button size="sm" variant="outline" className="min-h-11"
+            onClick={() => { rydUkendt(currentEmployeeId, conversationId, message.id); void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] }); }}>
+            Tjek igen
+          </Button>
+        </div>
+      )}
       <div className="mt-2 grid grid-cols-2 gap-2">
         {kanSende && (
           <Button size="sm" className="min-h-11" disabled={optaget}
             onClick={() => afgoerKlik("send", "Kunne ikke sende beskeden")}>
-            {afgoer.isPending && afgoer.variables?.handling === "send" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send alligevel"}
+            {laas.art === "send" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send alligevel"}
           </Button>
         )}
         <Button size="sm" variant="outline" className="min-h-11" disabled={optaget} onClick={onRet}>Ret</Button>
         {message.attachment_path && (
           <Button size="sm" variant="outline" className="min-h-11" disabled={optaget} onClick={fjernKlik}>
-            {fjern.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fjern fil"}
+            {laas.art === "fjern" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fjern fil"}
           </Button>
         )}
         <Button size="sm" variant="outline" className="min-h-11 text-destructive" disabled={optaget}
           onClick={() => afgoerKlik("traek", "Kunne ikke trække beskeden tilbage")}>
-          {afgoer.isPending && afgoer.variables?.handling === "traek" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Træk tilbage"}
+          {laas.art === "traek" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Træk tilbage"}
         </Button>
       </div>
     </div>
