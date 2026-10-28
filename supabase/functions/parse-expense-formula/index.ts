@@ -417,7 +417,7 @@ serve(async (req) => {
         locationCostsTotal += locTotal;
       }
 
-      
+
     }
 
     const avgLocationDailyRate = locationDetails.length > 0

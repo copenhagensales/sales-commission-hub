@@ -1,10 +1,14 @@
 // sb-fil (S6 / 24d). Udsteder upload-token til chat-vedhæftninger og streamer filer til samtalens medlemmer.
 // verify_jwt=true + egen JWT-kontrol. Ingen Storage-læse-URL forlader edge. Fejlsvar er {kode} uden indhold/filnavne.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { budgetIndstillinger } from "../_shared/sb-budget.ts";
+import { hentBegraenset, MAKS_BYTES } from "../_shared/sb-filtype.ts";
 
 const BUCKET = "chat-attachments";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAKS = 10 * 1024 * 1024;
+const MAKS = MAKS_BYTES;
+const SAMLET_MS = 55_000;
+const KALD_MS = 15_000;
 const RATE = 60;
 export const TYPER: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", txt: "text/plain" };
 const EXT_FOR: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "text/plain": "txt" };
@@ -18,25 +22,20 @@ const cors = {
 const json = (b: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store", ...extra } });
 
-/** Indholdsbaseret type (magic bytes). */
-export function filtype(b: Uint8Array): string | null {
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
-  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
-  if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "image/gif";
-  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp";
-  if (b.includes(0)) return null;
-  try { new TextDecoder("utf-8", { fatal: true }).decode(b); return "text/plain"; } catch { return null; }
-}
-
 /** Sikker Content-Disposition: ASCII-fallback + RFC 5987; endelse tvinges til den faktiske type. */
 export function disposition(navn: string | null, type: string): string {
   const ext = EXT_FOR[type];
-  const stamme = (navn ?? "").replace(/\.[^.]*$/, "").replace(/[\u0000-\u001f\u007f"\\/;:\r\n]/g, "").trim().slice(0, 100) || "fil";
+  const renset = (navn ?? "").replace(/\.[^.]*$/, "").replace(/[\u0000-\u001f\u007f"\\/;:\r\n]/g, "")
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "").trim();
+  const stamme = Array.from(renset).slice(0, 100).join("") || "fil";
   const fuld = `${stamme}.${ext}`;
   const ascii = fuld.replace(/[^\x20-\x7e]/g, "_");
   const art = type.startsWith("image/") ? "inline" : "attachment";
-  return `${art}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fuld)}`;
+  return `${art}; filename="${ascii}"; filename*=UTF-8''${rfc5987(fuld)}`;
 }
+
+/** RFC 5987/8187: encodeURIComponent + procentkodning af '()*. */
+export const rfc5987 = (s: string) => encodeURIComponent(s).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 
 /** Én byte-range. null = hele filen; "ugyldig" = 416. */
 export function range(h: string | null, size: number): { start: number; slut: number } | null | "ugyldig" {
@@ -83,7 +82,8 @@ Deno.serve(async (req) => {
     if (vent) { log("rate"); return json({ kode: "rate" }, 429, { "Retry-After": String(vent) }); }
     const { data: emp, error: eErr } = await bruger.rpc("get_current_employee_id");
     if (eErr || typeof emp !== "string") return json({ kode: "ingen_medarbejder" }, 403);
-    const svc = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+    const slut = start + SAMLET_MS;
+    const svc = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, budgetIndstillinger(() => slut, KALD_MS));
     const { data: em, error: amErr } = await svc.from("employee_master_data").select("is_active").eq("id", emp).maybeSingle();
     if (amErr) return json({ kode: "db" }, 500);
     if (em?.is_active !== true) return json({ kode: "inaktiv" }, 403);
@@ -115,10 +115,21 @@ Deno.serve(async (req) => {
         log(konflikt ? "konflikt" : "register_fejl");
         return json({ kode: konflikt ? "konflikt" : "register_fejl" }, konflikt ? 409 : 500);
       }
+      // Holdbar køhensigt FØR statusændring. sb_koe_fil returnerer void: succes = intet error (data kan være null).
+      // Uden bekræftet kø forbliver rækken 'uploadet' og overtages senere af oprydningen (oprettet > 3 t).
       const opryd = async (kode: string) => {
-        const a = await svc.from("sb_stier").update({ status: "slettes" }).eq("bucket", BUCKET).eq("sti", sti).eq("status", "uploadet");
-        const k = await svc.rpc("sb_koe_fil", { p_bucket: BUCKET, p_sti: sti, p_kilde: "udstedelse_fejl", p_kilde_id: null });
-        log(kode, { markering: a.error ? "fejl" : "ok", koe: k.error ? "fejl" : "ok" });
+        let koe = "fejl", markering = "ikke_forsoegt";
+        try {
+          const k = await svc.rpc("sb_koe_fil", { p_bucket: BUCKET, p_sti: sti, p_kilde: "udstedelse_fejl", p_kilde_id: null });
+          if (!k.error) koe = "ok";
+        } catch { koe = "fejl"; }
+        if (koe === "ok") {
+          try {
+            const a = await svc.from("sb_stier").update({ status: "slettes" }).eq("bucket", BUCKET).eq("sti", sti).eq("status", "uploadet");
+            markering = a.error ? "fejl" : "ok";
+          } catch { markering = "fejl"; }
+        }
+        log(kode, { markering, koe });
         return json({ kode }, 500);
       };
       // 2. Token (aldrig upsert, aldrig fornyet på samme sti).
@@ -148,12 +159,12 @@ Deno.serve(async (req) => {
       const { data: reg, error: rErr } = await svc.from("sb_stier").select("status, besked_id").eq("bucket", BUCKET).eq("sti", m.attachment_path).maybeSingle();
       if (rErr) return json({ kode: "db" }, 500);
       if (!reg || reg.status !== "bundet" || reg.besked_id !== mid) return json({ kode: "vaek" }, 410);
-      const { data: blob, error: dErr } = await svc.storage.from(BUCKET).download(m.attachment_path);
-      if (dErr || !blob) return json({ kode: "vaek" }, 410);
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const type = filtype(bytes);
+      // Størrelse (info) → loft → begrænset stream → komplethed → type fra bytes. Ingen delvis fil.
+      const h = await hentBegraenset(svc, BUCKET, m.attachment_path, slut);
+      if (!h.ok) { log(h.grund, { message_id: mid }); return json({ kode: "vaek" }, 410); }
+      const { bytes, type } = h;
       const ext = (/\.([a-z0-9]{1,5})$/i.exec(m.attachment_path)?.[1] ?? "").toLowerCase();
-      if (!type || TYPER[ext] !== type) { log("type_afvist", { message_id: mid }); return json({ kode: "vaek" }, 410); }
+      if (TYPER[ext] !== type) { log("type_afvist", { message_id: mid }); return json({ kode: "vaek" }, 410); }
       const r = range(req.headers.get("Range"), bytes.length);
       const faelles = {
         ...cors, "Content-Type": type, "Content-Disposition": disposition(m.attachment_name, type), "Accept-Ranges": "bytes",
