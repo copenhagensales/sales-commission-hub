@@ -77,7 +77,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
 
 import { ChatView } from "./ChatView";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
-import { rydAlleKladder, hentAfsendelser } from "@/lib/sbKladder";
+import { rydAlleKladder, hentAfsendelser, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
 import { hasUnsentDrafts } from "@/components/mobile";
 
 // Én stabil QueryClient pr. prøve (også gennem rerender/navigation), mutations.retry=1 som App.tsx.
@@ -545,8 +545,8 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
   let ventende: V[] = [];
   let samtidige = 0, maks = 0;
   const pr = new Map<string, number>(); let maksPrId = 0;
-  const afs = (id: string, fil: Record<string, unknown> | null = null) => ({
-    id, tekst: id, svarId: null, fil, tilstand: "afstemmer" as const, fejl: null, tidligereUkendt: true, oprettet: 1,
+  const afs = (id: string, fil: FilMeta | null = null): Afsendelse => ({
+    id, tekst: id, svarId: null, fil, tilstand: "afstemmer", fejl: null, tidligereUkendt: true, oprettet: 1,
   });
   const fremad = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
   const svarFor = (id: string, data: unknown) => {
@@ -681,7 +681,7 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
 
   it("§8 A: forhåndsopslag med overtaget sti → tilbud, nul INSERT; efter tryk én udstedelse og samme id", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
-    const fil = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/gammel.txt", trin: "uploadet" };
+    const fil: FilMeta = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/gammel.txt", trin: "uploadet" };
     tilfoejAfsendelse("e", "A", afs("F1", fil), new File(["x"], "x.txt", { type: "text/plain" }));
     const reg = (sti: string, status: string) => ({ data: { bucket: "chat-attachments", sti, besked_id: null, status, samtale_id: "A", ejer_employee_id: "e" }, error: null });
     net.svar.sb_stier = [reg("c/e/gammel.txt", "slettet")];
