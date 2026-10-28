@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor, within, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -109,6 +109,8 @@ beforeEach(() => {
   net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
+// d2 §4: afmontér komponenter og ryd QueryClient efter hver prøve (ikke kun generationsreset).
+afterEach(() => { cleanup(); qc.clear(); vi.restoreAllMocks(); });
 
 describe("T1 – ChatView afsendelse", () => {
   it("dobbelt Send og Enter+klik giver én afsendelse", async () => {
@@ -181,7 +183,7 @@ describe("T10 – Ret og genudstedelse", () => {
     return r;
   }
 
-  it("afvist filsending → Ret bevarer id, fil og svar; ny Send bruger samme id", async () => {
+  it("afvist filsending uden svar → Ret bevarer id og fil (ingen svarreference); ny Send bruger samme id", async () => {
     await medFil();
     mutateAsync.mockRejectedValueOnce(new SendFejl("server", "Afvist"));
     skriv("tekst"); await act(async () => { fireEvent.click(send()); });
@@ -191,6 +193,7 @@ describe("T10 – Ret og genudstedelse", () => {
     mutateAsync.mockResolvedValueOnce({});
     await act(async () => { fireEvent.click(send()); });
     expect(mutateAsync.mock.calls[1][0]).toMatchObject({ id, attachmentPath: "c/e/gammel.txt", content: "tekst" });
+    expect((mutateAsync.mock.calls[1][0] as { replyToId?: string }).replyToId).toBeUndefined();
   });
 
   it("Ret overskriver ikke en anden igangværende kladde", async () => {
@@ -663,7 +666,17 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
       return new Promise((res) => ventende.push({ id, res: (s) => { samtidige--; pr.set(id, pr.get(id)! - 1); res(s); } }));
     };
   });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(async () => {
+    // d2 §4: afslut ALLE kontrollerede opslag (også detached) før timere nulstilles; kontrollér kapaciteten bagefter.
+    for (let n = 0; n < 20 && ventende.length; n++) {
+      for (const x of ventende.splice(0)) await act(async () => { x.res({ data: { id: x.id, status: "leveret", revision: 1 }, error: null }); await vi.advanceTimersByTimeAsync(0); });
+    }
+    expect(ventende).toEqual([]);
+    const { afstemningsKapacitet } = await import("./ChatView");
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0 });
+    cleanup();
+    vi.useRealTimers();
+  });
 
   it("A afventer, B tilføjes → begge når afslutning", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
@@ -926,25 +939,61 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     r.unmount();
   });
 
-  it("c3 §7: manuel handling mens en reel baggrundstimer er aktiv (online-genstart) – ét kald, fuld afslutning", async () => {
+  it("d2 §4: manuel genafsendelse efter udtømt serie → uafklaret, reel 1 s-timer aktiv, online-kapløb samles; fuld afslutning", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     const { afstemningsKapacitet } = await import("./ChatView");
     tilfoejAfsendelse("e", "A", afs("A1"));
     await klarFake();
     for (let n = 0; n < 7; n++) { if (ventende.some((x) => x.id === "A1")) await svarFor("A1", null); await fremad(30000); }
+    net.insert.mockReturnValueOnce({ error: { message: "transport" } }); // INSERT uden kendt udfald
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
     await fremad(0);
-    await svarFor("A1", { data: null } as unknown as null); // manuelt forhåndsopslag uden række
+    await svarFor("A1", null); // manuelt forhåndsopslag: fejlfrit tomt (rigtigt netværkssvar data=null)
     await fremad(0);
-    // Uafklaret → forløbet planlagde en reel timer (1 s); online-hændelse under timeren samles.
-    window.dispatchEvent(new Event("online"));
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    expect(net.insert.mock.calls[0][0]).toMatchObject({ id: "A1", content: "A1" });
+    await svarFor("A1", null); // afstemning efter INSERT: stadig tom → uafklaret
+    await fremad(0);
+    expect(hentAfsendelser("e", "A")[0]).toMatchObject({ id: "A1", tilstand: "afstemmer", tidligereUkendt: true });
+    const n0 = opslag("A1");
+    await fremad(999);
+    expect(opslag("A1")).toBe(n0); // timeren er planlagt, men ikke udløbet
+    window.dispatchEvent(new Event("online")); window.dispatchEvent(new Event("online"));
+    await fremad(0);
+    expect(opslag("A1")).toBe(n0 + 1); // kapløbet: timeren erstattes af ÉN genstart
+    window.dispatchEvent(new Event("online")); // under aktivt opslag → samles til én ventende genstart
     await fremad(0);
     expect(maksPrId).toBe(1);
-    for (const x of [...ventende]) await svarFor(x.id, { id: x.id });
+    await svarFor("A1", null);
+    await fremad(0);
+    expect(opslag("A1")).toBe(n0 + 2);
+    await svarFor("A1", { id: "A1" });
     await fremad(60000);
-    for (const x of [...ventende]) await svarFor(x.id, { status: "leveret", revision: 1 });
+    expect(opslag("A1")).toBe(n0 + 2);
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+    expect(net.insert).toHaveBeenCalledTimes(1); // automatisk afstemning skrev aldrig
     expect(ventende).toEqual([]);
-    expect(afstemningsKapacitet().aktive).toBe(0);
+    expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+  });
+
+  // d2 §5: negative bevisbetingelser gennem komponentforløbet – ingen skrivende sideeffekter.
+  for (const [navn, afv] of [
+    ["binding til andet id", { besked_id: "ANDET" }], ["fremmed ejer", { ejer_employee_id: "x" }], ["fremmed samtale", { samtale_id: "Z" }],
+    ["anden bucket", { bucket: "andet" }], ["anden sti", { sti: "c/e/anden.txt" }], ["status uploadet", { status: "uploadet" }], ["ukendt status", { status: "?" }],
+  ] as const) it(`d2 §5 negativ (${navn}): automatisk afstemning giver intet genudstedelsestilbud og nul udstedelse/upload/INSERT`, async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const fil: FilMeta = { name: "x.txt", type: "text/plain", size: 1, sti: "c/e/gammel.txt", trin: "uploadet" };
+    tilfoejAfsendelse("e", "A", afs("F1", fil), new File(["x"], "x.txt", { type: "text/plain" }));
+    net.svar.sb_stier = [{ data: { bucket: "chat-attachments", sti: "c/e/gammel.txt", besked_id: null, status: "slettes", samtale_id: "A", ejer_employee_id: "e", ...afv }, error: null }];
+    await klarFake();
+    await svarFor("F1", null);
+    await fremad(0);
+    expect(hentAfsendelser("e", "A")[0]?.tilstand).not.toBe("genudsted");
+    expect(screen.queryByRole("button", { name: "Ikke sendt – prøv igen" }) && hentAfsendelser("e", "A")[0]?.tilstand).not.toBe("genudsted");
+    expect(udstedUpload).not.toHaveBeenCalled();
+    expect(uploadTilSti).not.toHaveBeenCalled();
+    expect(net.insert).not.toHaveBeenCalled();
+    expect(net.kald.filter((k) => k.startsWith("insert"))).toEqual([]);
   });
 
   for (const status of ["slettes", "slettet"]) it(`§8 A (${status}): forhåndsopslag med overtaget sti → tilbud, nul INSERT; efter tryk én udstedelse og samme id`, async () => {
