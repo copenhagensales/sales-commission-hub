@@ -18,6 +18,7 @@ import { MessageWithLinks } from "./LinkPreview";
 import { renderMentions } from "./MentionInput";
 import { BeskedStatus } from "./BeskedStatus";
 import { FilVedhaeftning } from "./FilVedhaeftning";
+import { laesRetKladde, gemRetKladde, sletRetKladde } from "@/lib/sbKladder";
 
 interface MessageBubbleProps {
   message: Message;
@@ -38,8 +39,12 @@ export function slettesTekst(slettesEfter: string, nu = Date.now()): string {
 }
 
 export function MessageBubble({ message, isOwn, currentEmployeeId, conversationId, onReply }: MessageBubbleProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(message.content);
+  // Uafsendt redigeringskladde (§1): besked-id, tekst og revisionen, redigeringen begyndte fra.
+  const gemtRet = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
+  const [isEditing, setIsEditing] = useState(!!gemtRet);
+  const [editContent, setEditContent] = useState(gemtRet?.tekst ?? message.content);
+  const [retRevision, setRetRevision] = useState(gemtRet?.revision ?? message.revision);
+  const [retLagerFejl, setRetLagerFejl] = useState(false);
   const [nu, setNu] = useState(() => Date.now());
 
   const editMessage = useEditMessage();
@@ -48,6 +53,15 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
   const markAsRead = useMarkMessageAsRead();
   const afgoer = useAfgoer();
   useDraftGuard(isEditing && editContent !== message.content);
+  useEffect(() => {
+    if (!isEditing || !currentEmployeeId) return;
+    setRetLagerFejl(!gemRetKladde(currentEmployeeId, conversationId, { beskedId: message.id, tekst: editContent, revision: retRevision }));
+  }, [isEditing, editContent, retRevision, currentEmployeeId, conversationId, message.id]);
+  const afslutRet = () => {
+    setIsEditing(false);
+    setRetLagerFejl(false);
+    if (currentEmployeeId) sletRetKladde(currentEmployeeId, conversationId, message.id);
+  };
 
   const trukket = message.status === "trukket_tilbage";
   const leveret = message.status === "leveret";
@@ -78,14 +92,14 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id, isOwn, currentEmployeeId, hasRead, leveret]);
 
-  const startRet = () => { setEditContent(message.content); setIsEditing(true); };
+  const startRet = () => { setEditContent(message.content); setRetRevision(message.revision); setIsEditing(true); };
 
   const handleSaveEdit = async () => {
     if (!editContent.trim() || editMessage.isPending) return;
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     try {
-      await editMessage.mutateAsync({ messageId: message.id, content: editContent, conversationId, revision: message.revision });
-      setIsEditing(false);
+      await editMessage.mutateAsync({ messageId: message.id, content: editContent, conversationId, revision: retRevision });
+      afslutRet();
     } catch (e) {
       // Kladden bevares ved fejl.
       toast.error(erForaeldet(e) ? "Beskeden er ændret – prøv igen" : serverTekst(e, "Kunne ikke gemme ændringen"));
@@ -159,11 +173,12 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
                 autoFocus
               />
               <p className="text-[14px] opacity-80">{editContent.length}/4.000</p>
+              {retLagerFejl && <p className="text-[14px]" role="status">Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben</p>}
               <div className="flex gap-1">
                 <Button size="sm" className="max-md:min-h-11 max-md:min-w-11" onClick={handleSaveEdit} disabled={editMessage.isPending} aria-label="Gem ændring">
                   <Check className="h-3 w-3" />
                 </Button>
-                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={() => setIsEditing(false)} disabled={editMessage.isPending} aria-label="Annullér">
+                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={afslutRet} disabled={editMessage.isPending} aria-label="Annullér">
                   <X className="h-3 w-3" />
                 </Button>
               </div>
