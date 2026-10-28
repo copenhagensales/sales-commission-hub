@@ -339,7 +339,8 @@ export function useMarkMessageAsRead() {
  * - `genudsted`: dokumenteret ubundet sti overtaget af oprydningen – brugerudløst genudstedelse er tilladt.
  */
 export class SendFejl extends Error {
-  constructor(public art: "server" | "ukendt" | "gemt_vaek" | "genudsted", tekst: string) { super(tekst); this.name = "SendFejl"; }
+  /** `indsat=false`: intet INSERT blev forsøgt i dette forsøg (fx fejlet forhåndsopslag). */
+  constructor(public art: "server" | "ukendt" | "gemt_vaek" | "genudsted", tekst: string, public indsat = true) { super(tekst); this.name = "SendFejl"; }
 }
 
 export const GEMT_VAEK_TEKST = "Beskeden blev gemt, men er ikke længere tilgængelig";
@@ -412,7 +413,7 @@ export async function sendBesked(v: SendInput, employeeId: string): Promise<void
   const foer = await afstemAfsendelse(v, employeeId);
   if (foer === "fundet") return;
   if (foer === "gemt_vaek") throw new SendFejl("gemt_vaek", GEMT_VAEK_TEKST);
-  if (foer === "ukendt") throw ukendt();
+  if (foer === "ukendt") throw new SendFejl("ukendt", "Ikke sendt – prøv igen", false);
   let error: { code?: string; message?: string } | null = null;
   try {
     const r = await supabase.from("chat_messages").insert({
@@ -454,7 +455,7 @@ export function useSendMessage() {
 
   return useMutation({
     mutationFn: async (v: SendInput) => {
-      const employeeId = await getCurrentEmployeeId().catch(() => { throw ukendt(); });
+      const employeeId = await getCurrentEmployeeId().catch(() => { throw new SendFejl("ukendt", "Ikke sendt – prøv igen", false); });
       await sendBesked(v, employeeId);
       return v;
     },
