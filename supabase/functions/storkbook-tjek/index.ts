@@ -161,6 +161,12 @@ Deno.serve(async (req) => {
       if (laest && (!akt || akt.revision !== rev || akt.sender_id !== emp || akt.status !== "tjekkes")) { log("foraeldet"); return json({ status: "forældet" }); }
       if (laest && akt) udfald = await vurder(akt);
     } catch { log("behandling_afbrudt"); udfald = { ...UKENDT }; }
+    // A4 §1: en dom, der først er færdigbehandlet ved/efter arbejdsfristen, er ikke gyldig → hele UKENDT
+    // (ingen resterende felter). Afslutningen bruger fortsat sit særskilte budget; højst ét forsøg.
+    if (Date.now() >= arbejdsFrist) {
+      if (udfald.udfald !== "ukendt") log("arbejdsfrist");
+      udfald = { ...UKENDT };
+    }
     return await afslut(udfald);
 
     async function vurder(akt: { content: string | null; attachment_path: string | null; conversation_id: string }): Promise<Udfald> {

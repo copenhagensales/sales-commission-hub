@@ -488,7 +488,7 @@ klientTest("§1/§5 stateful MOCK af SQL-reglerne: udstedelsesfejl → ingen sle
   } finally { time.restore(); }
 });
 
-klientTest("§5 stateful MOCK: overtagelse > 3 t → post 1 afsluttes først (slettet), post 2 afhentes SÆRSKILT efter genforsøgsvinduet og bevarer slettet", async () => {
+test("§5 stateful MOCK: overtagelse > 3 t → post 1 afsluttes først (slettet), post 2 afhentes SÆRSKILT efter genforsøgsvinduet og bevarer slettet", async () => {
   // MOCK (ikke kørt SQL). Samme regler som ovenfor; her sker overtagelsen før post 1 er afhentet.
   const T0 = Date.parse("2026-10-28T10:00:00Z");
   const time = new FakeTime(T0);
@@ -668,6 +668,15 @@ test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver posit
     const { res } = await kørFake(hTjek, tjekReq(), time);
     assertEquals(res.status, 500); assertEquals(await res.json(), { kode: "afslut_fejl" }); assertEquals(afslutKald().length, 0);
   } finally { time.restore(); }
+  // A4: samme svar ved 51 s, men vellykket afslutning → 200 tjekket med hele UKENDT som sendt udfald.
+  time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    nulstil(tjekRute({ sti: null, gateway: async () => { await vent(51_000 - (Date.now() - t0), null); return okDom(); } }));
+    const { res } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(res.status, 200); assertEquals(await res.json(), { status: "tjekket" });
+    assertEquals(afslutKald().length, 1); assertEquals(udfaldSendt(), { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" });
+  } finally { time.restore(); }
   // Gateway hænger → afbrydes ved arbejdsfristen (50 s) → UKENDT, afslutning lykkes.
   time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
   try {
@@ -676,6 +685,77 @@ test("§3 tjek: gateway efter arbejdsfristen → UKENDT; 4 s tilbage giver posit
     assertEquals(await res.json(), { status: "tjekket" }); assertEquals(udfaldSendt().udfald, "ukendt"); assert(ms < 51_000);
   } finally { time.restore(); }
 });
+
+// ---------------------------------------------------------------- A4 §1: arbejdsfristen efter modelsvaret
+const UKENDT_PAYLOAD = { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" };
+const cprDomR = () => jsonR({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ tone: "ok", personoplysninger: "fundet", type: "cpr", cpr: true }) } }] });
+/** Gateway, der ignorerer abort og leverer et færdigt svar ved `ms` efter start. */
+const gwVed = (t0: () => number, ms: number, svar: () => Response = okDom) => async () => { await vent(ms - (Date.now() - t0()), null); return svar(); };
+async function a4(ops: { gateway: (k: Kald) => Response | Promise<Response>; sti?: string | null; info?: TjekOps["info"]; download?: TjekOps["download"] }, time: FakeTime) {
+  nulstil(tjekRute({ sti: ops.sti ?? null, gateway: ops.gateway, info: ops.info, download: ops.download }));
+  const { res } = await kørFake(hTjek, tjekReq(), time);
+  const body = await res.json();
+  assertEquals(afslutKald().length, 1, "præcis ét afslutningsforsøg");
+  const b = JSON.parse(afslutKald()[0].krop);
+  assertEquals({ p_kilde: b.p_kilde, p_id: b.p_id, p_revision: b.p_revision, p_token: b.p_token }, { p_kilde: "besked", p_id: TJEK_ID, p_revision: 1, p_token: "tok" });
+  ingenUkendte();
+  return { res, body, udfald: b.p_udfald };
+}
+
+test("A4 §1 tjek: gyldigt modelsvar færdigbehandlet ved 51 s → hele UKENDT (ingen type), ét afslutningsforsøg, 200 tjekket", async () => {
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    const { res, body, udfald } = await a4({ gateway: gwVed(() => t0, 51_000) }, time);
+    assertEquals(res.status, 200); assertEquals(body, { status: "tjekket" });
+    assertEquals(udfald, UKENDT_PAYLOAD); assert(!("type" in udfald));
+  } finally { time.restore(); }
+});
+
+test("A4 §1 tjek: svar færdigbehandlet præcis ved 50.000 ms → UKENDT", async () => {
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    const { udfald } = await a4({ gateway: gwVed(() => t0, 50_000) }, time);
+    assertEquals(udfald, UKENDT_PAYLOAD);
+  } finally { time.restore(); }
+});
+
+test("A4 §1 tjek: svar færdigbehandlet ved 49 s → dommen bevares (udfald ok)", async () => {
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    const { body, udfald } = await a4({ gateway: gwVed(() => t0, 49_000) }, time);
+    assertEquals(body, { status: "tjekket" });
+    assertEquals(udfald, { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ok" });
+  } finally { time.restore(); }
+});
+
+test("A4 §1 tjek: headers ved 49 s, body færdig ved 51 s → UKENDT", async () => {
+  const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+  try {
+    const t0 = Date.now();
+    const krop = JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ tone: "ok", personoplysninger: "ingen", cpr: false }) } }] });
+    const gateway = async () => {
+      await vent(49_000 - (Date.now() - t0), null);
+      const stream = new ReadableStream<Uint8Array>({ async start(c) { c.enqueue(enc(krop.slice(0, 10))); await vent(51_000 - (Date.now() - t0), null); c.enqueue(enc(krop.slice(10))); c.close(); } });
+      return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    const { udfald } = await a4({ gateway }, time);
+    assertEquals(udfald, UKENDT_PAYLOAD);
+  } finally { time.restore(); }
+});
+
+for (const [ms, forventet] of [[49_000, { tone: "ok", personoplysninger: "fundet", type: "cpr", cpr: true, fil_tjekket: false, udfald: "ok" }], [51_000, UKENDT_PAYLOAD]] as const) {
+  test(`A4 §1 tjek: filfejl + CPR-dom færdig ved ${ms / 1000} s → ${ms < 50_000 ? "bevaret dom (fil_tjekket=false)" : "hele UKENDT"}`, async () => {
+    const time = new FakeTime(Date.parse("2026-10-28T10:00:00Z"));
+    try {
+      const t0 = Date.now();
+      const { udfald } = await a4({ sti: "c/e1/x.png", info: () => fejlR(), download: () => new Response(png(16)), gateway: gwVed(() => t0, ms, cprDomR) }, time);
+      assertEquals(udfald, forventet);
+    } finally { time.restore(); }
+  });
+}
 
 test("§3 tjek: RPC-false er forældet, RPC-fejl er fejl, ikke_konfigureret/optaget bevares", async () => {
   nulstil(tjekRute({ sti: null, afslut: () => jsonR(false) }));
