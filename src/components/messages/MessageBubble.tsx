@@ -82,10 +82,6 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     const fejl = harRetLagerFejl(currentEmployeeId, conversationId, message.id);
     setRet((r) => (r.ejer === noegle && r.lagerFejl !== fejl ? { ...r, lagerFejl: fejl } : r));
   }, [egenState, isEditing, editContent, retRevision, currentEmployeeId, conversationId, message.id, noegle]);
-  // B2b-2 §4: åben editor (også gendannet efter navigation/reload eller efter afsluttet Gem) holder låsen som 'ret'.
-  useEffect(() => {
-    if (isEditing && !laas.art && kanGemme) tagHandling(fastholdEjer(currentEmployeeId, conversationId, authBrugerId), message.id, "ret");
-  }, [isEditing, laas.art, kanGemme, currentEmployeeId, conversationId, authBrugerId, message.id]);
   const setEditContent = (tekst: string) => setRet((r) => (r.ejer === noegle ? { ...r, tekst } : r));
   /** Afslutter redigeringen for den nøgle, den tilhører; berører ikke en anden nøgles state. */
   const afslutRet = (ejer = noegle, emp = currentEmployeeId, conv = conversationId, msg = message.id) => {
@@ -97,6 +93,10 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // Gem tilbydes kun, når serverrækken stadig kan rettes (ikke under tjek og ikke tilbagetrukket).
   const kanGemme = !trukket && message.status !== "tjekkes";
   const nyereServer = message.revision !== retRevision;
+  // B2b-2 §4: åben editor (også gendannet efter navigation/reload eller efter afsluttet Gem) holder låsen som 'ret'.
+  useEffect(() => {
+    if (isEditing && !laas.art && kanGemme) tagHandling(fastholdEjer(currentEmployeeId, conversationId, authBrugerId), message.id, "ret");
+  }, [isEditing, laas.art, kanGemme, currentEmployeeId, conversationId, authBrugerId, message.id]);
 
   // Træk tilbage på leverede beskeder kun inden for én time fra leveret_at; synligheden opdateres ved grænsen.
   const traekGraense = leveret && message.leveret_at ? new Date(message.leveret_at).getTime() + TIME : 0;
