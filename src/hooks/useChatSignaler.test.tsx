@@ -11,7 +11,7 @@ type Svar = { data: unknown; error: unknown };
 type Handler = (p: { new: unknown; eventType?: string }) => void;
 const g = vi.hoisted(() => ({
   opslag: vi.fn<() => Promise<{ data: unknown; error: unknown }>>(),
-  kanaler: [] as Array<{ navn: string; h: Map<string, Handler>; fjernet: boolean }>,
+  kanaler: [] as Array<{ navn: string; h: Map<string, Handler>; fjernet: boolean; sub?: (s: string) => void }>,
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -19,9 +19,9 @@ vi.mock("@/integrations/supabase/client", () => ({
     rpc: vi.fn(async () => ({ data: [], error: null })),
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(), getSession: vi.fn(async () => ({ data: { session: null } })) },
     channel: (navn: string) => {
-      const k = { navn, h: new Map<string, Handler>(), fjernet: false };
+      const k: { navn: string; h: Map<string, Handler>; fjernet: boolean; sub?: (s: string) => void } = { navn, h: new Map<string, Handler>(), fjernet: false };
       g.kanaler.push(k);
-      const ch = { on: (_t: string, f: { table: string }, cb: Handler) => { k.h.set(f.table, cb); return ch; }, subscribe: () => ch, k };
+      const ch = { on: (_t: string, f: { table: string }, cb: Handler) => { k.h.set(f.table, cb); return ch; }, subscribe: (cb?: (s: string) => void) => { k.sub = cb; return ch; }, k };
       return ch;
     },
     removeChannel: (ch: { k: { fjernet: boolean } }) => { ch.k.fjernet = true; return Promise.resolve("ok"); },
@@ -160,5 +160,39 @@ describe("B2-6B §B kold ulæstforbruger uden ChatView", () => {
     await act(async () => { vi.advanceTimersByTime(1000); });
     expect(toast).not.toHaveBeenCalled();
     expect(inval.mock.calls.length).toBe(foer);
+  });
+});
+
+// ---------- B2-6C §C: straks-ugyldiggørelse før privat opslag og socket-genabonnement ----------
+describe("B2-6C §C signalmodtagelse", () => {
+  for (const udfald of ["succes", "fejl", "tomt"] as const) {
+    it(`privat signal (${udfald}): søge-/svarlyttere ugyldiggøres FØR opslaget afsluttes; dublet deler behandling`, async () => {
+      const d = udskudt<Svar>();
+      g.opslag.mockReturnValue(d.p);
+      const set: Array<{ conversationId: string | null; kildeId: string; haendelse: string }> = [];
+      const af = onChatSignal((x) => set.push(x));
+      monter();
+      const [k] = aktive();
+      act(() => { send(k, signal()); send(k, signal()); }); // dublet
+      await vi.waitFor(() => expect(g.opslag).toHaveBeenCalledTimes(1));
+      // Opslaget holdes stadig: lytterne har allerede fået en neutral hændelse med kilde_id og ukendt samtale.
+      expect(set).toEqual([{ conversationId: null, kildeId: "b1", haendelse: "genvalider" }]);
+      await act(async () => { d.løs(udfald === "succes" ? { data: { conversation_id: "c1" }, error: null } : udfald === "fejl" ? { data: null, error: { message: "x" } } : { data: null, error: null }); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(1000); });
+      expect(set[0].haendelse).toBe("genvalider");
+      expect(vi.mocked(toast).mock.calls.length).toBeLessThanOrEqual(1);
+      af();
+    });
+  }
+  it("socket-genabonnement uden online-event genvaliderer søgning/svar; første abonnement gør ikke", () => {
+    const set: string[] = [];
+    const af = onChatSignal((x) => set.push(x.haendelse));
+    monter();
+    const [k] = aktive();
+    act(() => { k.sub?.("SUBSCRIBED"); });
+    expect(set).toEqual([]);
+    act(() => { k.sub?.("CHANNEL_ERROR"); k.sub?.("SUBSCRIBED"); });
+    expect(set).toEqual(["genforbind"]);
+    af();
   });
 });
