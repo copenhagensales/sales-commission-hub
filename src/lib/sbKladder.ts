@@ -103,6 +103,7 @@ export function laesKladde(emp: string, conv: string): Kladde | null {
 }
 
 export function gemKladde(emp: string, conv: string, k: Kladde): boolean {
+  if (erLukket(emp, conv)) return true; // B2d-2 §12: sene callbacks genskaber ikke en ryddet samtale
   if (!k.tekst && !k.svarId && !k.fil && !k.retId) return skriv(noegle(emp, conv), null);
   return skriv(noegle(emp, conv), { tekst: k.tekst.slice(0, 4000), svarId: k.svarId, fil: k.fil ?? null, retId: k.retId ?? null });
 }
@@ -129,6 +130,40 @@ export function sletRetKladdeHvis(emp: string, conv: string, msg: string, versio
   skriv(k, null);
   return true;
 }
+// ---------- B2d-2 §12: rydning efter bekræftet sletning/forladelse ----------
+/** Samtaler, der er ryddet i denne generation; skrivninger herefter ignoreres (sene callbacks). */
+const lukkede = new Set<string>();
+const erLukket = (emp: string, conv: string) => lukkede.has(`${generation}:${nk(emp, conv)}`);
+/** Kun til prøver/visning: er samtalen ryddet i denne generation? */
+export const samtaleRyddet = erLukket;
+/**
+ * Rydder netop (bruger, samtale) i den aktuelle generation: skrivekladde, redigeringskladder, pending poster,
+ * File-referencer, uploadforløb og snapshots. Andre samtaler/brugere røres ikke. Kaldes først efter stopvejen.
+ * `gen` er handlingens generation; en anden generation (logud/brugerskift siden) gør intet.
+ */
+export function rydSamtale(emp: string, conv: string, gen: number = generation): void {
+  if (!emp || !conv || gen !== generation) return;
+  lukkede.add(`${generation}:${nk(emp, conv)}`);
+  const base = noegle(emp, conv);
+  const ramt = (k: string) => k === base || k.startsWith(`${base}:`);
+  const noegler = new Set<string>([...hukommelse.keys()].filter(ramt));
+  const l = lager();
+  if (l && !ignorerLager) {
+    try { for (let i = 0; i < l.length; i++) { const k = l.key(i); if (k && ramt(k)) noegler.add(k); } } catch { /* tombstones nedenfor dækker kendte nøgler */ }
+  }
+  for (const k of noegler) {
+    if (k.includes(":ret:")) retVersioner.set(k, ++retVersionNr); // sene Gem-forsøg kan ikke slette/genskabe en ny version
+    skriv(k, null);
+  }
+  const k = nk(emp, conv);
+  afsendelser.delete(k);
+  lagringsFejl.delete(k);
+  forloeb.delete(k); // invaliderer igangværende uploadforsøg
+  filSnapshots.delete(k);
+  for (const f of [...filer.keys()]) if (f.startsWith(`${k}:`)) filer.delete(f);
+  meld();
+}
+
 export function gemRetKladde(emp: string, conv: string, k: RetKladde): boolean {
   retVersioner.set(retNoegle(emp, conv, k.beskedId), ++retVersionNr);
   return skriv(retNoegle(emp, conv, k.beskedId), { beskedId: k.beskedId, tekst: k.tekst.slice(0, 4000), revision: k.revision });
@@ -222,6 +257,7 @@ function saet(emp: string, conv: string, l: Afsendelse[]): void {
 
 /** Synkron registrering før første sideeffekt. */
 export function tilfoejAfsendelse(emp: string, conv: string, a: Afsendelse, fil?: File | null): void {
+  if (erLukket(emp, conv)) return;
   if (fil) filer.set(fk(emp, conv, a.id), fil);
   saet(emp, conv, [...hentAfsendelser(emp, conv).filter((x) => x.id !== a.id), a]);
 }
@@ -245,6 +281,7 @@ export function fjernAfsendelse(emp: string, conv: string, id: string, gen = gen
 
 export const afsendelsesFil = (emp: string, conv: string, id: string) => filer.get(fk(emp, conv, id)) ?? null;
 export function saetAfsendelsesFil(emp: string, conv: string, id: string, f: File | null): void {
+  if (f && erLukket(emp, conv)) return;
   if (f) filer.set(fk(emp, conv, id), f); else filer.delete(fk(emp, conv, id));
   meld();
 }
@@ -252,6 +289,7 @@ export function saetAfsendelsesFil(emp: string, conv: string, id: string, f: Fil
 /** Skrivekladdens valgte File (overlever navigation/afmontering, ikke reload). */
 export const kladdeFil = (emp: string, conv: string) => filer.get(fk(emp, conv, "_kladde")) ?? null;
 export function saetKladdeFil(emp: string, conv: string, f: File | null): void {
+  if (f && erLukket(emp, conv)) return;
   if (f) filer.set(fk(emp, conv, "_kladde"), f); else filer.delete(fk(emp, conv, "_kladde"));
 }
 
@@ -350,6 +388,7 @@ export function abonnerAfsendelser(l: Lytter): () => void { lyttere.add(l); retu
 
 export function rydAlleKladder(): void {
   generation++;
+  lukkede.clear();
   retVersioner.clear();
   afsendelser.clear();
   filer.clear();
