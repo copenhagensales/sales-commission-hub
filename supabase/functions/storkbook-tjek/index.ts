@@ -48,6 +48,16 @@ export function validerDom(x: unknown): ModelDom | null {
   return d;
 }
 
+/** 24d2: præcis én række med boolsk tjek_tilladt; alt andet (fejl, exception, form) = lukket. */
+export async function tjekPortAaben(svc: { rpc: (f: string) => PromiseLike<{ data: unknown; error: unknown }> }): Promise<boolean> {
+  try {
+    const { data, error } = await svc.rpc("sb_24d2_drift");
+    if (error || !Array.isArray(data) || data.length !== 1) return false;
+    const r = data[0] as Record<string, unknown> | null;
+    return !!r && typeof r.beskeder_pause === "boolean" && typeof r.fil_tilladt === "boolean" && r.tjek_tilladt === true;
+  } catch { return false; }
+}
+
 export const UKENDT: Udfald = { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" };
 
 function stubAktiv(): boolean {
@@ -149,6 +159,8 @@ Deno.serve(async (req) => {
     // Fra her er reservationen bekræftet: alle forløb (undtagen verificeret forældet række) ender i
     // ÉN fælles afslutning med den oprindelige kombination (besked, id, revision, token). Ingen ny reservation.
     let udfald: Udfald = { ...UKENDT };
+    // 24d2 §5: modelporten efter reservation og før modelkald. Lukket/ukendt → fælles UKENDT-afslutning, ingen gateway.
+    if (!(await tjekPortAaben(svc))) { log("port_lukket"); return await afslut(udfald); }
     try {
       // Indholdet, der tjekkes, skal tilhøre den reserverede revision. Genlæsningsfejl → UKENDT (intet modelkald).
       let akt: { revision: number; sender_id: string; status: string; content: string | null; attachment_path: string | null; conversation_id: string } | null = null;

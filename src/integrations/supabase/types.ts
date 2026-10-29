@@ -15982,6 +15982,7 @@ export type Database = {
           oprettet: string
           slettet_at: string | null
           sti: string
+          udleveret_at: string | null
         }
         Insert: {
           bucket: string
@@ -15993,6 +15994,7 @@ export type Database = {
           oprettet?: string
           slettet_at?: string | null
           sti: string
+          udleveret_at?: string | null
         }
         Update: {
           bucket?: string
@@ -16004,6 +16006,7 @@ export type Database = {
           oprettet?: string
           slettet_at?: string | null
           sti?: string
+          udleveret_at?: string | null
         }
         Relationships: []
       }
@@ -16099,6 +16102,7 @@ export type Database = {
           ejer_employee_id: string | null
           oprettet: string
           samtale_id: string | null
+          sb_oprindelse: string
           slet_tidligst: string | null
           slettet_at: string | null
           status: string
@@ -16113,6 +16117,7 @@ export type Database = {
           ejer_employee_id?: string | null
           oprettet?: string
           samtale_id?: string | null
+          sb_oprindelse?: string
           slet_tidligst?: string | null
           slettet_at?: string | null
           status?: string
@@ -16127,6 +16132,7 @@ export type Database = {
           ejer_employee_id?: string | null
           oprettet?: string
           samtale_id?: string | null
+          sb_oprindelse?: string
           slet_tidligst?: string | null
           slettet_at?: string | null
           status?: string
@@ -20774,6 +20780,17 @@ export type Database = {
         }
         Returns: Json
       }
+      sb_24d2_barriere: { Args: { p_eksklusiv: boolean }; Returns: undefined }
+      sb_24d2_drift: {
+        Args: never
+        Returns: {
+          beskeder_pause: boolean
+          fil_tilladt: boolean
+          tjek_tilladt: boolean
+        }[]
+      }
+      sb_24d2_flag: { Args: { p_noegle: string }; Returns: boolean }
+      sb_24d2_registreret: { Args: never; Returns: boolean }
       sb_afgoer: {
         Args: {
           p_handling: string
