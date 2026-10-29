@@ -768,6 +768,36 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(hentAfsendelser("e", "A")).toEqual([]);
   });
 
+  it("B2c-2b-2 (Codex): afstemning holder id → egen række kendt udløbet → RLS fjerner rækken → gammelt opslag afslutter: pending-tekst/fil genopstår aldrig; plads til egen afslutning", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const fil: FilMeta = { name: "vedh.png", type: "image/png", size: 3, sti: "A/e/vedh.png", trin: "uploadet" };
+    tilfoejAfsendelse("e", "A", { ...afs("A1", fil), tekst: "ventende-tekst" });
+    const r = await klarFake();
+    const usynlig = () => { expect(screen.queryByText("ventende-tekst")).toBeNull(); expect(screen.queryByText("vedh.png")).toBeNull(); };
+    // Trin 1: fysisk afstemning holder id'et (ét aktivt opslag, plads optaget).
+    expect(opslag("A1")).toBe(1);
+    expect(screen.getByText("ventende-tekst")).toBeTruthy();
+    const { afstemningsKapacitet } = await import("./ChatView");
+    expect(afstemningsKapacitet().aktive).toBe(1);
+    // Trin 2: egen serverrække med kendt udløbet frist i rå messages (beviser gemning, vises ikke).
+    beskeder.liste = [{ ...fremmed("A1", "server-tekst", { attachment_path: fil.sti, attachment_name: fil.name, attachment_type: fil.type }),
+      sender_id: "e", status: "leveret", read_receipts: [], slettes_efter: new Date(Date.now() - 1).toISOString() }];
+    beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />)); await fremad(0);
+    usynlig(); expect(screen.queryByText("server-tekst")).toBeNull();
+    expect(afstemningsKapacitet().aktive).toBe(1); // pladsen beholdes af det fysiske opslag
+    // Trin 3: næste genhentning – RLS skjuler rækken (antagelse, ikke SQL).
+    beskeder.liste = []; beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />)); await fremad(0);
+    usynlig();
+    expect(afstemningsKapacitet().aktive).toBe(1);
+    // Trin 4: det gamle opslag afslutter senere (RLS: ingen række).
+    await svarFor("A1", null); await fremad(0);
+    usynlig();
+    expect(afstemningsKapacitet().aktive).toBe(0); // frigivet af egen afslutning
+    expect(net.insert).not.toHaveBeenCalled();
+  });
+
   it("mange pending id'er: målt maksimal samtidighed er 3", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     for (let i = 0; i < 8; i++) tilfoejAfsendelse("e", "A", afs(`P${i}`));
