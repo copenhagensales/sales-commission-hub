@@ -554,7 +554,7 @@ describe("B2c-1b §1 – aktuel frist i editor, Gem og kvittering", () => {
       const r = render(ui(m, "e"));
       expect(felt()?.value).toBe("min rettelse");
       vi.setSystemTime(T0 + 1500);
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       expect(felt()).toBeNull();
       expect(screen.queryByText("min rettelse")).toBeNull();
       expect(screen.queryByText("server")).toBeNull();
@@ -607,7 +607,7 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       const r = aaben(m);
       expect(felt()?.value).toBe("min rettelse");
       vi.setSystemTime(T0 + 1001);
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       expect(felt()).toBeNull();
       expect(screen.queryByText("min rettelse")).toBeNull();
       expect(kladde()).toBeNull();
@@ -635,10 +635,10 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
       expect(sbRet()).toBe(1);
       vi.setSystemTime(T0 + 1001);
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       expect(felt()).toBeNull();
       await act(async () => { svar(udfald === "succes" ? { data: 2, error: null } : { data: null, error: { code: "P0001", message: "Kun afventende indhold kan rettes" } }); });
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       expect(felt()).toBeNull();
       expect(screen.queryByText("min rettelse")).toBeNull();
       expect(kladde()).toBeNull();
@@ -652,13 +652,13 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
       const r = render(ui(m, "e"));
       vi.setSystemTime(T0 + 1001);
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       expect(screen.queryByText("server")).toBeNull();
       const ny = { ...besked("m1", "ny tekst", 2), slettes_efter: iso(60_000) };
-      r.rerender(ui(ny));
+      r.rerender(ui(ny, "e"));
       expect(screen.getByText("ny tekst")).toBeTruthy();
       gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny rettelse", revision: 2 });
-      r.rerender(ui({ ...ny }));
+      r.rerender(ui({ ...ny }, "e"));
       expect(kladde()?.tekst).toBe("ny rettelse");
       r.unmount();
     } finally { slut(); }
@@ -669,7 +669,7 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
       const r = aaben(m);
       vi.setSystemTime(T0 + 1000); // fristen nået
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       expect(felt()).toBeNull();
       r.unmount();
       vi.setSystemTime(T0 + 310); // urhop -690 ms: klientens ur er nu før fristen
@@ -709,7 +709,7 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
       const r = render(ui(m, "e"));
       vi.setSystemTime(T0 + 1001);
-      r.rerender(ui({ ...m }));
+      r.rerender(ui({ ...m }, "e"));
       r.unmount();
       const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
       cb("SIGNED_OUT", null); cb("SIGNED_IN", { user: { id: "u" } }); // ny generation, samme bruger

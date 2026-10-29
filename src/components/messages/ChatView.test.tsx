@@ -1610,7 +1610,7 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
 describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
   const T0 = new Date("2026-10-29T00:00:00Z").getTime();
   const iso = (ms: number) => new Date(T0 + ms).toISOString();
-  const pend = (id: string, tekst: string): Afsendelse => ({ id, tekst, svarId: null, fil: null, tilstand: "fejlet", fejl: null, tidligereUkendt: false, oprettet: 1 });
+  const pend = (id: string, tekst: string): Afsendelse => ({ id, tekst, svarId: null, fil: null, tilstand: "afvist", fejl: null, tidligereUkendt: false, oprettet: 1 });
   afterEach(() => { vi.useRealTimers(); });
 
   it("udløb uden genoplivet pending-tekst; heller ikke når den kendte udløbne række forsvinder fra RLS", async () => {
