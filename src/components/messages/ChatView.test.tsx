@@ -2143,3 +2143,106 @@ describe("B2bc-5c-1 §2 – genhentningsbudget bundet til det konkrete hentefors
     for (const v of venter.splice(0)) v();
   });
 });
+
+// ---------- B2bc-5c-2 §1 – udløb under »Tjek igen« og sent svar (rigtig ChatView + MessageBubble) ----------
+describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
+  const T0 = new Date("2026-10-29T09:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0);
+    const { supabase } = await import("@/integrations/supabase/client");
+    const session: Session = { access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
+      user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" } };
+    graense.session.mockResolvedValue({ data: { session }, error: null });
+    const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { cb("SIGNED_IN", { user: { id: "u" } }); });
+  });
+  afterEach(() => { graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null })); vi.useRealTimers(); });
+  const egen = (frist: string | null, extra: Record<string, unknown> = {}) => fremmed("m1", "original-hemmelig", { sender_id: "e", revision: 3, slettes_efter: frist, ...extra });
+  const editor = () => screen.queryAllByRole("textbox").find((x) => x.getAttribute("aria-label") !== "besked") as HTMLTextAreaElement | undefined;
+  const genrender = async (r: ReturnType<typeof render>) => { r.rerender(wrap(<ChatView conversationId="A" />)); await tick(); };
+  const bekraeftetRaekke = { data: { status: "leveret", revision: 4, content: "min rettelse", attachment_path: null }, error: null };
+
+  /** Gem med transportfejl + ulæselig efterlæsning → holdbart ukendt udfald med »Tjek igen« (før fristen). */
+  async function ukendtGem() {
+    const { gemRetKladde } = await import("@/lib/sbKladder");
+    beskeder.liste = [egen(iso(1000))];
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "min rettelse", revision: 3 });
+    graense.rpc.mockImplementation(async (navn: unknown) => { if (navn === "sb_ret") throw new TypeError("Failed to fetch"); return { data: "e", error: null }; });
+    net.svar.chat_messages = [{ data: null, error: { message: "netværk" } }];
+    const r = await klar();
+    await waitFor(() => expect(editor()?.value).toBe("min rettelse"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await tick(); await tick();
+    expect(await screen.findByRole("button", { name: "Tjek igen" })).toBeTruthy();
+    return r;
+  }
+
+  it("udløb under rækkeopslaget: sent bekræftende svar genskaber intet snapshot, rydder ikke nyere kladde og starter ingen efterbehandling", async () => {
+    const { udfaldSnapshot, handlingFor } = await import("@/hooks/useChat");
+    const { gemRetKladde, laesRetKladde } = await import("@/lib/sbKladder");
+    const r = await ukendtGem();
+    const hold = kontrol<Svar>();
+    net.vent = () => hold.p;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(true);
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    expect(udfaldSnapshot("e", "A", "m1")).toBeNull();          // fristoprydning via stopvejen
+    // Nyere gyldigt grundlag for samme id med ny kladde.
+    beskeder.liste = [egen(iso(60_000), { content: "ny tekst", revision: 7 })]; beskeder.opdateret++;
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "ny kladde", revision: 7 });
+    await genrender(r);
+    const refetch = vi.spyOn(qc, "refetchQueries"); const inval = vi.spyOn(qc, "invalidateQueries");
+    const rpcFoer = graense.rpc.mock.calls.length;
+    await act(async () => { hold.res(bekraeftetRaekke); await hold.p; });
+    await tick(); await tick();
+    expect(udfaldSnapshot("e", "A", "m1")).toBeNull();
+    expect(laesRetKladde("e", "A", "m1")?.tekst).toBe("ny kladde");
+    expect(refetch).not.toHaveBeenCalled();
+    expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
+    expect(graense.rpc.mock.calls.length).toBe(rpcFoer);
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
+    expect(screen.queryByText("Udfaldet kunne ikke bekræftes")).toBeNull();
+    r.unmount();
+  });
+
+  it("udløb under listegenhentningen: sent refetch-svar genskaber intet snapshot og starter ingen tjek-/cacheefterbehandling", async () => {
+    const { udfaldSnapshot, handlingFor } = await import("@/hooks/useChat");
+    const r = await ukendtGem();
+    net.svar.chat_messages = [bekraeftetRaekke];
+    const hold = kontrol<void>();
+    const refetch = vi.spyOn(qc, "refetchQueries").mockImplementation(() => hold.p);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    await waitFor(() => expect(refetch).toHaveBeenCalled()); // rækkeopslaget bekræftede; listen genhentes
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    const inval = vi.spyOn(qc, "invalidateQueries");
+    const kaldFoer = net.kald.length, rpcFoer = graense.rpc.mock.calls.length;
+    await act(async () => { hold.res(); await hold.p; });
+    await tick(); await tick();
+    expect(udfaldSnapshot("e", "A", "m1")).toBeNull();
+    expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
+    expect(net.kald.length).toBe(kaldFoer);
+    expect(graense.rpc.mock.calls.length).toBe(rpcFoer);
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
+    expect(editor()).toBeUndefined();
+    r.unmount();
+  });
+
+  it("stop uden fristbevis under »Tjek igen« bevarer den almindelige kontrakt for ukendt udfald", async () => {
+    const { udfaldSnapshot, stopEfterbehandling, handlingFor } = await import("@/hooks/useChat");
+    const r = await ukendtGem();
+    const hold = kontrol<Svar>();
+    net.vent = () => hold.p;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    act(() => { stopEfterbehandling("e", "A", "m1"); });   // stop – fristen er ikke passeret
+    await act(async () => { hold.res(bekraeftetRaekke); await hold.p; });
+    await tick(); await tick();
+    expect(udfaldSnapshot("e", "A", "m1")).not.toBeNull(); // ukendt udfald bevaret
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
+    expect(screen.getByText("Udfaldet kunne ikke bekræftes")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tjek igen" })).toBeTruthy();
+    r.unmount();
+  });
+});
