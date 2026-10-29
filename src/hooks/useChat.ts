@@ -1149,7 +1149,6 @@ export function serverTekst(e: unknown, fast: string): string {
 }
 export const erForaeldet = (e: unknown) => (e as { code?: string; message?: string } | null)?.code === "P0001" && /forældet revision/i.test((e as { message?: string }).message ?? "");
 
-const vent = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- B2b-2 §4 / B2b-3a §1–§2a: fælles handlingslås pr. (generation, medarbejder, samtale, besked) ----------
 export type HandlingsArt = "send" | "traek" | "fjern" | "ret" | "gem";
