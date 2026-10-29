@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, useAfgoer,
-  erSynligMedFokus, handlingsTekst, HandlingsFejl, tagHandling, overtagTilGem, frigivRet, useHandling,
+  erSynligMedFokus, handlingsTekst, HandlingsFejl, tagHandling, overtagTilGem, frigivRet, useHandling, udfaldSnapshot,
   useFristUr, erUdloebet, svarUtilgaengeligt,
 } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ import { useDraftGuard } from "@/components/mobile";
 import { ReadReceipts } from "./ReadReceipts";
 import { MessageWithLinks } from "./LinkPreview";
 import { renderMentions } from "./MentionInput";
-import { BeskedStatus } from "./BeskedStatus";
+import { BeskedStatus, UkendtUdfald } from "./BeskedStatus";
 import { FilVedhaeftning } from "./FilVedhaeftning";
 import { laesRetKladde, gemRetKladde, sletRetKladde, sletRetKladdeHvis, retKladdeVersion, harRetLagerFejl, fastholdEjer, ejerGyldig } from "@/lib/sbKladder";
 
@@ -145,14 +145,14 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     const ejerNoegle = noegle, conv = conversationId, msg = message.id;
     const ejer = fastholdEjer(currentEmployeeId, conv, authBrugerId);
     // B2b-2 §4: Gem overtager editorens lås atomisk; optaget af anden handling → ignoreret klik.
-    if (!ejer || !overtagTilGem(ejer, msg)) return;
+    if (!ejer || !overtagTilGem(ejer, msg, { revision: message.revision, status: message.status })) return;
     const emp = ejer.emp;
     // Startrevisionen (serverens grundlag) og kladdeversionen (lokal markør) fastholdes særskilt.
     const startRevision = retRevision;
     gemRetKladde(emp, conv, { beskedId: msg, tekst: editContent, revision: startRevision });
     const version = retKladdeVersion(emp, conv, msg);
     try {
-      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: startRevision, ejer });
+      await editMessage.mutateAsync({ messageId: msg, content: editContent, conversationId: conv, revision: startRevision, ejer, kladdeVersion: version });
       if (!ejerGyldig(ejer)) return; // ny session: ingen sletning/lukning
       // Kun den oprindelige kladdeversion ryddes; en nyere/genåbnet kladde bevares.
       if (sletRetKladdeHvis(emp, conv, msg, version, ejer.gen) && noegleRef.current === ejerNoegle) {
@@ -165,9 +165,22 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
       if (art === "stoppet") return;
       const egen = noegleRef.current === ejerNoegle;
       // Ukendt udfald: lokal tilstand ved editoren, ingen toast og ingen automatisk ny skrivning.
-      if (egen) setRet((r) => (r.ejer === ejerNoegle ? { ...r, konflikt: art === "konflikt", ukendt: art === "ukendt" } : r));
+      // B2b-3a §1: ukendt udfald ligger i det delte snapshot (overlever remount); kun konflikt er lokal editorstate.
+      if (egen) setRet((r) => (r.ejer === ejerNoegle ? { ...r, konflikt: art === "konflikt" } : r));
       const t = handlingsTekst(e, "Kunne ikke gemme ændringen");
       if (t) toast.error(t);
+    }
+  };
+
+  /** B2b-3a §1: »Tjek igen« bekræftede Gem → kun den oprindelige kladdeversion ryddes; en nyere kladde bevares. */
+  const gemSnap = currentEmployeeId ? udfaldSnapshot(currentEmployeeId, conversationId, message.id) : null;
+  const afklaretGem = (v: "bekraeftet" | "konflikt") => {
+    const s = gemSnap;
+    if (!s || s.art !== "gem" || !ejerGyldig(s.ejer)) return;
+    if (v === "konflikt") { setRet((r) => (r.ejer === noegle ? { ...r, konflikt: true } : r)); return; }
+    if (s.kladdeVersion !== null && sletRetKladdeHvis(s.ejer.emp, s.ejer.conv, s.id, s.kladdeVersion, s.ejer.gen) && noegleRef.current === noegle) {
+      frigivRet(s.ejer.emp, s.ejer.conv, s.id);
+      setRet((r) => (r.ejer === noegle ? { ...r, aaben: false, lagerFejl: false, konflikt: false, ukendt: false } : r));
     }
   };
 
@@ -181,10 +194,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const handleTraek = () => {
     // B2b-1/B2b-2: kontekst og den viste rækkes revision fastholdes ved trykket; fælles lås med statuskortet.
     const ejer = fastholdEjer(currentEmployeeId, conversationId, authBrugerId);
-    if (!ejer || !tagHandling(ejer, message.id, "traek")) return;
-    afgoer.mutate({ messageId: message.id, revision: message.revision, handling: "traek", conversationId, ejer }, {
-      onError: (e) => { if (!ejerGyldig(ejer)) return; const t = handlingsTekst(e, "Kunne ikke trække beskeden tilbage"); if (t) toast.error(t); },
-    });
+    if (!ejer || !tagHandling(ejer, message.id, "traek", { revision: message.revision, status: message.status })) return;
+    afgoer.mutate({ messageId: message.id, revision: message.revision, handling: "traek", conversationId, ejer, startStatus: message.status, fejltekst: "Kunne ikke trække beskeden tilbage" });
   };
 
 
@@ -246,7 +257,9 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               <p className="text-[14px] opacity-80">{editContent.length}/4.000</p>
               {retLagerFejl && <p className="text-[14px]" role="status">Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben</p>}
               {konflikt && <p className="text-[14px]" role="alert">Beskeden er ændret – prøv igen</p>}
-              {egenState && ret.ukendt && !konflikt && <p className="text-[14px]" role="alert">Udfaldet kunne ikke bekræftes</p>}
+              {egenState && !konflikt && currentEmployeeId && laas.ukendt === "gem" && (
+                <UkendtUdfald emp={currentEmployeeId} conversationId={conversationId} messageId={message.id} onAfklaret={afklaretGem} />
+              )}
               {!kanGemme && <p className="text-[14px]" role="status">Beskeden kan ikke rettes lige nu</p>}
               <div className="flex flex-wrap gap-1">
                 {kanGemme && (
@@ -355,6 +368,10 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
           )}
         </div>
 
+        {/* B2b-3a §1: ukendt udfald synligt fra den leverede/øvrige boble; statuskortet viser det selv for afventende beskeder. */}
+        {isOwn && !isEditing && currentEmployeeId && !(message.status === "afventer_afsender" && !trukket && !udloebet) && (
+          <UkendtUdfald emp={currentEmployeeId} conversationId={conversationId} messageId={message.id} />
+        )}
         {isOwn && !isEditing && !trukket && !udloebet && (
           <BeskedStatus message={message} conversationId={conversationId} currentEmployeeId={currentEmployeeId} authBrugerId={authBrugerId} onRet={startRet} />
         )}

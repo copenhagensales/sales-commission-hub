@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
@@ -887,5 +887,220 @@ describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
       expect(typeof result.current.opdateret).toBe("number");
       qcP.clear();
     } finally { spy.mockRestore(); }
+  });
+});
+
+// ---------- B2b-3a: resultatkontrakt, holdbart ukendt udfald, lås/kø/stop (netværk mocket; SQL/RLS = antagelser) ----------
+import { vurderUdfald, useAfgoer, useFjernFil, aktiveHandlinger, udfaldSnapshot, tjekUdfaldIgen, HandlingsFejl } from "./useChat";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { act } from "@testing-library/react";
+import { toast } from "sonner";
+
+describe("B2b-3a §1 – resultatvurdering mod snapshot", () => {
+  const raek = (revision: number, o: Partial<{ status: string; content: string; attachment_path: string | null }> = {}) =>
+    ({ status: "afventer_afsender", content: "x", attachment_path: null, revision, ...o });
+  it("startrevision 1 mod revision 3 med samme tekst → konflikt (en større revision er aldrig nok)", () => {
+    expect(vurderUdfald({ art: "gem", startRevision: 1, forventet: { revision: 2, content: "x" }, filRef: null }, raek(3))).toBe("konflikt");
+  });
+  it("filfjernelse fra revision 1 mod revision 3 uden fil → konflikt", () => {
+    expect(vurderUdfald({ art: "fjern", startRevision: 1, forventet: { revision: 2, utenFil: true }, filRef: "e/c/f" }, raek(3))).toBe("konflikt");
+  });
+  it("præcis startrevision + 1 med ønsket resultat → bekræftet; anden tekst ved +1 → konflikt", () => {
+    expect(vurderUdfald({ art: "gem", startRevision: 1, forventet: { revision: 2, content: "x" }, filRef: null }, raek(2))).toBe("bekraeftet");
+    expect(vurderUdfald({ art: "gem", startRevision: 1, forventet: { revision: 2, content: "y" }, filRef: null }, raek(2))).toBe("konflikt");
+  });
+  it("gammel række (startrevision) beviser ikke afvisning → ukendt; ulæselig/usynlig → ukendt", () => {
+    expect(vurderUdfald({ art: "gem", startRevision: 1, forventet: { revision: 2, content: "y" }, filRef: null }, raek(1))).toBe("ukendt");
+    expect(vurderUdfald({ art: "traek", startRevision: 4, forventet: { revision: 4, status: "trukket_tilbage" }, filRef: null }, raek(4))).toBe("ukendt");
+    expect(vurderUdfald({ art: "send", startRevision: 4, forventet: { revision: 4, status: "leveret" }, filRef: null }, "fejl")).toBe("ukendt");
+    expect(vurderUdfald({ art: "send", startRevision: 4, forventet: { revision: 4, status: "leveret" }, filRef: null }, null)).toBe("ukendt");
+  });
+  it("send/træk: samme revision i målstatus → bekræftet; anden revision eller anden status → konflikt", () => {
+    const s = { art: "send" as const, startRevision: 4, forventet: { revision: 4, status: "leveret" }, filRef: null };
+    expect(vurderUdfald(s, raek(4, { status: "leveret" }))).toBe("bekraeftet");
+    expect(vurderUdfald(s, raek(5, { status: "leveret" }))).toBe("konflikt");
+    expect(vurderUdfald(s, raek(4, { status: "trukket_tilbage" }))).toBe("konflikt");
+  });
+});
+
+describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.retry=1)", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const ID = "m1";
+  const rpc = () => vi.mocked(supabase.rpc);
+  const laesninger = () => kald.filter((k) => k === "select:chat_messages").length;
+  const r = (revision: number, o: Record<string, unknown> = {}) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null, ...o });
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    rpc().mockReset();
+    vi.mocked(toast.error).mockReset();
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u"); // ny generation: ingen låse/snapshots fra andre prøver
+  });
+  // Isolation: ingen rpc-kald/toasts lækker til andre prøver i blandet rækkefølge.
+  afterEach(() => { rpc().mockReset(); vi.mocked(toast.error).mockReset(); for (const k of Object.keys(svar)) delete svar[k]; });
+  const ejer = () => fastholdEjer("e", "c", "u")!;
+  const afslut = async () => { await act(async () => { await new Promise((x) => setTimeout(x, 0)); }); qc.clear(); };
+
+  it("Gem: transportfejl og række med revision 3 og samme tekst (start 1) → konflikt, ét sb_ret, intet snapshot", async () => {
+    const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
+    const e = ejer(); expect(tagHandling(e, ID, "gem")).toBe(true);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    svar.chat_messages = [r(3)];
+    const f = await result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }).then(() => null, (x) => x);
+    expect(f).toBeInstanceOf(HandlingsFejl); expect((f as HandlingsFejl).art).toBe("konflikt");
+    expect(rpc()).toHaveBeenCalledTimes(1);
+    expect(udfaldSnapshot("e", "c", ID)).toBeNull();
+    expect(aktiveHandlinger()).toBe(0);
+    await afslut();
+  });
+
+  it("sb_ret med revision ≠ start+1 er ikke direkte succes → afstemmes ved læsning", async () => {
+    const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "gem");
+    rpc().mockResolvedValueOnce({ data: 7, error: null } as never);
+    svar.chat_messages = [r(1)];
+    const f = await result.current.mutateAsync({ messageId: ID, content: "ny", conversationId: "c", revision: 1, ejer: e, kladdeVersion: 9 }).then(() => null, (x) => x);
+    expect((f as HandlingsFejl).art).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)).toMatchObject({ art: "gem", startRevision: 1, forventet: { revision: 2, content: "ny" }, kladdeVersion: 9, bekraeftet: false });
+    await afslut();
+  });
+
+  it("Fjern fil: transportfejl og revision 3 uden fil (start 1) → konflikt og én konflikttoast", async () => {
+    const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "fjern");
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    svar.chat_messages = [r(3)];
+    await result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "e/c/f", fejltekst: "Kunne ikke fjerne filen" }).catch(() => null);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Beskeden er ændret – prøv igen");
+    expect(udfaldSnapshot("e", "c", ID)).toBeNull();
+    await afslut();
+  });
+
+  it("transportfejl med gammel række → ukendt bevares; senere commit → »Tjek igen« bekræfter uden ny skrivning", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    svar.chat_messages = [r(4)];
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }).catch(() => null);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(false);
+    // Ret-åbning rydder ikke tilstanden.
+    expect(tagHandling(ejer(), ID, "ret")).toBe(true);
+    expect(udfaldSnapshot("e", "c", ID)).not.toBeNull();
+    svar.chat_messages = [r(4, { status: "leveret" })];
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("bekraeftet");
+    expect(udfaldSnapshot("e", "c", ID)).toBeNull();
+    expect(rpc()).toHaveBeenCalledTimes(1);
+    await afslut();
+  });
+
+  it("tilbageholdt og fejlet »Tjek igen«: tjekker under læsning; læsefejl bevarer snapshot; ingen skrivning", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "traek");
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    svar.chat_messages = [r(4)];
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "traek", conversationId: "c", ejer: e }).catch(() => null);
+    let slip!: (x: { data: unknown; error: unknown }) => void;
+    svar.chat_messages = [new Promise((x) => { slip = x; })];
+    const p = tjekUdfaldIgen(qc, "e", "c", ID);
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("stoppet"); // parallelt tryk deduplikeres
+    slip({ data: null, error: { message: "netværk" } });
+    expect(await p).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)?.art).toBe("traek");
+    expect(rpc()).toHaveBeenCalledTimes(1);
+    await afslut();
+  });
+
+  it("§2a: rigtig InfiniteData-query – mens genhentningen efter vellykket Send tilbageholdes, ignoreres et nyt klik; læsefejl → bekræftet-tilstand spærrer gammelt grundlag", async () => {
+    let n = 0; let slip!: (v: unknown) => void; let afvis!: (e: unknown) => void;
+    const side = (status: string) => ({ beskeder: [{ id: ID, status, revision: 4 }] });
+    renderHook(() => useInfiniteQuery({
+      queryKey: ["chat-messages", "c"], initialPageParam: 0, getNextPageParam: () => undefined,
+      queryFn: () => (++n === 1 ? Promise.resolve(side("afventer_afsender")) : new Promise((res, rej) => { slip = res; afvis = rej; })),
+    }), { wrapper: wrap });
+    await waitFor(() => expect(n).toBe(1));
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); const vis = { revision: 4, status: "afventer_afsender" };
+    expect(tagHandling(e, ID, "send", vis)).toBe(true);
+    rpc().mockResolvedValueOnce({ data: true, error: null } as never);
+    let faerdig = false;
+    const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).then(() => { faerdig = true; });
+    await waitFor(() => expect(n).toBe(2));
+    expect(faerdig).toBe(false);
+    expect(tagHandling(ejer(), ID, "send", vis)).toBe(false); // samme gamle grundlag: andet klik ignoreres
+    expect(rpc()).toHaveBeenCalledTimes(1);
+    afvis(new Error("netværk"));
+    await p;
+    expect(udfaldSnapshot("e", "c", ID)).toMatchObject({ bekraeftet: true });
+    expect(tagHandling(ejer(), ID, "traek", vis)).toBe(false); // stadig gammelt grundlag
+    expect(aktiveHandlinger()).toBe(0);
+    expect(tagHandling(ejer(), ID, "traek", { revision: 4, status: "leveret" })).toBe(true); // opdateret visning
+    expect(udfaldSnapshot("e", "c", ID)).toBeNull();
+    void slip;
+    await afslut();
+  });
+
+  it("§2a stop under RPC: intet resultatopslag, ingen toast/snapshot; låsen beholdes til kaldet afslutter", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    let slip!: (v: unknown) => void;
+    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })) as never);
+    const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }).catch(() => null);
+    await waitFor(() => expect(rpc()).toHaveBeenCalledTimes(1));
+    const foer = laesninger();
+    stopEfterbehandling("e", "c", ID);
+    expect(aktiveHandlinger()).toBe(1); // fysisk igangværende kald beholder låsen
+    slip({ data: null, error: { message: "Failed to fetch" } });
+    await p;
+    expect(laesninger()).toBe(foer);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(udfaldSnapshot("e", "c", ID)).toBeNull();
+    expect(aktiveHandlinger()).toBe(0);
+    await afslut();
+  });
+
+  it("§2a stop under resultatafstemningen (Gem): sent svar giver intet snapshot, ingen toast og ingen cacheinvalidering", async () => {
+    const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "gem");
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    let slip!: (x: { data: unknown; error: unknown }) => void;
+    svar.chat_messages = [new Promise((x) => { slip = x; })];
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    const p = result.current.mutateAsync({ messageId: ID, content: "ny", conversationId: "c", revision: 1, ejer: e }).then(() => null, (x) => x);
+    await waitFor(() => expect(laesninger()).toBe(1));
+    stopEfterbehandling("e", "c");
+    slip(r(1));
+    const f = await p;
+    expect((f as HandlingsFejl).art).toBe("stoppet");
+    expect(udfaldSnapshot("e", "c", ID)).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(inv).not.toHaveBeenCalled();
+    await afslut();
+  });
+
+  it("§2a stop under sb_fjern_fil før svar: ingen efterbehandling (intet tjek-kald)", async () => {
+    const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "fjern");
+    let slip!: (v: unknown) => void;
+    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })) as never);
+    const p = result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "f" }).catch(() => null);
+    await waitFor(() => expect(rpc()).toHaveBeenCalledTimes(1));
+    stopEfterbehandling("e", "c");
+    slip({ data: 2, error: null });
+    await p;
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    expect(laesninger()).toBe(0);
+    await afslut();
+  });
+});
+
+describe("B2b-3a §1 – Træk tilbage fra leveret: uændret startstatus er intet bevis", () => {
+  it("leveret → læst leveret i samme revision = ukendt; trukket = bekræftet; afventer = konflikt", () => {
+    const s = { art: "traek" as const, startRevision: 2, startStatus: "leveret", forventet: { revision: 2, status: "trukket_tilbage" }, filRef: null };
+    const raek = (status: string) => ({ status, revision: 2, content: "", attachment_path: null });
+    expect(vurderUdfald(s, raek("leveret"))).toBe("ukendt");
+    expect(vurderUdfald(s, raek("trukket_tilbage"))).toBe("bekraeftet");
+    expect(vurderUdfald(s, raek("afventer_afsender"))).toBe("konflikt");
   });
 });

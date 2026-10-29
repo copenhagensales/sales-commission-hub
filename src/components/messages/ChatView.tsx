@@ -244,7 +244,9 @@ export function stopAfstemninger(emp: string, conv: string, id?: string): void {
 registrerAfsendelsesKoordinering((gen, emp, conv, id) => {
   const k = laasNoegle(gen, emp, conv, id);
   if (afsOps.has(k) || laase.has(k) || forloeb.get(k)?.aktiv) return true;
-  return hentAfsendelser(emp, conv).some((a) => a.id === id && (a.tilstand === "sender" || a.tilstand === "afstemmer"));
+  // B2b-3a §2a: kun fysisk/planlagt arbejde blokerer. En udtømt afstemning (»Prøv igen« venter på brugeren)
+  // spærrer ikke serverhandlinger tavst; en synlig serverrække samordnes med posten i ChatView.
+  return hentAfsendelser(emp, conv).some((a) => a.id === id && (a.tilstand === "sender" || (a.tilstand === "afstemmer" && !forloeb.get(k)?.udtoemt)));
 });
 const erUdtoemt = (gen: number, emp: string, conv: string, id: string) => !!forloeb.get(laasNoegle(gen, emp, conv, id))?.udtoemt;
 if (typeof window !== "undefined") {
@@ -517,6 +519,20 @@ export function ChatView({ conversationId }: ChatViewProps) {
   }, [meId, conversationId, afstemmer, queryClient]);
   void koeV;
   const gen = sessionsGeneration();
+  // B2b-3a §2a: en synlig egen serverrække med samme id beviser gemningen. Posten ryddes, når intet fysisk arbejde
+  // (manuel afsendelse, netværkslås, aktiv afstemning) holder id'et; ellers venter den på sin egen afslutning.
+  const synligeEgne = (messages ?? []).filter((m) => m.sender_id === meId).map((m) => m.id);
+  const synligNoegle = afsendelser.filter((a) => synligeEgne.includes(a.id)).map((a) => a.id).join(",");
+  useEffect(() => {
+    if (!meId || !synligNoegle) return;
+    const g = sessionsGeneration();
+    for (const id of synligNoegle.split(",")) {
+      const k = laasNoegle(g, meId, conversationId, id);
+      if (afsOps.has(k) || laase.has(k) || forloeb.get(k)?.aktiv) continue;
+      if (forloeb.has(k)) stopForloeb(k);
+      fjernAfsendelse(meId, conversationId, id, g);
+    }
+  }, [meId, conversationId, synligNoegle, koeV]);
   const udtoemt = { has: (id: string) => !!meId && erUdtoemt(gen, meId, conversationId, id) };
 
   const composerTom = !message.trim() && !fil && !retId && !svarId && !replyTo;
