@@ -2236,7 +2236,8 @@ describe("B2-7 §2 – fire skriveveje: logud/brugerskift under skrivekaldets to
   const hentFn = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     if (init?.signal?.aborted) throw new DOMException("afbrudt", "AbortError");
     transport.push(String(url));
-    if (holdSvar) await new Promise<void>((x) => { sentSvar = x; });
+    // Allerede afsendt: serveren kan have gennemført; et senere afbrudt signal afviser svaret som fetch gør.
+    if (holdSvar) await new Promise<void>((x, afvis) => { sentSvar = x; init?.signal?.addEventListener("abort", () => afvis(new DOMException("afbrudt", "AbortError"))); });
     return new Response(svarHttp.krop, { status: 201, headers: { "content-type": "application/json" } });
   });
   const klient = createClient("http://lokal.test", "anon", {
