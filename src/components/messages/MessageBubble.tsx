@@ -48,18 +48,22 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const trukket = message.status === "trukket_tilbage";
   // B2c-1 §5: lokalt udløbet indhold (klientens ur) – visningsværn, intet skrives.
   const fristNu = useFristUr([message.slettes_efter, message.reply_to?.slettes_efter]);
-  const udloebet = erUdloebet(message.slettes_efter, fristNu);
+  // B2c-2a §1: kendt udløbet (konkret frist, generation) – et urhop tilbage genopliver hverken tekst eller editor.
+  const udloebet = erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, fristNu);
+  const slettet = !!message.deleted_at;
+  // Kendt udløbet, tilbagetrukket eller slettet originaltekst: ingen editor, ingen Gem, ingen »Brug nyeste tekst«.
+  const indholdVaek = trukket || udloebet || slettet;
   const leveret = message.status === "leveret";
   // B2b-1 §3: kladde gendannes med sin egen startrevision; tilbagetrukket indhold genskabes aldrig i editoren.
   const gendan = () => {
     const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
-    return { ejer: noegle, aaben: !!g && !trukket && !erUdloebet(message.slettes_efter, Date.now()), tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+    return { ejer: noegle, aaben: !!g && !trukket && !message.deleted_at && !erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now()), tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
       lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false, konflikt: false, ukendt: false };
   };
   const [ret, setRet] = useState(gendan);
   const egenState = ret.ejer === noegle;
   const { tekst: editContent, revision: retRevision, lagerFejl: retLagerFejl } = ret;
-  const isEditing = egenState && ret.aaben && !trukket && !udloebet; // gammel nøgles state vises/gemmes aldrig
+  const isEditing = egenState && ret.aaben && !indholdVaek; // gammel nøgles state vises/gemmes aldrig
   const konflikt = egenState && ret.konflikt;
   const noegleRef = useRef(noegle);
   noegleRef.current = noegle;
@@ -95,9 +99,18 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     setRet((r) => (r.ejer === ejer ? { ...r, aaben: false, lagerFejl: false, konflikt: false, ukendt: false } : r));
   };
   /** B2b-1 §3: eksplicit brugerhandling – nyeste servertekst og -revision bliver nyt redigeringsgrundlag (ny lokal kladdeændring). */
-  const brugNyeste = () => setRet((r) => (r.ejer === noegle ? { ...r, tekst: message.content, revision: message.revision, konflikt: false } : r));
+  const brugNyeste = () => { if (!indholdVaek) setRet((r) => (r.ejer === noegle ? { ...r, tekst: message.content, revision: message.revision, konflikt: false } : r)); };
+  // B2c-2a §1: editoroperationen invalideres (lukket state, frigivet 'ret'-lås) FØR kladden ryddes, så sene
+  // callbacks/gemmeeffekter ikke skriver teksten tilbage. Kun denne generations kladdeversion ryddes (sletRetKladdeHvis).
+  useEffect(() => {
+    if (!indholdVaek || !currentEmployeeId) return;
+    const emp = currentEmployeeId, conv = conversationId, msg = message.id, gen = sessionsGeneration();
+    setRet((r) => (r.ejer === noegle ? { ...r, aaben: false, tekst: "", konflikt: false } : r));
+    if (laas.art === "ret") frigivRet(emp, conv, msg);
+    if (laesRetKladde(emp, conv, msg)) sletRetKladdeHvis(emp, conv, msg, retKladdeVersion(emp, conv, msg), gen);
+  }, [indholdVaek, currentEmployeeId, conversationId, message.id, noegle, laas.art]);
   // Gem tilbydes kun, når serverrækken stadig kan rettes (ikke under tjek og ikke tilbagetrukket).
-  const kanGemme = !trukket && !udloebet && message.status !== "tjekkes";
+  const kanGemme = !indholdVaek && message.status !== "tjekkes"; // tjekkes: Gem spærret, kladden bevares
   const nyereServer = message.revision !== retRevision;
   // B2b-2 §4: åben editor (også gendannet efter navigation/reload eller efter afsluttet Gem) holder låsen som 'ret'.
   useEffect(() => {
@@ -119,7 +132,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     if (isOwn || !currentEmployeeId || hasRead || !leveret || udloebet) return;
     const kvitter = () => {
       // B2c-1b §1: fokus/genforbindelse før fristtimeren kvitterer aldrig en udløbet række.
-      if (erUdloebet(fristRef.current, Date.now())) { setNu(Date.now()); return; }
+      if (erKendtUdloebet(currentEmployeeId, conversationId, message.id, fristRef.current, Date.now())) { setNu(Date.now()); return; }
       if (erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ messageId: message.id, conversationId });
     };
     kvitter();
@@ -145,7 +158,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const handleSaveEdit = async () => {
     if (!kanGemme || !editContent.trim() || laas.art === "gem") return;
     // B2c-1b §1: fristen kontrolleres mod det aktuelle ur ved klik – en render fra før udløbet sender aldrig sb_ret.
-    if (erUdloebet(message.slettes_efter, Date.now())) { setNu(Date.now()); return; }
+    if (message.deleted_at || erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now())) { setNu(Date.now()); return; }
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     // §1/§2 (c1): fuld kontekst og kladdeversion fastholdes synkront før mutateAsync.
     const ejerNoegle = noegle, conv = conversationId, msg = message.id;
