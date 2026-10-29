@@ -647,7 +647,7 @@ describe("c3 §8 – to isolerede klientforløb med samme id mod fælles netvær
  * (P0001 IKKE_REGISTRERET_TEKST, når stien ikke er egen, ubundet og 'uploadet') tilbagefører hele transaktionen.
  * Oprydning overtager kun en ubundet 'uploadet' sti (→ 'slettes'); en sti i 'slettes'/'slettet' kan aldrig bindes igen.
  */
-function lavModel() {
+function lavModel(bindFoerPk = false) {
   type Sti = { bucket: string; sti: string; ejer_employee_id: string; samtale_id: string; status: string; besked_id: string | null };
   const stier = new Map<string, Sti>();
   const rækker = new Map<string, { id: string; attachment_path: string | null }>();
@@ -656,13 +656,16 @@ function lavModel() {
   const nySti = (sti: string, status = "uploadet") => stier.set(sti, { bucket: "chat-attachments", sti, ejer_employee_id: "e", samtale_id: "c", status, besked_id: null });
   const oprydning = (sti: string) => { const s = stier.get(sti); if (s && s.besked_id === null && s.status === "uploadet") s.status = "slettes"; };
   const udfoer = (row: { id: string; conversation_id: string; sender_id: string; attachment_path: string | null }) => {
-    if (rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } }; // tilbageført, ingen binding
+    if (!bindFoerPk && rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } }; // tilbageført, ingen binding
     if (row.attachment_path) {
       const s = stier.get(row.attachment_path);
       if (!s || s.besked_id !== null || s.status !== "uploadet" || s.ejer_employee_id !== row.sender_id || s.samtale_id !== row.conversation_id)
         return { error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } }; // tilbageført
       s.besked_id = row.id; s.status = "bundet";
+      // B2b-3b §3: bindingen udføres før primærnøglekonflikten; konflikten tilbagefører taberens binding.
+      if (bindFoerPk && rækker.has(row.id)) { s.besked_id = null; s.status = "uploadet"; return { error: { code: "23505", message: "duplicate key" } }; }
     }
+    if (bindFoerPk && rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } };
     rækker.set(row.id, { id: row.id, attachment_path: row.attachment_path });
     return { error: null };
   };
