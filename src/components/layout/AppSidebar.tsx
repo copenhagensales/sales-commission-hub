@@ -43,6 +43,7 @@ import { useCanViewRampTeam } from "@/hooks/useRampTeam";
 import { useQualityAccess } from "@/hooks/useQualityControl";
 import { ViewAsSelector } from "./ViewAsSelector";
 import { StrukturMenu, useSynligStruktur } from "./StrukturMenu";
+import { MobilMenu } from "@/components/mobile/MobilMenu";
 import { MIT_ARBEJDE } from "@/config/struktur";
 import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 import { usePendingSupplierDispatchCount } from "@/hooks/useSupplierReportDispatch";
@@ -406,6 +407,9 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const profilSide = synligStruktur.flatMap((o) => o.sider).find((sd) => sd.id === "side_min_profil");
   // Telefonens Menu-skuffe: Mit arbejde ligger i bundbjælken/Mig; Min profil står øverst.
   const mobilTop = isMobile && profilSide ? [profilSide] : [];
+
+  // D1: telefonens Menu-ark er sit eget udtryk (fliser, søgning, konto) – samme sider/synlighed/badges som sidebaren.
+  if (isMobile) return <MobilMenu badges={badges} onLogout={() => { handleLogout(); handleNavClick(); }} ekstra={<ViewAsSelector />} />;
 
   return (
     <aside className={sidebarClasses}>
