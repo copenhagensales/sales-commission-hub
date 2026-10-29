@@ -2557,10 +2557,11 @@ describe("24d2 r2 §2 – driftsstatus genkontrolleres efter hvert ventepunkt", 
 
   it("(4) nyere kladde skrevet FØR PAUSE-svaret bevares sammen med den afviste pending", async () => {
     beskeder.ægteSend = true; driftT.ægte = true;
+    let iPause = false; // serveren går i pause, mens INSERT venter; efterfølgende driftslæsning bekræfter den
     graense.rpc.mockImplementation(async (fn: unknown) => fn === "sb_24d2_drift"
-      ? { data: [{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
+      ? { data: [{ beskeder_pause: iPause, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
     const k = kontrol<{ error: unknown }>();
-    net.insert.mockImplementation(() => k.p);
+    net.insert.mockImplementation(() => { iPause = true; return k.p; });
     await klar();
     skriv("første");
     await act(async () => { fireEvent.click(send()); });
