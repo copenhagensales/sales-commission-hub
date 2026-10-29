@@ -27,7 +27,8 @@ const graense = vi.hoisted(() => ({
   rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
-  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "t" } } })),
+  // B2c-2b-2: sessionen bærer auth-brugeren (som en rigtig session), så §6-bindingen ikke afhænger af prøverækkefølge.
+  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "t", user: { id: "u" } } } })),
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (t: string) => {
