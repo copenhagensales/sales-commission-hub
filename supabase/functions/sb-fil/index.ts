@@ -58,6 +58,16 @@ export function tokenUdloeb(token: string): number | null {
   } catch { return null; }
 }
 
+/** 24d2: præcis én række med boolsk fil_tilladt; alt andet (fejl, exception, form) = lukket. */
+export async function filPortAaben(svc: { rpc: (f: string) => PromiseLike<{ data: unknown; error: unknown }> }): Promise<boolean> {
+  try {
+    const { data, error } = await svc.rpc("sb_24d2_drift");
+    if (error || !Array.isArray(data) || data.length !== 1) return false;
+    const r = data[0] as Record<string, unknown> | null;
+    return !!r && typeof r.beskeder_pause === "boolean" && typeof r.tjek_tilladt === "boolean" && r.fil_tilladt === true;
+  } catch { return false; }
+}
+
 const kald = new Map<string, number[]>();
 function begraens(uid: string): number {
   const nu = Date.now();
@@ -100,6 +110,8 @@ Deno.serve(async (req) => {
       if (ext === "pdf" || b.type === "application/pdf") return json({ kode: "pdf_udskudt" }, 400);
       if (!TYPER[ext] || TYPER[ext] !== b.type) return json({ kode: "filtype" }, 400);
       if (b.size > MAKS) return json({ kode: "stoerrelse" }, 400);
+      // 24d2 §4: filporten. Ukendt svar/fejl = lukket → 503 uden registrering eller token.
+      if (!(await filPortAaben(svc))) { log("vedligeholdelse"); return json({ kode: "vedligeholdelse" }, 503); }
       const { data: med, error: mErr } = await svc.from("chat_conversation_members").select("id")
         .eq("conversation_id", b.conversation_id).eq("employee_id", emp).maybeSingle();
       if (mErr) return json({ kode: "db" }, 500);

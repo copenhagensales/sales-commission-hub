@@ -80,10 +80,14 @@ const kaldTil = (pred: (k: Kald) => boolean) => kald.filter(pred);
 const ingenUkendte = () => assertEquals(ukendt, []);
 
 let uidNr = 0;
+// 24d2: driftsporten. Standard = åben (eksisterende prøver uændrede); prøverne nedenfor sætter `drift`.
+const ÅBEN = () => jsonR([{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }]);
+let drift: (k: Kald) => Response = ÅBEN;
 const fælles = (k: Kald): Response | undefined => {
   if (k.sti === "/auth/v1/user") return jsonR({ id: `00000000-0000-4000-8000-${String(++uidNr).padStart(12, "0")}`, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" });
   if (rpc(k, "get_current_employee_id")) return jsonR("e1");
   if (tabel(k, "employee_master_data")) return jsonR([{ is_active: true }]);
+  if (rpc(k, "sb_24d2_drift")) return drift(k);
   return undefined;
 };
 
@@ -1202,4 +1206,77 @@ test("§4 tjek: 0x0B/BOM foran HTML og RTF → ingen filpayload, fil_tjekket=fal
     assertEquals(gwKald().length, 1); assert(!harFilPayload(), n);
     assertEquals(udfaldSendt().fil_tjekket, false); assertEquals(udfaldSendt().udfald, "ok"); assertEquals(afslutKald().length, 1);
   }
+});
+
+// ---------------------------------------------------------------- 24d2 driftsporte (§4 sb-fil, §5 storkbook-tjek)
+const driftVarianter: [string, () => Response][] = [
+  ["fil/tjek=false", () => jsonR([{ beskeder_pause: false, fil_tilladt: false, tjek_tilladt: false }])],
+  ["RPC-fejl", () => fejlR()],
+  ["tom liste", () => jsonR([])],
+  ["to rækker", () => jsonR([{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }, { beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }])],
+  ["ugyldig form", () => jsonR([{ fil_tilladt: "true", tjek_tilladt: "true" }])],
+];
+const registerKald = () => kaldTil((k) => tabel(k, "sb_stier") && k.metode === "POST");
+const tokenKald = () => kaldTil((k) => k.sti.startsWith("/storage/v1/object/upload/sign/"));
+
+for (const [navn, svar] of driftVarianter) {
+  klientTest(`24d2 sb-fil: port lukket (${navn}) → 503 vedligeholdelse, ingen registrering, intet token`, async () => {
+    drift = svar;
+    try {
+      nulstil(udstedRute(() => tom(204)));
+      const r = await hFil(udstedReq());
+      assertEquals(r.status, 503); assertEquals(await r.json(), { kode: "vedligeholdelse" });
+      assertEquals(kaldTil((k) => rpc(k, "sb_24d2_drift")).length, 1);
+      assertEquals(registerKald().length, 0); assertEquals(tokenKald().length, 0); assertEquals(statusPatches().length, 0);
+      ingenUkendte();
+    } finally { drift = ÅBEN; }
+  });
+  test(`24d2 tjek: port lukket (${navn}) → intet gatewaykald, ét afslutningsforsøg med hele UKENDT`, async () => {
+    drift = svar;
+    try {
+      nulstil(tjekRute({ sti: null }));
+      const r = await hTjek(tjekReq());
+      assertEquals(r.status, 200); assertEquals(await r.json(), { status: "tjekket" });
+      assertEquals(gwKald().length, 0);
+      forventAfslutParam({ tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" });
+      // Rækkefølge: reservation → drift → afslutning; ingen genlæsning af indhold.
+      const ir = kald.findIndex((k) => rpc(k, "sb_tjek_reserver")), id = kald.findIndex((k) => rpc(k, "sb_24d2_drift"));
+      assert(ir >= 0 && ir < id); assertEquals(kaldTil(svcGenlaes).length, 0);
+      ingenUkendte();
+    } finally { drift = ÅBEN; }
+  });
+}
+
+klientTest("24d2 sb-fil: drift-RPC som exception → 503 uden registrering", async () => {
+  drift = () => { throw new Error("transport"); };
+  try {
+    nulstil(udstedRute(() => tom(204)));
+    const r = await hFil(udstedReq());
+    assertEquals(r.status, 503); assertEquals(await r.json(), { kode: "vedligeholdelse" }); assertEquals(registerKald().length, 0);
+  } finally { drift = ÅBEN; }
+});
+
+klientTest("24d2 sb-fil: port åben → uændret forløb (registrering + token forsøges), drift før registrering", async () => {
+  nulstil(udstedRute(() => tom(204)));
+  const r = await hFil(udstedReq());
+  assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "token_fejl" });
+  assertEquals(registerKald().length, 1); assertEquals(tokenKald().length, 1);
+  assert(kald.findIndex((k) => rpc(k, "sb_24d2_drift")) < kald.findIndex((k) => tabel(k, "sb_stier") && k.metode === "POST"));
+  ingenUkendte();
+});
+
+klientTest("24d2 sb-fil: laes kalder ikke driftsporten (lukket port påvirker ikke læsning)", async () => {
+  drift = () => jsonR([{ beskeder_pause: true, fil_tilladt: false, tjek_tilladt: false }]);
+  try {
+    nulstil(udstedRute(() => tom(204)));
+    await (await hFil(laesReq())).body?.cancel();
+    assertEquals(kaldTil((k) => rpc(k, "sb_24d2_drift")).length, 0);
+  } finally { drift = ÅBEN; ukendt = []; }
+});
+
+test("24d2 tjek: port åben → uændret (gateway kaldes én gang, udfald ok)", async () => {
+  nulstil(tjekRute({ sti: null }));
+  const r = await hTjek(tjekReq());
+  assertEquals(await r.json(), { status: "tjekket" }); assertEquals(gwKald().length, 1); assertEquals(udfaldSendt().udfald, "ok");
+  assertEquals(kaldTil((k) => rpc(k, "sb_24d2_drift")).length, 1); ingenUkendte();
 });
