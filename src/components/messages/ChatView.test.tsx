@@ -1610,7 +1610,7 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
 describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
   const T0 = new Date("2026-10-29T00:00:00Z").getTime();
   const iso = (ms: number) => new Date(T0 + ms).toISOString();
-  const pend = (id: string, tekst: string): Afsendelse => ({ id, tekst, svarId: null, fil: null, tilstand: "afvist", fejl: null, tidligereUkendt: false, oprettet: 1 });
+  const pend = (id: string, tekst: string, tilstand: Afsendelse["tilstand"] = "afvist"): Afsendelse => ({ id, tekst, svarId: null, fil: null, tilstand, fejl: null, tidligereUkendt: false, oprettet: 1 });
   afterEach(() => { vi.useRealTimers(); });
 
   it("udløb uden genoplivet pending-tekst; heller ikke når den kendte udløbne række forsvinder fra RLS", async () => {
@@ -1646,13 +1646,17 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     const svar = async (liste: unknown[]) => { beskeder.liste = liste as typeof beskeder.liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(n()).toBe(1); // ét fælles kald for begge forfaldne forløb
-    await svar([a]); // b bortfalder – nulstiller ikke a
-    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    await svar([a]); // b bortfalder – nulstiller ikke a (ingen ny 500 ms-start)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(n()).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(n()).toBe(2);
     await svar([a]);
-    r.unmount(); // remount bevarer a's budget
+    r.unmount(); // remount bevarer a's budget (næste ventetid 4 s, ikke 500 ms)
     r = render(wrap(<ChatView conversationId="A" />));
-    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3999); });
+    expect(n()).toBe(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(n()).toBe(3);
     // en anden række udløber undervejs: eget forløb, a's budget uændret
     const c = fremmed("c", "C-tekst", { slettes_efter: new Date(Date.now() - 1).toISOString() });
