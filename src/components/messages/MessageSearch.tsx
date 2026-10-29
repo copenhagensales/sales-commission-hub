@@ -17,7 +17,7 @@ interface MessageSearchProps {
 type Fase =
   | { art: "ingen" }
   | { art: "henter"; q: string; sg: number }
-  | { art: "resultat"; q: string; sg: number; data: SoegeResultat[] }
+  | { art: "resultat"; q: string; sg: number; data: SoegeResultat[]; start: number }
   | { art: "fejl"; q: string; sg: number };
 
 export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) {
@@ -88,7 +88,8 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
     let ny = false;
     for (const m of resultater) {
       const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu);
-      if (kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t).ny && vist) ny = true;
+      const r = kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t, aktuel.art === "resultat" ? aktuel.start : 0);
+      if ((r.ny && vist) || r.ophaevet) ny = true;
     }
     if (ny) setFristSlag((x) => x + 1); // render før frist → effekt efter frist: ny kontrol, ingen 0-ms-løkke
   });
