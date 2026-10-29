@@ -147,11 +147,6 @@ Deno.serve(async (req) => {
     const { data: em, error: amErr } = await svc.from("employee_master_data").select("is_active").eq("id", emp).maybeSingle();
     if (amErr || em?.is_active !== true) { log("inaktiv"); return json({ kode: "inaktiv" }, 403); }
 
-    const { data: cfg, error: cErr } = await svc.from("pulsen_config").select("value").eq("key", "sb_tjek_model").maybeSingle();
-    if (cErr) { log("konfig_fejl"); return json({ kode: "konfig_fejl" }, 500); }
-    const model = typeof cfg?.value === "string" ? cfg.value.trim() : "";
-    if (!model && !stubAktiv()) { log("ikke_konfigureret"); return json({ status: "ikke_konfigureret" }); }
-
     const { data: token, error: rErr } = await svc.rpc("sb_tjek_reserver", { p_kilde: "besked", p_id: id, p_revision: rev });
     if (rErr) { log("reserver_fejl"); return json({ kode: "reserver_fejl" }, 500); }
     if (!token) { log("optaget"); return json({ status: "optaget" }); }
@@ -159,8 +154,17 @@ Deno.serve(async (req) => {
     // Fra her er reservationen bekræftet: alle forløb (undtagen verificeret forældet række) ender i
     // ÉN fælles afslutning med den oprindelige kombination (besked, id, revision, token). Ingen ny reservation.
     let udfald: Udfald = { ...UKENDT };
-    // 24d2 §5: modelporten efter reservation og før modelkald. Lukket/ukendt → fælles UKENDT-afslutning, ingen gateway.
+    // 24d2 §5: modelporten efter reservation og før modelopslag/modelkald. Lukket/ukendt → fælles UKENDT-afslutning.
     if (!(await tjekPortAaben(svc))) { log("port_lukket"); return await afslut(udfald); }
+    // 24d2-edge-1b: modelnavnet læses først ved åben port. Mangler/fejler → UKENDT-afslutning, svaret som før.
+    let model = "";
+    let konfigFejl = false;
+    try {
+      const { data: cfg, error: cErr } = await svc.from("pulsen_config").select("value").eq("key", "sb_tjek_model").maybeSingle();
+      if (cErr) konfigFejl = true; else model = typeof cfg?.value === "string" ? cfg.value.trim() : "";
+    } catch { konfigFejl = true; }
+    if (konfigFejl) { log("konfig_fejl"); await afslut(udfald); return json({ kode: "konfig_fejl" }, 500); }
+    if (!model && !stubAktiv()) { log("ikke_konfigureret"); await afslut(udfald); return json({ status: "ikke_konfigureret" }); }
     try {
       // Indholdet, der tjekkes, skal tilhøre den reserverede revision. Genlæsningsfejl → UKENDT (intet modelkald).
       let akt: { revision: number; sender_id: string; status: string; content: string | null; attachment_path: string | null; conversation_id: string } | null = null;
