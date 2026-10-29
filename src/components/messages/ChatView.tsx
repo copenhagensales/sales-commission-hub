@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -378,7 +378,23 @@ export function ChatView({ conversationId }: ChatViewProps) {
     svarITraad?.slettes_efter, svarOpslag.data?.slettes_efter,
   ]);
   // B2c-2a §1: kendt udløbet pr. (generation, bruger, samtale, id, frist) – et urhop tilbage genopliver intet.
+  // B2bc-5b §2: render læser kun lageret; registreringen sker i layout-effekten nedenfor.
   const visBeskeder = useMemo(() => (messages ?? []).filter((m) => !erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu)), [messages, fristNu, meId, conversationId]);
+  const [, setUdloebSlag] = useState(0);
+  useLayoutEffect(() => {
+    // Fælles fristgrundlag: tråd, svaruddrag og valgt svar registreres mod det aktuelle ur efter commit.
+    // Render før frist → effekt efter frist: en nyregistreret, endnu vist række udløser én ny render.
+    const t = Date.now();
+    let ny = false;
+    const reg = (id: string | undefined, frist: string | null | undefined) => {
+      if (!id) return;
+      const vist = !erKendtUdloebet(meId, conversationId, id, frist, fristNu);
+      if (kontrollerUdloeb(meId, conversationId, id, frist, t).ny && vist) ny = true;
+    };
+    for (const m of messages ?? []) { reg(m.id, m.slettes_efter); if (m.reply_to) reg(m.reply_to.id, m.reply_to.slettes_efter); }
+    if (!svarITraad && svarOpslag.data) reg(svarOpslag.data.id, svarOpslag.data.slettes_efter);
+    if (ny) setUdloebSlag((x) => x + 1);
+  });
 
   // Ryd valgt svar, når originalen er tilbagetrukket, slettet, udløbet eller bevist utilgængelig (tomt RLS-opslag).
   useEffect(() => {
