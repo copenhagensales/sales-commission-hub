@@ -22,7 +22,7 @@ describe("24d2 §1 useSbDrift", () => {
     const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(result.current.status).toBe("kendt"));
     expect(result.current).toMatchObject({ beskederPause: false, filTilladt: true, tjekTilladt: true });
-    expect(tjekPortAaben("u", sessionsGeneration(), qc)).toBe(true);
+    expect(tjekPortAaben(qc, "u", sessionsGeneration())).toBe(true);
     graense.rpc.mockResolvedValue(raekke(true, false, false));
     act(() => result.current.refetch());
     await waitFor(() => expect(result.current.beskederPause).toBe(true));
@@ -42,7 +42,7 @@ describe("24d2 §1 useSbDrift", () => {
     await waitFor(() => expect(kald()).toBe(1));
     await waitFor(() => expect(qc.isFetching()).toBe(0));
     expect(result.current).toMatchObject({ status: "ukendt", filTilladt: false, tjekTilladt: false, beskederPause: false });
-    expect(tjekPortAaben("u", sessionsGeneration(), qc)).toBe(false);
+    expect(tjekPortAaben(qc, "u", sessionsGeneration())).toBe(false);
     expect(kald()).toBe(1);
   });
 
@@ -128,11 +128,11 @@ describe("24d2 §1 useSbDrift", () => {
     const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(result.current.status).toBe("kendt"));
     const g = sessionsGeneration();
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
     graense.rpc.mockImplementation(() => new Promise(() => {})); // genhentningen efter beviset hænger
     act(() => registrerPause(qc, "u", g));
-    expect(tjekPortAaben("u", g, qc)).toBe(false);
-    expect(tjekPortAaben("u", g)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(false);
+    expect(tjekPortAaben(null, "u", g)).toBe(false);
   });
 
   it("r2 (2) ældre åbent svar slippes efter beviset → pause bevares og port lukket", async () => {
@@ -146,8 +146,8 @@ describe("24d2 §1 useSbDrift", () => {
     await act(async () => { slipGammel(raekke(false, true, true)); await Promise.resolve(); });
     await new Promise((r) => setTimeout(r, 10));
     expect(result.current.beskederPause).toBe(true);
-    expect(tjekPortAaben("u", g, qc)).toBe(false);
-    expect(tjekPortAaben("u", g)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(false);
+    expect(tjekPortAaben(null, "u", g)).toBe(false);
   });
 
   it("r2 (3) to QueryClients deler ikke modelport", async () => {
@@ -156,15 +156,15 @@ describe("24d2 §1 useSbDrift", () => {
     const a = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(a.result.current.status).toBe("kendt"));
     const g = sessionsGeneration();
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
-    expect(tjekPortAaben("u", g, qcB)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
+    expect(tjekPortAaben(qcB, "u", g)).toBe(false);
     graense.rpc.mockResolvedValue(raekke(false, true, false));
     const b = renderHook(() => useSbDrift(true, "u"), { wrapper: ({ children }) => createElement(QueryClientProvider, { client: qcB }, children) });
     await waitFor(() => expect(b.result.current.status).toBe("kendt"));
-    expect(tjekPortAaben("u", g, qcB)).toBe(false);
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben(qcB, "u", g)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
     act(() => registrerPause(qcB, "u", g));
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
   });
 
   it("r2 (4) ægte window focus og visibilitychange giver hver én genhentning", async () => {
@@ -181,5 +181,42 @@ describe("24d2 §1 useSbDrift", () => {
     await waitFor(() => expect(qc.isFetching()).toBe(0));
     await new Promise((r) => setTimeout(r, 20));
     expect(kald()).toBe(foer + 2);
+  });
+
+  // ---------- r3 §1 ----------
+  it("r3 (2) forsinket svar fra før pausen efter nyere gyldig genåbning → porten forbliver åben, pausen ophævet", async () => {
+    graense.rpc.mockResolvedValueOnce(raekke(false, true, true));
+    const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("kendt"));
+    const g = sessionsGeneration();
+    let slipGammel: (v: { data: unknown; error: unknown }) => void = () => {};
+    graense.rpc.mockImplementationOnce(() => new Promise((r) => { slipGammel = r; })); // læsning før pausen hænger
+    act(() => result.current.refetch());
+    await waitFor(() => expect(kald()).toBe(2));
+    graense.rpc.mockResolvedValue(raekke(false, true, true)); // genhentningen efter beviset genåbner
+    act(() => registrerPause(qc, "u", g));
+    expect(tjekPortAaben(qc, "u", g)).toBe(false);
+    await waitFor(() => expect(tjekPortAaben(qc, "u", g)).toBe(true));
+    expect(result.current.beskederPause).toBe(false);
+    await act(async () => { slipGammel(raekke(true, false, false)); await Promise.resolve(); });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
+    expect(result.current.beskederPause).toBe(false);
+  });
+
+  it("r3 (3) faktisk annulleret læsning (AbortSignal) ændrer intet", async () => {
+    graense.rpc.mockResolvedValueOnce(raekke(false, true, true));
+    const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("kendt"));
+    const g = sessionsGeneration();
+    let slip: (v: { data: unknown; error: unknown }) => void = () => {};
+    graense.rpc.mockImplementationOnce(() => new Promise((r) => { slip = r; }));
+    act(() => { void qc.refetchQueries({ queryKey: ["sb-24d2-drift", "u", g] }); });
+    await waitFor(() => expect(kald()).toBe(2));
+    await act(async () => { await qc.cancelQueries({ queryKey: ["sb-24d2-drift", "u", g] }); });
+    await act(async () => { slip(raekke(true, false, false)); await Promise.resolve(); });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
+    expect(result.current.beskederPause).toBe(false);
   });
 });

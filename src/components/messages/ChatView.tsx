@@ -590,13 +590,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
     // c2 §6: manuel afsendelse deler køens tre pladser; anmodningen ejes af operationen (d1 §2).
     if (ks.gen !== gen || !(await tagPlads(ks, fk, op))) { slipEje(); return; }
     if (!vagt()) { slipEje(); frigivPlads(ks); return; }
-    // r2 §2(a): driftsstatus genkontrolleres efter hvert ventepunkt; stop bevarer posten urørt (banner viser pausen).
-    if (driftRef.current.pause || (a.fil && !driftRef.current.filAaben)) { slipEje(); frigivPlads(ks); return; }
-    opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
     let filMeta = a.fil;
     const driftStop = () => driftRef.current.pause || (!!filMeta && !driftRef.current.filAaben);
-    const bevar = () => opdaterAfsendelse(emp, conv, id, { tilstand: a.tilstand, fil: filMeta ?? null, fejl: null }, gen);
+    // r3 §2(a): et driftsstop ender som »afvist, kan sendes igen« (genudstedelse bevarer genudsted; tidligere ukendt: afstemning) –
+    // aldrig stående »Sender …«. Tekst, svar og fil bevares; afslutningen går gennem samme finally som andre stop.
+    const bevar = () => opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : a.tilstand === "genudsted" ? "genudsted" : "afvist", fil: filMeta ?? null, fejl: null }, gen);
     try {
+      // r2 §2(a): driftsstatus genkontrolleres efter hvert ventepunkt – her efter køventen.
+      if (driftStop()) { bevar(); return; }
+      opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
       if (genudsted && filMeta) {
         // §10: genudstedelse fra den bevarede File (kun dokumenteret ubundet overtaget sti, kun brugerudløst, én gang).
         const file = afsendelsesFil(emp, conv, id);

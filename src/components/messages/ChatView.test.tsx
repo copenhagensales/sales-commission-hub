@@ -2575,4 +2575,52 @@ describe("24d2 r2 §2 – driftsstatus genkontrolleres efter hvert ventepunkt", 
     expect(net.kald.filter((x) => x === "insert:chat_messages")).toHaveLength(1);
     graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null }));
   });
+
+  // ---------- r3 §2 ----------
+  async function fyldKoe() {
+    const holdte: Array<ReturnType<typeof kontrol<string>>> = [];
+    afstemKun.mockImplementation(() => { const k = kontrol<string>(); holdte.push(k); return k.p; });
+    const { fastholdEjer } = await import("@/lib/sbKladder");
+    const e = fastholdEjer("e", "A", "u")!;
+    act(() => { for (const id of ["q1", "q2", "q3"]) tilfoejAfsendelse("e", "A", { id, tekst: id, svarId: null, fil: null, tilstand: "afstemmer", fejl: null, tidligereUkendt: true, oprettet: 1 }, null, e); });
+    await waitFor(() => expect(holdte.length).toBe(3));
+    return holdte;
+  }
+
+  it("r3 (1) pause under køventen → afvist (ikke »Sender …«), intet INSERT; genforsøg efter genåbning med samme UUID", async () => {
+    const r = await klar();
+    const holdte = await fyldKoe();
+    skriv("første"); await act(async () => { fireEvent.click(send()); });
+    const id = hentAfsendelser("e", "A").find((a) => a.tekst === "første")!.id;
+    saetDrift(r, { beskederPause: true });
+    await act(async () => { for (const k of holdte) k.res("ikke_fundet"); await new Promise((x) => setTimeout(x, 20)); });
+    afstemKun.mockImplementation(async () => "ikke_fundet");
+    expect(mutateAsync).not.toHaveBeenCalled();
+    const p = hentAfsendelser("e", "A").find((a) => a.id === id)!;
+    expect(p.tilstand).toBe("afvist");
+    expect(screen.queryByText(/Sender/)).toBeNull();
+    saetDrift(r, { beskederPause: false });
+    const knap = await screen.findByRole("button", { name: "Ikke sendt – prøv igen" });
+    await waitFor(() => expect(knap).not.toBeDisabled());
+    await act(async () => { fireEvent.click(knap); await new Promise((x) => setTimeout(x, 20)); });
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mutateAsync.mock.calls[0][0]).toMatchObject({ id, content: "første" });
+  });
+
+  it("r3 (2) genudstedelse med pause FØR udstedelseskaldet → ingen udstedelse, upload eller INSERT", async () => {
+    const r = await medFil();
+    mutateAsync.mockRejectedValueOnce(new SendFejl("genudsted", IKKE_REGISTRERET_TEKST));
+    await act(async () => { fireEvent.click(send()); });
+    await screen.findByRole("button", { name: "Ikke sendt – prøv igen" });
+    expect(udstedUpload).toHaveBeenCalledTimes(1); // kladdeuploaden
+    const holdte = await fyldKoe();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    saetDrift(r, { beskederPause: true }); // pausen kommer, mens genudstedelsen venter i køen – før udstedelsen
+    await act(async () => { for (const k of holdte) k.res("ikke_fundet"); await new Promise((x) => setTimeout(x, 20)); });
+    afstemKun.mockImplementation(async () => "ikke_fundet");
+    expect(udstedUpload).toHaveBeenCalledTimes(1);
+    expect(uploadTilSti).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(hentAfsendelser("e", "A").find((a) => a.fil)?.fil).toMatchObject({ name: "x.txt" });
+  });
 });
