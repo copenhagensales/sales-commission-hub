@@ -90,7 +90,6 @@ export function NewConversationDialog({
     }
   };
 
-  const [hentFejl, setHentFejl] = useState(false);
   const handleCreate = async () => {
     // B2d-1 §8: kendt id → kun genhentning; ellers validering og én oprettelse (synkron lås i hooken).
     if (!createConversation.kendtId) {
@@ -105,7 +104,6 @@ export function NewConversationDialog({
     if (!kald) return;
     try {
       const conversation = await kald;
-      setHentFejl(false);
       toast.success("Samtale oprettet");
       onCreated(conversation.id);
       setSelectedIds([]);
@@ -114,11 +112,11 @@ export function NewConversationDialog({
       setSearch("");
     } catch (error) {
       // Valg og navn bevares ved fejl.
-      if (error instanceof OpretFejl && error.art === "hent") { setHentFejl(true); return; }
+      if (error instanceof OpretFejl && error.art === "hent") return; // vises via kendt id
       toast.error(serverTekst(error, "Kunne ikke oprette samtale"));
     }
   };
-  const visHentFejl = hentFejl || !!createConversation.kendtId;
+  const visHentFejl = !!createConversation.kendtId;
   const isPhone = useIsPhone();
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
