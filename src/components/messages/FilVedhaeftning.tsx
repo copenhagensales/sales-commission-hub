@@ -16,6 +16,8 @@ interface Props {
   brugerId?: string;
   /** Samtalen; indgår i hentningens fastholdte kontekst (B2c-2b-1 §6). */
   conversationId?: string;
+  /** Auth-bruger-id ved render (null = fastholdes fra sessionslytteren). */
+  authBrugerId?: string | null;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * der ryddes ved ændret reference, tilbagetrækning/udløb (afmontering) og brugerskift.
  * Billeder hentes først ved tryk (ingen størrelsesgaranti for automatisk preview ≤ 200 KB).
  */
-export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, conversationId }: Props) {
+export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, conversationId, authBrugerId = null }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [tekst, setTekst] = useState<string | null>(null);
   const [fejl, setFejl] = useState<unknown>(null);
@@ -51,7 +53,7 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, c
     monteret.current = true;
     return () => { monteret.current = false; ryd(); };
   }, []);
-  useEffect(() => { ryd(); }, [messageId, sti, brugerId]);
+  useEffect(() => { ryd(); }, [messageId, sti, brugerId, authBrugerId]);
   // Logud/brugerskift (ny sessionsgeneration, også samme bruger efter genlogin) rydder bytes og stopper hentning.
   useEffect(() => abonnerAfsendelser(() => {
     const g = sessionsGeneration();
@@ -60,7 +62,7 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, c
 
   const hent = async () => {
     if (laasRef.current !== null) return; // synkron lås: to klik før render starter ikke to hentninger
-    const ejer = fastholdEjer(brugerId, conversationId ?? messageId);
+    const ejer = fastholdEjer(brugerId, conversationId ?? messageId, authBrugerId);
     ryd();
     const nr = nrRef.current;
     if (!ejer) { setFejl(new SbFilFejl(401, "jwt")); return; }
