@@ -113,3 +113,21 @@ describe("T5 (B2c-1 §5) – søgning", () => {
     expect(screen.queryByText("sent")).toBeNull();
   });
 });
+
+describe("B2bc-5b §2 – søgning: fælles fristgrundlag", () => {
+  it("urhop −690 ms efter udløb genopliver ikke et kendt udløbet søgeresultat", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const t0 = Date.now();
+    soeg.fn.mockResolvedValueOnce([r("u690", "udløber-urhop", new Date(t0 + 1000).toISOString()), r("b690", "bliver-urhop")]);
+    vis();
+    await soegEfter("x");
+    expect(screen.getByText("udløber-urhop")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.queryByText("udløber-urhop")).toBeNull();
+    vi.setSystemTime(t0 + 1000 - 690);
+    fireEvent.change(felt(), { target: { value: "xy" } }); // vilkårlig ny render efter urhop
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.queryByText("udløber-urhop")).toBeNull();
+    expect(screen.getByText("bliver-urhop")).toBeTruthy();
+  });
+});

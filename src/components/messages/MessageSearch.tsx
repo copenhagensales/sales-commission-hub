@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useSearchMessages, onChatSignal, useFristUr, erUdloebet, type SoegeResultat } from "@/hooks/useChat";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useSearchMessages, onChatSignal, useFristUr, erKendtUdloebet, kontrollerUdloeb, type SoegeResultat } from "@/hooks/useChat";
 import { sessionsGeneration } from "@/lib/sbKladder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,18 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
   const aktuel = fase.art !== "ingen" && fase.sg !== sessionsGeneration() ? { art: "ingen" as const } : fase;
   const resultater = aktuel.art === "resultat" ? aktuel.data : [];
   const nu = useFristUr(resultater.map((m) => m.slettes_efter));
-  const viste = resultater.filter((m) => !erUdloebet(m.slettes_efter, nu));
+  // B2bc-5b §2: samme fristgrundlag som tråden – kendt udløbet overlever urhop; render læser kun.
+  const viste = resultater.filter((m) => !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu));
+  const [, setFristSlag] = useState(0);
+  useLayoutEffect(() => {
+    const t = Date.now();
+    let ny = false;
+    for (const m of resultater) {
+      const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu);
+      if (kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t).ny && vist) ny = true;
+    }
+    if (ny) setFristSlag((x) => x + 1); // render før frist → effekt efter frist: ny kontrol, ingen 0-ms-løkke
+  });
 
   return (
     <div className="border-b p-4 bg-muted/30">

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, useAfgoer,
   erSynligMedFokus, handlingsTekst, HandlingsFejl, tagHandling, overtagTilGem, frigivRet, useHandling, udfaldSnapshot,
-  useFristUr, erUdloebet, erKendtUdloebet, svarUtilgaengeligt,
+  useFristUr, erUdloebet, erKendtUdloebet, kontrollerUdloeb, svarUtilgaengeligt,
 } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -70,6 +70,10 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const noegleRef = useRef(noegle);
   noegleRef.current = noegle;
   const [nu, setNu] = useState(() => Date.now());
+  // B2bc-5b §2: registrering efter commit (render læser kun); render før frist → effekt efter frist giver én ny render.
+  useLayoutEffect(() => {
+    if (kontrollerUdloeb(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now()).ny && !udloebet) setNu(Date.now());
+  });
   const fristRef = useRef(message.slettes_efter);
   fristRef.current = message.slettes_efter;
 
