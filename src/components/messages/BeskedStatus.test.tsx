@@ -303,3 +303,28 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     expect(aktiveHandlinger()).toBe(0);
   });
 });
+
+describe("B2b-4a §1 – alle ukendte handlinger forbliver synlige og afstembare gennem Ret og remount", () => {
+  it.each([["Send alligevel"], ["Træk tilbage"], ["Fjern fil"]])("ukendt %s → Ret viser advarsel og »Tjek igen« i editoren; remount bevarer; Tjek igen skriver ikke", async (navn) => {
+    raekke = { data: { status: "afventer_afsender", revision: 4, content: "vist tekst", attachment_path: "e/c/f" }, error: null };
+    const r = render(ui(afventer(4, true)));
+    await waitFor(() => knap(navn));
+    graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    fireEvent.click(knap(navn));
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    fireEvent.click(knap("Ret"));
+    expect(screen.getByRole("textbox")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(knap("Tjek igen")).toBeTruthy();
+    r.unmount();
+    render(ui(afventer(4, true)));
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    const skriv = graense.rpc.mock.calls.filter((c) => c[0] !== "sb_tjek_begrundelse").length;
+    fireEvent.click(knap("Tjek igen"));
+    await flush();
+    expect(graense.rpc.mock.calls.filter((c) => c[0] !== "sb_tjek_begrundelse").length).toBe(skriv);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
