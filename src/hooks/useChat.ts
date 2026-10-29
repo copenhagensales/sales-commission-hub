@@ -949,6 +949,9 @@ export function useDeleteConversation() {
     // B2d-2 §12: sletning/forladelse gentages aldrig automatisk (appens mutations.retry=1).
     retry: 0,
     mutationFn: ({ conversationId, session: s }: { conversationId: string; session: SessionsKontekst }) => sletForloeb(conversationId, s).catch(foraeldetVed(s)),
+    onSettled: (_d, _e, v) => {
+      if (v && sessionGyldig(v.session)) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
   });
   async function sletForloeb(conversationId: string, s: SessionsKontekst): Promise<string> {
       // B2-6B §B: sessionen er fastholdt ved brugerhandlingen; den kontrolleres efter hvert ventepunkt og før hvert
@@ -1087,7 +1090,14 @@ export function useCreateConversation() {
 
   const mutation = useMutation({
     retry: 0,
-    mutationFn: async ({ input: { name, memberIds, isGroup }, session: s }: { input: OpretInput; session: SessionsKontekst }): Promise<Conversation> => {
+    mutationFn: (v: { input: OpretInput; session: SessionsKontekst }) => opretForloeb(v).catch(foraeldetVed(v.session)),
+    onSettled: (_d, e, v) => {
+      if (!v || !sessionGyldig(v.session)) return;
+      // Ved kendt id men fejlet hentning må listen ikke overskrive valget; ellers genvalideres den.
+      if (!(e instanceof OpretFejl && e.art === "hent")) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+  });
+  async function opretForloeb({ input: { name, memberIds, isGroup }, session: s }: { input: OpretInput; session: SessionsKontekst }): Promise<Conversation> {
       // B2-6B §B: sessionen er fastholdt ved klik; kontrol efter hvert ventepunkt og før hvert netværks-/cachetrin.
       kraevSession(s);
       const t = opretTilstand(queryClient);
@@ -1136,13 +1146,7 @@ export function useCreateConversation() {
       queryClient.setQueryData<Conversation[]>(["chat-conversations"], (old) => [conversation, ...(old ?? []).filter((c) => c.id !== conversation.id)]);
       if (t.kendtId === id) { t.kendtId = null; t.kendtInput = null; opretMeld(); }
       return conversation;
-    },
-    onSettled: (_d, e, v) => {
-      if (!v || !sessionGyldig(v.session)) return;
-      // Ved kendt id men fejlet hentning må listen ikke overskrive valget; ellers genvalideres den.
-      if (!(e instanceof OpretFejl && e.art === "hent")) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
-    },
-  });
+  }
 
   /**
    * Synkron lås på selve handlingen: dobbeltklik i samme tick giver ét kald. null = låst.
