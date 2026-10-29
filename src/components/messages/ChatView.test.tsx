@@ -8,7 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const mutateAsync = vi.fn();
 const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0 }; });
-const skriver = vi.hoisted(() => ({ fn: (..._a: unknown[]) => undefined as unknown }));
+const skriver = vi.hoisted(() => { const fn: (...a: unknown[]) => unknown = () => undefined; return { fn }; });
 const kvitMutate = vi.hoisted(() => { const fn: (...a: unknown[]) => void = () => undefined; return { fn }; });
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
