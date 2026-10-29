@@ -1540,7 +1540,10 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
 
   it("urforskel: serveren returnerer fortsat rækken → skjult lokalt og ny genhentning 2/4/8/16/32 s; uden rækken stopper planlægningen", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const inval = vi.spyOn(qc, "invalidateQueries");
+    // B2bc-5c-1 §2: forsøgets afslutning = netværkssvaret (holdt ved grænsen), ikke en vilkårlig cacheopdatering.
+    const venter: Array<() => void> = [];
+    const svar = () => { for (const v of venter.splice(0)) v(); };
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
     const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
     beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() + 100).toISOString() })];
     const r = render(wrap(<ChatView conversationId="A" />));
@@ -1552,7 +1555,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(genhentninger()).toBe(1);
     // Serveren (bagud-ur) returnerer stadig rækken med samme frist.
-    const returner = async () => { beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    const returner = async () => { svar(); beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await returner();
     await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
     expect(genhentninger()).toBe(1);
@@ -1560,7 +1563,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(genhentninger()).toBe(2);
     expect(screen.queryByText("original")).toBeNull();
     // Anden genhentning uden rækken → planlægningen stopper.
-    beskeder.liste = []; beskeder.opdateret++;
+    svar(); beskeder.liste = []; beskeder.opdateret++;
     r.rerender(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
     expect(genhentninger()).toBe(2);
@@ -1568,21 +1571,24 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
 
   it("urforskel: højst fem ekstra genhentninger (2, 4, 8, 16, 32 s), derefter ingen 0-ms-løkke", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const inval = vi.spyOn(qc, "invalidateQueries");
+    // B2bc-5c-1 §2: forsøgets afslutning = netværkssvaret (holdt ved grænsen), ikke en vilkårlig cacheopdatering.
+    const venter: Array<() => void> = [];
+    const svar = () => { for (const v of venter.splice(0)) v(); };
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
     const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
     beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() - 1).toISOString() })];
     const r = render(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(genhentninger()).toBe(1);
     for (const [i, ms] of [2000, 4000, 8000, 16000, 32000].entries()) {
-      beskeder.opdateret++;
+      svar(); beskeder.opdateret++;
       r.rerender(wrap(<ChatView conversationId="A" />));
       await act(async () => { await vi.advanceTimersByTimeAsync(ms - 1); });
       expect(genhentninger()).toBe(i + 1);
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(genhentninger()).toBe(i + 2);
     }
-    beskeder.opdateret++;
+    svar(); beskeder.opdateret++;
     r.rerender(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
     expect(genhentninger()).toBe(6);
