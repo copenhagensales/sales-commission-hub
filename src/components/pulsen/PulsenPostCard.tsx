@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { EyeOff, Link2, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Flag, Link2, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -19,6 +20,7 @@ import { PULSEN_MAX_CHARS, pulsenRelativeTime, shortName, showCharCounter } from
 import { cn } from "@/lib/utils";
 import { OmtaleFelt } from "./OmtaleFelt";
 import { erOmtaleFejl, renderOmtaler, type Omtale } from "./omtaler";
+import { ANMELD_KODER, anmeldTekst, begrundelseTekst, useSbBegrundelse, type AnmeldKode } from "@/hooks/useSbOpslag";
 
 const TYPE_PILL: Partial<Record<PulsenPost["post_type"], { label: string; cls: string }>> = {
   praise: { label: "Ros", cls: "bg-[hsl(var(--cph-praise))] text-[hsl(var(--cph-praise-foreground))]" },
@@ -34,6 +36,10 @@ export interface PostInteractions {
   onReact: (r: ReactionKey) => void;
   onComment: (body: string, mentions: Omtale[]) => Promise<unknown>;
   onDeleteComment: (id: string) => Promise<unknown>;
+  /** S7: moderation, anmeldelse og forfatterens afgørelse for kommentarer. */
+  onModerateComment?: (id: string, hide: boolean, kode?: AnmeldKode | null) => Promise<unknown>;
+  onReportComment?: (id: string, kode: AnmeldKode) => Promise<unknown>;
+  onDecideComment?: (id: string, revision: number, handling: "send" | "traek") => Promise<unknown>;
 }
 
 interface Props {
@@ -46,16 +52,31 @@ interface Props {
   interactions?: PostInteractions;
   onEdit: (body: string, mentions: Omtale[]) => Promise<unknown>;
   onDelete: () => void;
-  onHide: (hidden: boolean) => void;
+  onHide: (hidden: boolean, kode?: AnmeldKode | null) => void;
   onBestAnswer: (commentId: string | null) => void;
+  /** S7 */
+  onCommentsClosed?: (closed: boolean) => void;
+  onDecide?: (revision: number, handling: "send" | "traek") => Promise<unknown>;
+  onReport?: (kode: AnmeldKode) => Promise<unknown>;
 }
 
 function joinDanish(names: string[]) {
   return names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} og ${names[names.length - 1]}`;
 }
 
-export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageUrl, interactions, onEdit, onDelete, onHide, onBestAnswer }: Props) {
+export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageUrl, interactions, onEdit, onDelete, onHide, onBestAnswer, onCommentsClosed, onDecide, onReport }: Props) {
   const [editing, setEditing] = useState(false);
+  // S7: begrundelsesdialog (anmeld/skjul) for opslag og kommentarer
+  const [reasonFor, setReasonFor] = useState<{ art: "anmeld" | "skjul" | "anmeld_kommentar" | "skjul_kommentar"; id?: string } | null>(null);
+  const pickReason = async (kode: AnmeldKode) => {
+    const r = reasonFor; setReasonFor(null); if (!r) return;
+    try {
+      if (r.art === "anmeld" && onReport) { await onReport(kode); toast.success("Tak – vi kigger på det"); }
+      else if (r.art === "skjul") onHide(true, kode);
+      else if (r.art === "anmeld_kommentar" && r.id && interactions?.onReportComment) { await interactions.onReportComment(r.id, kode); toast.success("Tak – vi kigger på det"); }
+      else if (r.art === "skjul_kommentar" && r.id && interactions?.onModerateComment) await interactions.onModerateComment(r.id, true, kode);
+    } catch { toast.error("Det lykkedes ikke", { description: "Prøv igen." }); }
+  };
   // Reserveret plads (4:3) indtil billedets egne mål kendes, så feedet ikke hopper.
   const [imgRatio, setImgRatio] = useState<string | null>(null);
   const [draft, setDraft] = useState(post.body);
@@ -131,6 +152,11 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
               }}>
                 <Link2 className="mr-2 h-4 w-4" aria-hidden="true" /> Kopiér link
               </DropdownMenuItem>
+              {!isMine && onReport && (
+                <DropdownMenuItem onSelect={() => setReasonFor({ art: "anmeld" })}>
+                  <Flag className="mr-2 h-4 w-4" aria-hidden="true" /> Anmeld
+                </DropdownMenuItem>
+              )}
               {isPoll && pollOpen && (isMine || canModerate) && (
                 <DropdownMenuItem disabled={pollState.close.isPending} onSelect={() => setConfirmClose(true)}>
                   <Lock className="mr-2 h-4 w-4" aria-hidden="true" /> Luk nu
@@ -147,8 +173,13 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
                 </DropdownMenuItem>
               )}
               {canModerate && (
-                <DropdownMenuItem onSelect={() => onHide(!post.hidden_at)}>
+                <DropdownMenuItem onSelect={() => (post.hidden_at ? onHide(false) : setReasonFor({ art: "skjul" }))}>
                   <EyeOff className="mr-2 h-4 w-4" aria-hidden="true" /> {post.hidden_at ? "Vis igen" : "Skjul"}
+                </DropdownMenuItem>
+              )}
+              {canModerate && onCommentsClosed && !isPoll && (
+                <DropdownMenuItem onSelect={() => onCommentsClosed(!post.comments_closed_at)}>
+                  <Lock className="mr-2 h-4 w-4" aria-hidden="true" /> {post.comments_closed_at ? "Åbn kommentarer" : "Luk kommentarer"}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -158,9 +189,10 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
 
       {post.hidden_at && (
         <p className="mt-3 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-3 py-2 text-[13px] font-extrabold text-foreground">
-          Skjult – kun forfatteren og moderatorer kan se indlægget.
+          Skjult – kun forfatteren og moderatorer kan se indlægget.{post.hidden_kode ? ` · ${anmeldTekst(post.hidden_kode)}` : ""}
         </p>
       )}
+      {isMine && <OpslagTjekStatus post={post} onDecide={onDecide} onRet={() => { setDraft(post.body); setDraftMentions(post.mentions ?? []); setEditing(true); }} />}
 
       {editing ? (
         <div className="mt-3">
@@ -216,24 +248,41 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
       )}
 
       {interactions && !post.pending && !post.hidden_at && (
-        <PostFooter post={post} isMine={isMine} interactions={interactions} onBestAnswer={onBestAnswer} />
+        <PostFooter post={post} isMine={isMine} canModerate={canModerate} interactions={interactions} onBestAnswer={onBestAnswer} onReason={setReasonFor} />
       )}
+      <ReasonDialog art={reasonFor?.art ?? null} onClose={() => setReasonFor(null)} onPick={(k) => void pickReason(k)} />
     </article>
   );
 }
 
-function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: PulsenPost; isMine: boolean; interactions: PostInteractions; onBestAnswer: (id: string | null) => void }) {
+function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onReason }: { post: PulsenPost; isMine: boolean; canModerate: boolean; interactions: PostInteractions; onBestAnswer: (id: string | null) => void; onReason: (r: { art: "anmeld_kommentar" | "skjul_kommentar"; id: string }) => void }) {
   const [showAll, setShowAll] = useState(false);
   const [composing, setComposing] = useState(false);
   const [value, setValue] = useState("");
   const [valueMentions, setValueMentions] = useState<Omtale[]>([]);
   const [saving, setSaving] = useState(false);
+  const qc = useQueryClient();
   // Ældste først i tråden
   const comments = [...interactions.comments].reverse();
   const best = comments.find((c) => c.id === post.best_answer_comment_id) ?? null;
   const rest = comments.filter((c) => c.id !== best?.id);
   const visible = showAll ? rest : rest.slice(0, 1);
   const canPickBest = isMine && post.post_type === "question";
+  /** Anmeld/skjul-knapper – samme for bedste svar og tråden [Codex S7-c P2-2]. */
+  const handlinger = (c: PostInteractions["comments"][number]) => (
+    <>
+      {!c.isMine && interactions.onReportComment && (
+        <button type="button" aria-label="Anmeld kommentar" onClick={() => onReason({ art: "anmeld_kommentar", id: c.id })} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
+          <Flag className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
+      {canModerate && !c.isMine && interactions.onModerateComment && (
+        <button type="button" aria-label={c.hiddenAt ? "Vis kommentaren igen" : "Skjul kommentaren"} onClick={() => (c.hiddenAt ? void interactions.onModerateComment?.(c.id, false) : onReason({ art: "skjul_kommentar", id: c.id }))} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
+          {c.hiddenAt ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
+        </button>
+      )}
+    </>
+  );
 
   const savingRef = useRef(false);
   const latestValue = useRef(value);
@@ -252,7 +301,13 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
         setComposing(false);
       }
     } catch (e) {
-      toast.error(erOmtaleFejl(e) ? "Omtalen kunne ikke gemmes" : "Kommentaren blev ikke gemt");
+      if (erLukketFejl(e)) {
+        // [Codex S7-c P2-3] kommentarerne blev lukket, mens feltet var åbent: luk feltet og hent opslagets lukkestatus
+        toast.error("Kommentarerne er lukket på dette opslag");
+        setComposing(false);
+        void qc.invalidateQueries({ queryKey: ["pulsen-post", post.id] });
+        void qc.invalidateQueries({ queryKey: ["pulsen-feed"] });
+      } else toast.error(erOmtaleFejl(e) ? "Omtalen kunne ikke gemmes" : "Kommentaren blev ikke gemt");
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -264,6 +319,9 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
       <ReactionSummaryLine summary={interactions.summary} />
       <div className="flex items-center gap-1">
         <ReactButton summary={interactions.summary} onSet={interactions.onReact} disabled={!interactions.canInteract} />
+        {post.comments_closed_at ? (
+          <p className="flex min-h-[44px] items-center px-3 text-[14px] font-semibold text-muted-foreground">Kommentarer er lukket · <span className="tabular-nums">{comments.length}</span></p>
+        ) : (
         <button
           type="button"
           onClick={() => setComposing(true)}
@@ -272,12 +330,15 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
         >
           Kommentér · <span className="tabular-nums">{comments.length}</span>
         </button>
+        )}
       </div>
 
       {best && (
         <div className="mt-2 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-4 py-3">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--cph-praise-foreground))]">★ Bedste svar · {best.authorName}</p>
           <p className="mt-1 break-words text-[15px] text-foreground">{renderOmtaler(best.body, best.mentions)}</p>
+          {best.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{best.hiddenKode ? ` · ${anmeldTekst(best.hiddenKode)}` : ""}</p>}
+          <div className="flex items-center gap-1">{handlinger(best)}</div>
           {canPickBest && (
             <button type="button" onClick={() => onBestAnswer(null)} className="mt-1 min-h-[44px] text-[13px] font-semibold text-muted-foreground hover:underline">Fjern som bedste svar</button>
           )}
@@ -291,7 +352,11 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
               <div className="min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-3 py-2">
                 <p className="text-[13px] font-extrabold text-foreground">{c.authorName}</p>
                 <p className="break-words whitespace-pre-wrap text-[15px] text-foreground">{renderOmtaler(c.body, c.mentions)}</p>
+                {c.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{c.hiddenKode ? ` · ${anmeldTekst(c.hiddenKode)}` : ""}</p>}
+                {c.isMine && c.status === "tjekkes" && <p className="mt-1 text-[12px] text-muted-foreground">✓ Tjekkes …</p>}
+                {c.isMine && c.status === "afventer_afsender" && <KommentarAfventer id={c.id} revision={c.revision ?? 1} onDecide={interactions.onDecideComment} onDelete={() => interactions.onDeleteComment(c.id)} />}
               </div>
+              {handlinger(c)}
               {canPickBest && (
                 <button type="button" aria-label="Markér som bedste svar" onClick={() => onBestAnswer(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
                   <Star className="h-4 w-4" aria-hidden="true" />
@@ -312,7 +377,7 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
         </button>
       )}
 
-      {composing && (
+      {composing && !post.comments_closed_at && (
         <div className="mt-2 flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <OmtaleFelt
@@ -335,6 +400,75 @@ function PostFooter({ post, isMine, interactions, onBestAnswer }: { post: Pulsen
           <button type="button" onClick={() => void submit()} disabled={saving || !value.trim()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50 active:opacity-70">Send</button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- S7: tjekstatus, afgørelse og begrundelsesdialog
+const erLukketFejl = (e: unknown) => /SB_KOMMENTARER_LUKKET/.test(String((e as { message?: unknown })?.message ?? e));
+const ART_TITEL = { anmeld: "Anmeld opslaget", skjul: "Skjul opslaget", anmeld_kommentar: "Anmeld kommentaren", skjul_kommentar: "Skjul kommentaren" } as const;
+function ReasonDialog({ art, onClose, onPick }: { art: keyof typeof ART_TITEL | null; onClose: () => void; onPick: (kode: AnmeldKode) => void }) {
+  return (
+    <Dialog open={!!art} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="rounded-[24px] sm:max-w-sm">
+        <DialogTitle className="text-[18px] font-extrabold">{art ? ART_TITEL[art] : ""}</DialogTitle>
+        <p className="text-[14px] text-muted-foreground">{art?.startsWith("anmeld") ? "Hvad er problemet? Moderatorerne får besked." : "Forfatteren får en privat besked med begrundelsen."}</p>
+        <div className="mt-2 flex flex-col gap-2">
+          {ANMELD_KODER.map((k) => (
+            <button key={k.kode} type="button" onClick={() => onPick(k.kode)} className="min-h-[44px] rounded-2xl bg-[hsl(var(--cph-light-blue))] px-4 text-left text-[15px] font-semibold text-foreground hover:bg-muted">
+              {k.tekst}
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Eget opslag: gråt flueben mens det tjekkes; kort med begrundelse og valg, når det afventer forfatteren. */
+function OpslagTjekStatus({ post, onDecide, onRet }: { post: PulsenPost; onDecide?: (revision: number, handling: "send" | "traek") => Promise<unknown>; onRet: () => void }) {
+  const afventer = post.status === "afventer_afsender";
+  const begr = useSbBegrundelse("opslag", post.id, post.revision, afventer);
+  const [optaget, setOptaget] = useState(false);
+  const afgoer = async (h: "send" | "traek") => {
+    if (!onDecide || optaget) return;
+    setOptaget(true);
+    try { await onDecide(post.revision ?? 1, h); } catch { toast.error(h === "send" ? "Kunne ikke sende opslaget" : "Kunne ikke trække opslaget tilbage", { description: "Prøv igen." }); } finally { setOptaget(false); }
+  };
+  if (post.status === "tjekkes") return <p className="mt-2 text-[13px] text-muted-foreground">✓ Tjekkes … Andre ser opslaget, når tjekket er færdigt.</p>;
+  if (!afventer) return null;
+  return (
+    <div className="mt-3 rounded-2xl border border-border bg-card p-3" role="status">
+      <p className="text-[14px] font-extrabold text-foreground">Dit opslag afventer dig</p>
+      <p className="mt-1 text-[14px] text-foreground">{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data)}</p>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {begr.data !== "cpr_fil" && begr.data !== "ikke_tjekket_fil" && (
+          <button type="button" disabled={optaget} onClick={() => void afgoer("send")} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send alligevel</button>
+        )}
+        <button type="button" disabled={optaget} onClick={onRet} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[14px] font-extrabold text-foreground disabled:opacity-50">Ret</button>
+        <button type="button" disabled={optaget} onClick={() => void afgoer("traek")} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[14px] font-extrabold text-foreground disabled:opacity-50">Træk tilbage</button>
+      </div>
+    </div>
+  );
+}
+
+/** Egen kommentar, der afventer forfatteren: begrundelse + Send alligevel / Slet. */
+function KommentarAfventer({ id, revision, onDecide, onDelete }: { id: string; revision: number; onDecide?: (id: string, revision: number, handling: "send" | "traek") => Promise<unknown>; onDelete: () => Promise<unknown> }) {
+  const begr = useSbBegrundelse("kommentar", id, revision, true);
+  const [optaget, setOptaget] = useState(false);
+  const send = async () => {
+    if (!onDecide || optaget) return;
+    setOptaget(true);
+    try { await onDecide(id, revision, "send"); } catch { toast.error("Kunne ikke sende kommentaren", { description: "Prøv igen." }); } finally { setOptaget(false); }
+  };
+  return (
+    <div className="mt-1 text-[13px] text-foreground" role="status">
+      <p className="font-extrabold">Afventer dig</p>
+      <p>{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data)}</p>
+      <div className="mt-1 flex gap-2">
+        <button type="button" disabled={optaget} onClick={() => void send()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[13px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send alligevel</button>
+        <button type="button" disabled={optaget} onClick={() => void onDelete()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[13px] font-extrabold text-foreground disabled:opacity-50">Slet</button>
+      </div>
     </div>
   );
 }

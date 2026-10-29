@@ -1419,7 +1419,7 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
 
 // ---------- sb_signaler (S6) ----------
 
-interface SignalRaekke { id: number; kilde: string; kilde_id: string; haendelse: string; privat: boolean; conversation_id: string | null }
+interface SignalRaekke { id: number; kilde: string; kilde_id: string; haendelse: string; privat: boolean; conversation_id: string | null; post_id?: string | null }
 
 /**
  * B2d-1 §11: delt signal-/debouncetilstand ejes pr. QueryClient og sessionsgeneration.
@@ -1498,6 +1498,7 @@ function genvaliderAlt(qc: QueryClient, employeeId: string): void {
  * opslagfejl tillader senere behandling; tomt opslag er færdigt (ingen retry-løkke); højst én toast pr. bruger/session.
  */
 export function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: string, gen: number = sessionsGeneration()): Promise<void> {
+  if (s && employeeId && (s.kilde === "opslag" || s.kilde === "kommentar")) { behandlOpslagSignal(qc, s, employeeId, gen); return Promise.resolve(); }
   if (!s || s.kilde !== "besked" || !employeeId) return Promise.resolve();
   if (gen !== sessionsGeneration()) return Promise.resolve();
   const t = signalTilstand(qc);
@@ -1545,6 +1546,24 @@ export function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: stri
   })().finally(() => { if (t.igang.get(noegle) === p) t.igang.delete(noegle); });
   t.igang.set(noegle, p);
   return p;
+}
+
+/** S7-c: opslag/kommentarer. Kun genhentning (status læses aldrig fra payload); private signaler giver højst én toast pr. signal. */
+function behandlOpslagSignal(qc: QueryClient, s: SignalRaekke, employeeId: string, gen: number): void {
+  if (gen !== sessionsGeneration()) return;
+  const t = signalTilstand(qc);
+  planlaeg(qc, ["pulsen-feed"]);
+  planlaeg(qc, ["pulsen-latest-posts"]);
+  const post = s.kilde === "opslag" ? s.kilde_id : s.post_id ?? null;
+  if (post) planlaeg(qc, ["pulsen-post", post]);
+  if (s.kilde === "kommentar") planlaeg(qc, ["feed-comments"]);
+  if (!s.privat) return;
+  planlaeg(qc, ["sb-begrundelse", s.kilde, s.kilde_id]);
+  const noegle = `${employeeId}:${s.id}`;
+  if (t.toastet.has(noegle)) return;
+  const hvad = s.kilde === "opslag" ? "Dit opslag" : "Din kommentar";
+  const tekst = s.haendelse === "afventer" ? `${hvad} afventer dig` : s.haendelse === "udloeb" ? `${hvad} blev trukket tilbage` : s.haendelse === "skjult" ? `${hvad} er skjult af en moderator` : null;
+  if (tekst) { t.toastet.add(noegle); toast(tekst); }
 }
 
 // ---------- Status, begrundelser og handlinger (S6) ----------

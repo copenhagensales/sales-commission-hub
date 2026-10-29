@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { sbAnmeld } from "@/hooks/useSbOpslag";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, SearchX } from "lucide-react";
@@ -57,10 +58,16 @@ export default function StorkbookIndlaeg() {
           onReact: (reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: key, reaction }),
           onComment: (b, m) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body: b, mentions: m }),
           onDeleteComment: (cid) => fr.deleteComment.mutateAsync(cid),
+          onModerateComment: (cid, hide, kode) => fr.moderateComment.mutateAsync({ id: cid, hide, kode }),
+          onReportComment: (cid, kode) => fr.reportComment.mutateAsync({ id: cid, kode }),
+          onDecideComment: (cid, revision, handling) => fr.decideComment.mutateAsync({ id: cid, revision, handling }),
         }}
-        onEdit={(b, m) => mut.edit.mutateAsync({ id: post.id, body: b, mentions: m }).then(() => postQ.refetch())}
+        onEdit={(b, m) => mut.edit.mutateAsync({ id: post.id, body: b, mentions: m, revision: post.revision }).then(() => postQ.refetch())}
         onDelete={() => mut.remove.mutate(post, { onSuccess: () => navigate(backTo, { replace: true }), onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
-        onHide={(hidden) => mut.setHidden.mutate({ id: post.id, hidden }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
+        onCommentsClosed={(closed) => mut.setCommentsClosed.mutate({ id: post.id, closed }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke ændre kommentarerne", { description: "Prøv igen." }) })}
+        onDecide={(revision, handling) => mut.afgoer.mutateAsync({ id: post.id, revision, handling }).then(() => postQ.refetch())}
+        onReport={(kode) => sbAnmeld("opslag", post.id, kode)}
+        onHide={(hidden, kode) => mut.setHidden.mutate({ id: post.id, hidden, kode }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
         onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: post.id, commentId }, { onSettled: () => postQ.refetch(), onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}
       />
     );

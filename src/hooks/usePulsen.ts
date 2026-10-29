@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { startOfDay, subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+import { sbAfgoer, sbModerer, startTjek, type AnmeldKode } from "@/hooks/useSbOpslag";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { compressPulsenImage } from "@/lib/pulsen/compressImage";
@@ -29,6 +31,11 @@ export interface PulsenPost {
   image_path: string | null;
   best_answer_comment_id: string | null;
   hidden_at: string | null;
+  /** S7: moderationskode, lukkede kommentarer, tjekstatus og revision (fra 24d/S7-a). */
+  hidden_kode?: string | null;
+  comments_closed_at?: string | null;
+  status?: string | null;
+  revision?: number | null;
   created_at: string;
   edited_at: string | null;
   /** @-omtaler (tom liste for opslag uden omtaler). */
@@ -44,7 +51,7 @@ export interface PulsenPost {
 }
 
 const POST_SELECT =
-  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, best_answer_comment_id, hidden_at, created_at, edited_at, mentions, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
+  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, best_answer_comment_id, hidden_at, hidden_kode, comments_closed_at, status, revision, created_at, edited_at, mentions, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
 
 /** Henter navne på alle roste kolleger, så ros til flere vises korrekt. */
 async function attachPraised(posts: PulsenPost[]): Promise<PulsenPost[]> {
@@ -279,7 +286,9 @@ export function usePulsenMutations(author: PersonRef | null) {
         if (imagePath) await supabase.storage.from(PULSEN_BUCKET).remove([imagePath]);
         throw error;
       }
-      return (await attachPraised([data as unknown as PulsenPost]))[0];
+      const row = data as unknown as PulsenPost;
+      if (row.status === "tjekkes") startTjek("opslag", row.id, row.revision, () => refresh(row.id));  // S7-c: værnet sætter tjekkes, når det er tændt; genhent når tjekket er slut
+      return (await attachPraised([row]))[0];
     },
     onMutate: async ({ input, id, localUrl }) => {
       const key = feedKey(input.audience === "house" ? { kind: "house" } : { kind: "team", teamId: input.teamId as string });
@@ -321,12 +330,13 @@ export function usePulsenMutations(author: PersonRef | null) {
   });
 
   const edit = useMutation({
-    mutationFn: async ({ id, body, mentions }: { id: string; body: string; mentions?: Omtale[] }) => {
+    retry: 0,  // [Codex S7-c P2-4] sb_ret er revisionsbundet: et tabt svar må ikke udløse et nyt kald med samme revision
+    mutationFn: async ({ id, body, mentions, revision }: { id: string; body: string; mentions?: Omtale[]; revision?: number | null }) => {
       const tekst = body.trim().slice(0, PULSEN_MAX_CHARS);
-      // Omtaler sendes kun, når feltet har en liste (databasen tillader kun forfatteren at ændre dem).
-      const { error } = await supabase.from("pulsen_posts")
-        .update(mentions ? { body: tekst, mentions: rensOmtaler(tekst, mentions) } : { body: tekst }).eq("id", id);
+      // S7-c: al tekstrettelse går via sb_ret (før værnet: direkte opdatering i databasen; efter: ny revision → tjek). Omtaler kun når feltet har en liste.
+      const { data: nyRev, error } = await supabase.rpc("sb_ret", { p_kilde: "opslag", p_id: id, p_revision: revision ?? 1, p_tekst: tekst, p_mentions: mentions ? (rensOmtaler(tekst, mentions) as unknown as Json) : null });
       if (error) throw error;
+      if (typeof nyRev === "number") startTjek("opslag", id, nyRev, () => refresh(id));
     },
     onMutate: async ({ id, body, mentions }) => {
       await cancelFor(id);
@@ -355,16 +365,12 @@ export function usePulsenMutations(author: PersonRef | null) {
   });
 
   const setHidden = useMutation({
-    mutationFn: async ({ id, hidden }: { id: string; hidden: boolean }) => {
-      const { error } = await supabase
-        .from("pulsen_posts")
-        .update({ hidden_at: hidden ? new Date().toISOString() : null })
-        .eq("id", id);
-      if (error) throw error;
+    mutationFn: async ({ id, hidden, kode }: { id: string; hidden: boolean; kode?: AnmeldKode | null }) => {
+      await sbModerer("opslag", id, hidden ? "skjul" : "vis", kode);  // S7-c: via sb_moderer (kode + privat begrundelsessignal)
     },
-    onMutate: async ({ id, hidden }) => {
+    onMutate: async ({ id, hidden, kode }) => {
       await cancelFor(id);
-      patchEverywhere((p) => (p.id === id ? { ...p, hidden_at: hidden ? new Date().toISOString() : null } : p));
+      patchEverywhere((p) => (p.id === id ? { ...p, hidden_at: hidden ? new Date().toISOString() : null, hidden_kode: hidden ? kode ?? null : null } : p));
     },
     onError: (_e, v) => refresh(v.id),
     onSettled: (_d, _e, v) => refresh(v.id),
@@ -383,7 +389,19 @@ export function usePulsenMutations(author: PersonRef | null) {
     onSettled: (_d, _e, v) => refresh(v.id),
   });
 
-  return { create, edit, remove, setHidden, setBestAnswer };
+  // S7-c: luk/åbn kommentarer (moderator) og forfatterens afgørelse efter tjek
+  const setCommentsClosed = useMutation({
+    mutationFn: async ({ id, closed }: { id: string; closed: boolean }) => { await sbModerer("opslag", id, closed ? "luk_kommentarer" : "aabn_kommentarer"); },
+    onMutate: async ({ id, closed }) => { await cancelFor(id); patchEverywhere((p) => (p.id === id ? { ...p, comments_closed_at: closed ? new Date().toISOString() : null } : p)); },
+    onError: (_e, v) => refresh(v.id),
+    onSettled: (_d, _e, v) => refresh(v.id),
+  });
+  const afgoer = useMutation({
+    retry: 0,
+    mutationFn: async ({ id, revision, handling }: { id: string; revision: number; handling: "send" | "traek" }) => sbAfgoer("opslag", id, revision, handling),
+    onSettled: (_d, _e, v) => refresh(v.id),
+  });
+  return { create, edit, remove, setHidden, setBestAnswer, setCommentsClosed, afgoer };
 }
 
 /** Huset-spørgsmål uden kommentarer (team-spørgsmål har ingen kommentarer i v1). */

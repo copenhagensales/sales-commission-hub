@@ -196,3 +196,24 @@ describe("B2-6C §C signalmodtagelse", () => {
     af();
   });
 });
+
+describe("S7-c opslagssignaler", () => {
+  it("opslag: genhenter feed/opslag, privat afventer giver én toast (dublet ignoreres); kommentar genhenter kommentarer; intet chat-opslag", async () => {
+    const a = monter();
+    const [k] = aktive();
+    const o = { id: 11, kilde: "opslag", kilde_id: "p1", haendelse: "afventer", privat: true };
+    act(() => { send(k, signal(o)); send(k, signal(o)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    const n = nøgler(inval);
+    expect(n).toContain(JSON.stringify(["pulsen-feed"]));
+    expect(n).toContain(JSON.stringify(["pulsen-post", "p1"]));
+    expect(vi.mocked(toast)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast)).toHaveBeenCalledWith("Dit opslag afventer dig");
+    act(() => { send(k, signal({ id: 12, kilde: "kommentar", kilde_id: "c1", post_id: "p1", haendelse: "ny", privat: false })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(nøgler(inval)).toContain(JSON.stringify(["feed-comments"]));
+    expect(vi.mocked(toast)).toHaveBeenCalledTimes(1);
+    expect(g.opslag).not.toHaveBeenCalled();
+    a.unmount();
+  });
+});

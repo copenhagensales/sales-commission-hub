@@ -1,6 +1,6 @@
 // Tekst til infoknappen »Sådan virker Beskeder« (24d2). Kun tekst – ingen logik ud over driftsblokken.
 // Ordlyden ejes af ledelsen (Mathias/Kasper) og kan rettes her. Versionen noteres i ændringsloggen som bevis for, hvad der blev vist hvornår.
-export const BESKEDER_INFO_VERSION = "2026-10-29";
+export const BESKEDER_INFO_VERSION = "2026-10-29b";
 export const BESKEDER_INFO_KNAP_TEKST = "Sådan virker Beskeder";
 /** Indledning øverst i arket: forklarer tjekket, før afsnittene henviser til det (Mathias 29/10). */
 export const BESKEDER_INFO_INDLEDNING = "Stork tjekker automatisk hver besked for hård tone og personoplysninger, før den leveres til modtageren. Her kan du se, hvad det betyder for dig.";
@@ -70,6 +70,15 @@ export const BESKEDER_INFO: InfoAfsnit[] = [
     punkter: [
       "I korte perioder kan filer være lukket, eller beskeder sat på pause. Appen viser det ved skrivefeltet eller som et banner. Din kladde bevares.",
       "Har du en gammel fane åben, så genindlæs siden, hvis afsendelse afvises.",
+    ],
+  },
+  {
+    id: "opslag",
+    titel: "Opslag og kommentarer",
+    punkter: [
+      "Opslag og kommentarer i Storkbook tjekkes på samme måde som beskeder: gråt flueben, mens tjekket kører, og et kort til dig, hvis tjekket finder noget.",
+      "Du kan anmelde et opslag eller en kommentar via menuen. Moderatorerne får besked, og du ser ikke, hvem der ellers har anmeldt.",
+      "Moderatorer kan skjule et opslag eller en kommentar og lukke for kommentarer. Skjuler de dit indhold, får du en privat besked med begrundelsen.",
     ],
   },
   {

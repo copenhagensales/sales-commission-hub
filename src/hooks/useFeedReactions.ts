@@ -9,6 +9,7 @@ import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sbAfgoer, sbAnmeld, sbModerer, startTjek, type AnmeldKode } from "@/hooks/useSbOpslag";
 import { useAuth } from "@/hooks/useAuth";
 import { REACTIONS, reactionKeyForEmoji, reactionOption, type ReactionKey } from "@/lib/feedReactions";
 import { rensOmtaler, tilOmtaler, type Omtale } from "@/components/pulsen/omtaler";
@@ -38,6 +39,11 @@ export interface FeedCommentView {
   isMine: boolean;
   createdAt: string;
   mentions: Omtale[];
+  /** S7: tjekstatus, revision og moderation. */
+  status?: string | null;
+  revision?: number | null;
+  hiddenAt?: string | null;
+  hiddenKode?: string | null;
 }
 
 export function buildTargetKey(
@@ -138,7 +144,7 @@ export function useFeedReactions(targetKeys: string[]) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("feed_comments")
-        .select("id, target_key, user_id, body, created_at, mentions")
+        .select("id, target_key, user_id, body, created_at, mentions, status, revision, hidden_at, hidden_kode")
         .in("target_key", keys)
         .order("created_at", { ascending: false });
 
@@ -259,17 +265,23 @@ export function useFeedReactions(targetKeys: string[]) {
       const trimmed = body.trim().slice(0, 200);
       if (!trimmed) throw new Error("Beskeden må ikke være tom");
 
-      const { error } = await supabase.from("feed_comments").insert({
+      const { data, error } = await supabase.from("feed_comments").insert({
         target_type: targetType,
         target_key: targetKey,
         user_id: myUserId,
         body: trimmed,
         mentions: rensOmtaler(trimmed, mentions ?? []),
-      });
+      }).select("id, status, revision").single();
       if (error) throw error;
+      const r = data as { id: string; status?: string | null; revision?: number | null };
+      if (r.status === "tjekkes") startTjek("kommentar", r.id, r.revision, invalidate);  // S7-c: genhent, når tjekket er slut
     },
     onSuccess: invalidate,
   });
+  // S7-c: moderation, anmeldelse og forfatterens afgørelse for kommentarer
+  const moderateComment = useMutation({ retry: 0, mutationFn: async ({ id, hide, kode }: { id: string; hide: boolean; kode?: AnmeldKode | null }) => sbModerer("kommentar", id, hide ? "skjul" : "vis", kode), onSettled: invalidate });
+  const reportComment = useMutation({ retry: 0, mutationFn: async ({ id, kode }: { id: string; kode: AnmeldKode }) => sbAnmeld("kommentar", id, kode) });
+  const decideComment = useMutation({ retry: 0, mutationFn: async ({ id, revision, handling }: { id: string; revision: number; handling: "send" | "traek" }) => sbAfgoer("kommentar", id, revision, handling), onSettled: invalidate });
 
   const deleteComment = useMutation({
     retry: 0,
@@ -324,6 +336,10 @@ export function useFeedReactions(targetKeys: string[]) {
           body: c.body,
           authorName: lookupName(c.user_id),
           isMine: c.user_id === myUserId,
+          status: (c as { status?: string | null }).status ?? null,
+          revision: (c as { revision?: number | null }).revision ?? null,
+          hiddenAt: (c as { hidden_at?: string | null }).hidden_at ?? null,
+          hiddenKode: (c as { hidden_kode?: string | null }).hidden_kode ?? null,
           createdAt: c.created_at,
           mentions: tilOmtaler(c.mentions),
         })),
@@ -336,6 +352,9 @@ export function useFeedReactions(targetKeys: string[]) {
     setReaction,
     addComment,
     deleteComment,
+    moderateComment,
+    reportComment,
+    decideComment,
     isLoading: reactionsQuery.isLoading || commentsQuery.isLoading,
     canInteract: !!myUserId && !reactionsQuery.isLoading,
   };

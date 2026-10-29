@@ -1,4 +1,5 @@
 import { BOTTOM_NAV_HEIGHT, useIsPhone } from "@/components/mobile";
+import { sbAnmeld } from "@/hooks/useSbOpslag";
 import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { StorkbookMark } from "@/components/storkbook/StorkbookMark";
@@ -205,10 +206,16 @@ function PulsenFeed() {
                   onReact: (reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: key, reaction }),
                   onComment: (body, mentions) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body, mentions }),
                   onDeleteComment: (id) => fr.deleteComment.mutateAsync(id),
+                  onModerateComment: (id, hide, kode) => fr.moderateComment.mutateAsync({ id, hide, kode }),
+                  onReportComment: (id, kode) => fr.reportComment.mutateAsync({ id, kode }),
+                  onDecideComment: (id, revision, handling) => fr.decideComment.mutateAsync({ id, revision, handling }),
                 } : undefined}
-                onEdit={(body, mentions) => mut.edit.mutateAsync({ id: p.id, body, mentions })}
+                onEdit={(body, mentions) => mut.edit.mutateAsync({ id: p.id, body, mentions, revision: p.revision })}
                 onDelete={() => mut.remove.mutate(p, { onError: () => toast.error("Kunne ikke slette opslaget", { description: "Prøv igen." }) })}
-                onHide={(hidden) => mut.setHidden.mutate({ id: p.id, hidden }, { onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
+                onHide={(hidden, kode) => mut.setHidden.mutate({ id: p.id, hidden, kode }, { onError: () => toast.error("Kunne ikke ændre synligheden", { description: "Prøv igen." }) })}
+                onCommentsClosed={(closed) => mut.setCommentsClosed.mutate({ id: p.id, closed }, { onError: () => toast.error("Kunne ikke ændre kommentarerne", { description: "Prøv igen." }) })}
+                onDecide={(revision, handling) => mut.afgoer.mutateAsync({ id: p.id, revision, handling })}
+                onReport={(kode) => sbAnmeld("opslag", p.id, kode)}
                 onBestAnswer={(commentId) => mut.setBestAnswer.mutate({ id: p.id, commentId }, { onError: () => toast.error("Kunne ikke markere bedste svar", { description: "Prøv igen." }) })}
               />
             </div>

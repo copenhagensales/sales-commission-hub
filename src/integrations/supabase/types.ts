@@ -8813,6 +8813,9 @@ export type Database = {
           body: string
           created_at: string
           edited_at: string | null
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_kode: string | null
           id: string
           leveret_at: string | null
           mentions: Json
@@ -8834,6 +8837,9 @@ export type Database = {
           body: string
           created_at?: string
           edited_at?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_kode?: string | null
           id?: string
           leveret_at?: string | null
           mentions?: Json
@@ -8855,6 +8861,9 @@ export type Database = {
           body?: string
           created_at?: string
           edited_at?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_kode?: string | null
           id?: string
           leveret_at?: string | null
           mentions?: Json
@@ -14028,12 +14037,15 @@ export type Database = {
           author_employee_id: string
           best_answer_comment_id: string | null
           body: string
+          comments_closed_at: string | null
+          comments_closed_by: string | null
           created_at: string
           deleted_at: string | null
           edited_at: string | null
           event_id: string | null
           hidden_at: string | null
           hidden_by: string | null
+          hidden_kode: string | null
           id: string
           image_path: string | null
           leveret_at: string | null
@@ -14059,12 +14071,15 @@ export type Database = {
           author_employee_id: string
           best_answer_comment_id?: string | null
           body?: string
+          comments_closed_at?: string | null
+          comments_closed_by?: string | null
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
           event_id?: string | null
           hidden_at?: string | null
           hidden_by?: string | null
+          hidden_kode?: string | null
           id?: string
           image_path?: string | null
           leveret_at?: string | null
@@ -14090,12 +14105,15 @@ export type Database = {
           author_employee_id?: string
           best_answer_comment_id?: string | null
           body?: string
+          comments_closed_at?: string | null
+          comments_closed_by?: string | null
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
           event_id?: string | null
           hidden_at?: string | null
           hidden_by?: string | null
+          hidden_kode?: string | null
           id?: string
           image_path?: string | null
           leveret_at?: string | null
@@ -20800,6 +20818,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      sb_anmeld: {
+        Args: {
+          p_id: string
+          p_kilde: string
+          p_kode: string
+        }
+        Returns: string
+      }
       sb_bind_sti: {
         Args: {
           p_besked: string
@@ -20869,6 +20895,15 @@ export type Database = {
         Returns: Record<string, unknown>
       }
       sb_minimer_register: { Args: never; Returns: number }
+      sb_moderer: {
+        Args: {
+          p_handling: string
+          p_id: string
+          p_kilde: string
+          p_kode?: string
+        }
+        Returns: boolean
+      }
       sb_ny_status_efter_ret: {
         Args: { p_kilde: string; p_status: string }
         Returns: string
