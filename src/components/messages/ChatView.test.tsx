@@ -2440,9 +2440,11 @@ describe("24d2 §2 – driftsvisning i ChatView", () => {
   it("rigtig useSendMessage + rigtig drift: INSERT afvist med PAUSE → banner, drift genhentet, pending og nyere kladde bevares", async () => {
     beskeder.ægteSend = true; driftT.ægte = true;
     const driftKald = () => graense.rpc.mock.calls.filter((c) => c[0] === "sb_24d2_drift").length;
+    // Serveren er i pause, når INSERT afvises; den efterfølgende driftslæsning bekræfter pausen.
+    let iPause = false;
     graense.rpc.mockImplementation(async (fn: unknown) => fn === "sb_24d2_drift"
-      ? { data: [{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
-    net.insert.mockReturnValue({ error: { code: "P0001", message: "SB24D2_PAUSE" } });
+      ? { data: [{ beskeder_pause: iPause, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
+    net.insert.mockImplementation(() => { iPause = true; return { error: { code: "P0001", message: "SB24D2_PAUSE" } }; });
     await klar();
     await waitFor(() => expect(driftKald()).toBeGreaterThan(0));
     const foer = driftKald();
