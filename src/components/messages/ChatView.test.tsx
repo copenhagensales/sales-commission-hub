@@ -2427,9 +2427,10 @@ describe("24d2 §2 – driftsvisning i ChatView", () => {
   });
   it("pause: pending genforsøg låst (intet nyt kald); post med tekst bevares", async () => {
     driftT.v = { status: "kendt", beskederPause: true, filTilladt: true, tjekTilladt: true };
-    const e = fastholdEjerT();
-    tilfoejAfsendelse("e", "A", { id: "p1", tekst: "gammel", svarId: null, fil: null, tilstand: "afvist", fejl: null, tidligereUkendt: false, oprettet: 1 }, null, e);
     await klar();
+    const { fastholdEjer } = await import("@/lib/sbKladder");
+    const e = fastholdEjer("e", "A", "u")!;
+    act(() => { tilfoejAfsendelse("e", "A", { id: "p1", tekst: "gammel", svarId: null, fil: null, tilstand: "afvist", fejl: null, tidligereUkendt: false, oprettet: 1 }, null, e); });
     const knap = screen.getByRole("button", { name: "Ikke sendt – prøv igen" });
     expect(knap.hasAttribute("disabled")).toBe(true);
     fireEvent.click(knap);
