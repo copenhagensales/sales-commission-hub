@@ -85,6 +85,20 @@ async function kald<T extends { data: unknown; error: unknown }>(f: () => Promis
   try { const r = await f(); return { data: r.data, error: r.error }; } catch (e) { return { data: null, error: e ?? "undtagelse" }; }
 }
 
+/** Storage-remove-udfald → kode til sb_koe_afslut (null = bekræftet succes eller objekt findes ikke). */
+export function removeUdfald(e: unknown): null | "storage_fejl" | "transport_ukendt" {
+  if (!e) return null;
+  if (typeof e !== "object") return "transport_ukendt";
+  const o = e as { status?: unknown; statusCode?: unknown; originalError?: unknown };
+  const orig = o.originalError as { status?: unknown } | undefined;
+  const st = typeof o.status === "number" ? o.status
+    : typeof o.statusCode === "string" && /^\d{3}$/.test(o.statusCode) ? Number(o.statusCode)
+    : orig instanceof Response ? orig.status
+    : typeof orig?.status === "number" ? orig.status : null;
+  if (st === null) return "transport_ukendt";
+  return st === 404 ? null : "storage_fejl";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const start = Date.now();
@@ -162,12 +176,20 @@ Deno.serve(async (req) => {
       for (let i = 0; i < poster.length; i += SAMTIDIGHED) {
         if (!tid()) { stop("koe"); break koeloekke; }
         await Promise.all(poster.slice(i, i + SAMTIDIGHED).map(async (p) => {
-          // remove() giver ingen fejl for et objekt, der ikke findes – det er succes. Afbrudt remove er ikke bekræftet.
+          // remove() giver ingen fejl for et objekt, der ikke findes – det er succes. Udfaldet klassificeres
+          // uden rå fejltekst: kendt Storage-svar → storage_fejl; intet svar (afbrudt/timeout/netværk) → transport_ukendt.
           const rm = await kald(() => svc.storage.from(p.bucket).remove([p.sti]));
-          const ok = !rm.error;
-          const af = await kald(() => svc.rpc("sb_koe_afslut", { p_id: p.id, p_ok: ok, p_fejl: ok ? null : "storage_fejl" }));
-          if (af.error || af.data !== true) { fejl.push("koe_afslut"); rester.koe = true; }
-          if (!ok) { fejl.push("storage_fejl"); rester.koe = true; } else if (!af.error && af.data === true) slettet++;
+          const kode = removeUdfald(rm.error);
+          const ok = kode === null;
+          const afslut = () => kald(() => svc.rpc("sb_koe_afslut", { p_id: p.id, p_ok: ok, p_fejl: kode }));
+          let af = await afslut();
+          let bekraeftet = !af.error && af.data === true;
+          if (!bekraeftet) {
+            fejl.push("koe_afslut"); rester.koe = true;
+            // Remove lykkedes, men afslutning er ukendt: ét genforsøg; stadig ukendt → databasen holder ordren udleveret.
+            if (ok && Date.now() < slut) { af = await afslut(); bekraeftet = !af.error && af.data === true; }
+          }
+          if (kode !== null) { fejl.push(kode); rester.koe = true; } else if (bekraeftet) slettet++;
         }));
       }
       if (poster.length < 50) break;

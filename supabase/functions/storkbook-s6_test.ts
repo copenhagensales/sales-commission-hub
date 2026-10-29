@@ -830,7 +830,7 @@ test("§3 oprydning: gruppe ved 49 s med langsom remove OG langsom afslut → in
     const b = await res.json();
     assert(ms <= 58_100, `varighed ${ms} (må ikke nå 65 s)`);
     assert(langsomme.size > 0, "gruppen ved 49 s startede ikke");
-    assertEquals(b.ok, false); assert(b.fejl.includes("koe_afslut")); assert(b.fejl.includes("storage_fejl")); assertEquals(b.rester.koe, true);
+    assertEquals(b.ok, false); assert(b.fejl.includes("koe_afslut")); assert(b.fejl.includes("transport_ukendt")); assertEquals(b.rester.koe, true);
     assertEquals(b.slettet, gruppe); // kun bekræftede
   } finally { time.restore(); }
 });
@@ -847,15 +847,76 @@ test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
+test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, højst ét afslut-genforsøg (24d2-edge-2 d)", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), afslut: (k) => hænger(k.signal) as Promise<Response> }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
     assertEquals(b.ok, false); assertEquals(b.slettet, 0); assert(b.fejl.includes("koe_afslut"));
-    assertEquals(kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 1);
+    assertEquals(kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 2);
     assertEquals(kaldTil((k) => k.metode === "DELETE").length, 1);
+  } finally { time.restore(); }
+});
+
+// 24d2-edge-2: klassifikation af Storage-remove → sb_koe_afslut (kun koder, aldrig rå fejltekst).
+const koeAfslutKald = () => kaldTil((k) => rpc(k, "sb_koe_afslut")).map((k) => JSON.parse(k.krop));
+test("24d2-edge-2 (a): bekræftet succes og 404 »findes ikke« → afslut(id, true, null)", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(2) : []),
+      remove: (k) => JSON.parse(k.krop).prefixes[0].endsWith("/1.png") ? jsonR({ statusCode: "404", error: "not_found", message: "Object not found" }, 404) : jsonR([]) }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(koeAfslutKald().sort((x, y) => x.p_id - y.p_id), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 2, p_ok: true, p_fejl: null }]);
+    assertEquals(b.ok, true); assertEquals(b.slettet, 2);
+  } finally { time.restore(); }
+});
+test("24d2-edge-2 (b): kendt Storage-svar 500/403 med body → afslut(id, false, 'storage_fejl') uden rå tekst", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(2) : []),
+      remove: (k) => JSON.parse(k.krop).prefixes[0].endsWith("/0.png") ? jsonR({ statusCode: "500", error: "x", message: "HEMMELIG-TEKST" }, 500) : jsonR({ statusCode: "403", error: "y", message: "HEMMELIG-TEKST" }, 403) }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    const a = koeAfslutKald();
+    assertEquals(a.length, 2);
+    for (const x of a) { assertEquals(x.p_ok, false); assertEquals(x.p_fejl, "storage_fejl"); }
+    assert(!kaldTil((k) => rpc(k, "sb_koe_afslut")).some((k) => k.krop.includes("HEMMELIG")));
+    assertEquals(b.ok, false); assert(b.fejl.includes("storage_fejl")); assertEquals(b.slettet, 0);
+  } finally { time.restore(); }
+});
+test("24d2-edge-2 (c): netværksfejl uden svar → afslut(id, false, 'transport_ukendt')", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), remove: () => { throw new TypeError("fetch failed HEMMELIG"); } }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    assertEquals(koeAfslutKald(), [{ p_id: 1, p_ok: false, p_fejl: "transport_ukendt" }]);
+    assert(b.fejl.includes("transport_ukendt")); assert(!b.fejl.includes("storage_fejl")); assertEquals(b.slettet, 0);
+  } finally { time.restore(); }
+});
+test("24d2-edge-2 (d): remove ok, afslut fejler → ét genforsøg; lykkes = slettet, fejler igen = ingen tredje", async () => {
+  for (const andet of [true, false]) {
+    const time = new FakeTime(DAG);
+    try {
+      let n = 0;
+      nulstil(oprRute({ naeste: (_k, i) => jsonR(i === 0 ? poster(1) : []),
+        afslut: () => (n++ === 0 ? jsonR({ message: "x" }, 500) : andet ? jsonR(true) : jsonR({ message: "x" }, 500)) }));
+      const { res } = await kørFake(hOpr, oprReq(), time);
+      const b = await res.json();
+      assertEquals(koeAfslutKald(), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 1, p_ok: true, p_fejl: null }]);
+      assertEquals(kaldTil((k) => k.metode === "DELETE").length, 1);
+      assert(b.fejl.includes("koe_afslut")); assertEquals(b.slettet, andet ? 1 : 0);
+    } finally { time.restore(); }
+  }
+});
+test("24d2-edge-2 (d'): remove fejlet + afslut fejler → intet genforsøg", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, i) => jsonR(i === 0 ? poster(1) : []), remove: () => jsonR({ statusCode: "500", message: "x" }, 500), afslut: () => jsonR({ message: "x" }, 500) }));
+    await (await kørFake(hOpr, oprReq(), time)).res.json();
+    assertEquals(koeAfslutKald().length, 1);
   } finally { time.restore(); }
 });
 
