@@ -160,3 +160,50 @@ describe("T8 §8 samtaleoprettelse uden gentaget RPC", () => {
     expect(g.hent).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------- B2-6B §B ----------
+import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+describe("B2-6B §B oprettelse: session og reel lukning", () => {
+  it("holdt identitetsopslag + sessionsskift: nul oprettelses-RPC, ingen toast, ingen navigation", async () => {
+    let løs!: (v: unknown) => void;
+    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise((r) => { løs = r; }) as never);
+    const onCreated = vi.fn();
+    render(createElement(Vis, { open: true, onCreated }));
+    await vælgGruppe();
+    fireEvent.click(screen.getByRole("button", { name: "Opret samtale" }));
+    await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
+    rydAlleKladder(); // logud/brugerskift
+    await act(async () => { løs({ data: { user: { id: "u" } } }); await new Promise((r) => setTimeout(r, 0)); });
+    expect(opretKald()).toBe(0);
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("kendt oprettelses-id: faktisk Escape-lukning → genåbn bevarer navn/valg/id; kun hentning genforsøges", async () => {
+    g.rpc.mockResolvedValue({ data: "s1", error: null });
+    g.hent.mockResolvedValue({ data: null, error: { message: "netværk" } });
+    const onCreated = vi.fn();
+    let åbn!: () => void;
+    function Forælder() {
+      const [open, setOpen] = useState(true);
+      åbn = () => setOpen(true);
+      return createElement(QueryClientProvider, { client: qc }, createElement(NewConversationDialog, { open, onOpenChange: setOpen, onCreated }));
+    }
+    render(createElement(Forælder));
+    await vælgGruppe();
+    fireEvent.click(screen.getByRole("button", { name: "Opret samtale" }));
+    await screen.findByText(OPRETTET_IKKE_HENTET_TEKST);
+    fireEvent.keyDown(screen.getByPlaceholderText("Angiv gruppenavn..."), { key: "Escape", code: "Escape" });
+    await vi.waitFor(() => expect(screen.queryByPlaceholderText("Angiv gruppenavn...")).toBeNull());
+    act(() => { åbn(); });
+    expect(await screen.findByText(OPRETTET_IKKE_HENTET_TEKST)).toBeTruthy();
+    expect((screen.getByPlaceholderText("Angiv gruppenavn...") as HTMLInputElement).value).toBe("Holdet");
+    expect(screen.getByText("2 valgt")).toBeTruthy();
+    g.hent.mockResolvedValue({ data: samtale, error: null });
+    fireEvent.click(screen.getByRole("button", { name: "Prøv igen" }));
+    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith("s1"));
+    expect(opretKald()).toBe(1);
+  });
+});
