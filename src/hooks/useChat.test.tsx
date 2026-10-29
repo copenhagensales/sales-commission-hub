@@ -952,7 +952,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("Gem: transportfejl og række med revision 3 og samme tekst (start 1) → konflikt, ét sb_ret, intet snapshot", async () => {
     const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
     const e = ejer(); expect(tagHandling(e, ID, "gem")).toBe(true);
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(3)];
     const f = await result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }).then(() => null, (x) => x);
     expect(f).toBeInstanceOf(HandlingsFejl); expect((f as HandlingsFejl).art).toBe("konflikt");
@@ -965,7 +965,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("sb_ret med revision ≠ start+1 er ikke direkte succes → afstemmes ved læsning", async () => {
     const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "gem");
-    rpc().mockResolvedValueOnce({ data: 7, error: null } as never);
+    rpc().mockResolvedValueOnce({ data: 7, error: null });
     svar.chat_messages = [r(1)];
     const f = await result.current.mutateAsync({ messageId: ID, content: "ny", conversationId: "c", revision: 1, ejer: e, kladdeVersion: 9 }).then(() => null, (x) => x);
     expect((f as HandlingsFejl).art).toBe("ukendt");
@@ -976,7 +976,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("Fjern fil: transportfejl og revision 3 uden fil (start 1) → konflikt og én konflikttoast", async () => {
     const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "fjern");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(3)];
     await result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "e/c/f", fejltekst: "Kunne ikke fjerne filen" }).catch(() => null);
     expect(toast.error).toHaveBeenCalledTimes(1);
@@ -988,7 +988,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("transportfejl med gammel række → ukendt bevares; senere commit → »Tjek igen« bekræfter uden ny skrivning", async () => {
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "send");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(4)];
     await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }).catch(() => null);
     expect(toast.error).not.toHaveBeenCalled();
@@ -1006,7 +1006,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("tilbageholdt og fejlet »Tjek igen«: tjekker under læsning; læsefejl bevarer snapshot; ingen skrivning", async () => {
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "traek");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(4)];
     await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "traek", conversationId: "c", ejer: e }).catch(() => null);
     let slip!: (x: { data: unknown; error: unknown }) => void;
@@ -1031,7 +1031,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); const vis = { revision: 4, status: "afventer_afsender" };
     expect(tagHandling(e, ID, "send", vis)).toBe(true);
-    rpc().mockResolvedValueOnce({ data: true, error: null } as never);
+    rpc().mockResolvedValueOnce({ data: true, error: null });
     let faerdig = false;
     const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).then(() => { faerdig = true; });
     await waitFor(() => expect(n).toBe(2));
@@ -1053,7 +1053,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "send");
     let slip!: (v: unknown) => void;
-    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })) as never);
+    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })));
     const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }).catch(() => null);
     await waitFor(() => expect(rpc()).toHaveBeenCalledTimes(1));
     const foer = laesninger();
@@ -1071,7 +1071,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("§2a stop under resultatafstemningen (Gem): sent svar giver intet snapshot, ingen toast og ingen cacheinvalidering", async () => {
     const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "gem");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     let slip!: (x: { data: unknown; error: unknown }) => void;
     svar.chat_messages = [new Promise((x) => { slip = x; })];
     const inv = vi.spyOn(qc, "invalidateQueries");
@@ -1091,7 +1091,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "fjern");
     let slip!: (v: unknown) => void;
-    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })) as never);
+    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })));
     const p = result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "f" }).catch(() => null);
     await waitFor(() => expect(rpc()).toHaveBeenCalledTimes(1));
     stopEfterbehandling("e", "c");
