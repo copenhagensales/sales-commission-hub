@@ -178,14 +178,15 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("gentaget Send med P0001-statusafvisning, men rækken er leveret i samme revision → bekræftet uden toast", async () => {
+  it("B2b-3a: kendt P0001-statusafvisning vises ordret én gang, også når rækken er leveret i samme revision", async () => {
     render(ui(afventer(4)));
     await waitFor(() => knap("Send alligevel"));
     raekke = { data: { status: "leveret", revision: 4, content: "x", attachment_path: null }, error: null };
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } } as never);
     fireEvent.click(knap("Send alligevel"));
     await flush();
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Kun afventende indhold kan sendes");
   });
 
   it("reel konflikt med samme status skjules ikke: leveret men nyere revision → afvisningen vises ordret én gang", async () => {
@@ -209,9 +210,20 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     expect(toast.error).toHaveBeenCalledWith("Beskeden er ændret – prøv igen");
   });
 
-  it.each([[false], [null]])("uventet %s fra sb_afgoer er ikke succes – ukendt udfald vises lokalt uden ny skrivning", async (data) => {
+  it.each([[false], [null]])("B2b-3a: uventet %s fra sb_afgoer + samme revision i målstatus ved læsning → bekræftet uden toast", async (data) => {
     render(ui(afventer(4)));
     raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
+    await flush();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([[false], [null]])("uventet %s fra sb_afgoer er ikke succes – ukendt udfald vises lokalt uden ny skrivning", async (data) => {
+    render(ui(afventer(4)));
+    raekke = { data: { status: "afventer_afsender", revision: 4, content: "", attachment_path: null }, error: null };
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();

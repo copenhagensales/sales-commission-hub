@@ -18,7 +18,7 @@ export function UkendtUdfald({ emp, conversationId, messageId, onAfklaret }: {
   const qc = useQueryClient();
   const laas = useHandling(emp, conversationId, messageId);
   const [ulaest, setUlaest] = useState(false);
-  if (!laas.ukendt || laas.art) return null;
+  if (!laas.ukendt || (laas.art && laas.art !== "ret")) return null; // åben editor ('ret') rydder/skjuler ikke tilstanden
   const tjek = async () => {
     const v = await tjekUdfaldIgen(qc, emp, conversationId, messageId);
     setUlaest(v === "ukendt");
