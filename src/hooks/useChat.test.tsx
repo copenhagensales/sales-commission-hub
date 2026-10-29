@@ -1247,8 +1247,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
-    expect(tagHandling(ejer, "m")).not.toBeNull(); // manuel handling får låsen og stopper det gamle tjek
-    stopEfterbehandling("e", "c", "m");
+    expect(tagHandling(ejer, "m", "send")).toBe(true); // manuel handling får låsen og afslutter det gamle tjeks timer
     expect(aktiveTjekTimere()).toBe(0);
     await p; await vi.advanceTimersByTimeAsync(5000);
     expect(invokes()).toBe(1);
