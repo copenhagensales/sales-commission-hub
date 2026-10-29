@@ -440,7 +440,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const udloebne = udloebneListe.map((m) => `${m.id}@${m.slettes_efter}`).join(",");
   const [fristSlag, setFristSlag] = useState(0);
   useEffect(() => {
-    if (!messages) return; // ukendt liste: intet forløb afsluttes
+    if (!messages || !meId) return; // ukendt liste/identitet: intet forløb startes eller afsluttes
     const liste = udloebne ? udloebne.split(",").map((x) => { const i = x.indexOf("@"); return { id: x.slice(0, i), frist: x.slice(i + 1) }; }) : [];
     const due = synkFristForloeb(meId, conversationId, liste, Date.now());
     if (due === null) return;
