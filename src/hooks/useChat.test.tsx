@@ -602,6 +602,7 @@ describe("c3 §7 – logud under tjek-genforsøgets ventetid", () => {
     try {
       auth("SIGNED_IN", "u");
       const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+      saetModelPort("u", sessionsGeneration(), true, qc); // r3: modelporten er pr. QueryClient i produktionsvejen
       const inv = vi.spyOn(qc, "invalidateQueries");
       const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
       const { result, unmount } = renderHook(() => useSendMessage(), { wrapper });
