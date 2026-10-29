@@ -14,6 +14,27 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
   return reg ?? null;
 }
 
+export const PUSH_NOT_READY_MESSAGE =
+  "Notifikationer kunne ikke slås til endnu. Luk appen helt, åbn den igen og prøv en gang til.";
+export const SW_READY_TIMEOUT_MS = 10_000;
+
+/** Afventer en aktiv service worker (navigator.serviceWorker.ready) med kontrolleret timeout. */
+export async function waitForActiveRegistration(timeoutMs = SW_READY_TIMEOUT_MS): Promise<ServiceWorkerRegistration | null> {
+  if (!pushSupported()) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); }),
+    ]);
+    return reg && reg.active ? reg : null;
+  } catch {
+    return null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 /** Kaldes FØR signOut: sletter enhedens subscription i databasen (kræver stadig session) og afmelder browseren. */
 export async function clearPushSubscription(): Promise<void> {
   try {
@@ -34,7 +55,8 @@ export async function ensurePushSubscription(): Promise<void> {
     if (!standalone) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const reg = await getRegistration();
+    if (!(await getRegistration())) return;
+    const reg = await waitForActiveRegistration();
     if (!reg) return;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
@@ -77,14 +99,20 @@ export function usePushNotifications() {
   }, []);
 
   const subscribe = useCallback(async () => {
-    const reg = await getRegistration();
-    if (!reg) throw new Error("Notifikationer virker kun i den installerede Stork-app.");
+    if (!(await getRegistration())) throw new Error("Notifikationer virker kun i den installerede Stork-app.");
     const perm = await Notification.requestPermission();
     setPermission(perm);
     if (perm !== "granted") throw new Error("Notifikationer blev ikke tilladt.");
     const { data: keyRes, error: keyErr } = await supabase.functions.invoke("push-public-key", { body: {} });
     if (keyErr || !keyRes?.publicKey) throw new Error("Kunne ikke hente nøgle.");
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey) });
+    const reg = await waitForActiveRegistration();
+    if (!reg) throw new Error(PUSH_NOT_READY_MESSAGE);
+    let sub: PushSubscription;
+    try {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey) });
+    } catch {
+      throw new Error(PUSH_NOT_READY_MESSAGE);
+    }
     const json = sub.toJSON();
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw new Error("Ikke logget ind");
