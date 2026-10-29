@@ -2377,3 +2377,35 @@ describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessi
     unmount();
   });
 });
+
+// ---------- 24d2-klient §1 (g): lukket modelvej starter ingen nye tjek-/transportkald ----------
+describe("24d2 §1 (g) – modelport i startTjekHvisNoedvendigt", () => {
+  const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
+  afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset().mockImplementation(async () => ({ error: null })); });
+
+  it("lukket/ukendt port → intet modelkald, serverstatus læses kun", async () => {
+    saetModelPort("u", sessionsGeneration(), false);
+    svar.chat_messages = [tjekkes(2)];
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    expect(graense.invoke).not.toHaveBeenCalled();
+    expect(tjekPortAaben("u", sessionsGeneration())).toBe(false);
+  });
+
+  it("port lukkes under ventetiden → intet transportgenforsøg", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+    saetModelPort("u", sessionsGeneration(), false);
+    await vi.advanceTimersByTimeAsync(3000); await p;
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("kontrol: åben port → modelkald", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+  });
+});
