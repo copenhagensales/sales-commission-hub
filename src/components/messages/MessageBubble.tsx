@@ -255,7 +255,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
       <div className={cn("flex min-w-0 flex-col max-w-[85%] md:max-w-[70%]", isOwn ? "items-end" : "items-start")}>
         {message.reply_to && !trukket && !udloebet && (
           <div className={cn(
-            "text-xs px-2 md:px-3 py-1 rounded-t-lg border-l-2 mb-1 max-w-full min-w-0",
+            "text-xs max-md:text-[14px] px-2 md:px-3 py-1 rounded-t-lg border-l-2 mb-1 max-w-full min-w-0",
             isOwn ? "bg-primary/10 border-primary ml-auto" : "bg-muted border-muted-foreground"
           )}>
             <span className="font-medium">{message.reply_to.sender?.full_name}</span>
@@ -268,7 +268,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
           trukket ? "bg-muted text-muted-foreground" : isOwn ? (leveret ? "bg-primary text-primary-foreground" : "bg-primary/60 text-primary-foreground") : "bg-muted"
         )}>
           {!isOwn && message.sender && (
-            <div className="text-xs font-medium mb-1 opacity-70">{message.sender.full_name}</div>
+            <div className="text-xs max-md:text-[14px] font-medium mb-1 opacity-70">{message.sender.full_name}</div>
           )}
 
           {trukket ? (
@@ -339,7 +339,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
                 <div className="whitespace-pre-wrap break-words">{renderMentions(message.content)}</div>
               )}
 
-              <div className={cn("text-xs mt-1 flex flex-wrap items-center gap-1", isOwn ? "text-primary-foreground/70" : "text-muted-foreground")}>
+              <div className={cn("text-xs max-md:text-[14px] mt-1 flex flex-wrap items-center gap-1", isOwn ? "text-primary-foreground/70" : "text-muted-foreground")}>
                 {format(new Date(message.created_at), "HH:mm", { locale: da })}
                 {message.edited_at && <span>(redigeret)</span>}
                 {message.slettes_efter && <span>· {slettesTekst(message.slettes_efter, nu)}</span>}
@@ -412,7 +412,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
           <div className={cn("flex flex-wrap gap-1 mt-1", isOwn ? "justify-end" : "justify-start")}>
             {Object.entries(groupedReactions).map(([emoji, data]) => (
               <button key={emoji} onClick={() => handleReaction(emoji)}
-                className={cn("text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 border max-md:min-h-11 max-md:px-3",
+                className={cn("text-xs max-md:text-[14px] px-1.5 py-0.5 rounded-full flex items-center gap-1 border max-md:min-h-11 max-md:px-3",
                   data.hasOwn ? "bg-primary/20 border-primary" : "bg-muted border-transparent")}
                 title={data.users.join(", ")}>
                 <span>{emoji}</span>
