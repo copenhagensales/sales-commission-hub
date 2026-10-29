@@ -1728,3 +1728,45 @@ describe("B2c-2b-2 §7 – presence-kanal ved samtaleskift og afmontering", () =
     expect(b.track).not.toHaveBeenCalled();
   });
 });
+
+describe("B2c-2b-2 (Codex) – fristoprydning via stopvejen", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const r = (revision: number) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null });
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    graense.rpc.mockReset(); vi.mocked(toast.error).mockReset();
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { graense.rpc.mockReset(); vi.mocked(toast.error).mockReset(); for (const k of Object.keys(svar)) delete svar[k]; qc.clear(); });
+
+  it("når snapshot og »Tjek igen« for netop det udløbne id; andre snapshots og fysisk lås bevares", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    for (const id of ["x1", "x2"]) {
+      const e = fastholdEjer("e", "c", "u")!; expect(tagHandling(e, id, "send")).toBe(true);
+      graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+      svar.chat_messages = [r(4)];
+      await result.current.mutateAsync({ messageId: id, revision: 4, handling: "send", conversationId: "c", ejer: e }).catch(() => null);
+    }
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    expect(udfaldSnapshot("e", "c", "x1")).not.toBeNull();
+    const x2 = udfaldSnapshot("e", "c", "x2");
+    expect(x2).not.toBeNull();
+    // Igangværende »Tjek igen« for x1 (tilbageholdt læsning).
+    let slip!: (x: unknown) => void;
+    svar.chat_messages = [new Promise((x) => { slip = x; })];
+    const p = tjekUdfaldIgen(qc, "e", "c", "x1");
+    // Fysisk igangværende arbejde på x3 (låsen ejes af sit kald).
+    const e3 = fastholdEjer("e", "c", "u")!; expect(tagHandling(e3, "x3", "send")).toBe(true);
+    const laase = aktiveHandlinger();
+    fristOprydning("e", "c", "x1");
+    fristOprydning("e", "c", "x3");
+    slip(msg({ status: "leveret", revision: 4, content: "x", attachment_path: null }));
+    expect(await p).toBe("stoppet");
+    expect(udfaldSnapshot("e", "c", "x1")).toBeNull();
+    expect(udfaldSnapshot("e", "c", "x2")).toBe(x2); // andre afsendelser røres ikke
+    expect(aktiveHandlinger()).toBe(laase); // lås beholdes til egen afslutning
+    expect(toast.error).not.toHaveBeenCalled();
+    frigivHandling(e3, "x3");
+  });
+});
