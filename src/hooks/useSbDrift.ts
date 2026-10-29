@@ -30,6 +30,8 @@ export function tolkDrift(data: unknown): SbDriftRaekke | null {
 let sekvens = 0;
 interface PauseTilstand { pause: boolean; bevis: number }
 const pauser = new WeakMap<QueryClient, Map<string, PauseTilstand>>();
+/** Start-sekvens for den senest anvendte læsning pr. QueryClient og session (startrækkefølge, ikke svarrækkefølge). */
+const anvendt = new WeakMap<QueryClient, Map<string, number>>();
 const lyttere = new Set<() => void>();
 const meld = () => { for (const l of lyttere) l(); };
 const sk = (bruger: string, gen: number) => `${bruger}:${gen}`;
@@ -42,30 +44,21 @@ export const erPauseKendt = (qc: QueryClient, bruger: string, gen: number) => pa
 
 /**
  * Modelport for startTjekHvisNoedvendigt, afgrænset pr. QueryClient og (bruger, generation) som pausebeviset.
- * Med qc: kun denne klients kendte tjek_tilladt=true åbner. Uden qc (kaldere uden QueryClient, fx useChat):
- * åben kun hvis mindst én klient kender porten åben for sessionen og ingen klient har den lukket (fail-closed).
+ * Produktionskaldet giver altid sin QueryClient: kun denne klients kendte tjek_tilladt=true åbner. Der findes
+ * ingen samlende fallback på tværs af klienter; qc=null læser kun prøveopsætningernes testPorte (tom i produktion).
  */
 const modelPorte = new WeakMap<QueryClient, Map<string, boolean>>();
-const alleporte = new Set<Map<string, boolean>>(); // kun portkort (små), ikke QueryClients
 const testPorte = new Map<string, boolean>(); // kun saetModelPort uden qc (eksisterende prøveopsætninger)
 function portMap(qc: QueryClient): Map<string, boolean> {
   let m = modelPorte.get(qc);
-  if (!m) { m = new Map(); modelPorte.set(qc, m); alleporte.add(m); }
+  if (!m) { m = new Map(); modelPorte.set(qc, m); }
   return m;
 }
-export function tjekPortAaben(bruger: string | null | undefined, gen: number, qc?: QueryClient): boolean {
+export function tjekPortAaben(qc: QueryClient | null, bruger: string | null | undefined, gen: number): boolean {
   if (!bruger || gen !== sessionsGeneration()) return false;
   const k = sk(bruger, gen);
   if (qc) return modelPorte.get(qc)?.get(k) === true;
-  const t = testPorte.get(k);
-  if (t !== undefined) return t; // kun prøveopsætninger sætter denne
-  let aaben = false;
-  for (const m of alleporte) {
-    const v = m.get(k);
-    if (v === false) return false;
-    if (v === true) aaben = true;
-  }
-  return aaben;
+  return testPorte.get(k) === true;
 }
 
 /** Kun prøveopsætninger: sætter modelporten uden at gå gennem RPC-grænsen. */
@@ -91,9 +84,11 @@ function anvendLaesning(qc: QueryClient, bruger: string, gen: number, l: Laesnin
   if (gen !== sessionsGeneration()) return; // gammelt sessionssvar
   const k = sk(bruger, gen);
   const m = pauseMap(qc); const nu = m.get(k);
-  // En læsning startet før seneste pausebevis (også forsinket/annulleret) må hverken ophæve pausen eller åbne porten.
-  const aeldre = !!nu && l.start < nu.bevis;
-  if (aeldre) { portMap(qc).set(k, false); meld(); return; }
+  let a = anvendt.get(qc); if (!a) { a = new Map(); anvendt.set(qc, a); }
+  // Startrækkefølge: en læsning startet før seneste pausebevis eller før den senest anvendte læsning ignoreres
+  // helt – den må hverken åbne, lukke eller ændre pausen (ingen genlukning af en nyere gyldig genåbning).
+  if ((nu && l.start < nu.bevis) || l.start < (a.get(k) ?? 0)) return;
+  a.set(k, l.start);
   portMap(qc).set(k, l.raekke?.tjek_tilladt === true);
   if (l.raekke?.beskeder_pause) m.set(k, { pause: true, bevis: Math.max(nu?.bevis ?? 0, l.start) });
   else if (l.raekke && nu?.pause && l.start > nu.bevis) m.set(k, { pause: false, bevis: nu.bevis });
@@ -117,12 +112,13 @@ export function useSbDrift(enabled: boolean, bruger: string | null | undefined, 
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
     refetchOnReconnect: "always",
-    queryFn: async (): Promise<Laesning> => {
+    queryFn: async ({ signal }): Promise<Laesning> => {
       const start = ++sekvens;
       let raekke: SbDriftRaekke | null = null;
       try { const { data, error } = await kaldDrift(); raekke = error ? null : tolkDrift(data); } catch { raekke = null; }
       const l = { raekke, start };
-      if (b) anvendLaesning(qc, b, gen, l);
+      // Faktisk annulleret læsning (AbortSignal) ændrer intet i delt tilstand.
+      if (b && !signal.aborted) anvendLaesning(qc, b, gen, l);
       return l;
     },
   });

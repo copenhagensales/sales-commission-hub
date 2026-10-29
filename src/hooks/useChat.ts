@@ -1948,13 +1948,13 @@ async function tjekHeaders(f: TjekForloeb, vagt: () => boolean): Promise<Record<
  * Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét transportgenforsøg efter 2 s, kun hvis
  * genlæsningen viser samme revision og stadig 'tjekkes'. Edge-resultatet ændrer aldrig klientstatus direkte.
  */
-export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean = () => true, ejer?: OperationsEjer): Promise<void> {
+export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean, ejer: OperationsEjer | undefined, qc: QueryClient | null): Promise<void> {
   if (!vagt()) return;
   const r = await laesStatus(messageId);
   if (!vagt() || !r || r.status !== "tjekkes") return;
   const gen = ejer?.gen ?? sessionsGeneration();
   // 24d2 §1: nye modelkald kræver kendt tjek_tilladt=true for sessionen; serverens beskedstatus røres ikke.
-  if (!tjekPortAaben(ejer?.bruger, gen)) return;
+  if (!tjekPortAaben(qc, ejer?.bruger, gen)) return;
   const k = `${ejer?.bruger ?? ""}:${gen}:${messageId}:${r.revision}`;
   if (tjekAktive.has(k)) return;
   tjekAktive.add(k);
@@ -1966,7 +1966,7 @@ export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => bo
       if (!gyldig()) return;
       const headers = await tjekHeaders(f, gyldig);
       if (!headers || !gyldig()) return; // kontrol efter sessionsopslag og umiddelbart før transport
-      if (!tjekPortAaben(f.ejer?.bruger, f.gen)) return; // 24d2: lukket modelvej → intet transportgenforsøg
+      if (!tjekPortAaben(qc, f.ejer?.bruger, f.gen)) return; // 24d2: lukket modelvej → intet transportgenforsøg
       let error: unknown = null;
       try { ({ error } = await supabase.functions.invoke("storkbook-tjek", { headers, signal: f.afbryd.signal, body: { type: "besked", id: messageId, revision: r.revision } })); }
       catch { return; } // uventet kast: intet genforsøg; klienten læser altid faktisk DB-status
@@ -2022,7 +2022,7 @@ function efterHandling(qc: QueryClient, ejer: OperationsEjer, conversationId: st
   const k = `${ejer.op}:${messageId}`;
   efterOps.set(k, { ejer, conv: conversationId, id: messageId });
   void qc.invalidateQueries({ queryKey: ["sb-begrundelse"] });
-  void startTjekHvisNoedvendigt(messageId, vagt, ejer).finally(() => {
+  void startTjekHvisNoedvendigt(messageId, vagt, ejer, qc).finally(() => {
     efterOps.delete(k);
     if (!vagt()) return;
     void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
