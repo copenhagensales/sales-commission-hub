@@ -25,6 +25,7 @@ const graense = vi.hoisted(() => ({
   rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
+  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "t" } } })),
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (t: string) => {
@@ -50,7 +51,7 @@ vi.mock("@/integrations/supabase/client", () => {
       storage: { from: () => ({ uploadToSignedUrl: (...a: unknown[]) => (lagerUpload.fn ? lagerUpload.fn(...a) : Promise.resolve({ error: null })) }) },
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
-        getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
+        getSession: graense.session,
       },
     },
   };
@@ -473,7 +474,7 @@ describe("c3 §7 – uploadnavigation gennem rigtig sbFil (fetch/storage ved gr�
   beforeEach(async () => {
     beskeder.ægteSend = true; beskeder.ægteFil = true;
     const { supabase } = await import("@/integrations/supabase/client");
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
+    graense.session.mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } });
     const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
   });
@@ -529,7 +530,7 @@ describe("c3 §7 – uploadnavigation gennem rigtig sbFil (fetch/storage ved gr�
   it("fjern fil under rigtig sessionsopslag → nul POST", async () => {
     const { supabase } = await import("@/integrations/supabase/client");
     const sess = kontrol<unknown>();
-    vi.mocked(supabase.auth.getSession).mockReturnValueOnce(sess.p as never);
+    graense.session.mockReturnValueOnce(sess.p);
     fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await klar();
     await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
@@ -1254,7 +1255,7 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
     // B2b-2: typet sessionsfixture uden as-never-omgåelse.
     const session: Session = { access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
       user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" } };
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session }, error: null });
+    graense.session.mockResolvedValue({ data: { session }, error: null });
     auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
   });
@@ -1355,7 +1356,11 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
   });
 
   it("offline-udløb: åben tekstfil, åbent billede, pågående hentning, svaruddrag og valgt svar fjernes straks uden netværk", async () => {
-    const frist = om(2000); // B2b-3b: rummelig vægurfrist, så langsomme/blandede kørsler ikke udløber før klik
+    // B2c-1b: årsag til ustabilitet = vægurfrist (rigtig tid) mod klikkenes varighed; ved langsomme/blandede kørsler
+    // udløb c.png før klikket. Nu styres Date deterministisk; kun planlægningstimeren kører i rigtig tid.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T00:00:00Z"));
+    const frist = om(300);
     const signaler: AbortSignal[] = [];
     let n = 0;
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: string, init?: RequestInit) => {
@@ -1390,7 +1395,8 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
     expect(screen.getByText("Svarer på:")).toBeTruthy();
     const kaldFoer = fetchSpy.mock.calls.length;
-    await vent(2050);
+    await act(async () => { vi.setSystemTime(Date.now() + 400); });
+    await vent(700);
     expect(screen.queryByText("hemmelig")).toBeNull();
     expect(screen.queryByText("filindhold")).toBeNull();
     expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
@@ -1525,5 +1531,75 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
     expect(genhentninger()).toBe(6);
     expect(vi.getTimerCount()).toBeLessThan(5); // ingen ophobede/løbske timere
+  });
+});
+
+describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () => {
+  const T0 = new Date("2026-10-29T00:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  const raekke = (content: string, slettes_efter: string | null = null) => ({ data: { id: "x", content, sender_id: "s", status: "leveret", slettes_efter, deleted_at: null, sender: null }, error: null });
+  const vent = (ms: number) => act(async () => { await new Promise((x) => setTimeout(x, ms)); });
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("frist passerer under svaropslag → udløbet svar vises aldrig", async () => {
+    const k = kontrol<Svar>();
+    net.vent = () => k.p;
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    vi.setSystemTime(T0 + 1000);
+    await act(async () => { k.res(raekke("udløbet svar", iso(500))); await k.p; });
+    await vent(0);
+    expect(screen.queryByText("udløbet svar")).toBeNull();
+    r.unmount();
+  });
+
+  it("gammel svartekst skjules straks ved genforbindelse; læsefejl → fejltilstand uden tekst, reference bevaret", async () => {
+    net.svar.chat_messages = [raekke("svartekst")];
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    await waitFor(() => expect(screen.getByText("svartekst")).toBeTruthy());
+    net.svar.chat_messages = [{ data: null, error: { message: "Failed to fetch" } }];
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    expect(screen.queryByText("svartekst")).toBeNull(); // straks, før debounce/netværk
+    await vent(400);
+    await waitFor(() => expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy());
+    expect(screen.queryByText("svartekst")).toBeNull();
+    expect(laesKladde("e", "A")?.svarId).toBe("x"); // fejl er ikke sletning
+    r.unmount();
+  });
+
+  it("sent oprindeligt svar efter invalidation genindsætter ikke indhold (query havde endnu ingen data)", async () => {
+    const gammel = kontrol<Svar>();
+    let n = 0;
+    net.vent = () => (++n === 1 ? gammel.p : Promise.resolve(raekke("ny tekst")));
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await vent(400);
+    await waitFor(() => expect(screen.getByText("ny tekst")).toBeTruthy());
+    await act(async () => { gammel.res(raekke("gammel tekst")); await gammel.p; });
+    await vent(0);
+    expect(screen.queryByText("gammel tekst")).toBeNull();
+    expect(screen.getByText("ny tekst")).toBeTruthy();
+    r.unmount();
+  });
+
+  it("fokus før fristtimerbehandling: ingen kvittering af udløbne id'er", async () => {
+    const kvit = vi.fn();
+    kvitMutate.fn = kvit;
+    const fokus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    beskeder.liste = [fremmed("u1", "udløber", { slettes_efter: iso(1000) }), fremmed("v1", "varig")];
+    const r = await klar();
+    vi.setSystemTime(T0 + 1500);
+    fokus.mockReturnValue(true);
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds?: string[] }).messageIds ?? []);
+    expect(ids).not.toContain("u1");
+    fokus.mockRestore();
+    r.unmount();
   });
 });

@@ -82,10 +82,12 @@ export function svarUtilgaengeligt(r: { status: BeskedStatusVaerdi | null; slett
  * planlægges næste. Allerede udløbne frister armeres aldrig (ingen 0-ms-løkke). Forgrund/genforbindelse kontrollerer straks.
  */
 export function useFristUr(frister: ReadonlyArray<string | null | undefined>): number {
-  const [nu, setNu] = useState(() => Date.now());
+  // B2c-1b §1: intet gemt nu – kun et slag-tal, der tvinger ny render og ny planlægning. En timer, der fyrer før
+  // fristen (fx ur-justering), planlægger næste fremtidige frist igen (aldrig 0 ms, da kun d > 0 armeres).
+  const [slag, setSlag] = useState(0);
   const noegle = [...new Set(frister.filter((f): f is string => !!f))].sort().join("|");
   useEffect(() => {
-    const opd = () => setNu(Date.now());
+    const opd = () => setSlag((x) => x + 1);
     const synlig = () => { if (document.visibilityState === "visible") opd(); };
     const start = Date.now();
     let min = Infinity;
@@ -103,8 +105,9 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
       window.removeEventListener("focus", opd);
       document.removeEventListener("visibilitychange", synlig);
     };
-  }, [noegle, nu]);
-  return nu;
+  }, [noegle, slag]);
+  // Hver render vurderer mod klientens AKTUELLE ur.
+  return Date.now();
 }
 
 /** Ventetider for genhentning, når serveren stadig returnerer en lokalt udløbet række (ure kan afvige). */
@@ -114,10 +117,11 @@ export const FRIST_GENHENT_MS = [500, 2000, 4000, 8000, 16000, 32000] as const;
  * B2c-1 §5: svaroriginal uden for de indlæste sider valideres ved et afgrænset RLS-opslag (én række).
  * null = ingen synlig række (utilgængelig). Nøglen indeholder sessionsgenerationen, så et gammelt svar aldrig rammer en ny session.
  */
-export function useSvarOriginal(id: string | null) {
+export function useSvarOriginal(id: string | null, forespGen = 0) {
   const gen = sessionsGeneration();
   return useQuery({
-    queryKey: ["chat-svar-original", gen, id],
+    // B2c-1b §2: forespørgselsgenerationen gør, at et svar startet før genvalideringen aldrig rammer den nye nøgle.
+    queryKey: ["chat-svar-original", gen, forespGen, id],
     enabled: !!id,
     retry: false,
     queryFn: async (): Promise<ReplyPreview | null> => {
@@ -128,6 +132,8 @@ export function useSvarOriginal(id: string | null) {
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
+      // Identitet kontrolleres før resultatet bruges: ny session → fejl (ikke »slettet«), så referencen bevares.
+      if (sessionsGeneration() !== gen) throw new Error("forældet session");
       if (!data) return null;
       const s = data.sender;
       return {

@@ -343,7 +343,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // B2c-1 §5: valgt svar – fra tråden, ellers et afgrænset RLS-opslag (fravær i siden er ikke bevis for sletning).
   const svarRef = svarId ?? replyTo?.id ?? null;
   const svarITraad = svarRef && messages ? messages.find((x) => x.id === svarRef) : undefined;
-  const svarOpslag = useSvarOriginal(svarRef && messages && !svarITraad ? svarRef : null);
+  // B2c-1b §2: genvalidering skjuler straks uddraget; ny forespørgselsgeneration efter 300 ms debounce.
+  const [svarGen, setSvarGen] = useState(0);
+  const [svarSkjult, setSvarSkjult] = useState<{ fra: number; gen: number } | null>(null);
+  const svarOpslag = useSvarOriginal(svarRef && messages && !svarITraad ? svarRef : null, svarGen);
 
   // Lokal fristkontrol (klientens ur) på tværs af tråd, svaruddrag og valgt svar. Kun visning – intet skrives.
   const fristNu = useFristUr([
@@ -367,15 +370,41 @@ export function ChatView({ conversationId }: ChatViewProps) {
     }
   }), [replyTo, svarId]);
   // Signal, forgrund og genforbindelse genvaliderer det valgte svars opslag (300 ms debounce).
+  const svarGenRef = useRef(0);
   useEffect(() => {
-    const gv = () => planlaeg(queryClient, ["chat-svar-original"]);
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const gv = () => {
+      const maal = svarGenRef.current + 1;
+      setSvarSkjult((x) => x ?? { fra: Date.now(), gen: maal });
+      if (t) return; // 300 ms debounce
+      t = setTimeout(() => {
+        t = null;
+        // Gammelt arbejde annulleres og fjernes; den nye generation henter på en ny nøgle.
+        void queryClient.cancelQueries({ queryKey: ["chat-svar-original"] });
+        queryClient.removeQueries({ queryKey: ["chat-svar-original"] });
+        svarGenRef.current = maal;
+        setSvarGen(maal);
+        planlaeg(queryClient, ["chat-messages", conversationId]);
+      }, 300);
+    };
     const synlig = () => { if (document.visibilityState === "visible") gv(); };
     const af = onChatSignal(gv);
     window.addEventListener("online", gv);
+    window.addEventListener("focus", gv);
     document.addEventListener("visibilitychange", synlig);
-    return () => { af(); window.removeEventListener("online", gv); document.removeEventListener("visibilitychange", synlig); };
-  }, [queryClient]);
-  const visSvar = svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) ? svarITraad
+    return () => {
+      if (t) clearTimeout(t);
+      af(); window.removeEventListener("online", gv); window.removeEventListener("focus", gv); document.removeEventListener("visibilitychange", synlig);
+    };
+  }, [queryClient, conversationId]);
+  // Skjulningen ophæves først, når et resultat fra den nye generation (eller en ny trådhentning) foreligger.
+  useEffect(() => {
+    if (!svarSkjult || svarGen < svarSkjult.gen) return;
+    const faerdig = svarITraad ? opdateret > svarSkjult.fra : !svarRef || (!svarOpslag.isFetching && (svarOpslag.isSuccess || svarOpslag.isError));
+    if (faerdig) setSvarSkjult(null);
+  }, [svarSkjult, svarGen, svarITraad, opdateret, svarRef, svarOpslag.isFetching, svarOpslag.isSuccess, svarOpslag.isError]);
+  const visSvar = svarSkjult ? null
+    : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) ? svarITraad
     : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) ? svarOpslag.data : null;
 
   // Kvitterer kun hentede/viste LEVEREDE beskeder fra andre uden egen kvittering – kun ved synligt vindue med fokus.
@@ -384,9 +413,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
     .filter((m) => meId && m.sender_id !== meId && m.status === "leveret" && !m.read_receipts?.some((rr) => rr.employee_id === meId))
     .map((m) => m.id);
   const ukvitteretNoegle = ukvitterede.join(",");
+  const fristPrId = useRef(new Map<string, string | null>());
+  fristPrId.current = new Map((messages ?? []).map((m) => [m.id, m.slettes_efter]));
   useEffect(() => {
     if (!conversationId || !ukvitterede.length) return;
-    const kvitter = () => { if (erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ conversationId, messageIds: ukvitterede }); };
+    const kvitter = () => {
+      // B2c-1b §1: aktuel frist ved selve kvitteringen – fokus før fristtimeren kvitterer aldrig udløbne id'er.
+      const nuNu = Date.now();
+      const ids = ukvitterede.filter((id) => !erUdloebet(fristPrId.current.get(id), nuNu));
+      if (ids.length && erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ conversationId, messageIds: ids });
+    };
     kvitter();
     window.addEventListener("focus", kvitter);
     document.addEventListener("visibilitychange", kvitter);
@@ -723,7 +759,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         <div ref={bottomRef} aria-hidden="true" />
       </ScrollArea>
 
-      {svarRef && (visSvar || svarOpslag.isError) && (
+      {svarRef && (visSvar || svarOpslag.isError || svarSkjult) && (
         <div className="px-2 md:px-4 py-2 bg-muted/50 border-t flex items-center justify-between gap-2">
           <div className="text-sm min-w-0 flex-1">
             <span className="text-muted-foreground">Svarer på: </span>
