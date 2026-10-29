@@ -96,7 +96,10 @@ describe("24d2 §1 useSbDrift", () => {
     const r2 = renderHook(() => useSbDrift(false, "u"), { wrapper: wrap });
     expect(r2.result.current.beskederPause).toBe(true);
     graense.rpc.mockResolvedValue(raekke(false, true, true));
+    const foer = kald();
     act(() => result.current.refetch());
+    await waitFor(() => expect(kald()).toBe(foer + 1));
+    console.log("K", foer, qc.isFetching());
     await waitFor(() => expect(result.current.beskederPause).toBe(false));
   });
 
