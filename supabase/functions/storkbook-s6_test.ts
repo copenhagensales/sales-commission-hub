@@ -861,17 +861,56 @@ test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, højst é
 
 // 24d2-edge-2: klassifikation af Storage-remove → sb_koe_afslut (kun koder, aldrig rå fejltekst).
 const koeAfslutKald = () => kaldTil((k) => rpc(k, "sb_koe_afslut")).map((k) => JSON.parse(k.krop));
-test("24d2-edge-2 (a): bekræftet succes og 404 »findes ikke« → afslut(id, true, null)", async () => {
+test("24d2-edge-2b (a): 404 med JSON-body → afslut(id, false, 'storage_fejl'), slettet ikke talt; tom liste = succes", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(2) : []),
-      remove: (k) => JSON.parse(k.krop).prefixes[0].endsWith("/1.png") ? jsonR({ statusCode: "404", error: "not_found", message: "Object not found" }, 404) : jsonR([]) }));
+      remove: (k) => JSON.parse(k.krop).prefixes[0].endsWith("/1.png") ? jsonR({ statusCode: "404", error: "TenantNotFound", message: "HEMMELIG" }, 404) : jsonR([]) }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
-    assertEquals(koeAfslutKald().sort((x, y) => x.p_id - y.p_id), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 2, p_ok: true, p_fejl: null }]);
-    assertEquals(b.ok, true); assertEquals(b.slettet, 2);
+    assertEquals(koeAfslutKald().sort((x, y) => x.p_id - y.p_id), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 2, p_ok: false, p_fejl: "storage_fejl" }]);
+    assert(!kaldTil((k) => rpc(k, "sb_koe_afslut")).some((k) => k.krop.includes("HEMMELIG")));
+    assertEquals(b.ok, false); assertEquals(b.slettet, 1); assert(b.fejl.includes("storage_fejl"));
   } finally { time.restore(); }
 });
+for (const [navn, status] of [["(b) 404 HTML-body", 404], ["(c) 500 HTML-body", 500]] as const) {
+  test(`24d2-edge-2b ${navn} (StorageUnknownError med Response) → 'storage_fejl'`, async () => {
+    const time = new FakeTime(DAG);
+    try {
+      nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []),
+        remove: () => new Response("<html>HEMMELIG</html>", { status, headers: { "Content-Type": "text/html" } }) }));
+      const { res } = await kørFake(hOpr, oprReq(), time);
+      const b = await res.json();
+      assertEquals(koeAfslutKald(), [{ p_id: 1, p_ok: false, p_fejl: "storage_fejl" }]);
+      assertEquals(b.slettet, 0);
+    } finally { time.restore(); }
+  });
+}
+test("24d2-edge-2b (d): afbrudt remove (abort-signal) → payload {p_ok:false, p_fejl:'transport_ukendt'}", async () => {
+  const time = new FakeTime(DAG);
+  try {
+    nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), remove: (k) => hænger(k.signal) as Promise<Response> }));
+    const { res } = await kørFake(hOpr, oprReq(), time);
+    const b = await res.json();
+    const a = koeAfslutKald();
+    assertEquals(a.length, 1); assertEquals(a[0].p_ok, false); assertEquals(a[0].p_fejl, "transport_ukendt");
+    assertEquals(b.slettet, 0);
+  } finally { time.restore(); }
+});
+for (const [navn, til] of [["lige før", 57_900], ["ved", 58_000]] as const) {
+  test(`24d2-edge-2b (e): afslut-genforsøg ${navn} 58-sekundersfristen → intet netværkskald efter fristen`, async () => {
+    const time = new FakeTime(DAG);
+    try {
+      nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []),
+        afslut: async (k) => { const rest = DAG + til - Date.now(); if (rest > 0) await vent(rest, k.signal); return jsonR({ message: "x" }, 500); } }));
+      const { res, ms } = await kørFake(hOpr, oprReq(), time);
+      await res.json();
+      assert(ms <= 58_100, `varighed ${ms}`);
+      for (const k of kald) assert(k.t < DAG + 58_000, `kald efter fristen: ${k.sti} @ ${k.t - DAG}`);
+      assert(koeAfslutKald().length <= 2);
+    } finally { time.restore(); }
+  });
+}
 test("24d2-edge-2 (b): kendt Storage-svar 500/403 med body → afslut(id, false, 'storage_fejl') uden rå tekst", async () => {
   const time = new FakeTime(DAG);
   try {
