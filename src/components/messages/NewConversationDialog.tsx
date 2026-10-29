@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst } from "@/hooks/useChat";
+import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst, OpretFejl, OPRETTET_IKKE_HENTET_TEKST } from "@/hooks/useChat";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -91,15 +91,19 @@ export function NewConversationDialog({
   };
 
   const handleCreate = async () => {
-    if (createConversation.isPending) return;
-    const v = validerSamtale(deltagere.length, groupName, isGroup);
-    if ("fejl" in v) { toast.error(v.fejl); return; }
+    // B2d-1 §8: kendt id → kun genhentning; ellers validering og én oprettelse (synkron lås i hooken).
+    if (!createConversation.kendtId) {
+      const v = validerSamtale(deltagere.length, groupName, isGroup);
+      if ("fejl" in v) { toast.error(v.fejl); return; }
+    }
+    const kald = createConversation.opret({
+      name: isGroup ? groupName.trim() : undefined,
+      memberIds: deltagere,
+      isGroup,
+    });
+    if (!kald) return;
     try {
-      const conversation = await createConversation.mutateAsync({
-        name: isGroup ? groupName.trim() : undefined,
-        memberIds: deltagere,
-        isGroup,
-      });
+      const conversation = await kald;
       toast.success("Samtale oprettet");
       onCreated(conversation.id);
       setSelectedIds([]);
@@ -108,10 +112,11 @@ export function NewConversationDialog({
       setSearch("");
     } catch (error) {
       // Valg og navn bevares ved fejl.
+      if (error instanceof OpretFejl && error.art === "hent") return; // vises via kendt id
       toast.error(serverTekst(error, "Kunne ikke oprette samtale"));
     }
   };
-
+  const visHentFejl = !!createConversation.kendtId;
   const isPhone = useIsPhone();
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
@@ -229,6 +234,9 @@ export function NewConversationDialog({
             </TabsContent>
           </Tabs>
 
+          {visHentFejl && (
+            <p role="alert" className="text-sm text-destructive">{OPRETTET_IKKE_HENTET_TEKST}</p>
+          )}
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">
               {selectedTeamId ? `Team valgt (${deltagere.length} medlemmer)` : `${deltagere.length} valgt`}
@@ -236,12 +244,12 @@ export function NewConversationDialog({
             <Button
               className="max-md:min-h-11"
               onClick={handleCreate}
-              disabled={deltagere.length === 0 || createConversation.isPending}
+              disabled={(deltagere.length === 0 && !createConversation.kendtId) || createConversation.isPending}
             >
               {createConversation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Opret samtale
+              {createConversation.kendtId ? "Prøv igen" : "Opret samtale"}
             </Button>
           </div>
         </div>
