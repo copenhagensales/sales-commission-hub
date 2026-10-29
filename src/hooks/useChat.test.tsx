@@ -2095,7 +2095,6 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
 // ---------- B2-6B §B: sletning/forladelse ved sessionsskift, genoptaget gruppe, rigtig SDK ----------
 import { fastholdSession, sessionGyldig, rydSamtale, laesStart, genoptagSamtale, samtaleRyddet, ejerGyldig as ejerOk, tilfoejAfsendelse as tilfoej6, hentAfsendelser as hent6, gemKladde as gem6, laesKladde as laes6, saetAfsendelsesFil, afsendelsesFil, sessionsGeneration as gen6 } from "@/lib/sbKladder";
 import { useDeleteConversation as useSlet6, ForaeldetSession as Foraeldet6 } from "./useChat";
-import { createClient } from "@supabase/supabase-js";
 describe("B2-6B §B sletning/forladelse: sessionsskift ved hvert ventepunkt", () => {
   let qc6: QueryClient;
   const w6 = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc6 }, children);
