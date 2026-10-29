@@ -1992,7 +1992,7 @@ describe("B2bc-5b §2 – fristlager: render læser, effekt registrerer; oprydni
 });
 
 // ---------- B2d-2 T12 (§12): sletning/forladelse gennem rigtig useDeleteConversation ----------
-import { useDeleteConversation, rydSlettetSamtale, registrerSamtaleStop, handlingFor } from "./useChat";
+import { useDeleteConversation, rydSlettetSamtale, registrerSamtaleStop, handlingFor, ForaeldetSession } from "./useChat";
 import { gemKladde, laesKladde, tilfoejAfsendelse, hentAfsendelser, gemRetKladde, laesRetKladde, sessionsGeneration as genNu } from "@/lib/sbKladder";
 describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
   let qc12: QueryClient;
@@ -2074,7 +2074,7 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     rydAlleKladder(); // logud/brugerskift
     expect(laesKladde("e", "S")).toBeNull(); // logud rydder brugerens tilstand
     gemKladde("e", "S", { tekst: "ny brugers kladde", svarId: null });
-    await act(async () => { løs({ data: { created_by: "e", is_group: true, direct_key: null }, error: null }); await p; });
+    await act(async () => { løs({ data: { created_by: "e", is_group: true, direct_key: null }, error: null }); await expect(p).rejects.toBeInstanceOf(ForaeldetSession); });
     expect(stop).not.toHaveBeenCalled();
     expect(laesKladde("e", "S")?.tekst).toBe("ny brugers kladde");
     rydSlettetSamtale("e", "S", genNu() - 1);
