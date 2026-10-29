@@ -2450,7 +2450,7 @@ describe("24d2 §2 – driftsvisning i ChatView", () => {
     const foer = driftKald();
     skriv("første");
     await act(async () => { fireEvent.click(send()); });
-    await waitFor(() => expect(screen.getByText(/Beskeder er under vedligeholdelse/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/du kan læse, men ikke sende/)).toBeTruthy());
     await waitFor(() => expect(driftKald()).toBeGreaterThan(foer));
     expect(net.kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
     skriv("nyere");
