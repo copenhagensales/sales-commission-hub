@@ -104,7 +104,8 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
       document.removeEventListener("visibilitychange", synlig);
     };
   }, [noegle, nu]);
-  return nu;
+  // B2c-1b §1: hver render vurderer mod klientens AKTUELLE ur – et gemt nu fra montering/sidste timer autoriserer aldrig visning.
+  return Math.max(nu, Date.now());
 }
 
 /** Ventetider for genhentning, når serveren stadig returnerer en lokalt udløbet række (ure kan afvige). */
@@ -114,10 +115,11 @@ export const FRIST_GENHENT_MS = [500, 2000, 4000, 8000, 16000, 32000] as const;
  * B2c-1 §5: svaroriginal uden for de indlæste sider valideres ved et afgrænset RLS-opslag (én række).
  * null = ingen synlig række (utilgængelig). Nøglen indeholder sessionsgenerationen, så et gammelt svar aldrig rammer en ny session.
  */
-export function useSvarOriginal(id: string | null) {
+export function useSvarOriginal(id: string | null, forespGen = 0) {
   const gen = sessionsGeneration();
   return useQuery({
-    queryKey: ["chat-svar-original", gen, id],
+    // B2c-1b §2: forespørgselsgenerationen gør, at et svar startet før genvalideringen aldrig rammer den nye nøgle.
+    queryKey: ["chat-svar-original", gen, forespGen, id],
     enabled: !!id,
     retry: false,
     queryFn: async (): Promise<ReplyPreview | null> => {
@@ -128,6 +130,8 @@ export function useSvarOriginal(id: string | null) {
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
+      // Identitet kontrolleres før resultatet bruges: ny session → fejl (ikke »slettet«), så referencen bevares.
+      if (sessionsGeneration() !== gen) throw new Error("forældet session");
       if (!data) return null;
       const s = data.sender;
       return {

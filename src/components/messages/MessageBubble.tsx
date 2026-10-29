@@ -64,6 +64,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const noegleRef = useRef(noegle);
   noegleRef.current = noegle;
   const [nu, setNu] = useState(() => Date.now());
+  const fristRef = useRef(message.slettes_efter);
+  fristRef.current = message.slettes_efter;
 
   const editMessage = useEditMessage();
   const deleteMessage = useDeleteMessage();
@@ -116,6 +118,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   useEffect(() => {
     if (isOwn || !currentEmployeeId || hasRead || !leveret || udloebet) return;
     const kvitter = () => {
+      // B2c-1b §1: fokus/genforbindelse før fristtimeren kvitterer aldrig en udløbet række.
+      if (erUdloebet(fristRef.current, Date.now())) { setNu(Date.now()); return; }
       if (erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ messageId: message.id, conversationId });
     };
     kvitter();
@@ -140,6 +144,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
 
   const handleSaveEdit = async () => {
     if (!kanGemme || !editContent.trim() || laas.art === "gem") return;
+    // B2c-1b §1: fristen kontrolleres mod det aktuelle ur ved klik – en render fra før udløbet sender aldrig sb_ret.
+    if (erUdloebet(message.slettes_efter, Date.now())) { setNu(Date.now()); return; }
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     // §1/§2 (c1): fuld kontekst og kladdeversion fastholdes synkront før mutateAsync.
     const ejerNoegle = noegle, conv = conversationId, msg = message.id;
