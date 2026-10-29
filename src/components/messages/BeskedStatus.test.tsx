@@ -101,7 +101,7 @@ describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatori
     expect(kald("sb_afgoer")[0][1]).toMatchObject({ p_revision: 7, p_handling: "traek" });
     // B2b-2: rækken er usynlig i mocken → ukendt udfald vises lokalt, ingen toast.
     expect(toast.error).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
   });
 
   it("Fjern fil sender den viste revision; transportfejl giver præcis ét sb_fjern_fil", async () => {
@@ -289,7 +289,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     graense.rpc.mockResolvedValueOnce({ data, error: null });
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     expect(toast.error).not.toHaveBeenCalled();
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
     fireEvent.click(knap("Tjek igen"));
@@ -302,7 +302,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     graense.rpc.mockResolvedValueOnce({ data, error: null });
     fireEvent.click(knap("Fjern fil"));
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
   });
 
   it("Ret fra statuskortet: kortet afmonteres, editoren holder låsen; Træk tilbage i boblen er ignoreret indtil Annullér", async () => {
@@ -325,15 +325,15 @@ describe("B2b-4a §1 – alle ukendte handlinger forbliver synlige og afstembare
     graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     fireEvent.click(knap(navn));
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     fireEvent.click(knap("Ret"));
     expect(screen.getByRole("textbox")).toBeTruthy();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     expect(knap("Tjek igen")).toBeTruthy();
     r.unmount();
     render(ui(afventer(4, true)));
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     const skriv = graense.rpc.mock.calls.filter((c) => c[0] !== "sb_tjek_begrundelse").length;
     fireEvent.click(knap("Tjek igen"));
     await flush();

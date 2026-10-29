@@ -2213,7 +2213,7 @@ describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
     expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
     expect(graense.rpc.mock.calls.length).toBe(rpcFoer);
     expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
-    expect(screen.queryByText("Udfaldet kunne ikke bekræftes")).toBeNull();
+    expect(screen.queryByText("Afstemmer … udfaldet kunne ikke bekræftes")).toBeNull();
     r.unmount();
   });
 
@@ -2251,7 +2251,7 @@ describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
     await tick(); await tick();
     expect(udfaldSnapshot("e", "A", "m1")).not.toBeNull(); // ukendt udfald bevaret
     expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
-    expect(screen.getByText("Udfaldet kunne ikke bekræftes")).toBeTruthy();
+    expect(screen.getByText("Afstemmer … udfaldet kunne ikke bekræftes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Tjek igen" })).toBeTruthy();
     r.unmount();
   });

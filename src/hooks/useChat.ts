@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef
 import { toast } from "sonner";
 import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, registrerKladdeOprydning, fastholdSession, sessionGyldig, kraevSession, ForaeldetSession, ejerSignal, laesStart, genoptagSamtale, type OperationsEjer, type SessionsKontekst } from "@/lib/sbKladder";
 export { ForaeldetSession } from "@/lib/sbKladder";
-import { tjekPortAaben } from "@/hooks/useSbDrift";
+import { tjekPortAaben, registrerPause } from "@/hooks/useSbDrift";
 
 export interface Conversation {
   id: string;
@@ -590,6 +590,20 @@ export function useMarkMessageAsRead() {
   });
 }
 
+/** 24d2 §2(c): præcise driftsafvisninger (P0001 + ordret kode) og deres faste tekster. */
+export const DRIFT_TEKST = {
+  SB24D2_PAUSE: "Beskeder er under vedligeholdelse – prøv igen senere",
+  SB24D2_FIL_LUKKET: "Filen kunne ikke sendes: filer er lukket lige nu",
+  SB24D2_BUSY: "Prøv igen om et øjeblik",
+} as const;
+export type DriftKode = keyof typeof DRIFT_TEKST;
+export function driftKode(e: unknown): DriftKode | null {
+  if (typeof e !== "object" || e === null) return null;
+  if (Reflect.get(e, "code") !== "P0001") return null;
+  const m: unknown = Reflect.get(e, "message");
+  return m === "SB24D2_PAUSE" || m === "SB24D2_FIL_LUKKET" || m === "SB24D2_BUSY" ? m : null;
+}
+
 /**
  * Fejl ved afsendelse (S6/B2a §2):
  * - `server`: kendt afvist/ikke gennemført (P0001 vises ordret);
@@ -707,7 +721,7 @@ const ukendt = () => new SendFejl("ukendt", "Ikke sendt – prøv igen");
  * ukendt udfald afstemmes, og en bekræftet række genindsættes aldrig.
  */
 export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string, vagt: () => boolean = () => true,
-  sessionSignal: () => AbortSignal | null = () => null): Promise<void> {
+  sessionSignal: () => AbortSignal | null = () => null, vedPause: () => void = () => {}): Promise<void> {
   if (!vagt()) throw foraeldet();
   const foer = await afstemAfsendelse(v, employeeId, vagt);
   if (!vagt()) throw foraeldet();
@@ -733,6 +747,8 @@ export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string,
     error = r.error;
   } catch { error = { message: "transport" }; }
   if (!error) return;
+  // 24d2 §2(c): pausebevis registreres ved modtagelsen; den efterfølgende B2-klassifikation er uændret.
+  if (driftKode(error) === "SB24D2_PAUSE" && vagt()) vedPause();
   // Et allerede afsendt INSERT kan være gennemført; et forældet forløb starter ingen afstemning.
   if (!vagt()) throw new SendFejl("ukendt", "Ikke sendt – prøv igen");
 
@@ -753,7 +769,8 @@ export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string,
     }
     // Generel P0001/CPR efter tidligere ukendt udfald er ikke bevis for afvisning → uafklaret.
     if (v.tidligereUkendt) throw ukendt();
-    throw new SendFejl("server", error.message || "Beskeden blev afvist");
+    const dk = driftKode(error);
+    throw new SendFejl("server", dk ? DRIFT_TEKST[dk] : error.message || "Beskeden blev afvist");
   }
   // 23505 uden synlig række eller transportfejl: uafklaret.
   if (error.code === "23505" || !error.code || v.tidligereUkendt) throw ukendt();
@@ -769,7 +786,7 @@ export function useSendMessage() {
       const ejer = v.ejer;
       const vagt = () => ejerPasser(ejer, v.conversationId);
       if (!vagt()) throw foraeldet();
-      await sendBesked(v, ejer.emp, vagt, () => ejerSignal(ejer));
+      await sendBesked(v, ejer.emp, vagt, () => ejerSignal(ejer), () => registrerPause(queryClient, ejer.bruger, ejer.gen));
       return v;
     },
     // Afstemningsforløbet ejer genforsøgene (App.tsx' mutations.retry=1 overstyres lokalt).
@@ -1561,6 +1578,8 @@ export function useBegrundelse(employeeId: string | undefined, messageId: string
 /** Fejl fra serveren: P0001 vises ordret, ellers fast tekst. */
 export function serverTekst(e: unknown, fast: string): string {
   const pe = e as { code?: string; message?: string } | null;
+  const dk = driftKode(e);
+  if (dk) return DRIFT_TEKST[dk];
   if (pe?.code === "P0001" && typeof pe.message === "string" && pe.message) return pe.message;
   return fast;
 }
@@ -1803,6 +1822,8 @@ async function udfoerHandling(qc: QueryClient, s: Omit<UdfaldSnapshot, "bekraeft
   kald: () => PromiseLike<{ data: unknown; error: unknown }>, direkte: (data: unknown) => boolean): Promise<void> {
   if (!vagt()) throw new HandlingsFejl("stoppet");
   const res = await kaldRpc(kald);
+  // 24d2 §2(c): pausebevis fra sb_ret/sb_fjern_fil/sb_afgoer registreres ved modtagelsen (gyldig session).
+  if (driftKode(res.error) === "SB24D2_PAUSE" && ejerGyldig(s.ejer)) registrerPause(qc, s.ejer.bruger, s.ejer.gen);
   if (!vagt()) throw new HandlingsFejl("stoppet");
   if (!(res.error === null && direkte(res.data))) {
     if (res.error?.code === "P0001") {
