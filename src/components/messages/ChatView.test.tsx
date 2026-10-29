@@ -1466,14 +1466,21 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
   });
 
   it("successive frister: hver frist planlægges efter den forrige", async () => {
+    // B2bc-5c-2 §3: kontrolleret ur (ingen vægurfrister); fristtimerne afvikles med falske timere.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     beskeder.liste = [fremmed("a", "første", { slettes_efter: om(150) }), fremmed("b", "anden", { slettes_efter: om(450) }), fremmed("c", "varig")];
-    await klar();
-    await vent(250);
+    const r = render(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(149); });
+    expect(screen.getByText("første")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(screen.queryByText("første")).toBeNull();
     expect(screen.getByText("anden")).toBeTruthy();
-    await vent(300);
+    await act(async () => { await vi.advanceTimersByTimeAsync(299); });
+    expect(screen.getByText("anden")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(screen.queryByText("anden")).toBeNull();
     expect(screen.getByText("varig")).toBeTruthy();
+    r.unmount();
   });
 
   it("SQL-pladsholder efter oprydning: samme id vises igen med serverens pladsholder (ingen blokliste)", async () => {
