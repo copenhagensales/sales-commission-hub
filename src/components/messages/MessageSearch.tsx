@@ -88,7 +88,7 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
     let ny = false;
     for (const m of resultater) {
       const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu);
-      const r = kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t, aktuel.art === "resultat" ? aktuel.start : 0);
+      const r = kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t, aktuel.art === "resultat" ? aktuel.start : 0, m.revision);
       if ((r.ny && vist) || r.ophaevet) ny = true;
     }
     if (ny) setFristSlag((x) => x + 1); // render før frist → effekt efter frist: ny kontrol, ingen 0-ms-løkke

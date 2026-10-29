@@ -121,7 +121,7 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
  * Kun data fra en læsning STARTET efter registreringen (start > reg) er dokumenteret nyere og kan afslutte forløbet.
  * En anden friststreng eller null fra et ældre svaruddrag, søgeresultat eller en ældre side er ikke bevis.
  */
-const kendteUdloebne = new Map<string, { frist: string; reg: number }>();
+const kendteUdloebne = new Map<string, { frist: string; reg: number; rev: number | null }>();
 // Brugeren er bundet via sessionsgenerationen (logud/brugerskift øger den i kladdeoprydningen); medarbejder-id kan
 // ankomme asynkront og indgår derfor ikke, så samme forløb ikke dubleres, når identiteten ankommer.
 const kuNoegle = (_emp: string | null | undefined, conv: string, id: string) => `${sessionsGeneration()}:${conv}:${id}`;
@@ -143,16 +143,19 @@ export function erKendtUdloebet(emp: string | null | undefined, conv: string, id
  * (0 = ukendt → aldrig bevis for nyere data). Returnerer `ny` ved ny registrering og `ophaevet`, når dokumenteret
  * nyere serverdata (ny gyldig frist eller SQL-pladsholder/null) afslutter forløbet – ingen permanent id-blokliste.
  */
-export function kontrollerUdloeb(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number, start = 0): { udloebet: boolean; ny: boolean; ophaevet: boolean } {
+export function kontrollerUdloeb(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number, start = 0, revision: number | null = null): { udloebet: boolean; ny: boolean; ophaevet: boolean } {
   const k = kuNoegle(emp, conv, id);
   const e = kendteUdloebne.get(k);
+  const rev = typeof revision === "number" ? revision : null;
   if (e) {
-    if (frist === e.frist || start <= e.reg) return { udloebet: true, ny: false, ophaevet: false };
-    if (frist && erUdloebet(frist, nu)) { kendteUdloebne.set(k, { frist, reg: laesStart() }); return { udloebet: true, ny: false, ophaevet: false }; }
+    // Dokumenteret nyere: læsning startet efter registreringen ELLER højere revision for samme id.
+    const nyere = start > e.reg || (rev !== null && e.rev !== null && rev > e.rev);
+    if (frist === e.frist || !nyere) return { udloebet: true, ny: false, ophaevet: false };
+    if (frist && erUdloebet(frist, nu)) { kendteUdloebne.set(k, { frist, reg: laesStart(), rev }); return { udloebet: true, ny: false, ophaevet: false }; }
     kendteUdloebne.delete(k);
     return { udloebet: false, ny: false, ophaevet: true };
   }
-  if (frist && erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, { frist, reg: laesStart() }); return { udloebet: true, ny: true, ophaevet: false }; }
+  if (frist && erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, { frist, reg: laesStart(), rev }); return { udloebet: true, ny: true, ophaevet: false }; }
   return { udloebet: false, ny: false, ophaevet: false };
 }
 /** Er id'et knyttet til en kendt udløbet serverrække (også efter at rækken er forsvundet fra RLS)? */

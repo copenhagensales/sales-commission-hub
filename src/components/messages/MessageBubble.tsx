@@ -72,7 +72,9 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const [nu, setNu] = useState(() => Date.now());
   // B2bc-5b §2: registrering efter commit (render læser kun); render før frist → effekt efter frist giver én ny render.
   useLayoutEffect(() => {
-    if (kontrollerUdloeb(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now()).ny && !udloebet) setNu(Date.now());
+    // B2-6C §C: kun højere revision er bevis her (ingen startbevis i boblen); ophævelse giver én ny render.
+    const r = kontrollerUdloeb(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now(), 0, message.revision);
+    if ((r.ny && !udloebet) || r.ophaevet) setNu(Date.now());
   });
   const fristRef = useRef(message.slettes_efter);
   fristRef.current = message.slettes_efter;

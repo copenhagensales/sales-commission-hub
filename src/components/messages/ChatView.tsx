@@ -390,13 +390,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
     let ny = false;
     // B2-6C §C: hver kilde registreres med sit eget startbevis; kun en læsning startet efter registreringen kan
     // ophæve et kendt udløb (ophævelse udløser én ny render, så legitim nyere servertilstand vises).
-    const reg = (id: string | undefined, frist: string | null | undefined, start: number) => {
+    const reg = (id: string | undefined, frist: string | null | undefined, start: number, revision: number | null = null) => {
       if (!id) return;
       const vist = !erKendtUdloebet(meId, conversationId, id, frist, fristNu);
-      const r = kontrollerUdloeb(meId, conversationId, id, frist, t, start);
+      const r = kontrollerUdloeb(meId, conversationId, id, frist, t, start, revision);
       if ((r.ny && vist) || r.ophaevet) ny = true;
     };
-    for (const m of messages ?? []) { reg(m.id, m.slettes_efter, hentStart); if (m.reply_to) reg(m.reply_to.id, m.reply_to.slettes_efter, hentStart); }
+    for (const m of messages ?? []) { reg(m.id, m.slettes_efter, hentStart, m.revision); if (m.reply_to) reg(m.reply_to.id, m.reply_to.slettes_efter, hentStart); }
     if (!svarITraad && svarOpslag.data) reg(svarOpslag.data.id, svarOpslag.data.slettes_efter, svarHentStart(svarOpslag.data));
     if (ny) setUdloebSlag((x) => x + 1);
   });
