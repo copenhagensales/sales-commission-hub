@@ -1207,7 +1207,7 @@ export function tagHandling(ejer: OperationsEjer | null, id: string, art: Handli
   if (handlinger.has(k) || afsKoordinering(ejer.gen, ejer.emp, ejer.conv, id)) return false;
   if (art !== "ret" && foraeldetVisning(k, vis)) { hMeld(); return false; }
   handlinger.set(k, { ejer, art });
-  if (art !== "ret") ukendte.delete(k);
+  if (art !== "ret") { ukendte.delete(k); stopTjek(ejer.emp, ejer.conv, id); } // B2b-3b: manuel handling afslutter et aktivt tjekforløbs ventetimer
   hMeld();
   return true;
 }
