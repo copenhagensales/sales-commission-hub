@@ -46,6 +46,7 @@ const graense = vi.hoisted(() => ({
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
   session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })),
+  upload: vi.fn<(...a: unknown[]) => Promise<{ error: unknown }>>(async () => ({ error: null })),
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -54,6 +55,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
       getSession: graense.session },
     functions: { invoke: graense.invoke },
+    storage: { from: () => ({ uploadToSignedUrl: graense.upload }) },
   },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
@@ -1465,5 +1467,75 @@ describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek",
     await p; await vi.advanceTimersByTimeAsync(5000);
     expect(graense.invoke).toHaveBeenCalledTimes(1);
     frigivHandling(ejer, "m");
+  });
+});
+
+// ---------- B2b-4b §3: rigtig SDK (functions-js via supabase-js) med mocket HTTP ----------
+import { createClient } from "@supabase/supabase-js";
+
+describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og mocket HTTP", () => {
+  let http: Array<{ url: string; authorization: string | null }> = [];
+  let slipToken: () => void = () => undefined;
+  let tokenOpslag = 0;
+  /** Mocket HTTP (ingen netværk): et allerede afbrudt signal afvises uden transport, som fetch-specifikationen kræver. */
+  const httpMock = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    if (init?.signal?.aborted) return Promise.reject(new DOMException("aborted", "AbortError"));
+    const h = new Headers(init?.headers);
+    http.push({ url: String(input), authorization: h.get("Authorization") });
+    return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  };
+  const lavSdk = () => createClient("http://lokal.test", "anon-noegle", {
+    // SDK'ets eget, senere tokenopslag (fetchWithAuth venter på det, også når Authorization er sat eksplicit).
+    accessToken: () => { tokenOpslag++; return new Promise<string>((x) => { slipToken = () => x("sdk-token"); }); },
+    global: { fetch: httpMock },
+  });
+  const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
+  beforeEach(() => {
+    http = []; tokenOpslag = 0;
+    const sdk = lavSdk();
+    graense.invoke.mockReset().mockImplementation((navn: unknown, o: unknown) => sdk.functions.invoke(String(navn), {
+      headers: { Authorization: String(arg(o, "headers", "Authorization")) },
+      body: arg(o, "body") as Record<string, unknown>,
+      signal: (() => { const s = arg(o, "signal"); return s instanceof AbortSignal ? s : undefined; })(),
+    }));
+    auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { graense.invoke.mockReset(); });
+
+  it("positiv kontrol: uden stop sendes præcis ét HTTP-kald med den eksplicitte JWT", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.waitFor(() => expect(tokenOpslag).toBe(1));
+    slipToken();
+    await p;
+    expect(http).toHaveLength(1);
+    expect(http[0].url).toContain("/functions/v1/storkbook-tjek");
+    expect(http[0].authorization).toBe("Bearer jwt-u");
+  });
+
+  it("stop under SDK'ets tokenopslag → ingen efterfølgende HTTP-transport, intet genforsøg", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.waitFor(() => expect(tokenOpslag).toBe(1)); // inde i SDK'et, efter vores sidste kontrol før invoke
+    stopEfterbehandling("e", "c", "m");
+    slipToken();
+    await p;
+    expect(http).toHaveLength(0);
+    expect(tokenOpslag).toBe(1);
+    expect(aktiveTjek()).toBe(0);
+    expect(aktiveTjekTimere()).toBe(0);
+  });
+
+  it("sessionsophør under SDK'ets tokenopslag → ingen efterfølgende HTTP-transport", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(tokenOpslag).toBe(1));
+    auth("SIGNED_OUT", null);
+    slipToken();
+    await p;
+    expect(http).toHaveLength(0);
+    expect(aktiveTjekTimere()).toBe(0);
+    auth("SIGNED_IN", "u");
   });
 });
