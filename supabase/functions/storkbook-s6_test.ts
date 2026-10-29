@@ -117,7 +117,7 @@ test("tjek: ugyldige/modstridende domme afvises (→ ukendt)", () => {
     assertEquals(tjek.validerDom(x), null);
   }
   assertEquals(tjek.UKENDT, { tone: "ok", personoplysninger: "ingen", cpr: false, fil_tjekket: false, udfald: "ukendt" });
-  assertEquals(tjek.MAKS_OUTPUT_TOKENS, 200);
+  assertEquals(tjek.MAKS_OUTPUT_TOKENS, 1000);
 });
 
 test("Content-Disposition er sikker og tvinger faktisk endelse", () => {
@@ -1266,6 +1266,15 @@ test("§1 tjek: model uden gyldig dom → UKENDT via fælles afslutning", async 
   nulstil(tjekA3({ gateway: () => jsonR({ choices: [{ finish_reason: "length", message: { content: "{" } }] }) }));
   assertEquals(await (await hTjek(tjekReq())).json(), { status: "tjekket" });
   forventAfslutParam({ ...tjek.UKENDT });
+});
+
+test("24d2-edge-1c tjek: gatewaykaldets body har max_tokens=1000, reasoning_effort='low' og uændrede faste felter", async () => {
+  nulstil(tjekA3({}));
+  assertEquals(await (await hTjek(tjekReq())).json(), { status: "tjekket" });
+  assertEquals(gwKald().length, 1);
+  const b = JSON.parse(gwKald()[0].krop);
+  assertEquals(b.max_tokens, 1000); assertEquals(b.reasoning_effort, "low");
+  assertEquals(b.temperature, 0); assertEquals(b.stream, false); assertEquals(b.response_format, { type: "json_object" });
 });
 
 // ---------------------------------------------------------------- §4 0x0B og hele ASCII-whitespace-sættet
