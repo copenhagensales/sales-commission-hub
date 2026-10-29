@@ -992,10 +992,15 @@ export function useDeleteConversation() {
     },
   });
 
-  /** Fastholder sessionen synkront ved klik. Sen afslutning efter sessionsophør afvises med ForaeldetSession. */
+  /** B2-7 §1: en afvisning efter sessionsophør (fx identitetsopslag eller afbrudt SDK-kald) bliver ForaeldetSession. */
+function foraeldetVed(s: SessionsKontekst): (e: unknown) => never {
+  return (e) => { throw sessionGyldig(s) ? e : new ForaeldetSession(); };
+}
+
+/** Fastholder sessionen synkront ved klik. Sen afslutning efter sessionsophør afvises med ForaeldetSession. */
   const slet = useCallback((conversationId: string): Promise<string> => {
     const session = fastholdSession();
-    return mutation.mutateAsync({ conversationId, session }).then((id) => { kraevSession(session); return id; });
+    return mutation.mutateAsync({ conversationId, session }).then((id) => { kraevSession(session); return id; }, foraeldetVed(session));
   }, [mutation]);
 
   return { ...mutation, slet };
@@ -1152,7 +1157,7 @@ export function useCreateConversation() {
     t.laast = true;
     const gen = t.gen;
     return mutation.mutateAsync({ input, session })
-      .then((c) => { kraevSession(session); return c; })
+      .then((c) => { kraevSession(session); return c; }, foraeldetVed(session))
       .finally(() => { if (t.gen === gen) t.laast = false; });
   }, [queryClient, mutation]);
 
