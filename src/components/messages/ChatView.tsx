@@ -513,10 +513,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
   useEffect(() => {
     if (!messages) return; // ukendt liste: intet forløb afsluttes
     const liste = udloebne ? udloebne.split(",").map((x) => { const i = x.indexOf("@"); return { id: x.slice(0, i), frist: x.slice(i + 1) }; }) : [];
-    const due = synkFristForloeb(meId, conversationId, liste, Date.now(), opdateret);
+    const due = synkFristForloeb(meId, conversationId, liste, Date.now());
     if (due === null) return;
     const t = setTimeout(() => {
-      if (fyrFristForloeb(meId, conversationId, Date.now(), opdateret)) void queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+      const nr = fyrFristForloeb(meId, conversationId, Date.now());
+      if (nr !== null) {
+        // B2bc-5c-1 §2: kun dette forsøgs afslutning (svar eller fejl) starter næste ventetid.
+        const emp = meId, conv = conversationId;
+        void queryClient.invalidateQueries({ queryKey: ["chat-messages", conv] }).catch(() => undefined).finally(() => {
+          afslutFristForsoeg(emp, conv, nr, Date.now());
+          setFristSlag((x) => x + 1);
+        });
+      }
       setFristSlag((x) => x + 1);
     }, Math.max(0, due - Date.now()));
     return () => clearTimeout(t);
