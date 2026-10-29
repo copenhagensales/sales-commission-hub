@@ -1543,7 +1543,7 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
   afterEach(() => { vi.useRealTimers(); });
 
   it("frist passerer under svaropslag → udløbet svar vises aldrig", async () => {
-    const k = kontrol<unknown>();
+    const k = kontrol<Svar>();
     net.vent = () => k.p;
     beskeder.liste = [fremmed("m", "tråd")];
     gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
@@ -1572,7 +1572,7 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
   });
 
   it("sent oprindeligt svar efter invalidation genindsætter ikke indhold (query havde endnu ingen data)", async () => {
-    const gammel = kontrol<unknown>();
+    const gammel = kontrol<Svar>();
     let n = 0;
     net.vent = () => (++n === 1 ? gammel.p : Promise.resolve(raekke("ny tekst")));
     beskeder.liste = [fremmed("m", "tråd")];
