@@ -2475,22 +2475,27 @@ describe("24d2 §2(c) – pause, filport og optaget barriere", () => {
     expect(f instanceof SendFejl ? f.message : null).toBe("Filen kunne ikke sendes: filer er lukket lige nu");
   });
 
-  it.each([
-    ["sb_ret", () => useEditMessage(), (e: ReturnType<typeof fastholdEjer>) => ({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e! }), "gem"],
-    ["sb_fjern_fil", () => useFjernFil(), (e: ReturnType<typeof fastholdEjer>) => ({ messageId: ID, revision: 1, conversationId: "c", ejer: e!, filRef: "e/c/f", fejltekst: "x" }), "fjern"],
-    ["sb_afgoer send", () => useAfgoer(), (e: ReturnType<typeof fastholdEjer>) => ({ messageId: ID, revision: 1, handling: "send" as const, conversationId: "c", ejer: e!, fejltekst: "x" }), "send"],
-  ] as const)("%s afvist med PAUSE: pause registreres og drift genhentes; ét kald", async (navn, hook, input, art) => {
+  const pauseHandling = async (navn: string, kør: (e: NonNullable<ReturnType<typeof fastholdEjer>>) => Promise<unknown>) => {
     const spy = vi.spyOn(qc, "invalidateQueries");
     graense.rpc.mockResolvedValue({ data: null, error: PAUSE });
     svar.chat_messages = [r(1)];
-    const { result } = renderHook(() => hook(), { wrapper: wrap });
-    const e = ejer(); expect(tagHandling(e, ID, art)).toBe(true);
-    // @ts-expect-error – it.each samler tre mutationstyper; input matcher hver hook.
-    const f = await result.current.mutateAsync(input(e)).then(() => null, (x: unknown) => x);
+    const f = await kør(ejer()).then(() => null, (x: unknown) => x);
     expect(f instanceof HandlingsFejl ? f.art : null).toBe("afvist");
     expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
     expect(driftGenhentet(spy)).toBe(true);
     expect(graense.rpc).toHaveBeenCalledTimes(1);
-    expect(String(graense.rpc.mock.calls[0][0])).toBe(navn.split(" ")[0]);
+    expect(String(graense.rpc.mock.calls[0][0])).toBe(navn);
+  };
+  it("sb_ret afvist med PAUSE: pause + drift genhentes; ét kald", async () => {
+    const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
+    await pauseHandling("sb_ret", (e) => { tagHandling(e, ID, "gem"); return result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }); });
+  });
+  it("sb_fjern_fil afvist med PAUSE: pause + drift genhentes; ét kald", async () => {
+    const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
+    await pauseHandling("sb_fjern_fil", (e) => { tagHandling(e, ID, "fjern"); return result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "e/c/f", fejltekst: "x" }); });
+  });
+  it("sb_afgoer send afvist med PAUSE: pause + drift genhentes; ét kald", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    await pauseHandling("sb_afgoer", (e) => { tagHandling(e, ID, "send"); return result.current.mutateAsync({ messageId: ID, revision: 1, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }); });
   });
 });
