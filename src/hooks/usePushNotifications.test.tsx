@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -29,7 +34,7 @@ describe("usePushNotifications.subscribe", () => {
     let resolveReady!: (r: unknown) => void;
     const ready = new Promise((r) => { resolveReady = r; });
     const { reg, subscribe } = setup(ready);
-    const { result } = renderHook(() => usePushNotifications());
+    const { result } = renderHook(() => usePushNotifications(), { wrapper });
     let p!: Promise<void>;
     await act(async () => { p = result.current.subscribe(); await Promise.resolve(); await vi.advanceTimersByTimeAsync(100); });
     expect(subscribe).not.toHaveBeenCalled();
@@ -39,7 +44,7 @@ describe("usePushNotifications.subscribe", () => {
 
   it("(b) timeout giver dansk besked og intet subscribe-kald", async () => {
     const { subscribe } = setup(new Promise(() => undefined));
-    const { result } = renderHook(() => usePushNotifications());
+    const { result } = renderHook(() => usePushNotifications(), { wrapper });
     let err: unknown;
     await act(async () => {
       const p = result.current.subscribe().catch((e) => { err = e; });
@@ -54,7 +59,7 @@ describe("usePushNotifications.subscribe", () => {
     const { reg, subscribe } = setup(Promise.resolve(null));
     subscribe.mockRejectedValueOnce(new Error("Subscribing for push requires an active service worker"));
     Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: vi.fn(async () => reg), ready: Promise.resolve({ ...reg, active: {} }) } });
-    const { result } = renderHook(() => usePushNotifications());
+    const { result } = renderHook(() => usePushNotifications(), { wrapper });
     await act(async () => { await expect(result.current.subscribe()).rejects.toThrow(PUSH_NOT_READY_MESSAGE); });
   });
 });
