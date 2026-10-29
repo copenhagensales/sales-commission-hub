@@ -324,8 +324,12 @@ function PulsenFeed() {
             )}
             {me.employeeId && isPhone && !composerOpen && !composerSynlig && (
               <button type="button" onClick={() => {
-                  composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  composerRef.current?.querySelector<HTMLElement>("textarea, [contenteditable=true], button")?.focus({ preventScroll: true });
+                  // Åbner skrivefeltet (ikke kun rul + fokus på den lukkede åbner – Mathias 29/10: »kommer ikke til indlæg«).
+                  const el = composerRef.current;
+                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  const felt = el?.querySelector<HTMLElement>("textarea, [contenteditable=true]");
+                  if (felt) felt.focus({ preventScroll: true });
+                  else el?.querySelector<HTMLButtonElement>("button")?.click();
                 }}
                 style={{ bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px) + 16px)` }}
                 className="fixed right-4 z-30 min-h-[44px] w-auto rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[16px] font-extrabold text-[hsl(var(--cph-light-blue))] shadow-lg active:opacity-80">
