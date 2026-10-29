@@ -2360,6 +2360,7 @@ describe("B2-6C §C fristidentitet på tværs af original og svaruddrag", () => 
   }
 });
 
+import type { Session } from "@supabase/supabase-js";
 // ---------- B2-6A §D: handleSend kræver fastholdt ejer (auth-bruger + session) ----------
 describe("B2-6A §D handleSend uden gyldig auth-ejer", () => {
   it("auth-lytteren melder anden bruger: intet accepteres, composeren bevares, ingen RPC", async () => {
@@ -2378,7 +2379,11 @@ describe("B2-6A §D handleSend uden gyldig auth-ejer", () => {
       expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("hej");
       expect(mutateAsync).not.toHaveBeenCalled();
     } finally {
-      await act(async () => { lyt("SIGNED_IN", { access_token: "t", user: { id: "u" } } as Parameters<typeof lyt>[1]); });
+      const session: Session = {
+        access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
+        user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" },
+      };
+      await act(async () => { lyt("SIGNED_IN", session); });
     }
   });
 });
