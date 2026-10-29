@@ -1355,7 +1355,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
   });
 
   it("offline-udløb: åben tekstfil, åbent billede, pågående hentning, svaruddrag og valgt svar fjernes straks uden netværk", async () => {
-    const frist = om(400);
+    const frist = om(2000); // B2b-3b: rummelig vægurfrist, så langsomme/blandede kørsler ikke udløber før klik
     const signaler: AbortSignal[] = [];
     let n = 0;
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: string, init?: RequestInit) => {
@@ -1390,7 +1390,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
     expect(screen.getByText("Svarer på:")).toBeTruthy();
     const kaldFoer = fetchSpy.mock.calls.length;
-    await vent(450);
+    await vent(2050);
     expect(screen.queryByText("hemmelig")).toBeNull();
     expect(screen.queryByText("filindhold")).toBeNull();
     expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
