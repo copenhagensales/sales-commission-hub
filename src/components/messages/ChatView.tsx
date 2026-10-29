@@ -927,7 +927,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           {filFejl && (
             <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
               <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk filfejl">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk">
                 <X className="h-4 w-4" />
               </Button>
             </div>
