@@ -41,7 +41,8 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (t: string) => builder(t),
     rpc: vi.fn(async () => ({ data: "e", error: null })),
-    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn() },
+    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
+      getSession: vi.fn(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })) },
     functions: { invoke: vi.fn(async () => ({ error: null })) },
   },
 }));
