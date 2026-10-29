@@ -129,13 +129,13 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
                 onClick={() => onSelectMessage(msg)}
                 className="w-full text-left p-2 rounded hover:bg-muted transition-colors"
               >
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <div className="flex items-center justify-between text-xs max-md:text-[14px] text-muted-foreground mb-1">
                   <span className="font-medium">{msg.sender?.full_name}</span>
                   <span>{format(new Date(msg.created_at), "d. MMM yyyy HH:mm", { locale: da })}</span>
                 </div>
                 <p className="text-sm truncate">{msg.content}</p>
                 {msg.conversation && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs max-md:text-[14px] text-muted-foreground mt-1">
                     i: {msg.conversation.name || "Direkte besked"}
                   </p>
                 )}
