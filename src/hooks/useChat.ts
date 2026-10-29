@@ -1164,6 +1164,8 @@ export type SkriveArt = "send" | "traek" | "fjern" | "gem";
 export interface UdfaldSnapshot {
   ejer: OperationsEjer; id: string; art: SkriveArt; startRevision: number;
   forventet: { revision: number; status?: string; content?: string; utenFil?: boolean };
+  /** Status i den viste række ved trykket (send/træk); uændret status ved samme revision er intet bevis. */
+  startStatus?: string;
   /** Filreferencen ved handlingens start (Fjern fil). */
   filRef: string | null;
   /** Redigeringskladdens version ved Gem (lokal markør), ellers null. */
@@ -1305,7 +1307,7 @@ export type Vurdering = "bekraeftet" | "konflikt" | "ukendt";
  * resultat bekræfter. En større revision er en reel konflikt (også med samme tekst/ingen fil). Den gamle række
  * (startrevisionen, uændret) beviser ikke afvisning efter en transportfejl → ukendt. Ulæselig/usynlig → ukendt.
  */
-export function vurderUdfald(s: Pick<UdfaldSnapshot, "art" | "startRevision" | "forventet" | "filRef">, r: Raekke | null | "fejl"): Vurdering {
+export function vurderUdfald(s: Pick<UdfaldSnapshot, "art" | "startRevision" | "forventet" | "filRef" | "startStatus">, r: Raekke | null | "fejl"): Vurdering {
   if (r === "fejl" || !r || !Number.isFinite(r.revision)) return "ukendt";
   const f = s.forventet;
   if (r.revision === f.revision) {
@@ -1313,7 +1315,7 @@ export function vurderUdfald(s: Pick<UdfaldSnapshot, "art" | "startRevision" | "
     if (f.utenFil && r.attachment_path !== null) return "konflikt";
     if (f.status !== undefined && r.status !== f.status) {
       // send/træk: samme revision, men stadig afventer → intet bevis endnu; anden status → konflikt.
-      return r.status === "afventer_afsender" ? "ukendt" : "konflikt";
+      return r.status === (s.startStatus ?? "afventer_afsender") ? "ukendt" : "konflikt";
     }
     return "bekraeftet";
   }
@@ -1471,6 +1473,8 @@ function efterHandling(qc: QueryClient, ejer: OperationsEjer, conversationId: st
 /** B2b-1: revisionen er fastholdt fra den viste række; ejer er obligatorisk og fastholdt synkront ved trykket. */
 export interface AfgoerInput {
   messageId: string; revision: number; handling: "send" | "traek"; conversationId: string; ejer: OperationsEjer;
+  /** B2b-3a: den viste rækkes status ved trykket (standard: afventer_afsender). */
+  startStatus?: string;
   /** B2b-3a: fast fejltekst; toast vises af hooken (én gang pr. handling, kun for gyldig ejer). */
   fejltekst?: string;
 }
@@ -1491,7 +1495,7 @@ export function useAfgoer() {
         // 24d: true eller exception. sb_afgoer øger ikke revisionen → samme revision i målstatus.
         const status = v.handling === "send" ? "leveret" : "trukket_tilbage";
         await udfoerHandling(qc, { ejer: v.ejer, id: v.messageId, art: v.handling, startRevision: v.revision,
-          forventet: { revision: v.revision, status }, filRef: null, kladdeVersion: null }, vagt,
+          forventet: { revision: v.revision, status }, startStatus: v.startStatus, filRef: null, kladdeVersion: null }, vagt,
           () => supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling }),
           (d) => d === true);
         return v;

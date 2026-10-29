@@ -195,7 +195,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
     // B2b-1/B2b-2: kontekst og den viste rækkes revision fastholdes ved trykket; fælles lås med statuskortet.
     const ejer = fastholdEjer(currentEmployeeId, conversationId, authBrugerId);
     if (!ejer || !tagHandling(ejer, message.id, "traek", { revision: message.revision, status: message.status })) return;
-    afgoer.mutate({ messageId: message.id, revision: message.revision, handling: "traek", conversationId, ejer, fejltekst: "Kunne ikke trække beskeden tilbage" });
+    afgoer.mutate({ messageId: message.id, revision: message.revision, handling: "traek", conversationId, ejer, startStatus: message.status, fejltekst: "Kunne ikke trække beskeden tilbage" });
   };
 
 

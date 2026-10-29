@@ -78,7 +78,7 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
   const afgoerKlik = (handling: "send" | "traek", fast: string) => {
     const s = start();
     if (!s || !tagHandling(s.ejer, message.id, handling, vis)) return; // ignoreret klik: ingen mutation, ingen toast
-    afgoer.mutate({ ...s.vars, handling, fejltekst: fast });
+    afgoer.mutate({ ...s.vars, handling, startStatus: message.status, fejltekst: fast });
   };
   const fjernKlik = () => {
     const s = start();

@@ -1095,3 +1095,13 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     await afslut();
   });
 });
+
+describe("B2b-3a §1 – Træk tilbage fra leveret: uændret startstatus er intet bevis", () => {
+  it("leveret → læst leveret i samme revision = ukendt; trukket = bekræftet; afventer = konflikt", () => {
+    const s = { art: "traek" as const, startRevision: 2, startStatus: "leveret", forventet: { revision: 2, status: "trukket_tilbage" }, filRef: null };
+    const raek = (status: string) => ({ status, revision: 2, content: "", attachment_path: null });
+    expect(vurderUdfald(s, raek("leveret"))).toBe("ukendt");
+    expect(vurderUdfald(s, raek("trukket_tilbage"))).toBe("bekraeftet");
+    expect(vurderUdfald(s, raek("afventer_afsender"))).toBe("konflikt");
+  });
+});

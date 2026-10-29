@@ -440,7 +440,6 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await flush();
     fireEvent.click(screen.getByRole("menuitem", { name: "Træk tilbage" }));
     await flush();
-    console.warn("DBG", vi.mocked(supabase.rpc).mock.calls.length, document.body.innerHTML.includes("bekræftes"));
     expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
     expect(toast.error).not.toHaveBeenCalled();
     raekke = { data: { status: "trukket_tilbage", revision: m.revision, content: "", attachment_path: null }, error: null };
