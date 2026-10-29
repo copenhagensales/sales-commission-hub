@@ -2474,3 +2474,104 @@ describe("24d2 §2 – driftsvisning i ChatView", () => {
     graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null }));
   });
 });
+
+// ---------- 24d2-klient r2 §2: genkontrol efter ventepunkter ----------
+describe("24d2 r2 §2 – driftsstatus genkontrolleres efter hvert ventepunkt", () => {
+  const saetDrift = (r: ReturnType<typeof render>, v: Partial<typeof driftT.v>) => {
+    driftT.v = { ...driftT.v, ...v };
+    r.rerender(wrap(<ChatView conversationId="A" />));
+  };
+  async function medFil() {
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/gammel.txt", token: "t", conversationId: "A" });
+    uploadTilSti.mockResolvedValueOnce(undefined);
+    const r = await klar();
+    const input = r.container.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    return r;
+  }
+
+  it("(1) pause opstår under køventen → intet INSERT, pending bevaret, banner", async () => {
+    const holdte: Array<ReturnType<typeof kontrol<string>>> = [];
+    afstemKun.mockImplementation(() => { const k = kontrol<string>(); holdte.push(k); return k.p; });
+    const r = await klar();
+    const { fastholdEjer } = await import("@/lib/sbKladder");
+    const e = fastholdEjer("e", "A", "u")!;
+    act(() => { for (const id of ["q1", "q2", "q3"]) tilfoejAfsendelse("e", "A", { id, tekst: id, svarId: null, fil: null, tilstand: "afstemmer", fejl: null, tidligereUkendt: true, oprettet: 1 }, null, e); });
+    await waitFor(() => expect(holdte.length).toBe(3)); // køens tre pladser er optaget
+    skriv("første"); await act(async () => { fireEvent.click(send()); });
+    expect(mutateAsync).not.toHaveBeenCalled();
+    saetDrift(r, { beskederPause: true });
+    await act(async () => { for (const k of holdte) k.res("ikke_fundet"); await new Promise((x) => setTimeout(x, 20)); });
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByText(/du kan læse, men ikke sende/)).toBeTruthy();
+    expect(hentAfsendelser("e", "A").find((a) => a.tekst === "første")).toBeTruthy();
+    expect(screen.getByText("første")).toBeTruthy();
+    afstemKun.mockImplementation(async () => "ikke_fundet");
+  });
+
+  it("(2) pause under genudstedelse → intet upload og intet INSERT", async () => {
+    const r = await medFil();
+    mutateAsync.mockRejectedValueOnce(new SendFejl("genudsted", IKKE_REGISTRERET_TEKST));
+    await act(async () => { fireEvent.click(send()); });
+    const k = kontrol<{ sti: string; token: string; conversationId: string }>();
+    udstedUpload.mockImplementationOnce(() => k.p);
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    expect(udstedUpload).toHaveBeenCalledTimes(2);
+    saetDrift(r, { beskederPause: true });
+    await act(async () => { k.res({ sti: "c/e/ny.txt", token: "t2", conversationId: "A" }); await new Promise((x) => setTimeout(x, 20)); });
+    expect(uploadTilSti).toHaveBeenCalledTimes(1); // kun den oprindelige kladdeupload
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(hentAfsendelser("e", "A")).toHaveLength(1);
+    expect(hentAfsendelser("e", "A")[0].tilstand).toBe("genudsted");
+  });
+
+  it("(3a) filport lukkes under genudstedelsens upload → intet INSERT med fil", async () => {
+    const r = await medFil();
+    mutateAsync.mockRejectedValueOnce(new SendFejl("genudsted", IKKE_REGISTRERET_TEKST));
+    await act(async () => { fireEvent.click(send()); });
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/ny.txt", token: "t2", conversationId: "A" });
+    const k = kontrol<undefined>();
+    uploadTilSti.mockImplementationOnce(() => k.p);
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Ikke sendt – prøv igen" })); });
+    saetDrift(r, { filTilladt: false });
+    await act(async () => { k.res(undefined); await new Promise((x) => setTimeout(x, 20)); });
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(hentAfsendelser("e", "A")[0].fil).toMatchObject({ name: "x.txt" });
+  });
+
+  it("(3b) filport lukkes under kladdeupload → filen bevares i kladden, intet INSERT", async () => {
+    udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.txt", token: "t", conversationId: "A" });
+    const k = kontrol<undefined>();
+    uploadTilSti.mockImplementationOnce(() => k.p);
+    const r = await klar();
+    const input = r.container.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
+    saetDrift(r, { filTilladt: false });
+    await act(async () => { k.res(undefined); await new Promise((x) => setTimeout(x, 20)); });
+    expect(screen.getByText("x.txt")).toBeTruthy();
+    expect(laesKladde("e", "A")?.fil).toMatchObject({ name: "x.txt", trin: "valgt" });
+    await act(async () => { fireEvent.click(send()); });
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("(4) nyere kladde skrevet FØR PAUSE-svaret bevares sammen med den afviste pending", async () => {
+    beskeder.ægteSend = true; driftT.ægte = true;
+    graense.rpc.mockImplementation(async (fn: unknown) => fn === "sb_24d2_drift"
+      ? { data: [{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
+    const k = kontrol<{ error: unknown }>();
+    net.insert.mockImplementation(() => k.p);
+    await klar();
+    skriv("første");
+    await act(async () => { fireEvent.click(send()); });
+    await waitFor(() => expect(net.kald).toContain("insert:chat_messages"));
+    skriv("nyere"); // skrevet før svaret
+    await act(async () => { k.res({ error: { code: "P0001", message: "SB24D2_PAUSE" } }); await new Promise((x) => setTimeout(x, 20)); });
+    await waitFor(() => expect(screen.getByText(/du kan læse, men ikke sende/)).toBeTruthy());
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("nyere");
+    expect(laesKladde("e", "A")?.tekst).toBe("nyere");
+    expect(screen.getByText("første")).toBeTruthy();
+    expect(net.kald.filter((x) => x === "insert:chat_messages")).toHaveLength(1);
+    graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null }));
+  });
+});
