@@ -847,14 +847,14 @@ test("§3 oprydning: de to tunge RPC'er med 9 s svar fuldføres (ingen kunstig 8
   } finally { time.restore(); }
 });
 
-test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet blindt genforsøg", async () => {
+test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, højst ét afslut-genforsøg (24d2-edge-2 d)", async () => {
   const time = new FakeTime(DAG);
   try {
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), afslut: (k) => hænger(k.signal) as Promise<Response> }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
     assertEquals(b.ok, false); assertEquals(b.slettet, 0); assert(b.fejl.includes("koe_afslut"));
-    assertEquals(kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 1);
+    assertEquals(kaldTil((k) => rpc(k, "sb_koe_afslut")).length, 2);
     assertEquals(kaldTil((k) => k.metode === "DELETE").length, 1);
   } finally { time.restore(); }
 });
