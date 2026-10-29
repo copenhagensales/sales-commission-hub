@@ -25,7 +25,7 @@ type Ctl<T> = { p: Promise<T>; res: (v: T) => void; rej: (e: unknown) => void };
 const styret = <T,>(): Ctl<T> => { let res!: (v: T) => void, rej!: (e: unknown) => void; const p = new Promise<T>((a, b) => { res = a; rej = b; }); return { p, res, rej }; };
 
 let aabne: Ctl<unknown>[] = [];
-const hold = <T,>(): Ctl<T> => { const c = styret<T>(); aabne.push(c as Ctl<unknown>); return c; };
+const hold = <T,>(): Ctl<T> => { const c = styret<T>(); c.p.catch(() => undefined); aabne.push(c as Ctl<unknown>); return c; };
 
 /** Session-mock: aktuel bruger; kan tilbageholdes. */
 let aktuel: string | null = "u1";
@@ -51,6 +51,13 @@ const vis = (p: Partial<Parameters<typeof FilVedhaeftning>[0]> = {}) => (
 );
 const klik = () => act(async () => { fireEvent.click(screen.getByRole("button", { name: "Åbn f.txt" })); });
 const flush = () => act(async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); });
+
+// jsdom mangler Blob.text(); grænsen polyfilles i prøven (browsere har den).
+if (typeof Blob.prototype.text !== "function") {
+  Object.defineProperty(Blob.prototype, "text", { configurable: true, writable: true, value: function (this: Blob) {
+    return new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsText(this); });
+  } });
+}
 
 beforeEach(() => {
   registrerKladdeOprydning();
