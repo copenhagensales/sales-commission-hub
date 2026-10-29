@@ -1880,8 +1880,8 @@ describe("B2bc-5a §1 – resultatbevis læser samme deduplikerede rækkegrundla
     expect(graense.rpc).toHaveBeenCalledTimes(1);
   });
 
-  it("»Tjek igen« bekræfter rækken, men kun den ikke-viste kopi er opdateret (og genhentningen fejler) → bekræftet, ingen skrivning", async () => {
-    const { h } = toSider((n) => { if (n === 1) return [raek("leveret", 4)]; throw new Error("net"); });
+  it("»Tjek igen« bekræfter rækken, men genhentningen opdaterer kun den ikke-viste kopi → bekræftet, ingen skrivning", async () => {
+    const { h } = toSider((n) => [raek(n === 1 ? "afventer_afsender" : "leveret", 4)]);
     await vi.waitFor(() => expect(qc.getQueryData<{ pages: unknown[] }>(["chat-messages", "c"])?.pages).toHaveLength(1));
     await act(async () => { await h.result.current.fetchNextPage(); });
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
