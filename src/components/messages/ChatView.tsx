@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -286,7 +286,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   convRef.current = conversationId;
   const queryClient = useQueryClient();
 
-  const { data: messages, isLoading, hasOlder, isLoadingOlder, loadOlder, opdateret } = useMessages(conversationId);
+  const { data: messages, isLoading, hasOlder, isLoadingOlder, loadOlder, opdateret, hentStart } = useMessages(conversationId);
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
   const { typingUsers, setTyping } = useTypingIndicator(conversationId);
@@ -365,8 +365,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const svarITraad = svarRef && messages ? messages.find((x) => x.id === svarRef) : undefined;
   // B2c-1b §2: genvalidering skjuler straks uddraget; ny forespørgselsgeneration efter 300 ms debounce.
   const [svarGen, setSvarGen] = useState(0);
-  const [svarSkjult, setSvarSkjult] = useState<{ fra: number; gen: number } | null>(null);
-  const svarOpslag = useSvarOriginal(svarRef && messages && !svarITraad ? svarRef : null, svarGen);
+  // B2bc-5a §3: `seq` = trådens hentesekvens ved hændelsen; kun blokke startet derefter er bevis.
+  const [svarSkjult, setSvarSkjult] = useState<{ seq: number; gen: number } | null>(null);
+  const [svarVent, setSvarVent] = useState(false);
+  // Svaroriginaler inde i tråden: id → hentesekvens ved hændelsen; uddraget skjules til en frisk blok foreligger.
+  const [traadSvarSkjult, setTraadSvarSkjult] = useState<ReadonlyMap<string, number>>(new Map());
+  const svarOpslag = useSvarOriginal(svarRef && messages && !svarITraad ? svarRef : null, svarGen, !svarVent);
 
   // Lokal fristkontrol (klientens ur) på tværs af tråd, svaruddrag og valgt svar. Kun visning – intet skrives.
   const fristNu = useFristUr([
@@ -379,12 +383,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // Ryd valgt svar, når originalen er tilbagetrukket, slettet, udløbet eller bevist utilgængelig (tomt RLS-opslag).
   useEffect(() => {
     if (!svarRef || !messages) return;
+    // B2bc-5a §3: under genvalidering er intet læseresultat bevis – et gammelt tomt svar rydder ikke referencen.
+    // Kun den lokale frist (klientens ur, ingen læsning) må rydde imens.
+    if (svarSkjult) {
+      if (erUdloebet(svarITraad?.slettes_efter ?? replyTo?.slettes_efter, fristNu)) { setReplyTo(null); setSvarId(null); }
+      return;
+    }
     const vaek = svarITraad
       ? svarUtilgaengeligt(svarITraad, fristNu)
       : svarOpslag.isSuccess && (!svarOpslag.data || svarUtilgaengeligt(svarOpslag.data, fristNu));
     if (vaek) { setReplyTo(null); setSvarId(null); return; }
     if (svarITraad && (!replyTo || replyTo.id !== svarITraad.id || replyTo.content !== svarITraad.content)) setReplyTo(svarITraad);
-  }, [messages, svarRef, svarITraad, svarOpslag.isSuccess, svarOpslag.data, fristNu, replyTo]);
+  }, [messages, svarRef, svarITraad, svarOpslag.isSuccess, svarOpslag.data, fristNu, replyTo, svarSkjult]);
   useEffect(() => onChatSignal((s) => {
     if (["trukket", "slettet", "udloeb"].includes(s.haendelse) && (replyTo?.id === s.kildeId || svarId === s.kildeId)) {
       setReplyTo(null); setSvarId(null);
@@ -394,36 +404,49 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const svarGenRef = useRef(0);
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | null = null;
-    const gv = () => {
+    const gv = (sig?: { kildeId?: string }) => {
+      // B2bc-5a §3: ugyldiggørelsen sker straks; de 300 ms forsinker kun den nye hentning.
+      const seq = traadHentSekvens(conversationId);
       const maal = svarGenRef.current + 1;
-      setSvarSkjult((x) => x ?? { fra: Date.now(), gen: maal });
-      if (t) return; // 300 ms debounce
+      svarGenRef.current = maal;
+      void queryClient.cancelQueries({ queryKey: ["chat-svar-original"] });
+      queryClient.removeQueries({ queryKey: ["chat-svar-original"] });
+      setSvarGen(maal);
+      setSvarSkjult({ seq, gen: maal });
+      setSvarVent(true);
+      const kilde = sig?.kildeId;
+      if (kilde) setTraadSvarSkjult((m) => new Map(m).set(kilde, seq));
+      if (t) clearTimeout(t);
       t = setTimeout(() => {
         t = null;
-        // Gammelt arbejde annulleres og fjernes; den nye generation henter på en ny nøgle.
-        void queryClient.cancelQueries({ queryKey: ["chat-svar-original"] });
-        queryClient.removeQueries({ queryKey: ["chat-svar-original"] });
-        svarGenRef.current = maal;
-        setSvarGen(maal);
+        setSvarVent(false);
         planlaeg(queryClient, ["chat-messages", conversationId]);
       }, 300);
     };
     const synlig = () => { if (document.visibilityState === "visible") gv(); };
-    const af = onChatSignal(gv);
-    window.addEventListener("online", gv);
-    window.addEventListener("focus", gv);
+    const udenSig = () => gv();
+    const af = onChatSignal((sig) => gv(sig));
+    window.addEventListener("online", udenSig);
+    window.addEventListener("focus", udenSig);
     document.addEventListener("visibilitychange", synlig);
     return () => {
       if (t) clearTimeout(t);
-      af(); window.removeEventListener("online", gv); window.removeEventListener("focus", gv); document.removeEventListener("visibilitychange", synlig);
+      af(); window.removeEventListener("online", udenSig); window.removeEventListener("focus", udenSig); document.removeEventListener("visibilitychange", synlig);
     };
   }, [queryClient, conversationId]);
   // Skjulningen ophæves først, når et resultat fra den nye generation (eller en ny trådhentning) foreligger.
   useEffect(() => {
-    if (!svarSkjult || svarGen < svarSkjult.gen) return;
-    const faerdig = svarITraad ? opdateret > svarSkjult.fra : !svarRef || (!svarOpslag.isFetching && (svarOpslag.isSuccess || svarOpslag.isError));
+    if (!svarSkjult || svarGen < svarSkjult.gen || svarVent) return;
+    // B2bc-5a §3: tråden er kun bevis, når alle viste blokke er startet efter hændelsen (ikke dataUpdatedAt).
+    const faerdig = svarITraad ? hentStart > svarSkjult.seq : !svarRef || (!svarOpslag.isFetching && (svarOpslag.isSuccess || svarOpslag.isError));
     if (faerdig) setSvarSkjult(null);
-  }, [svarSkjult, svarGen, svarITraad, opdateret, svarRef, svarOpslag.isFetching, svarOpslag.isSuccess, svarOpslag.isError]);
+  }, [svarSkjult, svarGen, svarVent, svarITraad, hentStart, svarRef, svarOpslag.isFetching, svarOpslag.isSuccess, svarOpslag.isError]);
+  useEffect(() => {
+    if (!traadSvarSkjult.size) return;
+    let rest: Map<string, number> | null = null;
+    for (const [id, seq] of traadSvarSkjult) if (hentStart <= seq) (rest ??= new Map()).set(id, seq);
+    if ((rest?.size ?? 0) !== traadSvarSkjult.size) setTraadSvarSkjult(rest ?? new Map());
+  }, [hentStart, traadSvarSkjult]);
   const visSvar = svarSkjult ? null
     : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) ? svarITraad
     : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) ? svarOpslag.data : null;
@@ -733,7 +756,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             </div>
           )}
           {visBeskeder.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === meId} currentEmployeeId={meId} authBrugerId={currentEmployee?.authId ?? null}
+            <MessageBubble key={msg.id} message={msg} svarUgyldig={!!msg.reply_to && traadSvarSkjult.has(msg.reply_to.id)} isOwn={msg.sender_id === meId} currentEmployeeId={meId} authBrugerId={currentEmployee?.authId ?? null}
               conversationId={conversationId} onReply={(m) => { setReplyTo(m); setSvarId(m.id); }} />
           ))}
           {afsendelser.filter((p) => !messages?.some((m) => m.id === p.id) && !harKendtUdloebet(meId, conversationId, p.id)).map((p) => (

@@ -7,7 +7,7 @@ import type { Session } from "@supabase/supabase-js";
 /** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
 const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const mutateAsync = vi.fn();
-const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0 }; });
+const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0, hentStart: 0 }; });
 const skriver = vi.hoisted(() => { const fn: (...a: unknown[]) => unknown = () => undefined; return { fn }; });
 const kvitMutate = vi.hoisted(() => { const fn: (...a: unknown[]) => void = () => undefined; return { fn }; });
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
@@ -82,7 +82,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
   const ægte = await orig<typeof import("@/hooks/useChat")>();
   return {
     ...ægte,
-    useMessages: () => ({ data: beskeder.liste, isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined, opdateret: beskeder.opdateret }),
+    useMessages: () => ({ data: beskeder.liste, isLoading: false, hasOlder: false, isLoadingOlder: false, loadOlder: () => undefined, opdateret: beskeder.opdateret, hentStart: beskeder.hentStart }),
     // §9: rigtig useSendMessage (rigtige send-/afstemningsfunktioner) når ægteSend er sat; ellers kontrolleret mutateAsync.
     useSendMessage: () => (beskeder.ægteSend ? ægte.useSendMessage() : { mutateAsync }),
     useRealtimeMessages: () => undefined,
@@ -1835,5 +1835,111 @@ describe("T7 (B2c-2b-2 §7) – preview og oprydning", () => {
     const efterAfmont = kald.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
     expect(kald.length).toBe(efterAfmont);
+  });
+});
+
+// ---------- B2bc-5a §3: genvalidering bruger kun gyldige læsninger (enkeltopslag og svaroriginaler i tråden) ----------
+import { meldChatSignal } from "@/hooks/useChat";
+describe("B2bc-5a §3 – ugyldiggørelse straks ved hændelsen; 300 ms forsinker kun ny hentning", () => {
+  const raekke = (content: string) => ({ data: { id: "x", content, sender_id: "s", status: "leveret", slettes_efter: null, deleted_at: null, sender: null }, error: null });
+  const vent = (ms: number) => act(async () => { await new Promise((x) => setTimeout(x, ms)); });
+  afterEach(() => { net.vent = null; beskeder.hentStart = 0; });
+  const startMedGammelt = async () => {
+    const gammel = kontrol<Svar>(), ny = kontrol<Svar>();
+    let n = 0;
+    net.vent = () => (++n === 1 ? Promise.resolve(raekke("første")) : n === 2 ? gammel.p : ny.p);
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    await waitFor(() => expect(screen.getByText("første")).toBeTruthy());
+    // Et gammelt request startes (genforbindelse), og en ny hændelse kommer, mens det er i gang.
+    await act(async () => { meldChatSignal({ conversationId: "A", kildeId: "andet0", haendelse: "trukket" }); });
+    await vent(350);
+    expect(n).toBe(2);
+    await act(async () => { meldChatSignal({ conversationId: "A", kildeId: "andet", haendelse: "trukket" }); });
+    return { r, gammel, ny, kaldt: () => n };
+  };
+
+  it("gammelt enkeltopslag afslutter TOMT før 300 ms: referencen bevares og ny validering sker", async () => {
+    const { r, gammel, ny, kaldt } = await startMedGammelt();
+    await act(async () => { gammel.res({ data: null, error: null }); await gammel.p; });
+    await vent(50);
+    expect(laesKladde("e", "A")?.svarId).toBe("x");
+    expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy();
+    await vent(350);
+    expect(kaldt()).toBe(3);
+    await act(async () => { ny.res(raekke("aktuel")); await ny.p; });
+    await waitFor(() => expect(screen.getByText("aktuel")).toBeTruthy());
+    r.unmount();
+  });
+
+  it("gammelt enkeltopslag afslutter MED TEKST før 300 ms: hverken skjulning ophæves eller gammel tekst vises", async () => {
+    const { r, gammel, ny } = await startMedGammelt();
+    await act(async () => { gammel.res(raekke("gammel tekst")); await gammel.p; });
+    await vent(50);
+    expect(screen.queryByText("gammel tekst")).toBeNull();
+    expect(screen.queryByText("første")).toBeNull();
+    await vent(350);
+    await act(async () => { ny.res(raekke("aktuel")); await ny.p; });
+    await waitFor(() => expect(screen.getByText("aktuel")).toBeTruthy());
+    expect(screen.queryByText("gammel tekst")).toBeNull();
+    r.unmount();
+  });
+
+  it("ny læsning fejler: fejltilstand uden gammel tekst, referencen bevares", async () => {
+    const { r, gammel, ny } = await startMedGammelt();
+    await vent(350);
+    await act(async () => { ny.res({ data: null, error: { message: "Failed to fetch" } }); await ny.p.catch(() => null); });
+    await waitFor(() => expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy());
+    await act(async () => { gammel.res(raekke("gammel tekst")); await gammel.p; });
+    await vent(0);
+    expect(screen.queryByText("gammel tekst")).toBeNull();
+    expect(screen.queryByText("første")).toBeNull();
+    expect(laesKladde("e", "A")?.svarId).toBe("x");
+    r.unmount();
+  });
+
+  it("gyldigt aktuelt tomt opslag rydder referencen", async () => {
+    const { r, ny } = await startMedGammelt();
+    await vent(350);
+    await act(async () => { ny.res({ data: null, error: null }); await ny.p; });
+    await waitFor(() => expect(laesKladde("e", "A")?.svarId ?? null).toBeNull());
+    r.unmount();
+  });
+
+  it("svar i tråden: gammelt trådrequest (startet før hændelsen) ophæver ikke skjulning; først en blok startet efter gør", async () => {
+    beskeder.liste = [fremmed("x", "original v1"), fremmed("m", "tråd")];
+    beskeder.hentStart = 0;
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    await waitFor(() => expect(screen.getAllByText("original v1").length).toBe(2)); // boble + »Svarer på«
+    await act(async () => { meldChatSignal({ conversationId: "A", kildeId: "andet", haendelse: "trukket" }); });
+    expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy();
+    // Gammelt request afslutter efter hændelsen: ny dataUpdatedAt, ny tekst, men startnummer ≤ hændelsens.
+    beskeder.liste = [fremmed("x", "gammel v0"), fremmed("m", "tråd")]; beskeder.opdateret += 10_000;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await vent(400);
+    expect(within(screen.getByText("Svarer på:").parentElement!).queryByText("gammel v0")).toBeNull();
+    expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy();
+    beskeder.liste = [fremmed("x", "frisk"), fremmed("m", "tråd")]; beskeder.hentStart = 1; beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await vent(0);
+    await waitFor(() => expect(within(screen.getByText("Svarer på:").parentElement!).getByText("frisk")).toBeTruthy());
+    r.unmount();
+  });
+
+  it("svaroriginal inde i trådens bobler: gammel uddragstekst vises ikke, før en frisk blok foreligger", async () => {
+    const svarRef = { id: "o", content: "gammelt uddrag", sender_id: "s", status: "leveret", slettes_efter: null, deleted_at: null, sender: { id: "s", full_name: "S" } };
+    beskeder.liste = [fremmed("m", "tråd", { reply_to: svarRef, reply_to_id: "o" })];
+    const r = await klar();
+    expect(screen.getByText("gammelt uddrag")).toBeTruthy();
+    await act(async () => { meldChatSignal({ conversationId: "A", kildeId: "o", haendelse: "trukket" }); });
+    expect(screen.queryByText("gammelt uddrag")).toBeNull();
+    beskeder.opdateret += 10_000; r.rerender(wrap(<ChatView conversationId="A" />)); await vent(0);
+    expect(screen.queryByText("gammelt uddrag")).toBeNull(); // gammelt request: ingen genindsættelse
+    beskeder.liste = [fremmed("m", "tråd", { reply_to: { ...svarRef, content: "frisk uddrag" }, reply_to_id: "o" })]; beskeder.hentStart = 1;
+    r.rerender(wrap(<ChatView conversationId="A" />)); await vent(0);
+    await waitFor(() => expect(screen.getByText("frisk uddrag")).toBeTruthy());
+    r.unmount();
   });
 });

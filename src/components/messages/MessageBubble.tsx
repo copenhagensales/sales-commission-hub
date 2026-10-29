@@ -29,6 +29,8 @@ interface MessageBubbleProps {
   authBrugerId?: string | null;
   conversationId: string;
   onReply: (message: Message) => void;
+  /** B2bc-5a §3: svaroriginalen genvalideres; gammel svartekst vises ikke imens. */
+  svarUgyldig?: boolean;
 }
 
 const EMOJI_OPTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉"];
@@ -41,7 +43,7 @@ export function slettesTekst(slettesEfter: string, nu = Date.now()): string {
   return n <= 0 ? "Slettes i dag" : n === 1 ? "Slettes om 1 dag" : `Slettes om ${n} dage`;
 }
 
-export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId = null, conversationId, onReply }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId = null, conversationId, onReply, svarUgyldig = false }: MessageBubbleProps) {
   // Uafsendt redigeringskladde: besked-id, tekst og revisionen, redigeringen begyndte fra.
   // §1/§7: redigeringsstate ejes af nøglen (medarbejder, samtale, besked), den blev startet/gendannet under.
   const noegle = currentEmployeeId ? `${currentEmployeeId}\u0000${conversationId}\u0000${message.id}` : null;
@@ -249,7 +251,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
             isOwn ? "bg-primary/10 border-primary ml-auto" : "bg-muted border-muted-foreground"
           )}>
             <span className="font-medium">{message.reply_to.sender?.full_name}</span>
-            <p className="truncate text-muted-foreground">{svarVaek ? "Beskeden er ikke længere tilgængelig" : message.reply_to.content}</p>
+            <p className="truncate text-muted-foreground">{svarVaek ? "Beskeden er ikke længere tilgængelig" : svarUgyldig ? "Svaret kan ikke vises lige nu" : message.reply_to.content}</p>
           </div>
         )}
 

@@ -1774,3 +1774,183 @@ describe("B2c-2b-2 (Codex) – fristoprydning via stopvejen", () => {
     frigivHandling(e3, "x3");
   });
 });
+
+// ---------- B2bc-5a: visningsbevis på det viste grundlag og gyldige genvalideringslæsninger (netværk mocket; SQL/RLS = antagelser) ----------
+import { dedupSider, traadHentSekvens } from "./useChat";
+
+describe("B2bc-5a §1 – resultatbevis læser samme deduplikerede rækkegrundlag som visningen", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const ID = "m1";
+  const raek = (status: string, revision: number) => ({ id: ID, status, revision });
+  const ejer = () => fastholdEjer("e", "c", "u")!;
+  const forventet = { id: ID, forventet: { revision: 4, status: "leveret" }, ejer: { conv: "c" } };
+  /** To sider: side 0 (nyeste) og side 1 (ældre, den viste kopi). `nyeste` styrer side 0's svar pr. kald. */
+  const toSider = (nyeste: (n: number) => Promise<unknown[]> | unknown[], aeldre: () => unknown[] = () => [raek("afventer_afsender", 4)]) => {
+    let n = 0;
+    const h = renderHook(() => useInfiniteQuery({ queryKey: ["chat-messages", "c"], initialPageParam: 0,
+      getNextPageParam: (_l: unknown, all: unknown[]) => (all.length < 2 ? all.length : undefined),
+      queryFn: async ({ pageParam }: { pageParam: number }) => (pageParam === 0 ? nyeste(++n) : aeldre()) }), { wrapper: wrap });
+    return { h, kald: () => n };
+  };
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    graense.rpc.mockReset(); vi.mocked(toast.error).mockReset();
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { onlineManager.setOnline(true); graense.rpc.mockReset(); graense.from.mockReset(); for (const k of Object.keys(svar)) delete svar[k]; qc.clear(); });
+
+  it("rigtig useMessages: dublet på to sider med forskellig status/revision – visning og bevis bruger den samme (ældste sides) kopi", async () => {
+    const raekker = Array.from({ length: CHAT_PAGE_SIZE }, (_, i) => ({ id: i === 0 ? ID : `x${i}`, conversation_id: "c", sender_id: "s", content: "x",
+      status: i === 0 ? "leveret" : "leveret", revision: i === 0 ? 5 : 1, created_at: new Date(2026, 9, 2, 0, i).toISOString(), reply_to_id: null }));
+    const aeldre = [{ id: ID, conversation_id: "c", sender_id: "s", content: "x", status: "afventer_afsender", revision: 4, created_at: new Date(2026, 9, 1).toISOString(), reply_to_id: null }];
+    const thenable = (data: unknown) => {
+      const b: Record<string, unknown> = {};
+      for (const k of ["select", "eq", "is", "order", "in", "range", "neq"]) b[k] = () => b;
+      b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok);
+      return b;
+    };
+    let side = 0;
+    graense.from.mockImplementation((t: string) => (t === "chat_messages" ? thenable(side++ === 0 ? raekker : aeldre) : thenable([])));
+    const { result } = renderHook(() => useMessages("c"), { wrapper: wrap });
+    await waitFor(() => expect(result.current.hasOlder).toBe(true));
+    await act(async () => { result.current.loadOlder(); });
+    await waitFor(() => expect(qc.getQueryData<{ pages: unknown[] }>(["chat-messages", "c"])?.pages).toHaveLength(2));
+    const vist = result.current.data?.find((m) => m.id === ID);
+    expect(vist).toMatchObject({ revision: 4, status: "afventer_afsender" }); // visningsrækkefølgen er uændret
+    expect(visningIndarbejdet(qc, { id: ID, forventet: { revision: 5, status: "leveret" }, ejer: { conv: "c" } })).toBe(false);
+    expect(visningIndarbejdet(qc, { id: ID, forventet: { revision: 4, status: "afventer_afsender" }, ejer: { conv: "c" } })).toBe(true);
+    expect(dedupSider(qc.getQueryData<{ pages: never[][] }>(["chat-messages", "c"])!.pages).find((m) => m.id === ID)).toBe(vist);
+  });
+
+  it("direkte succes: genhentning opdaterer kun den ikke-viste kopi → bekræftet snapshot; nyt klik starter intet skrivekald", async () => {
+    const { h } = toSider((n) => [raek(n === 1 ? "afventer_afsender" : "leveret", 4)]);
+    await vi.waitFor(() => expect(qc.getQueryData<{ pages: unknown[] }>(["chat-messages", "c"])?.pages).toHaveLength(1));
+    await act(async () => { await h.result.current.fetchNextPage(); });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); expect(tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(true);
+    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
+    expect(visningIndarbejdet(qc, forventet)).toBe(false);
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("direkte succes med paused/offline genhentning og dublet → bekræftet snapshot, ét skrivekald", async () => {
+    const { h } = toSider(() => [raek("leveret", 4)]);
+    await vi.waitFor(() => expect(qc.getQueryData<{ pages: unknown[] }>(["chat-messages", "c"])?.pages).toHaveLength(1));
+    await act(async () => { await h.result.current.fetchNextPage(); });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" });
+    graense.rpc.mockImplementationOnce(async () => { onlineManager.setOnline(false); return { data: true, error: null }; });
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("direkte succes uden observer (afmonteret liste): nyere kopi kun på side 0 frigiver ikke det viste grundlag", async () => {
+    qc.setQueryData(["chat-messages", "c"], { pages: [[raek("leveret", 4)], [raek("afventer_afsender", 4)]], pageParams: [0, 1] });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" });
+    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("tilbageholdt genhentning, der kun opdaterer side 0: låsen holdes til svaret, derefter bekræftet snapshot", async () => {
+    let slip!: (v: unknown[]) => void;
+    const { h } = toSider((n) => (n <= 1 ? [raek("afventer_afsender", 4)] : new Promise<unknown[]>((x) => { slip = x; })));
+    await vi.waitFor(() => expect(qc.getQueryData<{ pages: unknown[] }>(["chat-messages", "c"])?.pages).toHaveLength(1));
+    await act(async () => { await h.result.current.fetchNextPage(); });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" });
+    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
+    const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
+    await vi.waitFor(() => expect(typeof slip).toBe("function"));
+    expect(aktiveHandlinger()).toBe(1);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    slip([raek("leveret", 4)]);
+    await p;
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(aktiveHandlinger()).toBe(0);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("»Tjek igen« bekræfter rækken, men genhentningen opdaterer kun den ikke-viste kopi → bekræftet, ingen skrivning", async () => {
+    const { h } = toSider((n) => [raek(n === 1 ? "afventer_afsender" : "leveret", 4)]);
+    await vi.waitFor(() => expect(qc.getQueryData<{ pages: unknown[] }>(["chat-messages", "c"])?.pages).toHaveLength(1));
+    await act(async () => { await h.result.current.fetchNextPage(); });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" });
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+    svar.chat_messages = [msg({ status: "afventer_afsender", revision: 4, content: "x", attachment_path: null })];
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).catch(() => null);
+    svar.chat_messages = [msg({ status: "leveret", revision: 4, content: "x", attachment_path: null })];
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("B2bc-5a §3 – trådens hentesekvens: kun requests startet efter hændelsen er bevis (rigtig useMessages)", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  type Ctl = { res: (d: unknown[]) => void };
+  const koe: Ctl[] = [];
+  const styret = () => {
+    const b: Record<string, unknown> = {};
+    for (const k of ["select", "eq", "is", "order", "in", "range", "neq"]) b[k] = () => b;
+    const p = new Promise<unknown[]>((res) => koe.push({ res }));
+    b.then = (ok: (v: unknown) => unknown, fejl?: (e: unknown) => unknown) => p.then((data) => ({ data, error: null })).then(ok, fejl);
+    return b;
+  };
+  const tom = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "is", "order", "in", "range", "neq"]) b[k] = () => b; b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok); return b; };
+  const r = (content: string) => [{ id: "m", conversation_id: "c5", sender_id: "s", content, status: "leveret", revision: 1, created_at: new Date(2026, 9, 1).toISOString(), reply_to_id: null }];
+  beforeEach(() => {
+    koe.length = 0;
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1 }, queries: { retry: false } } });
+    graense.from.mockImplementation((t: string) => (t === "chat_messages" ? styret() : tom()));
+  });
+  afterEach(() => { for (const k of koe.splice(0)) k.res([]); graense.from.mockReset(); qc.clear(); });
+
+  it("gammelt trådrequest afslutter efter hændelsen: data skifter, men hentStart beviser intet; nyt request gør", async () => {
+    const { result } = renderHook(() => useMessages("c5"), { wrapper: wrap });
+    await vi.waitFor(() => expect(koe).toHaveLength(1));
+    await act(async () => { koe[0].res(r("v1")); });
+    await waitFor(() => expect(result.current.data?.[0]?.content).toBe("v1"));
+    // Gammelt request starter …
+    void act(() => { void qc.refetchQueries({ queryKey: ["chat-messages", "c5"] }); });
+    await vi.waitFor(() => expect(koe).toHaveLength(2));
+    const haendelse = traadHentSekvens("c5"); // … hændelsen kommer efter starten
+    await act(async () => { koe[1].res(r("gammel")); });
+    await waitFor(() => expect(result.current.data?.[0]?.content).toBe("gammel"));
+    expect(result.current.hentStart).toBeLessThanOrEqual(haendelse); // dataUpdatedAt er nyere, men det er ikke bevis
+    void act(() => { void qc.invalidateQueries({ queryKey: ["chat-messages", "c5"] }); });
+    await vi.waitFor(() => expect(koe).toHaveLength(3));
+    await act(async () => { koe[2].res(r("ny")); });
+    await waitFor(() => expect(result.current.data?.[0]?.content).toBe("ny"));
+    expect(result.current.hentStart).toBeGreaterThan(haendelse);
+  });
+
+  it("sen gammel afslutning efter nyt svar ændrer hverken data eller bevis", async () => {
+    const { result } = renderHook(() => useMessages("c5"), { wrapper: wrap });
+    await vi.waitFor(() => expect(koe).toHaveLength(1));
+    await act(async () => { koe[0].res(r("v1")); });
+    await waitFor(() => expect(result.current.data?.[0]?.content).toBe("v1"));
+    void act(() => { void qc.refetchQueries({ queryKey: ["chat-messages", "c5"] }); });
+    await vi.waitFor(() => expect(koe).toHaveLength(2));
+    const haendelse = traadHentSekvens("c5");
+    void act(() => { void qc.invalidateQueries({ queryKey: ["chat-messages", "c5"] }); }); // annullerer det gamle
+    await vi.waitFor(() => expect(koe).toHaveLength(3));
+    await act(async () => { koe[2].res(r("ny")); });
+    await waitFor(() => expect(result.current.data?.[0]?.content).toBe("ny"));
+    await act(async () => { koe[1].res(r("gammel")); await new Promise((x) => setTimeout(x, 0)); });
+    expect(result.current.data?.[0]?.content).toBe("ny");
+    expect(result.current.hentStart).toBeGreaterThan(haendelse);
+  });
+});
