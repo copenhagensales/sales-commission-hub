@@ -1540,7 +1540,10 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
 
   it("urforskel: serveren returnerer fortsat rækken → skjult lokalt og ny genhentning 2/4/8/16/32 s; uden rækken stopper planlægningen", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const inval = vi.spyOn(qc, "invalidateQueries");
+    // B2bc-5c-1 §2: forsøgets afslutning = netværkssvaret (holdt ved grænsen), ikke en vilkårlig cacheopdatering.
+    const venter: Array<() => void> = [];
+    const svar = () => { for (const v of venter.splice(0)) v(); };
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
     const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
     beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() + 100).toISOString() })];
     const r = render(wrap(<ChatView conversationId="A" />));
@@ -1552,7 +1555,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(genhentninger()).toBe(1);
     // Serveren (bagud-ur) returnerer stadig rækken med samme frist.
-    const returner = async () => { beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    const returner = async () => { svar(); beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await returner();
     await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
     expect(genhentninger()).toBe(1);
@@ -1560,7 +1563,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(genhentninger()).toBe(2);
     expect(screen.queryByText("original")).toBeNull();
     // Anden genhentning uden rækken → planlægningen stopper.
-    beskeder.liste = []; beskeder.opdateret++;
+    svar(); beskeder.liste = []; beskeder.opdateret++;
     r.rerender(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
     expect(genhentninger()).toBe(2);
@@ -1568,21 +1571,24 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
 
   it("urforskel: højst fem ekstra genhentninger (2, 4, 8, 16, 32 s), derefter ingen 0-ms-løkke", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const inval = vi.spyOn(qc, "invalidateQueries");
+    // B2bc-5c-1 §2: forsøgets afslutning = netværkssvaret (holdt ved grænsen), ikke en vilkårlig cacheopdatering.
+    const venter: Array<() => void> = [];
+    const svar = () => { for (const v of venter.splice(0)) v(); };
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
     const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
     beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() - 1).toISOString() })];
     const r = render(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(genhentninger()).toBe(1);
     for (const [i, ms] of [2000, 4000, 8000, 16000, 32000].entries()) {
-      beskeder.opdateret++;
+      svar(); beskeder.opdateret++;
       r.rerender(wrap(<ChatView conversationId="A" />));
       await act(async () => { await vi.advanceTimersByTimeAsync(ms - 1); });
       expect(genhentninger()).toBe(i + 1);
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(genhentninger()).toBe(i + 2);
     }
-    beskeder.opdateret++;
+    svar(); beskeder.opdateret++;
     r.rerender(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
     expect(genhentninger()).toBe(6);
@@ -1705,14 +1711,16 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
 
   it("budget 500 ms + 2/4/8/16/32 s pr. fristforløb gennem remount og andre rækkers udløb/bortfald; SQL-pladsholder afslutter", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const inval = vi.spyOn(qc, "invalidateQueries");
+    // B2bc-5c-1 §2: henteforsøget afsluttes først, når netværkssvaret (svar()) foreligger.
+    const venter: Array<() => void> = [];
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
     const n = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
     const nu = Date.now();
     const a = fremmed("a", "A-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
     const b = fremmed("b", "B-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
     beskeder.liste = [a, b];
     let r = render(wrap(<ChatView conversationId="A" />));
-    const svar = async (liste: unknown[]) => { beskeder.liste = liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    const svar = async (liste: unknown[]) => { for (const v of venter.splice(0)) v(); beskeder.liste = liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(n()).toBe(1); // ét fælles kald for begge forfaldne forløb
     await svar([a]); // b bortfalder – nulstiller ikke a (ingen ny 500 ms-start)
@@ -1941,5 +1949,197 @@ describe("B2bc-5a §3 – ugyldiggørelse straks ved hændelsen; 300 ms forsinke
     r.rerender(wrap(<ChatView conversationId="A" />)); await vent(0);
     await waitFor(() => expect(screen.getByText("frisk uddrag")).toBeTruthy());
     r.unmount();
+  });
+});
+
+
+// ---------- B2bc-5c-1 §1/§2 – fristlivscyklus gennem rigtig ChatView + rigtig MessageBubble ----------
+describe("B2bc-5c-1 – fristlivscyklus gennem tråden", () => {
+  const T0 = new Date("2026-10-29T08:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  let authCb!: (e: string, s: unknown) => void;
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0);
+    const { supabase } = await import("@/integrations/supabase/client");
+    const session: Session = { access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
+      user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" } };
+    graense.session.mockResolvedValue({ data: { session }, error: null });
+    authCb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { authCb("SIGNED_IN", { user: { id: "u" } }); });
+  });
+  afterEach(() => { graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null })); vi.useRealTimers(); });
+  const egen = (frist: string | null, extra: Record<string, unknown> = {}) => fremmed("m1", "original-hemmelig", { sender_id: "e", revision: 3, slettes_efter: frist, ...extra });
+  const editor = () => screen.queryAllByRole("textbox").find((x) => x.getAttribute("aria-label") !== "besked") as HTMLTextAreaElement | undefined;
+  const genrender = async (r: ReturnType<typeof render>) => { r.rerender(wrap(<ChatView conversationId="A" />)); await tick(); };
+  async function medKladde(frist: string | null, ekstra: unknown[] = []) {
+    const { gemRetKladde } = await import("@/lib/sbKladder");
+    beskeder.liste = [egen(frist), ...ekstra];
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "min rettelse", revision: 3 });
+    const r = await klar();
+    await waitFor(() => expect(editor()?.value).toBe("min rettelse"));
+    return r;
+  }
+
+  it("udløb af åben (gendannet) editor: editor, kladde og Ret-lås ryddes; urhop −690 ms genopliver intet", async () => {
+    const { laesRetKladde } = await import("@/lib/sbKladder");
+    const { handlingFor } = await import("@/hooks/useChat");
+    const r = await medKladde(iso(1000));
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    expect(editor()).toBeUndefined();
+    expect(screen.queryByText("original-hemmelig")).toBeNull();
+    expect(laesRetKladde("e", "A", "m1")).toBeNull();
+    expect(handlingFor("e", "A", "m1").art).toBeNull();
+    vi.setSystemTime(T0 + 1001 - 690);
+    await genrender(r);
+    expect(editor()).toBeUndefined();
+    expect(screen.queryByText("original-hemmelig")).toBeNull();
+    expect(screen.queryByText("min rettelse")).toBeNull();
+    r.unmount();
+  });
+
+  for (const udfald of ["sen succes", "P0001", "transportfejl"] as const) {
+    it(`udløb under Gem med ${udfald}: sent svar genskaber hverken tekst, kladde eller snapshot og starter ingen efterbehandling`, async () => {
+      const { laesRetKladde } = await import("@/lib/sbKladder");
+      const { handlingFor } = await import("@/hooks/useChat");
+      const hold = kontrol<{ data: unknown; error: unknown }>();
+      graense.rpc.mockImplementation(async (navn: unknown) => (navn === "sb_ret" ? hold.p : { data: "e", error: null }));
+      const r = await medKladde(iso(1000));
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+      await waitFor(() => expect(graense.rpc).toHaveBeenCalledWith("sb_ret", expect.objectContaining({ p_id: "m1", p_revision: 3 })));
+      vi.setSystemTime(T0 + 1001);
+      await genrender(r);
+      expect(handlingFor("e", "A", "m1").art).toBe("gem"); // fysisk igangværende Gem beholder pladsen
+      const inval = vi.spyOn(qc, "invalidateQueries");
+      const kaldFoer = net.kald.length, rpcFoer = graense.rpc.mock.calls.length;
+      await act(async () => {
+        if (udfald === "sen succes") hold.res({ data: 4, error: null });
+        else if (udfald === "P0001") hold.res({ data: null, error: { code: "P0001", message: "Revisionen er ændret" } });
+        else hold.rej(new TypeError("Failed to fetch"));
+        await hold.p.catch(() => undefined);
+      });
+      await tick(); await tick();
+      expect(editor()).toBeUndefined();
+      expect(screen.queryByText("original-hemmelig")).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(laesRetKladde("e", "A", "m1")).toBeNull();
+      expect(handlingFor("e", "A", "m1")).toMatchObject({ art: null, ukendt: null, tjekker: false }); // egen afslutning frigav, intet snapshot
+      expect(net.kald.length).toBe(kaldFoer);             // intet række-/statusopslag
+      expect(graense.rpc.mock.calls.length).toBe(rpcFoer); // intet tjek/afstemningskald
+      expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
+      r.unmount();
+    });
+  }
+
+  it("RLS-bortfald efter udløb: kladden genopstår ikke; nyere gyldigt grundlag (ny frist) vises og rammes ikke af gammel oprydning", async () => {
+    const { laesRetKladde, gemRetKladde } = await import("@/lib/sbKladder");
+    const r = await medKladde(iso(1000));
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    beskeder.liste = []; beskeder.opdateret++;          // rækken forsvinder fra RLS
+    await genrender(r);
+    expect(laesRetKladde("e", "A", "m1")).toBeNull();
+    // Nyere gyldigt grundlag for samme id (ny frist, ny revision) + ny kladde startet herpå.
+    beskeder.liste = [egen(iso(60_000), { content: "ny gyldig tekst", revision: 5 })]; beskeder.opdateret++;
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "ny kladde", revision: 5 });
+    await genrender(r);
+    expect(editor()?.value).toBe("ny kladde"); // ny gyldig række med ny kladde: editoren gendannes
+    expect(laesRetKladde("e", "A", "m1")?.tekst).toBe("ny kladde");
+    r.unmount();
+  });
+
+  it("urhop −690 ms i svaruddrag: kendt udløbet svaroriginal vises ikke igen", async () => {
+    const svarFra = { id: "o1", content: "svar-hemmelig", sender_id: "anden", sender: { id: "anden", full_name: "Kollega" }, status: "leveret", slettes_efter: iso(1000), deleted_at: null };
+    beskeder.liste = [fremmed("m9", "mit svar", { reply_to_id: "o1", reply_to: svarFra })];
+    const r = await klar();
+    expect(screen.getByText("svar-hemmelig")).toBeTruthy();
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    expect(screen.queryByText("svar-hemmelig")).toBeNull();
+    vi.setSystemTime(T0 + 1001 - 690);
+    await genrender(r);
+    expect(screen.queryByText("svar-hemmelig")).toBeNull();
+    expect(screen.getByText("mit svar")).toBeTruthy();
+    r.unmount();
+  });
+
+  it("suspenderet/kasseret render ændrer ikke udløbsbevis: render efter frist uden commit efterlader ingen registrering", async () => {
+    const { erKendtUdloebet, harKendtUdloebet } = await import("@/hooks/useChat");
+    beskeder.liste = [fremmed("s1", "suspenderet-tekst", { slettes_efter: iso(1000) })];
+    // En render, der aldrig committes (kastet undervejs efter at have læst lageret som en suspenderet render gør).
+    const Kasseret = () => { erKendtUdloebet("e", "A", "s1", iso(1000), T0 + 5000); throw new Promise(() => undefined); };
+    const { Suspense } = await import("react");
+    const k = render(wrap(<Suspense fallback={null}><Kasseret /></Suspense>));
+    expect(harKendtUdloebet("e", "A", "s1")).toBe(false);
+    k.unmount();
+    const r = await klar(); // anden visning før fristen: indholdet vises
+    expect(screen.getByText("suspenderet-tekst")).toBeTruthy();
+    r.unmount();
+  });
+
+  it("en anden, uberørt afsendelse fortsætter, mens en række udløber", async () => {
+    beskeder.ægteSend = true;
+    const hold = kontrol<{ error: unknown }>();
+    net.insert.mockImplementation(() => hold.p);
+    beskeder.liste = [fremmed("x1", "udløbende", { slettes_efter: iso(1000) })];
+    const r = await klar();
+    skriv("uberørt afsendelse"); await act(async () => { fireEvent.click(send()); });
+    await waitFor(() => expect(net.kald).toContain("insert:chat_messages"));
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    expect(screen.queryByText("udløbende")).toBeNull();
+    expect(hentAfsendelser("e", "A").map((a) => a.tekst)).toEqual(["uberørt afsendelse"]);
+    expect(screen.getByText("uberørt afsendelse")).toBeTruthy();
+    await act(async () => { hold.res({ error: null }); await hold.p; });
+    await tick();
+    expect(net.insert).toHaveBeenCalledTimes(1);
+    r.unmount();
+  });
+
+  it("grænse render før frist → effekt efter frist: uret passerer fristen mellem render og commit; skjules i samme commit-runde", async () => {
+    beskeder.liste = [fremmed("g1", "grænse-tekst", { slettes_efter: iso(1000) })];
+    // Flyt renderes efter hele ChatView-træet, men før commit: uret er før fristen under trådens render og efter ved effekterne.
+    const Flyt = () => { vi.setSystemTime(T0 + 1001); return null; };
+    let r!: ReturnType<typeof render>;
+    act(() => { r = render(wrap(<><ChatView conversationId="A" /><Flyt /></>)); }); // synkron: ingen timere afvikles
+    expect(screen.queryByText("grænse-tekst")).toBeNull();
+    r.unmount();
+  });
+
+  it("grænse callback før frist → render efter frist (regressionsværn fra B2c-1b): Gem efter frist sender intet sb_ret", async () => {
+    const r = await medKladde(iso(1000));
+    graense.rpc.mockClear();
+    vi.setSystemTime(T0 + 1001); // ingen ny render endnu – knappen fra før fristen er stadig i DOM
+    const knap = screen.queryByRole("button", { name: "Gem ændring" });
+    if (knap) await act(async () => { fireEvent.click(knap); });
+    expect(graense.rpc.mock.calls.some((c) => c[0] === "sb_ret")).toBe(false);
+    r.unmount();
+  });
+});
+
+describe("B2bc-5c-1 §2 – genhentningsbudget bundet til det konkrete henteforsøg", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  it("anden cacheopdatering (opdateret fra anden kilde) afslutter ikke forsøget; ventetiden måles fra forsøgets eget svar", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const venter: Array<() => void> = [];
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
+    const n = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
+    const a = fremmed("bf1", "BF-tekst", { slettes_efter: new Date(Date.now() - 1).toISOString() });
+    beskeder.liste = [a];
+    const r = render(wrap(<ChatView conversationId="A" />));
+    const genrender = async () => { r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(n()).toBe(1); // forsøg 1 startet (svar holdes ved grænsen)
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    beskeder.opdateret++; await genrender(); // realtime/anden kilde opdaterer cachen – ikke forsøgets svar
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); }); // gammel kode: næste forsøg 2 s efter opdateringen
+    expect(n()).toBe(1);
+    await act(async () => { for (const v of venter.splice(0)) v(); await vi.advanceTimersByTimeAsync(0); }); // forsøgets eget svar
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(n()).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(n()).toBe(2); // 2 s målt fra det konkrete forsøgs afslutning
+    r.unmount();
+    for (const v of venter.splice(0)) v();
   });
 });

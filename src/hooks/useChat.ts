@@ -154,12 +154,14 @@ export const harKendtUdloebet = (emp: string | null | undefined, conv: string, i
  * Budgettet (FRIST_GENHENT_MS: 500 ms + 2/4/8/16/32 s) overlever remount og andre rækkers udløb/bortfald;
  * gentagne svar med samme frist nulstiller det ikke. Række væk/ændret frist afslutter forløbet.
  */
-const fristForloeb = new Map<string, { n: number; due: number; opd: number | null }>();
+const fristForloeb = new Map<string, { n: number; due: number; forsoeg: number | null }>();
+let fristForsoegNr = 0;
 /**
- * Ventetiden måles fra svaret på den foregående genhentning (opdateret ændret). Udebliver svaret (fejlet
- * genhentning, afmontering), bruges en sikkerhedsgrænse på dobbelt ventetid fra genhentningen.
+ * B2bc-5c-1 §2: ventetiden måles fra afslutningen af DET KONKRETE henteforsøg (afslutFristForsoeg med forsøgets
+ * nummer). En anden cacheopdatering (fx `opdateret` fra realtime/anden kilde) afslutter ikke forsøget. Udebliver
+ * afslutningen (afmontering), gælder sikkerhedsgrænsen på dobbelt ventetid fra genhentningen.
  */
-export function synkFristForloeb(emp: string | null | undefined, conv: string, udloebne: ReadonlyArray<{ id: string; frist: string }>, nu: number, opdateret: number): number | null {
+export function synkFristForloeb(emp: string | null | undefined, conv: string, udloebne: ReadonlyArray<{ id: string; frist: string }>, nu: number): number | null {
   rydAndreGenerationer(fristForloeb);
   const pre = `${kuNoegle(emp, conv, "")}`;
   const aktuelle = new Set(udloebne.map((u) => `${pre}${u.id}@${u.frist}`));
@@ -169,23 +171,32 @@ export function synkFristForloeb(emp: string | null | undefined, conv: string, u
     const k = `${pre}${u.id}@${u.frist}`;
     let f = fristForloeb.get(k);
     // Ur-skævhed: første genhentning ved frist + 500 ms (aldrig før nu).
-    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]), opd: null }; fristForloeb.set(k, f); }
+    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]), forsoeg: null }; fristForloeb.set(k, f); }
     if (f.n >= FRIST_GENHENT_MS.length) continue;
-    if (f.opd !== null && opdateret !== f.opd) { f.due = nu + FRIST_GENHENT_MS[f.n]; f.opd = null; }
     if (min === null || f.due < min) min = f.due;
   }
   return min;
 }
-/** Forbruger ét genforsøg for hvert forfaldent forløb; returnerer om der skal genhentes. */
-export function fyrFristForloeb(emp: string | null | undefined, conv: string, nu: number, opdateret: number): boolean {
+/** Forbruger ét genforsøg for hvert forfaldent forløb; returnerer forsøgets nummer (null = intet at hente). */
+export function fyrFristForloeb(emp: string | null | undefined, conv: string, nu: number): number | null {
   const pre = `${kuNoegle(emp, conv, "")}`;
-  let fyr = false;
+  let nr: number | null = null;
   for (const [k, f] of fristForloeb) {
     if (!k.startsWith(pre) || f.n >= FRIST_GENHENT_MS.length || f.due > nu) continue;
-    f.n++; fyr = true; f.opd = opdateret;
+    nr ??= ++fristForsoegNr;
+    f.n++; f.forsoeg = nr;
     if (f.n < FRIST_GENHENT_MS.length) f.due = nu + 2 * FRIST_GENHENT_MS[f.n];
   }
-  return fyr;
+  return nr;
+}
+/** Det konkrete henteforsøg er afsluttet (svar eller fejl): næste ventetid måles herfra – kun for dets egne forløb. */
+export function afslutFristForsoeg(emp: string | null | undefined, conv: string, nr: number, nu: number): void {
+  const pre = `${kuNoegle(emp, conv, "")}`;
+  for (const [k, f] of fristForloeb) {
+    if (!k.startsWith(pre) || f.forsoeg !== nr) continue;
+    f.forsoeg = null;
+    if (f.n < FRIST_GENHENT_MS.length) f.due = nu + FRIST_GENHENT_MS[f.n];
+  }
 }
 
 /** Ventetider for genhentning, når serveren stadig returnerer en lokalt udløbet række (ure kan afvige). */

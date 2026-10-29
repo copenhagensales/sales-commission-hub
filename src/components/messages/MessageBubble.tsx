@@ -242,7 +242,9 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const isImage = message.attachment_type?.startsWith("image/");
   const hasUrls = /https?:\/\/[^\s]+/.test(message.content);
   const visHandlinger = !isEditing && !trukket && !udloebet && (leveret || !isOwn);
-  const svarVaek = !!message.reply_to && svarUtilgaengeligt(message.reply_to, fristNu);
+  // B2bc-5c-1 §1: samme fristgrundlag som tråden – kendt udløbet svaroriginal genopstår ikke ved urhop.
+  const svarVaek = !!message.reply_to && (svarUtilgaengeligt(message.reply_to, fristNu)
+    || erKendtUdloebet(currentEmployeeId, conversationId, message.reply_to.id, message.reply_to.slettes_efter, fristNu));
   const btn = "h-7 w-7 md:h-6 md:w-6 max-md:h-11 max-md:w-11";
   const ico = "h-3.5 w-3.5 md:h-3 md:w-3 max-md:h-4 max-md:w-4";
 

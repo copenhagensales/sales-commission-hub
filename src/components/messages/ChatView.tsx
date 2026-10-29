@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, afslutFristForsoeg, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -463,9 +463,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
     for (const [id, seq] of traadSvarSkjult) if (hentStart <= seq) (rest ??= new Map()).set(id, seq);
     if ((rest?.size ?? 0) !== traadSvarSkjult.size) setTraadSvarSkjult(rest ?? new Map());
   }, [hentStart, traadSvarSkjult]);
+  // B2bc-5c-1 §1: valgt svar bruger samme kendt-udløbet-grundlag (urhop genopliver ikke).
+  const svarVaekKendt = (s: { id: string; slettes_efter?: string | null }) => erKendtUdloebet(meId, conversationId, s.id, s.slettes_efter, fristNu);
   const visSvar = svarSkjult ? null
-    : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) ? svarITraad
-    : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) ? svarOpslag.data : null;
+    : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) && !svarVaekKendt(svarITraad) ? svarITraad
+    : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) && !svarVaekKendt(svarOpslag.data) ? svarOpslag.data : null;
 
   // Kvitterer kun hentede/viste LEVEREDE beskeder fra andre uden egen kvittering – kun ved synligt vindue med fokus.
   // B2c-1: skjulte (lokalt udløbne) rækker kvitteres aldrig.
@@ -513,10 +515,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
   useEffect(() => {
     if (!messages) return; // ukendt liste: intet forløb afsluttes
     const liste = udloebne ? udloebne.split(",").map((x) => { const i = x.indexOf("@"); return { id: x.slice(0, i), frist: x.slice(i + 1) }; }) : [];
-    const due = synkFristForloeb(meId, conversationId, liste, Date.now(), opdateret);
+    const due = synkFristForloeb(meId, conversationId, liste, Date.now());
     if (due === null) return;
     const t = setTimeout(() => {
-      if (fyrFristForloeb(meId, conversationId, Date.now(), opdateret)) void queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+      const nr = fyrFristForloeb(meId, conversationId, Date.now());
+      if (nr !== null) {
+        // B2bc-5c-1 §2: kun dette forsøgs afslutning (svar eller fejl) starter næste ventetid.
+        const emp = meId, conv = conversationId;
+        void queryClient.invalidateQueries({ queryKey: ["chat-messages", conv] }).catch(() => undefined).finally(() => {
+          afslutFristForsoeg(emp, conv, nr, Date.now());
+          setFristSlag((x) => x + 1);
+        });
+      }
       setFristSlag((x) => x + 1);
     }, Math.max(0, due - Date.now()));
     return () => clearTimeout(t);
