@@ -2090,24 +2090,23 @@ describe("B2bc-5c-1 – fristlivscyklus gennem tråden", () => {
     r.unmount();
   });
 
-  it("grænse render før frist → effekt efter frist: uret passerer fristen mellem render og commit; skjules uden ny ekstern render", async () => {
+  it("grænse render før frist → effekt efter frist: uret passerer fristen mellem render og commit; skjules i samme commit-runde", async () => {
     beskeder.liste = [fremmed("g1", "grænse-tekst", { slettes_efter: iso(1000) })];
-    // Uret flyttes forbi fristen, når boblens tekst er renderet, men før layout-effekterne kører (efter render, før commit).
-    let flyttet = false;
-    const { MessageBubble } = await import("./MessageBubble");
-    void MessageBubble;
-    const origNow = Date.now.bind(Date);
-    const spion = vi.spyOn(Date, "now").mockImplementation(() => {
-      const t = origNow();
-      return t;
-    });
-    const r = render(wrap(<ChatView conversationId="A" />));
-    // Første commit er sket med uret før fristen; flyt uret og lad kun eksisterende effekter køre (ingen rerender udefra).
-    expect(screen.getByText("grænse-tekst")).toBeTruthy();
-    spion.mockRestore();
-    vi.setSystemTime(T0 + 1001); flyttet = true;
-    await act(async () => { await Promise.resolve(); });
-    expect(flyttet).toBe(true);
+    // Flyt renderes efter hele ChatView-træet, men før commit: uret er før fristen under trådens render og efter ved effekterne.
+    const Flyt = () => { vi.setSystemTime(T0 + 1001); return null; };
+    let r!: ReturnType<typeof render>;
+    act(() => { r = render(wrap(<><ChatView conversationId="A" /><Flyt /></>)); }); // synkron: ingen timere afvikles
+    expect(screen.queryByText("grænse-tekst")).toBeNull();
+    r.unmount();
+  });
+
+  it("grænse callback før frist → render efter frist (regressionsværn fra B2c-1b): Gem efter frist sender intet sb_ret", async () => {
+    const r = await medKladde(iso(1000));
+    graense.rpc.mockClear();
+    vi.setSystemTime(T0 + 1001); // ingen ny render endnu – knappen fra før fristen er stadig i DOM
+    const knap = screen.queryByRole("button", { name: "Gem ændring" });
+    if (knap) await act(async () => { fireEvent.click(knap); });
+    expect(graense.rpc.mock.calls.some((c) => c[0] === "sb_ret")).toBe(false);
     r.unmount();
   });
 });
