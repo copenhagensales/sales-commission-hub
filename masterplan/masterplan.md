@@ -338,6 +338,7 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 - **1.0 i dag:** Microsoft-login (Entra ID) findes allerede. Værnet `microsoft-login-guard` kobler et Microsoft-login til medarbejderen via e-mail og afviser dubletter. Adgangskode-login er stadig åbent. Værnet omlægges her til at slå op i identiteterne.
 - **Afgjort:** eksisterende koblinger gælder fra første salg og er markeret som udledt. Ved dobbeltkoblinger gælder 1.0's valg, og sagen står som match-konflikt. Et Microsoft-login kobles automatisk, når præcis én aktiv medarbejder har kontoens e-mail og endnu ingen konto, som i 1.0's værn. Har medarbejderen allerede en anden konto, typisk med adgangskode på privat e-mail, kobler en administrator Microsoft-identiteten til personen, og sagen står i fælles oversigt. Værnets egne skrivninger, kontokoblingen og sletningen af tomme dubletkonti, bliver handlinger i strukturen. Så snart deres Microsoft-identitet er koblet, kræves Microsoft-login for superadmin og for roller, der ser CPR, bank eller løn (forretningsforståelsen §10 og 2.0-masterplanen: »Ingen backdoor«). Sammenlægning af identiteter, der flytter historiske salg, sker kun med break-glass.
 - **Bevis:** for hver agent i salg fra de seneste 90 dage giver resolveren samme person som 1.0, eller forskellen er en registreret konflikt. Et Microsoft-login giver samme medarbejder som 1.0's værn.
+- **SoMe-krav (tilføjet 29/10-2026, Mathias):** identiteterne skal også rumme rekrutteringens eksterne nøgler, så SoMe-attribution (trin 5.13) kan bygges uden ny identitetslogik: kandidat-id fra annonceplatform (Meta/TikTok/LinkedIn/Snap/Google), lead-id fra hjemmesidens formular og kampagne-id ved ansættelse. Samme regel som for agenter: nøglen peger på præcis én person, ellers »ikke matchet«. Kilde: fase0/some/plan-v5.md (1.0-bundtet bygges ikke; ligger som kildemateriale).
 
 #### Trin 1.7 Organisationstræ med dateret historik · L
 
@@ -935,6 +936,15 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Diagnose- og testfunktioner uden kaldere stoppes.
   - Kundehenvendelser anonymiseres efter opbevaringsreglen i stedet for at slettes.
 - **Bevis:** samme kundehenvendelse leveret to gange giver én. En Tryg-gennemgang af et salg fra før skiftet bevarer koblingen. Et stoppet job vises som fejlet i oversigten.
+
+#### Trin 5.13 SoMe-attribution (rekruttering) · M
+
+**Færdigt bagefter:** ejer, rekruttering og SoMe-ansvarlig kan se, hvilke annoncekampagner der gav kandidater, ansættelser og fratrædelser, med forbrug pr. kampagne hentet automatisk, og hvor hver person kom fra. Fratrædelsesårsag registreres i Stork af den, der har rettigheden. Alt går gennem hjemmesiden som indgang.
+
+- **Bygges:** attributionstabel pr. person (kampagne, platform, lead, dato) oven på identiteterne fra 1.6; forbrug via platformenes API'er (Windsor.ai eller direkte CAPI/Data Manager, jf. fase0/some/opkoblinger-v1.md); dagstal pr. kampagne; rettighedsnøgler i strukturen (menu_some, personaleadgang); rollen SOME findes allerede i 1.0.
+- **Forudsætter:** trin 1.6 med SoMe-nøglerne og trin 5.5 (rekruttering) flyttet. Ingen løn- eller salgsdata berøres.
+- **Afgjort (Mathias 29/10-2026):** bygges i strukturen, ikke i 1.0 (fase0/some/plan-v5.md + 01/02-SQL er kildemateriale); ejerrollen (Mathias + Kasper) er superadmin-undtagelse; ansættelsesstop = fratrædelse i attributionen.
+- **Bevis:** for hver ansættelse i de seneste 6 måneder findes kampagne eller »ukendt kilde«, og forbrugstal pr. kampagne stemmer med platformens egen rapport for en valgt måned.
 
 #### Trin 5.12 Lukning og slutkontrol · L
 
