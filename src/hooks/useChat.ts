@@ -960,28 +960,99 @@ async function hentSamtale(id: string): Promise<Conversation> {
   } as Conversation;
 }
 
+/** B2d-1 §8: tekst ved kendt oprettelses-id, hvor efterfølgende hentning fejlede. */
+export const OPRETTET_IKKE_HENTET_TEKST = "Samtalen er oprettet, men kunne ikke hentes. Prøv igen";
+/** Udfaldsfejl for oprettelse: `hent` = id kendt, hentning fejlede; `ukendt` = RPC-svaret gik tabt uden id. */
+export class OpretFejl extends Error {
+  constructor(public art: "hent" | "ukendt", public id: string | null = null) { super(art); this.name = "OpretFejl"; }
+}
+interface OpretTilstand { gen: number; laast: boolean; kendtId: string | null }
+const opretTilstande = new WeakMap<QueryClient, OpretTilstand>();
+const opretLyttere = new Set<() => void>();
+const opretMeld = () => { for (const l of [...opretLyttere]) l(); };
+function opretTilstand(qc: QueryClient): OpretTilstand {
+  const gen = sessionsGeneration();
+  let t = opretTilstande.get(qc);
+  if (!t) { t = { gen, laast: false, kendtId: null }; opretTilstande.set(qc, t); }
+  else if (t.gen !== gen) { t.gen = gen; t.laast = false; t.kendtId = null; }
+  return t;
+}
+abonnerAfsendelser(() => opretMeld());
+
+/**
+ * B2d-1 §8: retry:0, synkron lås og fastholdt samtale-id adskilt fra hentningen.
+ * Med kendt id genforsøges kun hentningen (også efter genåbning i samme session); RPC'en gentages aldrig.
+ */
 export function useCreateConversation() {
   const queryClient = useQueryClient();
+  const kendtId = useSyncExternalStore(
+    (l) => { opretLyttere.add(l); return () => { opretLyttere.delete(l); }; },
+    () => opretTilstand(queryClient).kendtId,
+  );
 
-  return useMutation({
-    mutationFn: async ({ name, memberIds, isGroup }: { name?: string; memberIds: string[]; isGroup: boolean }) => {
-      const mig = await getCurrentEmployeeId();
-      const andre = [...new Set(memberIds)].filter((x) => x && x !== mig);
-      const v = validerSamtale(andre.length, name, isGroup);
-      if ("fejl" in v) throw Object.assign(new Error(v.fejl), { code: "P0001" });
-      const { data: id, error } = isGroup
-        ? await supabase.rpc("sb_chat_start_gruppe", { p_navn: (name ?? "").trim(), p_medlemmer: andre })
-        : await supabase.rpc("sb_chat_start_direkte", { p_anden: andre[0] });
-      if (error) throw error;
-      if (typeof id !== "string") throw new Error("Intet samtale-id");
-      const conversation = await hentSamtale(id);
-      queryClient.setQueryData<Conversation[]>(["chat-conversations"], (old) => [conversation, ...(old ?? []).filter((c) => c.id !== id)]);
+  const mutation = useMutation({
+    retry: 0,
+    mutationFn: async ({ name, memberIds, isGroup }: { name?: string; memberIds: string[]; isGroup: boolean }): Promise<Conversation> => {
+      const t = opretTilstand(queryClient);
+      const gen = t.gen;
+      let id = t.kendtId;
+      if (!id) {
+        const mig = await getCurrentEmployeeId();
+        const andre = [...new Set(memberIds)].filter((x) => x && x !== mig);
+        const v = validerSamtale(andre.length, name, isGroup);
+        if ("fejl" in v) throw Object.assign(new Error(v.fejl), { code: "P0001" });
+        let res: { data: unknown; error: unknown };
+        try {
+          res = isGroup
+            ? await supabase.rpc("sb_chat_start_gruppe", { p_navn: (name ?? "").trim(), p_medlemmer: andre })
+            : await supabase.rpc("sb_chat_start_direkte", { p_anden: andre[0] });
+        } catch {
+          // Svaret gik tabt: udfaldet er ukendt. Ingen automatisk ny oprettelse; listen genhentes.
+          void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+          throw new OpretFejl("ukendt");
+        }
+        if (res.error) {
+          const kode = typeof res.error === "object" && res.error !== null ? Reflect.get(res.error, "code") : undefined;
+          if (typeof kode === "string" && kode) throw res.error;
+          void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+          throw new OpretFejl("ukendt");
+        }
+        if (typeof res.data !== "string" || !res.data) {
+          void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+          throw new OpretFejl("ukendt");
+        }
+        id = res.data;
+        if (gen !== sessionsGeneration()) throw new OpretFejl("ukendt");
+        t.kendtId = id;
+        opretMeld();
+      }
+      let conversation: Conversation;
+      try {
+        conversation = await hentSamtale(id);
+      } catch {
+        throw new OpretFejl("hent", id);
+      }
+      if (gen !== sessionsGeneration()) throw new OpretFejl("hent", id);
+      queryClient.setQueryData<Conversation[]>(["chat-conversations"], (old) => [conversation, ...(old ?? []).filter((c) => c.id !== conversation.id)]);
+      if (t.kendtId === id) { t.kendtId = null; opretMeld(); }
       return conversation;
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    onSettled: (_d, e) => {
+      // Ved kendt id men fejlet hentning må listen ikke overskrive valget; ellers genvalideres den.
+      if (!(e instanceof OpretFejl && e.art === "hent")) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
+
+  /** Synkron lås på selve handlingen: dobbeltklik i samme tick giver ét kald. null = låst. */
+  const opret = useCallback((input: { name?: string; memberIds: string[]; isGroup: boolean }): Promise<Conversation> | null => {
+    const t = opretTilstand(queryClient);
+    if (t.laast) return null;
+    t.laast = true;
+    const gen = t.gen;
+    return mutation.mutateAsync(input).finally(() => { if (t.gen === gen) t.laast = false; });
+  }, [queryClient, mutation]);
+
+  return { ...mutation, opret, kendtId };
 }
 
 export function useRealtimeMessages(conversationId: string | null) {
