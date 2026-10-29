@@ -1514,6 +1514,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     const inval = vi.spyOn(qc, "invalidateQueries");
     const genhentninger = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
+    const tider: number[] = []; inval.mockImplementation(((...a: Parameters<typeof qc.invalidateQueries>) => { tider.push(Date.now()); return Promise.resolve(); }) ); (globalThis as Record<string, unknown>).__t = tider;
     beskeder.liste = [fremmed("a", "original", { slettes_efter: new Date(Date.now() - 1).toISOString() })];
     const r = render(wrap(<ChatView conversationId="A" />));
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
@@ -1522,6 +1523,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
       beskeder.opdateret++;
       r.rerender(wrap(<ChatView conversationId="A" />));
       await act(async () => { await vi.advanceTimersByTimeAsync(ms - 1); });
+      if (genhentninger() !== i + 1) throw new Error("TIDER " + JSON.stringify(tider.map((x) => x - tider[0])));
       expect(genhentninger()).toBe(i + 1);
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(genhentninger()).toBe(i + 2);
