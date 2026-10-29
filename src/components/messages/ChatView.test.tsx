@@ -8,6 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const mutateAsync = vi.fn();
 const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0 }; });
+const skriver = vi.hoisted(() => ({ fn: (..._a: unknown[]) => undefined as unknown }));
 const kvitMutate = vi.hoisted(() => { const fn: (...a: unknown[]) => void = () => undefined; return { fn }; });
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
@@ -67,8 +68,8 @@ vi.mock("./MessageSearch", () => ({ MessageSearch: () => null }));
 vi.mock("./TypingIndicator", () => ({ TypingIndicator: () => null }));
 vi.mock("./MentionInput", async (orig) => ({
   ...(await orig<typeof import("./MentionInput")>()),
-  MentionInput: ({ value, onChange, onKeyDown }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void }) => (
-    <textarea aria-label="besked" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} />
+  MentionInput: ({ value, onChange, onKeyDown, onTyping }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void; onTyping?: () => void }) => (
+    <textarea aria-label="besked" value={value} onChange={(e) => { onChange(e.target.value); onTyping?.(); }} onKeyDown={onKeyDown} />
   ),
 }));
 vi.mock("@/lib/sbFil", async (orig) => ({
@@ -86,7 +87,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
     useSendMessage: () => (beskeder.ægteSend ? ægte.useSendMessage() : { mutateAsync }),
     useRealtimeMessages: () => undefined,
     useMarkAsRead: () => ({ mutate: (...a: unknown[]) => kvitMutate.fn(...a), isPending: false }),
-    useTypingIndicator: () => ({ typingUsers: [], setTyping: vi.fn() }),
+    useTypingIndicator: () => ({ typingUsers: [], setTyping: (...a: unknown[]) => skriver.fn(...a) }),
     useChatAktiv: () => undefined,
     afstemKun: (...a: Parameters<typeof ægte.afstemKun>) => (beskeder.ægteSend ? ægte.afstemKun(...a) : afstemKun()),
   };
@@ -1740,5 +1741,99 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
     expect(n()).toBe(totalFoerPladsholder);
     r.unmount();
+  });
+});
+
+
+// ---------- B2c-2b-2 T7 (§7) – preview-ejerskab, komponenttimere og navigation ----------
+describe("T7 (B2c-2b-2 §7) – preview og oprydning", () => {
+  let oprettet: string[] = [];
+  let revoked: string[] = [];
+  beforeEach(() => {
+    oprettet = []; revoked = [];
+    let nr = 0;
+    globalThis.URL.createObjectURL = () => { const u = `blob:p${++nr}`; oprettet.push(u); return u; };
+    globalThis.URL.revokeObjectURL = (u: string) => { revoked.push(u); };
+    udstedUpload.mockImplementation(() => holdt());
+  });
+  afterEach(() => { vi.useRealTimers(); skriver.fn = () => undefined; });
+  const png = (n: string) => new File([new Uint8Array([1, 2, 3])], n, { type: "image/png" });
+  const vistPreview = () => screen.queryAllByRole("img").map((i) => i.getAttribute("src"));
+
+  it("fjernelse: preview-URL revokes direkte, intet billede tilbage", async () => {
+    const r = await klar();
+    await vaelg(r.container, png("a.png"));
+    expect(oprettet).toEqual(["blob:p1"]);
+    expect(vistPreview()).toEqual(["blob:p1"]);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Fjern fil" })); });
+    expect(revoked).toEqual(["blob:p1"]);
+    expect(vistPreview()).toEqual([]);
+  });
+
+  it("erstatning: gammel URL revokes, ny vises; afmontering revokes den aktuelle", async () => {
+    const r = await klar();
+    await vaelg(r.container, png("a.png"));
+    await vaelg(r.container, png("b.png"));
+    expect(revoked).toContain("blob:p1");
+    expect(vistPreview()).toEqual([oprettet[oprettet.length - 1]]);
+    r.unmount();
+    for (const u of oprettet) expect(revoked).toContain(u);
+  });
+
+  it("send: preview frigives ved afsendelse", async () => {
+    udstedUpload.mockResolvedValue({ sti: "A/e/a.png", token: "k", conversationId: "A" });
+    uploadTilSti.mockResolvedValue(undefined);
+    mutateAsync.mockImplementation(() => holdt());
+    const r = await klar();
+    await vaelg(r.container, png("a.png"));
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    await act(async () => { fireEvent.click(send()); });
+    expect(revoked).toContain("blob:p1");
+    expect(vistPreview()).not.toContain("blob:p1");
+  });
+
+  it("navigation: URL frigives, File bevares i kladdelageret; genåbning danner nyt preview", async () => {
+    const { kladdeFilTilstand } = await import("@/lib/sbKladder");
+    const f = png("a.png");
+    const r = await klar();
+    await vaelg(r.container, f);
+    await navigér(r, "B");
+    expect(revoked).toEqual(["blob:p1"]);
+    expect(kladdeFilTilstand("e", "A")?.file).toBe(f);
+    await navigér(r, "A");
+    expect(oprettet).toEqual(["blob:p1", "blob:p2"]);
+    expect(vistPreview()).toEqual(["blob:p2"]);
+  });
+
+  it("navigation stopper og sletter ikke bevarede afsendelser", async () => {
+    mutateAsync.mockImplementation(() => holdt());
+    const r = await klar();
+    skriv("bevaret");
+    await act(async () => { fireEvent.click(send()); });
+    const foer = hentAfsendelser("e", "A").map((a) => a.id);
+    expect(foer).toHaveLength(1);
+    await navigér(r, "B");
+    await navigér(r, "A");
+    expect(hentAfsendelser("e", "A").map((a) => a.id)).toEqual(foer);
+    expect(screen.getByText("bevaret")).toBeTruthy();
+  });
+
+  it("skrive-timer ryddes ved samtaleskift og afmontering: ingen sen presence-skrivning", async () => {
+    const kald: unknown[][] = [];
+    skriver.fn = (...a: unknown[]) => { kald.push(a); };
+    const r = await klar();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    skriv("h");
+    expect(kald.at(-1)?.[0]).toBe(true);
+    expect(kald.at(-1)?.[3]).toBe("A");
+    r.rerender(wrap(<ChatView conversationId="B" />));
+    const efterSkift = kald.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    expect(kald.slice(efterSkift).filter((k) => k[0] === false)).toEqual([]);
+    skriv("x");
+    r.unmount();
+    const efterAfmont = kald.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    expect(kald.length).toBe(efterAfmont);
   });
 });
