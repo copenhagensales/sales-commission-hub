@@ -122,11 +122,21 @@ beforeEach(() => {
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
 // d2 §4: afmontér komponenter og ryd QueryClient efter hver prøve (ikke kun generationsreset).
-afterEach(() => { cleanup(); qc.clear(); });
+// B2b-4b §3: tilbageholdte prøvepromises afsluttes altid (afvises), og alle køforløb stoppes før næste prøve.
+const aabne: Array<() => void> = [];
+function holdt<T>(): Promise<T> { return new Promise<T>((_r, rej) => { aabne.push(() => rej(new Error("prøveslut"))); }); }
+afterEach(async () => {
+  cleanup();
+  for (const x of aabne.splice(0)) x();
+  await new Promise((x) => setTimeout(x, 0));
+  const { stopAfstemninger } = await import("./ChatView");
+  for (const conv of ["A", "B", "c"]) stopAfstemninger("e", conv);
+  qc.clear();
+});
 
 describe("T1 – ChatView afsendelse", () => {
   it("dobbelt Send og Enter+klik giver én afsendelse", async () => {
-    mutateAsync.mockReturnValue(new Promise(() => undefined));
+    mutateAsync.mockReturnValue(holdt());
     await klar();
     skriv("hej");
     await act(async () => {
@@ -153,7 +163,7 @@ describe("T1 – ChatView afsendelse", () => {
   });
 
   it("A–B–A: pending A overlever samtaleskift, kladde skrives ikke under ny nøgle", async () => {
-    mutateAsync.mockReturnValue(new Promise(() => undefined));
+    mutateAsync.mockReturnValue(holdt());
     const r = await klar("A");
     skriv("til A"); await act(async () => { fireEvent.click(send()); });
     skriv("kladde A");
@@ -168,7 +178,7 @@ describe("T1 – ChatView afsendelse", () => {
   });
 
   it("valgt fil under upload: Send er låst", async () => {
-    udstedUpload.mockReturnValue(new Promise(() => undefined));
+    udstedUpload.mockReturnValue(holdt());
     const { container } = await klar();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
@@ -371,7 +381,7 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
     await klar();
     expect(screen.getByText("Filen kunne ikke uploades – prøv igen")).toBeInTheDocument();
     expect(send()).toBeDisabled();
-    udstedUpload.mockReturnValueOnce(new Promise(() => undefined));
+    udstedUpload.mockReturnValueOnce(holdt());
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
     expect(udstedUpload).toHaveBeenCalledTimes(2);
     expect(screen.getByText("Uploader …")).toBeInTheDocument();
@@ -460,7 +470,7 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
 
   it("filbytes, token og preview-URL gemmes aldrig i sessionStorage", async () => {
     udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.png", token: "HEMMELIGT-TOKEN", conversationId: "A" });
-    uploadTilSti.mockReturnValueOnce(new Promise(() => undefined));
+    uploadTilSti.mockReturnValueOnce(holdt());
     const r = await klar();
     await vaelg(r.container, new File(["BYTES"], "x.png", { type: "image/png" }));
     await tick();
