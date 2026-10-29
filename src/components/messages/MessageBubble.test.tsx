@@ -1,3 +1,4 @@
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -29,6 +30,14 @@ vi.mock("./FilVedhaeftning", () => ({ FilVedhaeftning: () => null }));
 import { MessageBubble } from "./MessageBubble";
 import { gemRetKladde, laesRetKladde, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
 import { supabase } from "@/integrations/supabase/client";
+
+// B2b-4b §3: typede auth-callbacks uden typeomgåelse – fuld Session bygges fra bruger-id.
+const sessionFor = (id: string): Session => ({ access_token: `jwt-${id}`, refresh_token: "r", expires_in: 3600, token_type: "bearer",
+  user: { id, app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" } });
+const authCb = (e: AuthChangeEvent, s: { user: { id: string } } | null): void => {
+  const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0];
+  void cb(e, s ? sessionFor(s.user.id) : null);
+};
 import { toast } from "sonner";
 import { hasUnsentDrafts } from "@/components/mobile";
 import type { Message } from "@/hooks/useChat";
@@ -54,7 +63,7 @@ beforeEach(() => {
   // c3 §7: fast udgangspunkt uafhængigt af rækkefølge: mocket hook, aktiv auth-bruger "u" via rigtig callback.
   aegte.brug = false;
   registrerKladdeOprydning();
-  (vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void)("SIGNED_IN", { user: { id: "u" } });
+  authCb("SIGNED_IN", { user: { id: "u" } });
 });
 
 describe("§7 – gemt redigeringskladde gendannes ved asynkron identitet", () => {
@@ -128,7 +137,7 @@ describe("§1 – prop-skift i MessageBubble giver ingen krydsskrivning", () => 
 });
 
 describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEditMessage)", () => {
-  let auth!: (e: string, s: unknown) => void;
+  let auth: typeof authCb = authCb;
   let svar!: (v: { data: unknown; error: unknown }) => void;
   let afvis!: (e: unknown) => void;
   const kontrolRet = () => graense.rpc.mockImplementationOnce(() =>
@@ -143,7 +152,7 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
     graense.from.mockImplementation((() => chain()));
     vi.mocked(toast.error).mockReset();
     registrerKladdeOprydning();
-    auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    auth = authCb;
     auth("SIGNED_IN", { user: { id: "u" } });
     inv = vi.spyOn(qc, "invalidateQueries");
   });
@@ -236,7 +245,7 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
 });
 
 describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessage, mocket rpc)", () => {
-  let auth!: (e: string, s: unknown) => void;
+  let auth: typeof authCb = authCb;
   const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
   const gem = () => fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
   const konfliktSvar = () => graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } });
@@ -249,7 +258,7 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
     graense.rpc.mockReset();
     graense.from.mockImplementation((() => chain()));
     vi.mocked(toast.error).mockReset();
-    auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    auth = authCb;
     auth("SIGNED_IN", { user: { id: "u" } });
   });
 
@@ -353,7 +362,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     graense.from.mockImplementation((() => chain()));
     graense.invoke.mockResolvedValue({ data: null, error: null });
     vi.mocked(toast.error).mockReset();
-    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    const auth = authCb;
     auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } });
   });
 
@@ -755,7 +764,7 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       vi.setSystemTime(T0 + 1001);
       r.rerender(ui({ ...m }, "e"));
       r.unmount();
-      const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+      const cb = authCb;
       cb("SIGNED_OUT", null); cb("SIGNED_IN", { user: { id: "u" } }); // ny generation, samme bruger
       vi.setSystemTime(T0 + 310); // ur før fristen i den nye generation
       gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny generation", revision: 1 });

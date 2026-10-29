@@ -1,3 +1,4 @@
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -21,6 +22,14 @@ import { MessageBubble } from "./MessageBubble";
 import { aktiveHandlinger } from "@/hooks/useChat";
 import { rydAlleKladder, registrerKladdeOprydning, laesRetKladde } from "@/lib/sbKladder";
 import { supabase } from "@/integrations/supabase/client";
+
+// B2b-4b §3: typede auth-callbacks uden typeomgåelse – fuld Session bygges fra bruger-id.
+const sessionFor = (id: string): Session => ({ access_token: `jwt-${id}`, refresh_token: "r", expires_in: 3600, token_type: "bearer",
+  user: { id, app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" } });
+const authCb = (e: AuthChangeEvent, s: { user: { id: string } } | null): void => {
+  const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0];
+  void cb(e, s ? sessionFor(s.user.id) : null);
+};
 import { toast } from "sonner";
 import type { Message } from "@/hooks/useChat";
 
@@ -31,7 +40,7 @@ const afventer = (rev: number, fil = false): Message => ({
 } as unknown as Message);
 
 let qc: QueryClient;
-let auth!: (e: string, s: unknown) => void;
+let auth: typeof authCb = authCb;
 const ui = (m: Message, bruger: string | null = "u") => (
   <QueryClientProvider client={qc}>
     <MessageBubble message={m} isOwn currentEmployeeId="e" authBrugerId={bruger} conversationId="c" onReply={() => undefined} />
@@ -54,7 +63,7 @@ beforeEach(() => {
   raekke = { data: null, error: null };
   vi.mocked(toast.error).mockReset();
   registrerKladdeOprydning();
-  auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+  auth = authCb;
   auth("SIGNED_OUT", null); // ny generation pr. prøve: ingen låse fra tidligere prøver
   auth("SIGNED_IN", { user: { id: "u" } });
 });
