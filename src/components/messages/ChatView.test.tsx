@@ -94,6 +94,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
 });
 
 import { ChatView } from "./ChatView";
+import { laesStart as laesStartT } from "@/lib/sbKladder";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
 import { rydAlleKladder, hentAfsendelser, gemKladde, laesKladde, tilfoejAfsendelse, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
 import { hasUnsentDrafts } from "@/components/mobile";
@@ -1488,8 +1489,9 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     const r = await klar();
     expect(screen.queryByText("original")).toBeNull();
     expect(screen.getByText("Ingen beskeder endnu. Start samtalen!")).toBeTruthy(); // tomtilstand fra det viste indhold
+    // B2-6C: pladsholderen kommer fra en læsning startet efter registreringen (dokumenteret nyere serverdata).
     beskeder.liste = [fremmed("a", "Beskeden er slettet efter fristen", { status: "trukket_tilbage", slettes_efter: null })];
-    beskeder.opdateret = 1;
+    beskeder.opdateret = 1; beskeder.hentStart = laesStartT();
     r.rerender(wrap(<ChatView conversationId="A" />));
     await tick();
     expect(screen.getByText("Beskeden er slettet efter fristen")).toBeTruthy();

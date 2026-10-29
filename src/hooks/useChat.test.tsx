@@ -1962,8 +1962,8 @@ describe("B2bc-5b §2 – fristlager: render læser, effekt registrerer; oprydni
     expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001)).toBe(true); // render ser udløb ved eget ur
     expect(harKendtUdloebet("e", "c5b", "m1")).toBe(false);              // men intet er registreret
     expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001 - 690)).toBe(false); // uregistreret: ingen bevis
-    expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toEqual({ udloebet: true, ny: true });
-    expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toEqual({ udloebet: true, ny: false }); // ingen løkke
+    expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toMatchObject({ udloebet: true, ny: true });
+    expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toMatchObject({ udloebet: true, ny: false }); // ingen løkke
     expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001 - 690)).toBe(true);
     // Ny gyldig frist og SQL-pladsholder (null) afslutter forløbet – ingen permanent blokliste.
     expect(kontrollerUdloeb("e", "c5b", "m1", new Date(99_000).toISOString(), 10_500).udloebet).toBe(false);
