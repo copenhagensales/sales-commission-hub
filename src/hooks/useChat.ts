@@ -1931,6 +1931,8 @@ export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => bo
   const r = await laesStatus(messageId);
   if (!vagt() || !r || r.status !== "tjekkes") return;
   const gen = ejer?.gen ?? sessionsGeneration();
+  // 24d2 §1: nye modelkald kræver kendt tjek_tilladt=true for sessionen; serverens beskedstatus røres ikke.
+  if (!tjekPortAaben(ejer?.bruger, gen)) return;
   const k = `${ejer?.bruger ?? ""}:${gen}:${messageId}:${r.revision}`;
   if (tjekAktive.has(k)) return;
   tjekAktive.add(k);
