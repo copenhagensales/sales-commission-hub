@@ -57,14 +57,15 @@ export function tjekPortAaben(bruger: string | null | undefined, gen: number, qc
   if (!bruger || gen !== sessionsGeneration()) return false;
   const k = sk(bruger, gen);
   if (qc) return modelPorte.get(qc)?.get(k) === true;
-  let aaben = testPorte.get(k);
-  if (aaben === false) return false;
+  const t = testPorte.get(k);
+  if (t !== undefined) return t; // kun prøveopsætninger sætter denne
+  let aaben = false;
   for (const m of alleporte) {
     const v = m.get(k);
     if (v === false) return false;
     if (v === true) aaben = true;
   }
-  return aaben === true;
+  return aaben;
 }
 
 /** Kun prøveopsætninger: sætter modelporten uden at gå gennem RPC-grænsen. */

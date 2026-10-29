@@ -22,7 +22,7 @@ describe("24d2 §1 useSbDrift", () => {
     const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(result.current.status).toBe("kendt"));
     expect(result.current).toMatchObject({ beskederPause: false, filTilladt: true, tjekTilladt: true });
-    expect(tjekPortAaben("u", sessionsGeneration())).toBe(true);
+    expect(tjekPortAaben("u", sessionsGeneration(), qc)).toBe(true);
     graense.rpc.mockResolvedValue(raekke(true, false, false));
     act(() => result.current.refetch());
     await waitFor(() => expect(result.current.beskederPause).toBe(true));
@@ -42,7 +42,7 @@ describe("24d2 §1 useSbDrift", () => {
     await waitFor(() => expect(kald()).toBe(1));
     await waitFor(() => expect(qc.isFetching()).toBe(0));
     expect(result.current).toMatchObject({ status: "ukendt", filTilladt: false, tjekTilladt: false, beskederPause: false });
-    expect(tjekPortAaben("u", sessionsGeneration())).toBe(false);
+    expect(tjekPortAaben("u", sessionsGeneration(), qc)).toBe(false);
     expect(kald()).toBe(1);
   });
 
@@ -120,5 +120,66 @@ describe("24d2 §1 useSbDrift", () => {
     renderHook(() => useSbDrift(false, "u"), { wrapper: wrap });
     await new Promise((r) => setTimeout(r, 20));
     expect(kald()).toBe(0);
+  });
+
+  // ---------- r2 §1 ----------
+  it("r2 (1) pause registreret → modelport lukket straks (via RPC-grænsen)", async () => {
+    graense.rpc.mockResolvedValue(raekke(false, true, true));
+    const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("kendt"));
+    const g = sessionsGeneration();
+    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    graense.rpc.mockImplementation(() => new Promise(() => {})); // genhentningen efter beviset hænger
+    act(() => registrerPause(qc, "u", g));
+    expect(tjekPortAaben("u", g, qc)).toBe(false);
+    expect(tjekPortAaben("u", g)).toBe(false);
+  });
+
+  it("r2 (2) ældre åbent svar slippes efter beviset → pause bevares og port lukket", async () => {
+    let slipGammel: (v: { data: unknown; error: unknown }) => void = () => {};
+    graense.rpc.mockImplementationOnce(() => new Promise((r) => { slipGammel = r; }));
+    const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
+    await waitFor(() => expect(kald()).toBe(1));
+    const g = sessionsGeneration();
+    graense.rpc.mockImplementation(() => new Promise(() => {})); // nyere læsning svarer ikke
+    act(() => registrerPause(qc, "u", g));
+    await act(async () => { slipGammel(raekke(false, true, true)); await Promise.resolve(); });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(result.current.beskederPause).toBe(true);
+    expect(tjekPortAaben("u", g, qc)).toBe(false);
+    expect(tjekPortAaben("u", g)).toBe(false);
+  });
+
+  it("r2 (3) to QueryClients deler ikke modelport", async () => {
+    const qcB = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
+    graense.rpc.mockResolvedValue(raekke(false, true, true));
+    const a = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
+    await waitFor(() => expect(a.result.current.status).toBe("kendt"));
+    const g = sessionsGeneration();
+    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben("u", g, qcB)).toBe(false);
+    graense.rpc.mockResolvedValue(raekke(false, true, false));
+    const b = renderHook(() => useSbDrift(true, "u"), { wrapper: ({ children }) => createElement(QueryClientProvider, { client: qcB }, children) });
+    await waitFor(() => expect(b.result.current.status).toBe("kendt"));
+    expect(tjekPortAaben("u", g, qcB)).toBe(false);
+    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    act(() => registrerPause(qcB, "u", g));
+    expect(tjekPortAaben("u", g, qc)).toBe(true);
+  });
+
+  it("r2 (4) ægte window focus og visibilitychange giver hver én genhentning", async () => {
+    graense.rpc.mockResolvedValue(raekke(false, true, true));
+    const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("kendt"));
+    await waitFor(() => expect(qc.isFetching()).toBe(0));
+    const foer = kald();
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    await waitFor(() => expect(kald()).toBe(foer + 1));
+    await waitFor(() => expect(qc.isFetching()).toBe(0));
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    await waitFor(() => expect(kald()).toBe(foer + 2));
+    await waitFor(() => expect(qc.isFetching()).toBe(0));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(kald()).toBe(foer + 2);
   });
 });
