@@ -236,6 +236,9 @@ export function NewConversationDialog({
             </TabsContent>
           </Tabs>
 
+          {visHentFejl && (
+            <p role="alert" className="text-sm text-destructive">{OPRETTET_IKKE_HENTET_TEKST}</p>
+          )}
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">
               {selectedTeamId ? `Team valgt (${deltagere.length} medlemmer)` : `${deltagere.length} valgt`}
@@ -243,12 +246,12 @@ export function NewConversationDialog({
             <Button
               className="max-md:min-h-11"
               onClick={handleCreate}
-              disabled={deltagere.length === 0 || createConversation.isPending}
+              disabled={(deltagere.length === 0 && !createConversation.kendtId) || createConversation.isPending}
             >
               {createConversation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Opret samtale
+              {createConversation.kendtId ? "Prøv igen" : "Opret samtale"}
             </Button>
           </div>
         </div>
