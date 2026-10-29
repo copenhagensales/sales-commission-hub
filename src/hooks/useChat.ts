@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef
 import { toast } from "sonner";
 import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, registrerKladdeOprydning, fastholdSession, sessionGyldig, kraevSession, ForaeldetSession, ejerSignal, laesStart, genoptagSamtale, type OperationsEjer, type SessionsKontekst } from "@/lib/sbKladder";
 export { ForaeldetSession } from "@/lib/sbKladder";
+import { tjekPortAaben } from "@/hooks/useSbDrift";
 
 export interface Conversation {
   id: string;
@@ -1931,6 +1932,8 @@ export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => bo
   const r = await laesStatus(messageId);
   if (!vagt() || !r || r.status !== "tjekkes") return;
   const gen = ejer?.gen ?? sessionsGeneration();
+  // 24d2 §1: nye modelkald kræver kendt tjek_tilladt=true for sessionen; serverens beskedstatus røres ikke.
+  if (!tjekPortAaben(ejer?.bruger, gen)) return;
   const k = `${ejer?.bruger ?? ""}:${gen}:${messageId}:${r.revision}`;
   if (tjekAktive.has(k)) return;
   tjekAktive.add(k);
@@ -1942,6 +1945,7 @@ export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => bo
       if (!gyldig()) return;
       const headers = await tjekHeaders(f, gyldig);
       if (!headers || !gyldig()) return; // kontrol efter sessionsopslag og umiddelbart før transport
+      if (!tjekPortAaben(f.ejer?.bruger, f.gen)) return; // 24d2: lukket modelvej → intet transportgenforsøg
       let error: unknown = null;
       try { ({ error } = await supabase.functions.invoke("storkbook-tjek", { headers, signal: f.afbryd.signal, body: { type: "besked", id: messageId, revision: r.revision } })); }
       catch { return; } // uventet kast: intet genforsøg; klienten læser altid faktisk DB-status

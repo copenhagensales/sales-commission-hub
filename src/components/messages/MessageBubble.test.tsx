@@ -28,7 +28,8 @@ vi.mock("./BeskedStatus", async (orig) => ({ ...(await orig<typeof import("./Bes
 vi.mock("./FilVedhaeftning", () => ({ FilVedhaeftning: () => null }));
 
 import { MessageBubble } from "./MessageBubble";
-import { gemRetKladde, laesRetKladde, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
+import { gemRetKladde, laesRetKladde, rydAlleKladder, registrerKladdeOprydning, sessionsGeneration } from "@/lib/sbKladder";
+import { saetModelPort } from "@/hooks/useSbDrift";
 import { supabase } from "@/integrations/supabase/client";
 
 // B2b-4b §3: typede auth-callbacks uden typeomgåelse – fuld Session bygges fra bruger-id.
@@ -59,6 +60,7 @@ const liste = (r: { id?: string; status: string; revision: number }) =>
 const ui = (m: Message, emp?: string, bruger: string | null = "u") => wrap(<MessageBubble message={m} isOwn currentEmployeeId={emp} authBrugerId={bruger} conversationId="c" onReply={() => undefined} />);
 
 beforeEach(() => {
+  for (let g = 0; g <= sessionsGeneration() + 5; g++) saetModelPort("u", g, true); // 24d2: kendt tjek_tilladt=true
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();

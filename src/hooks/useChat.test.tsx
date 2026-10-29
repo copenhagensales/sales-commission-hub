@@ -3,7 +3,8 @@ import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fastholdEjer, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
+import { fastholdEjer, rydAlleKladder, registrerKladdeOprydning, sessionsGeneration } from "@/lib/sbKladder";
+import { saetModelPort, tjekPortAaben } from "@/hooks/useSbDrift";
 
 /** c3 §7: rigtige auth-callbacks (registreret én gang i modulet). */
 /** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
@@ -83,6 +84,8 @@ const msg = (data: unknown, error: unknown = null) => ({ data, error });
 const fejl = (p: Promise<unknown>) => p.then(() => null, (x) => x as SendFejl);
 
 beforeEach(() => {
+  for (let g = 0; g <= sessionsGeneration() + 5; g++) saetModelPort("u", g, true); // 24d2: kendt tjek_tilladt=true
+
   insert.mockReset();
   kald.length = 0;
   for (const k of Object.keys(svar)) delete svar[k];
@@ -2372,5 +2375,37 @@ describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessi
     expect(e).not.toBeInstanceOf(Foraeldet7);
     expect(e instanceof Error ? e.message : null).toBe("Not authenticated");
     unmount();
+  });
+});
+
+// ---------- 24d2-klient §1 (g): lukket modelvej starter ingen nye tjek-/transportkald ----------
+describe("24d2 §1 (g) – modelport i startTjekHvisNoedvendigt", () => {
+  const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
+  afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset().mockImplementation(async () => ({ error: null })); });
+
+  it("lukket/ukendt port → intet modelkald, serverstatus læses kun", async () => {
+    saetModelPort("u", sessionsGeneration(), false);
+    svar.chat_messages = [tjekkes(2)];
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    expect(graense.invoke).not.toHaveBeenCalled();
+    expect(tjekPortAaben("u", sessionsGeneration())).toBe(false);
+  });
+
+  it("port lukkes under ventetiden → intet transportgenforsøg", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+    saetModelPort("u", sessionsGeneration(), false);
+    await vi.advanceTimersByTimeAsync(3000); await p;
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("kontrol: åben port → modelkald", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 });
