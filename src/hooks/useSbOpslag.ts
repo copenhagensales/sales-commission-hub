@@ -56,4 +56,10 @@ export function useSbBegrundelse(kilde: SbKilde, id: string, revision: number | 
     },
   });
 }
-export const begrundelseTekst = (k: Begrundelse | null | undefined) => (k ? BEGRUNDELSE_TEKST[k] : "Indholdet kunne ikke tjekkes. Læs det igennem, før du sender.");
+/** Beskedteksterne (useChat) med kilden sat ind: »Beskeden …« → »Opslaget …«/»Kommentaren …«. */
+export function begrundelseTekst(k: Begrundelse | null | undefined, kilde: SbKilde = "opslag"): string {
+  const stor = kilde === "opslag" ? "Opslaget" : "Kommentaren";
+  const lille = kilde === "opslag" ? "opslaget" : "kommentaren";
+  const t = k ? BEGRUNDELSE_TEKST[k] : "Indholdet kunne ikke tjekkes. Læs det igennem, før du sender.";
+  return t.replace(/^Beskeden/, stor).replace(/beskeden/g, lille);
+}

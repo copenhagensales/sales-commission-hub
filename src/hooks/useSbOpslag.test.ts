@@ -56,5 +56,8 @@ describe("useSbOpslag", () => {
     expect(anmeldTekst("x")).toBeNull();
     expect(begrundelseTekst(null)).toMatch(/kunne ikke tjekkes/i);
     expect(begrundelseTekst("haard_tone")).not.toMatch(/kunne ikke tjekkes/i);
+    expect(begrundelseTekst("personoplysning", "opslag")).toMatch(/^Opslaget ser ud til/);
+    expect(begrundelseTekst("ikke_tjekket", "kommentar")).toMatch(/^Kommentaren kunne ikke tjekkes/);
+    expect(begrundelseTekst("personoplysning", "kommentar")).not.toMatch(/[Bb]eskeden/);
   });
 });

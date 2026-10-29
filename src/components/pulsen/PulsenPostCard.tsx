@@ -192,7 +192,6 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
           Skjult – kun forfatteren og moderatorer kan se indlægget.{post.hidden_kode ? ` · ${anmeldTekst(post.hidden_kode)}` : ""}
         </p>
       )}
-      {isMine && <OpslagTjekStatus post={post} onDecide={onDecide} onRet={() => { setDraft(post.body); setDraftMentions(post.mentions ?? []); setEditing(true); }} />}
 
       {editing ? (
         <div className="mt-3">
@@ -247,6 +246,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
         </>
       )}
 
+      {isMine && <OpslagTjekStatus post={post} onDecide={onDecide} onRet={() => { setDraft(post.body); setDraftMentions(post.mentions ?? []); setEditing(true); }} />}
       {interactions && !post.pending && !post.hidden_at && (
         <PostFooter post={post} isMine={isMine} canModerate={canModerate} interactions={interactions} onBestAnswer={onBestAnswer} onReason={setReasonFor} />
       )}
@@ -440,7 +440,7 @@ function OpslagTjekStatus({ post, onDecide, onRet }: { post: PulsenPost; onDecid
   return (
     <div className="mt-3 rounded-2xl border border-border bg-card p-3" role="status">
       <p className="text-[14px] font-extrabold text-foreground">Dit opslag afventer dig</p>
-      <p className="mt-1 text-[14px] text-foreground">{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data)}</p>
+      <p className="mt-1 text-[14px] text-foreground">{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data, "opslag")}</p>
       <div className="mt-2 grid grid-cols-3 gap-2">
         {begr.data !== "cpr_fil" && begr.data !== "ikke_tjekket_fil" && (
           <button type="button" disabled={optaget} onClick={() => void afgoer("send")} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send alligevel</button>
@@ -464,7 +464,7 @@ function KommentarAfventer({ id, revision, onDecide, onDelete }: { id: string; r
   return (
     <div className="mt-1 text-[13px] text-foreground" role="status">
       <p className="font-extrabold">Afventer dig</p>
-      <p>{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data)}</p>
+      <p>{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data, "kommentar")}</p>
       <div className="mt-1 flex gap-2">
         <button type="button" disabled={optaget} onClick={() => void send()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[13px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send alligevel</button>
         <button type="button" disabled={optaget} onClick={() => void onDelete()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[13px] font-extrabold text-foreground disabled:opacity-50">Slet</button>
