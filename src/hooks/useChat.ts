@@ -1196,6 +1196,11 @@ export function onChatSignal(cb: SignalLytter): () => void {
   return () => { signalLyttere.delete(cb); };
 }
 
+/** Fordeler et allerede behandlet signal til lytterne (også prøvernes grænse). Indhold læses aldrig herfra. */
+export function meldChatSignal(s: { conversationId: string | null; kildeId: string; haendelse: string }): void {
+  for (const l of signalLyttere) l(s);
+}
+
 const sete = new Set<string>();
 const toastet = new Set<number>();
 
@@ -1220,7 +1225,7 @@ async function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: strin
     if (s.haendelse === "afventer") toast("Din besked afventer dig");
     else if (s.haendelse === "udloeb") toast("Din besked blev trukket tilbage");
   }
-  for (const l of signalLyttere) l({ conversationId: conv, kildeId: s.kilde_id, haendelse: s.haendelse });
+  meldChatSignal({ conversationId: conv, kildeId: s.kilde_id, haendelse: s.haendelse });
   if (sete.size > 2000) sete.clear();
 }
 
