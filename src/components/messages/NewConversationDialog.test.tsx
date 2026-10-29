@@ -166,15 +166,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 describe("B2-6B §B oprettelse: session og reel lukning", () => {
   it("holdt identitetsopslag + sessionsskift: nul oprettelses-RPC, ingen toast, ingen navigation", async () => {
-    let løs!: (v: unknown) => void;
-    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise((r) => { løs = r; }) as never);
+    type Bruger = Awaited<ReturnType<typeof supabase.auth.getUser>>;
+    let løs!: (v: Bruger) => void;
+    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise<Bruger>((r) => { løs = r; }));
     const onCreated = vi.fn();
     render(createElement(Vis, { open: true, onCreated }));
     await vælgGruppe();
     fireEvent.click(screen.getByRole("button", { name: "Opret samtale" }));
     await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
     rydAlleKladder(); // logud/brugerskift
-    await act(async () => { løs({ data: { user: { id: "u" } } }); await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => { løs({ data: { user: { id: "u" } } } as Bruger); await new Promise((r) => setTimeout(r, 0)); });
     expect(opretKald()).toBe(0);
     expect(onCreated).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
