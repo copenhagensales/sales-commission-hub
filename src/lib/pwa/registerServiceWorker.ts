@@ -33,6 +33,13 @@ async function unregisterAppWorkers() {
   );
 }
 
+let started = false;
+
+/** Kun til prøver: nulstil idempotensværnet. */
+export function __resetRegisterServiceWorkerForTests() {
+  started = false;
+}
+
 export function registerServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
@@ -40,6 +47,9 @@ export function registerServiceWorker() {
     void unregisterAppWorkers().catch(() => undefined);
     return;
   }
+
+  if (started) return;
+  started = true;
 
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
@@ -52,7 +62,7 @@ export function registerServiceWorker() {
     requestSafeReload(() => window.location.reload(), 1500);
   });
 
-  window.addEventListener("load", () => {
+  const doRegister = () => {
     navigator.serviceWorker
       .register(SW_PATH, { scope: "/" })
       .then((reg) => {
@@ -63,5 +73,8 @@ export function registerServiceWorker() {
         });
       })
       .catch(() => undefined);
-  });
+  };
+
+  if (document.readyState === "complete") doRegister();
+  else window.addEventListener("load", doRegister, { once: true });
 }
