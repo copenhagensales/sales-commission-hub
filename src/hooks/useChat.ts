@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, ejerPasser, annullerOperation, sessionsGeneration, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, annullerOperation, sessionsGeneration, abonnerAfsendelser, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -1149,7 +1149,6 @@ export function serverTekst(e: unknown, fast: string): string {
 }
 export const erForaeldet = (e: unknown) => (e as { code?: string; message?: string } | null)?.code === "P0001" && /forældet revision/i.test((e as { message?: string }).message ?? "");
 
-const vent = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- B2b-2 §4 / B2b-3a §1–§2a: fælles handlingslås pr. (generation, medarbejder, samtale, besked) ----------
 export type HandlingsArt = "send" | "traek" | "fjern" | "ret" | "gem";
@@ -1208,7 +1207,7 @@ export function tagHandling(ejer: OperationsEjer | null, id: string, art: Handli
   if (handlinger.has(k) || afsKoordinering(ejer.gen, ejer.emp, ejer.conv, id)) return false;
   if (art !== "ret" && foraeldetVisning(k, vis)) { hMeld(); return false; }
   handlinger.set(k, { ejer, art });
-  if (art !== "ret") ukendte.delete(k);
+  if (art !== "ret") { ukendte.delete(k); stopTjek(ejer.emp, ejer.conv, id); } // B2b-3b: manuel handling afslutter et aktivt tjekforløbs ventetimer
   hMeld();
   return true;
 }
@@ -1411,6 +1410,44 @@ async function laesStatus(id: string): Promise<{ status: string; revision: numbe
     return { status: String(data.status), revision: Number(data.revision) };
   } catch { return null; }
 }
+/** B2b-3b §2b: registreret tjekforløb (ejer, id, revision) til afslutning; ventetimeren kan afsluttes af stop/sessionophør. */
+interface TjekForloeb { ejer: OperationsEjer | null; gen: number; id: string; revision: number; annulleret: boolean; timer: ReturnType<typeof setTimeout> | null; vaek: (() => void) | null }
+const tjekForloeb = new Map<string, TjekForloeb>();
+export const aktiveTjekTimere = () => [...tjekForloeb.values()].filter((f) => f.timer !== null).length;
+function afslutTjek(f: TjekForloeb): void {
+  f.annulleret = true;
+  if (f.timer !== null) { clearTimeout(f.timer); f.timer = null; }
+  const v = f.vaek; f.vaek = null; v?.();
+}
+/** Stopper tjekforløb for (medarbejder, samtale[, id]) – samtale afgøres af ejerens kontekst. */
+function stopTjek(emp: string, conv: string, id?: string): void {
+  for (const f of tjekForloeb.values()) if (f.ejer && f.ejer.emp === emp && f.ejer.conv === conv && (id === undefined || f.id === id)) afslutTjek(f);
+}
+/** Sessionsophør (ny generation via kladdeoprydningen): afslutter ventetimere fra tidligere generationer straks. */
+abonnerAfsendelser(() => {
+  const g = sessionsGeneration();
+  for (const f of tjekForloeb.values()) if (f.gen !== g || (f.ejer && !ejerGyldig(f.ejer))) afslutTjek(f);
+});
+/** Afbrydelig ventetid; resolve(false) hvis forløbet afsluttes undervejs. */
+function ventTjek(f: TjekForloeb, ms: number): Promise<boolean> {
+  if (f.annulleret) return Promise.resolve(false);
+  return new Promise((res) => {
+    f.vaek = () => res(false);
+    f.timer = setTimeout(() => { f.timer = null; f.vaek = null; res(!f.annulleret); }, ms);
+  });
+}
+/** JWT bundet til operationens bruger: sessionsopslag, kontekstkontrol, eksplicit Authorization (SDK'ets senere opslag bruges ikke). */
+async function tjekHeaders(f: TjekForloeb, vagt: () => boolean): Promise<Record<string, string> | null> {
+  let token: string | null = null; let bruger: string | null = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token ?? null; bruger = data.session?.user?.id ?? null;
+  } catch { return null; }
+  if (!token || f.annulleret || !vagt() || f.gen !== sessionsGeneration()) return null;
+  if (f.ejer && bruger !== f.ejer.bruger) return null;
+  return { Authorization: `Bearer ${token}` };
+}
+
 /**
  * Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét transportgenforsøg efter 2 s, kun hvis
  * genlæsningen viser samme revision og stadig 'tjekkes'. Edge-resultatet ændrer aldrig klientstatus direkte.
@@ -1419,23 +1456,29 @@ export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => bo
   if (!vagt()) return;
   const r = await laesStatus(messageId);
   if (!vagt() || !r || r.status !== "tjekkes") return;
-  const k = `${ejer?.bruger ?? ""}:${ejer?.gen ?? sessionsGeneration()}:${messageId}:${r.revision}`;
+  const gen = ejer?.gen ?? sessionsGeneration();
+  const k = `${ejer?.bruger ?? ""}:${gen}:${messageId}:${r.revision}`;
   if (tjekAktive.has(k)) return;
   tjekAktive.add(k);
+  const f: TjekForloeb = { ejer: ejer ?? null, gen, id: messageId, revision: r.revision, annulleret: false, timer: null, vaek: null };
+  tjekForloeb.set(k, f);
+  const gyldig = () => !f.annulleret && vagt();
   try {
     for (let forsoeg = 0; forsoeg < 2; forsoeg++) {
-      if (!vagt()) return;
+      if (!gyldig()) return;
+      const headers = await tjekHeaders(f, gyldig);
+      if (!headers || !gyldig()) return; // kontrol efter sessionsopslag og umiddelbart før transport
       let error: unknown = null;
-      try { ({ error } = await supabase.functions.invoke("storkbook-tjek", { body: { type: "besked", id: messageId, revision: r.revision } })); }
+      try { ({ error } = await supabase.functions.invoke("storkbook-tjek", { headers, body: { type: "besked", id: messageId, revision: r.revision } })); }
       catch { return; } // uventet kast: intet genforsøg; klienten læser altid faktisk DB-status
-      if (!error || !erTransport(error) || forsoeg === 1) return;
-      await vent(2000);
-      if (!vagt()) return;
+      // Sent svar efter annullering opretter ingen ny timer.
+      if (!gyldig() || !error || !erTransport(error) || forsoeg === 1) return;
+      if (!(await ventTjek(f, 2000)) || !gyldig()) return;
       const r2 = await laesStatus(messageId);
       // Ændret revision/status, utilgængelig række eller læsefejl stopper det gamle forløb.
-      if (!vagt() || !r2 || r2.status !== "tjekkes" || r2.revision !== r.revision) return;
+      if (!gyldig() || !r2 || r2.status !== "tjekkes" || r2.revision !== r.revision) return;
     }
-  } finally { tjekAktive.delete(k); }
+  } finally { tjekAktive.delete(k); afslutTjek(f); if (tjekForloeb.get(k) === f) tjekForloeb.delete(k); }
 }
 
 /** Registreret efterbehandling (bruger, generation, samtale, id, operation), synlig for stopvejen til den er afsluttet. */
@@ -1451,6 +1494,8 @@ export function stopEfterbehandling(emp: string, conv: string, id?: string): voi
     if (h.art === "ret" || !k.startsWith(pre) || (id !== undefined && k !== pre + id)) continue;
     annullerOperation(h.ejer.op);
   }
+  // B2b-3b §2b: tjekforløbets ventetimer afsluttes straks (ikke først ved udløb).
+  stopTjek(emp, conv, id);
   for (const [k, e] of [...efterOps]) {
     if (e.ejer.gen === gen && e.ejer.emp === emp && e.conv === conv && (id === undefined || e.id === id)) { annullerOperation(e.ejer.op); efterOps.delete(k); }
   }

@@ -37,12 +37,20 @@ function builder(tabel: string) {
   };
   return b;
 }
+// B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
+
+const graense = vi.hoisted(() => ({
+  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
+  from: vi.fn<(t: string) => unknown>(),
+}));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (t: string) => builder(t),
-    rpc: vi.fn(async () => ({ data: "e", error: null })),
-    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn() },
-    functions: { invoke: vi.fn(async () => ({ error: null })) },
+    from: (t: string) => (graense.from.getMockImplementation() ? graense.from(t) : builder(t)),
+    rpc: graense.rpc,
+    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
+      getSession: vi.fn(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })) },
+    functions: { invoke: graense.invoke },
   },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
@@ -66,7 +74,7 @@ beforeEach(() => {
   for (const k of Object.keys(svar)) delete svar[k];
   for (const k of Object.keys(dyn)) delete dyn[k];
   dynInsert.fn = undefined;
-  vi.mocked(supabase.functions.invoke).mockClear();
+  graense.invoke.mockClear();
   auth("SIGNED_IN", "u"); // fast udgangspunkt: aktiv auth-bruger "u" (uafhængigt af prøverækkefølge)
 });
 
@@ -269,7 +277,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     return { inv, ...renderHook(() => useSendMessage(), { wrapper }) };
   };
-  beforeEach(() => { vi.mocked(supabase.rpc).mockClear(); });
+  beforeEach(() => { graense.rpc.mockClear(); });
 
   it("fastholdt ejer: ingen identitetsopslag undervejs, sender_id er den fastholdte", async () => {
     const { result } = opsaet();
@@ -579,8 +587,8 @@ describe("c3 §7 – logud under tjek-genforsøgets ventetid", () => {
       const { result, unmount } = renderHook(() => useSendMessage(), { wrapper });
       svar.chat_messages = [msg(null), msg({ status: "tjekkes", revision: 1 })];
       insert.mockResolvedValueOnce({ error: null });
-      vi.mocked(supabase.functions.invoke).mockClear();
-      vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } } as never);
+      graense.invoke.mockClear();
+      graense.invoke.mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } });
       await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
       await vi.advanceTimersByTimeAsync(0);
       expect(supabase.functions.invoke).toHaveBeenCalledTimes(1); // første tjek er sendt; ventetiden løber
@@ -639,7 +647,7 @@ describe("c3 §8 – to isolerede klientforløb med samme id mod fælles netvær
  * (P0001 IKKE_REGISTRERET_TEKST, når stien ikke er egen, ubundet og 'uploadet') tilbagefører hele transaktionen.
  * Oprydning overtager kun en ubundet 'uploadet' sti (→ 'slettes'); en sti i 'slettes'/'slettet' kan aldrig bindes igen.
  */
-function lavModel() {
+function lavModel(bindFoerPk = false) {
   type Sti = { bucket: string; sti: string; ejer_employee_id: string; samtale_id: string; status: string; besked_id: string | null };
   const stier = new Map<string, Sti>();
   const rækker = new Map<string, { id: string; attachment_path: string | null }>();
@@ -648,13 +656,16 @@ function lavModel() {
   const nySti = (sti: string, status = "uploadet") => stier.set(sti, { bucket: "chat-attachments", sti, ejer_employee_id: "e", samtale_id: "c", status, besked_id: null });
   const oprydning = (sti: string) => { const s = stier.get(sti); if (s && s.besked_id === null && s.status === "uploadet") s.status = "slettes"; };
   const udfoer = (row: { id: string; conversation_id: string; sender_id: string; attachment_path: string | null }) => {
-    if (rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } }; // tilbageført, ingen binding
+    if (!bindFoerPk && rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } }; // tilbageført, ingen binding
     if (row.attachment_path) {
       const s = stier.get(row.attachment_path);
       if (!s || s.besked_id !== null || s.status !== "uploadet" || s.ejer_employee_id !== row.sender_id || s.samtale_id !== row.conversation_id)
         return { error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } }; // tilbageført
       s.besked_id = row.id; s.status = "bundet";
+      // B2b-3b §3: bindingen udføres før primærnøglekonflikten; konflikten tilbagefører taberens binding.
+      if (bindFoerPk && rækker.has(row.id)) { s.besked_id = null; s.status = "uploadet"; return { error: { code: "23505", message: "duplicate key" } }; }
     }
+    if (bindFoerPk && rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } };
     rækker.set(row.id, { id: row.id, attachment_path: row.attachment_path });
     return { error: null };
   };
@@ -726,24 +737,24 @@ describe("d2 §5 – sent gammelt INSERT og to klienter mod fælles netværksmod
 });
 
 // ---------- B2b-2: §9 tjek for rigtig revision, stophul 2 og auth-skift før mutationFn (netværk mocket; SQL antagelser) ----------
-import { startTjekHvisNoedvendigt, stopEfterbehandling, aktiveEfterbehandlinger, aktiveTjek, useEditMessage, tagHandling } from "./useChat";
+import { startTjekHvisNoedvendigt, stopEfterbehandling, aktiveEfterbehandlinger, aktiveTjek, aktiveTjekTimere, useEditMessage, tagHandling, frigivHandling } from "./useChat";
 import { ejerGyldig } from "@/lib/sbKladder";
 
 describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
   const transport = { error: { name: "FunctionsFetchError" } };
   const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
-  const invokes = () => vi.mocked(supabase.functions.invoke).mock.calls.length;
-  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); vi.mocked(supabase.functions.invoke).mockReset(); });
-  const slut = () => { vi.useRealTimers(); vi.mocked(supabase.functions.invoke).mockReset().mockImplementation((async () => ({ error: null })) as never); };
+  const invokes = () => graense.invoke.mock.calls.length;
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); graense.invoke.mockReset(); });
+  const slut = () => { vi.useRealTimers(); graense.invoke.mockReset().mockImplementation((async () => ({ error: null }))); };
 
   it("samme revision og stadig tjekkes efter transportfejl → præcis ét genforsøg (højst to kald i alt)", async () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2), tjekkes(2)];
-      vi.mocked(supabase.functions.invoke).mockResolvedValue(transport as never);
+      graense.invoke.mockResolvedValue(transport);
       const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
       await vi.advanceTimersByTimeAsync(10000); await p;
       expect(invokes()).toBe(2);
-      expect(vi.mocked(supabase.functions.invoke).mock.calls[1][1]).toMatchObject({ body: { type: "besked", id: "m", revision: 2 } });
+      expect(graense.invoke.mock.calls[1][1]).toMatchObject({ body: { type: "besked", id: "m", revision: 2 } });
       expect(aktiveTjek()).toBe(0);
     } finally { slut(); }
   });
@@ -752,7 +763,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
     "%s efter ventetiden stopper det gamle forløb (intet genforsøg)", async (_n, r2) => {
       try {
         svar.chat_messages = [tjekkes(2), r2];
-        vi.mocked(supabase.functions.invoke).mockResolvedValue(transport as never);
+        graense.invoke.mockResolvedValue(transport);
         const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
         await vi.advanceTimersByTimeAsync(3000); await p;
         expect(invokes()).toBe(1);
@@ -762,7 +773,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
   it("brugerskift under ventetiden stopper det gamle forløb", async () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2)];
-      vi.mocked(supabase.functions.invoke).mockResolvedValue(transport as never);
+      graense.invoke.mockResolvedValue(transport);
       const ejer = fastholdEjer("e", "c", "u")!;
       const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
       await vi.advanceTimersByTimeAsync(0);
@@ -778,7 +789,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2), tjekkes(3)];
       const slip: Array<() => void> = [];
-      vi.mocked(supabase.functions.invoke).mockImplementation((() => new Promise((r) => { slip.push(() => r({ error: null })); })) as never);
+      graense.invoke.mockImplementation((() => new Promise((r) => { slip.push(() => r({ error: null })); })));
       const ejer = fastholdEjer("e", "c", "u")!;
       const a = startTjekHvisNoedvendigt("m", () => true, ejer);
       const b = startTjekHvisNoedvendigt("m", () => true, ejer);
@@ -787,19 +798,19 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       const c = startTjekHvisNoedvendigt("m", () => true, ejer);
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(2);
-      expect(vi.mocked(supabase.functions.invoke).mock.calls.map((x) => (x[1] as { body: { revision: number } }).body.revision)).toEqual([2, 3]);
+      expect(graense.invoke.mock.calls.map((x) => (x[1] as { body: { revision: number } }).body.revision)).toEqual([2, 3]);
       for (const f of slip) f();
       await vi.advanceTimersByTimeAsync(0);
       await Promise.all([a, b, c]); // alle forløb afsluttet før timerreset
       expect(aktiveTjek()).toBe(0);
-      vi.mocked(supabase.functions.invoke).mockReset();
+      graense.invoke.mockReset();
     } finally { slut(); }
   });
 
   it.each([["optaget"], ["forældet"], ["ikke_konfigureret"]])("edge-resultat %s ændrer aldrig status direkte (kun læsninger)", async (status) => {
     try {
       svar.chat_messages = [tjekkes(2)];
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({ data: { status }, error: null } as never);
+      graense.invoke.mockResolvedValue({ data: { status }, error: null });
       await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
       expect(kald.filter((k) => !k.startsWith("select:"))).toEqual([]);
     } finally { slut(); }
@@ -816,7 +827,7 @@ describe("B2b-2 stophul 2 – bekræftet INSERT stoppes under detached statusops
     let statusSvar!: (r: { data: unknown; error: unknown }) => void;
     svar.chat_messages = [msg(null), new Promise((r) => { statusSvar = r; })];
     insert.mockResolvedValueOnce({ error: null });
-    vi.mocked(supabase.functions.invoke).mockClear();
+    graense.invoke.mockClear();
     await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
     await new Promise((x) => setTimeout(x, 0));
     expect(aktiveEfterbehandlinger()).toBe(1); // detached efterbehandling er synlig for stopvejen
@@ -838,7 +849,7 @@ describe("B2b-2 – auth-skift efter mutate, men før mutationFn", () => {
     const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     const { result, unmount } = renderHook(() => useEditMessage(), { wrapper });
-    vi.mocked(supabase.rpc).mockClear();
+    graense.rpc.mockClear();
     const ejer = fastholdEjer("e", "c", "u")!;
     expect(tagHandling(ejer, "m", "gem")).toBe(true);
     const p = result.current.mutateAsync({ messageId: "m", content: "x", conversationId: "c", revision: 1, ejer }).catch((e) => e);
@@ -869,10 +880,10 @@ describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
       return b;
     };
     let foerste = true;
-    const spy = vi.spyOn(supabase, "from").mockImplementation(((t: string) => {
+    graense.from.mockImplementation((t: string) => {
       if (t === "chat_messages" && foerste) { foerste = false; return thenable(raekker); }
       return thenable([]);
-    }) as never);
+    });
     try {
       const qcP = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } } });
       const w = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qcP }, children);
@@ -886,7 +897,7 @@ describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
       expect(cache?.pageParams).toEqual([0]);
       expect(typeof result.current.opdateret).toBe("number");
       qcP.clear();
-    } finally { spy.mockRestore(); }
+    } finally { graense.from.mockReset(); }
   });
 });
 
@@ -927,7 +938,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   let qc: QueryClient;
   const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
   const ID = "m1";
-  const rpc = () => vi.mocked(supabase.rpc);
+  const rpc = () => graense.rpc;
   const laesninger = () => kald.filter((k) => k === "select:chat_messages").length;
   const r = (revision: number, o: Record<string, unknown> = {}) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null, ...o });
   beforeEach(() => {
@@ -944,7 +955,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("Gem: transportfejl og række med revision 3 og samme tekst (start 1) → konflikt, ét sb_ret, intet snapshot", async () => {
     const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
     const e = ejer(); expect(tagHandling(e, ID, "gem")).toBe(true);
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(3)];
     const f = await result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }).then(() => null, (x) => x);
     expect(f).toBeInstanceOf(HandlingsFejl); expect((f as HandlingsFejl).art).toBe("konflikt");
@@ -957,7 +968,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("sb_ret med revision ≠ start+1 er ikke direkte succes → afstemmes ved læsning", async () => {
     const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "gem");
-    rpc().mockResolvedValueOnce({ data: 7, error: null } as never);
+    rpc().mockResolvedValueOnce({ data: 7, error: null });
     svar.chat_messages = [r(1)];
     const f = await result.current.mutateAsync({ messageId: ID, content: "ny", conversationId: "c", revision: 1, ejer: e, kladdeVersion: 9 }).then(() => null, (x) => x);
     expect((f as HandlingsFejl).art).toBe("ukendt");
@@ -968,7 +979,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("Fjern fil: transportfejl og revision 3 uden fil (start 1) → konflikt og én konflikttoast", async () => {
     const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "fjern");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(3)];
     await result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "e/c/f", fejltekst: "Kunne ikke fjerne filen" }).catch(() => null);
     expect(toast.error).toHaveBeenCalledTimes(1);
@@ -980,7 +991,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("transportfejl med gammel række → ukendt bevares; senere commit → »Tjek igen« bekræfter uden ny skrivning", async () => {
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "send");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(4)];
     await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }).catch(() => null);
     expect(toast.error).not.toHaveBeenCalled();
@@ -998,7 +1009,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("tilbageholdt og fejlet »Tjek igen«: tjekker under læsning; læsefejl bevarer snapshot; ingen skrivning", async () => {
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "traek");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(4)];
     await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "traek", conversationId: "c", ejer: e }).catch(() => null);
     let slip!: (x: { data: unknown; error: unknown }) => void;
@@ -1023,7 +1034,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); const vis = { revision: 4, status: "afventer_afsender" };
     expect(tagHandling(e, ID, "send", vis)).toBe(true);
-    rpc().mockResolvedValueOnce({ data: true, error: null } as never);
+    rpc().mockResolvedValueOnce({ data: true, error: null });
     let faerdig = false;
     const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).then(() => { faerdig = true; });
     await waitFor(() => expect(n).toBe(2));
@@ -1045,7 +1056,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "send");
     let slip!: (v: unknown) => void;
-    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })) as never);
+    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })));
     const p = result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }).catch(() => null);
     await waitFor(() => expect(rpc()).toHaveBeenCalledTimes(1));
     const foer = laesninger();
@@ -1063,7 +1074,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   it("§2a stop under resultatafstemningen (Gem): sent svar giver intet snapshot, ingen toast og ingen cacheinvalidering", async () => {
     const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "gem");
-    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     let slip!: (x: { data: unknown; error: unknown }) => void;
     svar.chat_messages = [new Promise((x) => { slip = x; })];
     const inv = vi.spyOn(qc, "invalidateQueries");
@@ -1083,7 +1094,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
     const e = ejer(); tagHandling(e, ID, "fjern");
     let slip!: (v: unknown) => void;
-    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })) as never);
+    rpc().mockImplementationOnce((() => new Promise((x) => { slip = x; })));
     const p = result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "f" }).catch(() => null);
     await waitFor(() => expect(rpc()).toHaveBeenCalledTimes(1));
     stopEfterbehandling("e", "c");
@@ -1102,5 +1113,144 @@ describe("B2b-3a §1 – Træk tilbage fra leveret: uændret startstatus er inte
     expect(vurderUdfald(s, raek("leveret"))).toBe("ukendt");
     expect(vurderUdfald(s, raek("trukket_tilbage"))).toBe("bekraeftet");
     expect(vurderUdfald(s, raek("afventer_afsender"))).toBe("konflikt");
+  });
+});
+
+describe("B2b-3b §3 – to klienter, binding før primærnøglekonflikt (model = antagelse, ikke SQL)", () => {
+  const lav = () => {
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+    return { qc, ...renderHook(() => useSendMessage(), { wrapper }) };
+  };
+  const forloeb = async (m: ReturnType<typeof lavModel>) => {
+    auth("SIGNED_IN", "u");
+    const k1 = lav(), k2 = lav();
+    m.holdNaeste();
+    const p1 = fejl(k1.result.current.mutateAsync({ ...vf, attachmentPath: "c/e/b.png", ejer: fastholdEjer("e", "c", "u")! }));
+    await vi.waitFor(() => expect(m.holdte).toHaveLength(1));
+    await k2.result.current.mutateAsync({ ...vf, attachmentPath: "c/e/c.png", ejer: fastholdEjer("e", "c", "u")! });
+    return { k1, k2, p1 };
+  };
+  const ryd = (...k: Array<ReturnType<typeof lav>>) => { for (const x of k) { x.unmount(); x.qc.clear(); } };
+
+  it("taberen binder først, konflikten tilbagefører bindingen → én række med vinderens sti, taberens sti ubundet, ingen fejl", async () => {
+    const m = lavModel(true); m.nySti("c/e/b.png"); m.nySti("c/e/c.png");
+    const { k1, k2, p1 } = await forloeb(m);
+    m.holdte[0]();
+    expect(await p1).toBeNull(); // afstemt som allerede gemt
+    expect(m.rækker.size).toBe(1);
+    expect(m.rækker.get(vf.id)?.attachment_path).toBe("c/e/c.png");
+    expect(m.stier.get("c/e/c.png")).toMatchObject({ besked_id: vf.id, status: "bundet" });
+    expect(m.stier.get("c/e/b.png")).toMatchObject({ besked_id: null, status: "uploadet" });
+    // Beskedopslaget viser faktisk den bundne række.
+    expect((await dyn.chat_messages!({ id: vf.id })).data).toMatchObject({ id: vf.id, status: "leveret" });
+    ryd(k1, k2);
+  });
+
+  for (const [navn, opsaet] of [
+    ["fejlet beskedopslag", (m: ReturnType<typeof lavModel>) => { dyn.chat_messages = async () => ({ data: null, error: { message: "Failed to fetch" } }); void m; }],
+    ["registerfejl efter tomt beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: null }); dyn.sb_stier = async () => ({ data: null, error: { message: "x" } }); }],
+    ["manglende register efter tomt beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: null }); dyn.sb_stier = async () => ({ data: null, error: null }); }],
+    ["minimeret register efter tomt beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: null }); dyn.sb_stier = async () => ({ data: { besked_id: null }, error: null }); }],
+  ] as const) it(`negativt bevis: ${navn} → taberen uafklaret (ukendt), intet nyt INSERT, taberens sti ubundet`, async () => {
+    const m = lavModel(true); m.nySti("c/e/b.png"); m.nySti("c/e/c.png");
+    const { k1, k2, p1 } = await forloeb(m);
+    opsaet(m);
+    m.holdte[0]();
+    const e = await p1;
+    expect(e?.art).toBe("ukendt");
+    expect(m.rækker.size).toBe(1);
+    expect(m.stier.get("c/e/b.png")).toMatchObject({ besked_id: null, status: "uploadet" });
+    ryd(k1, k2);
+  });
+});
+
+describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
+  const transport = { error: { name: "FunctionsFetchError" } };
+  const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
+  const invokes = () => graense.invoke.mock.calls.length;
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); graense.invoke.mockReset(); auth("SIGNED_IN", "u"); });
+  afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset(); vi.mocked(supabase.auth.getSession).mockReset().mockImplementation(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null }) as Awaited<ReturnType<typeof supabase.auth.getSession>>); });
+
+  it("JWT bindes eksplicit til operationens session (Authorization-header)", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    graense.invoke.mockResolvedValue({ error: null });
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    expect(graense.invoke.mock.calls[0][1]).toMatchObject({ headers: { Authorization: "Bearer jwt-u" }, body: { id: "m", revision: 2 } });
+  });
+
+  it("stop under edge-kald: sent transportsvar opretter ingen ventetimer, intet genforsøg", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    let slip: (v: unknown) => void = () => undefined;
+    graense.invoke.mockImplementationOnce(() => new Promise((r) => { slip = r; }));
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.waitFor(() => expect(invokes()).toBe(1));
+    stopEfterbehandling("e", "c", "m");
+    slip(transport);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(aktiveTjekTimere()).toBe(0);
+    await vi.advanceTimersByTimeAsync(5000); await p;
+    expect(invokes()).toBe(1);
+    expect(aktiveTjek()).toBe(0);
+  });
+
+  it("stop under genforsøgsventetiden afslutter timeren straks; ingen genlæsning/genforsøg", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    graense.invoke.mockResolvedValue(transport);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1)); // bevist aktiv timer
+    const laes = kald.filter((k) => k === "select:chat_messages").length;
+    stopEfterbehandling("e", "c", "m");
+    expect(aktiveTjekTimere()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+    await p;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(invokes()).toBe(1);
+    expect(kald.filter((k) => k === "select:chat_messages").length).toBe(laes);
+  });
+
+  it("sessionsophør (logud) under ventetiden afslutter timeren straks", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    graense.invoke.mockResolvedValue(transport);
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
+    auth("SIGNED_OUT", null);
+    expect(aktiveTjekTimere()).toBe(0);
+    await p; await vi.advanceTimersByTimeAsync(5000);
+    expect(invokes()).toBe(1);
+  });
+
+  it("sessionsskift under SDK/token-ventepunkt: gammelt arbejde sendes aldrig med den nye brugers JWT", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    let slip: (v: Awaited<ReturnType<typeof supabase.auth.getSession>>) => void = () => undefined;
+    vi.mocked(supabase.auth.getSession).mockImplementationOnce(() => new Promise((r) => { slip = r; }));
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(supabase.auth.getSession).toHaveBeenCalled());
+    auth("SIGNED_IN", "anden");
+    slip({ data: { session: { access_token: "jwt-anden", user: { id: "anden" } } }, error: null } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+    await p;
+    expect(invokes()).toBe(0);
+  });
+
+  it("session med anden bruger end operationens (uden generationsskift) → intet kald", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: { access_token: "jwt-x", user: { id: "x" } } }, error: null } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    expect(invokes()).toBe(0);
+  });
+
+  it("manuel handling (Send) mod bevist aktiv timer: afslutter tjekforløbet (timer væk), ingen genforsøg bagefter", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    graense.invoke.mockResolvedValue(transport);
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
+    expect(tagHandling(ejer, "m", "send")).toBe(true); // manuel handling får låsen og afslutter det gamle tjeks timer
+    expect(aktiveTjekTimere()).toBe(0);
+    await p; await vi.advanceTimersByTimeAsync(5000);
+    expect(invokes()).toBe(1);
+    frigivHandling(ejer, "m");
   });
 });

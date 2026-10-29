@@ -4,8 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 // Netværket mockes ved grænsen; MessageBubble, BeskedStatus og hooks er de rigtige. SQL-adfærd er antagelser.
+// B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
+
+const graense = vi.hoisted(() => ({
+  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
+  from: vi.fn<(t: string) => unknown>(),
+}));
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { onAuthStateChange: vi.fn(), getSession: vi.fn() }, from: vi.fn(), rpc: vi.fn(), functions: { invoke: vi.fn() } },
+  supabase: { auth: { onAuthStateChange: vi.fn(), getSession: vi.fn() }, from: graense.from, rpc: graense.rpc, functions: { invoke: graense.invoke } },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 vi.mock("./FilVedhaeftning", () => ({ FilVedhaeftning: () => null }));
@@ -33,14 +40,14 @@ const ui = (m: Message, bruger: string | null = "u") => (
 let raekke: { data: unknown; error: unknown } = { data: null, error: null };
 const chain = (tabel: string) => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b;
   b.maybeSingle = async () => (tabel === "sb_tjek_begrundelser" ? { data: { aarsag_kode: "haard_tone" }, error: null } : tabel === "chat_messages" ? raekke : { data: null, error: null }); return b; };
-const kald = (navn: string) => vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === navn);
+const kald = (navn: string) => graense.rpc.mock.calls.filter((c) => c[0] === navn);
 
 beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
   rydAlleKladder();
   sessionStorage.clear();
-  vi.mocked(supabase.rpc).mockReset();
-  vi.mocked(supabase.from).mockImplementation(((t: string) => chain(t)) as never);
+  graense.rpc.mockReset();
+  graense.from.mockImplementation(((t: string) => chain(t)));
   raekke = { data: null, error: null };
   vi.mocked(toast.error).mockReset();
   registrerKladdeOprydning();
@@ -57,7 +64,7 @@ describe("T3 (B2b-1) – Ret fra statuskortet fastholder den viste revision", ()
     expect(felt.value).toBe("vist tekst");
     r.rerender(ui(afventer(4)));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "rettet" } });
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 4, /* SQL-kontrakt: startrevision 3 + 1 */ error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data: 4, /* SQL-kontrakt: startrevision 3 + 1 */ error: null });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     expect((kald("sb_ret")[0][1] as { p_revision: number }).p_revision).toBe(3);
   });
@@ -73,7 +80,7 @@ describe("T3 (B2b-1) – Ret fra statuskortet fastholder den viste revision", ()
 
 describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatorisk kontekst", () => {
   it("Træk tilbage sender den viste revision; transportfejl giver præcis ét sb_afgoer (trods mutations.retry=1)", async () => {
-    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     render(ui(afventer(7)));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Træk tilbage" })); await new Promise((x) => setTimeout(x, 10)); });
     expect(kald("sb_afgoer")).toHaveLength(1);
@@ -84,7 +91,7 @@ describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatori
   });
 
   it("Fjern fil sender den viste revision; transportfejl giver præcis ét sb_fjern_fil", async () => {
-    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     render(ui(afventer(2, true)));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Fjern fil" })); await new Promise((x) => setTimeout(x, 10)); });
     expect(kald("sb_fjern_fil")).toHaveLength(1);
@@ -104,7 +111,7 @@ describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatori
 
   it("sessionsskift under sb_afgoer: sent fejlsvar giver ingen toast", async () => {
     let afvis!: (e: unknown) => void;
-    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((_a, r) => { afvis = r; })) as never);
+    graense.rpc.mockImplementationOnce((() => new Promise((_a, r) => { afvis = r; })));
     render(ui(afventer(2)));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Træk tilbage" })); });
     expect(kald("sb_afgoer")).toHaveLength(1);
@@ -117,7 +124,7 @@ describe("B2b-1 – useAfgoer/useFjernFil: viste revision, retry:0 og obligatori
 
 describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", () => {
   const styret = () => { let a!: (v: unknown) => void; let r!: (e: unknown) => void;
-    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((x, y) => { a = x; r = y; })) as never);
+    graense.rpc.mockImplementationOnce((() => new Promise((x, y) => { a = x; r = y; })));
     return { svar: (v: unknown) => a(v), afvis: (e: unknown) => r(e) }; };
   const flush = async () => { await act(async () => { await new Promise((x) => setTimeout(x, 5)); }); };
   const knap = (n: string) => screen.getByRole("button", { name: n });
@@ -171,7 +178,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it("tabt succes-svar (transportfejl) afstemmes mod rækken: samme revision trukket tilbage → ingen toast", async () => {
     render(ui(afventer(4)));
     raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
     expect(toast.error).not.toHaveBeenCalled();
@@ -182,7 +189,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     render(ui(afventer(4)));
     await waitFor(() => knap("Send alligevel"));
     raekke = { data: { status: "leveret", revision: 4, content: "x", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
     fireEvent.click(knap("Send alligevel"));
     await flush();
     expect(toast.error).toHaveBeenCalledTimes(1);
@@ -193,7 +200,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     render(ui(afventer(4)));
     await waitFor(() => knap("Send alligevel"));
     raekke = { data: { status: "leveret", revision: 5, content: "x", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
     fireEvent.click(knap("Send alligevel"));
     await flush();
     expect(toast.error).toHaveBeenCalledTimes(1);
@@ -203,7 +210,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it("forældet revision vises som »Beskeden er ændret – prøv igen« én gang", async () => {
     render(ui(afventer(4)));
     raekke = { data: { status: "afventer_afsender", revision: 5, content: "x", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } });
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
     expect(toast.error).toHaveBeenCalledTimes(1);
@@ -213,7 +220,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it.each([[false], [null]])("B2b-3a: uventet %s fra sb_afgoer + samme revision i målstatus ved læsning → bekræftet uden toast", async (data) => {
     render(ui(afventer(4)));
     raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data, error: null });
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -224,7 +231,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it.each([[false], [null]])("uventet %s fra sb_afgoer er ikke succes – ukendt udfald vises lokalt uden ny skrivning", async (data) => {
     render(ui(afventer(4)));
     raekke = { data: { status: "afventer_afsender", revision: 4, content: "", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data, error: null });
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
     expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
@@ -237,7 +244,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
 
   it.each([[null], [1]])("uventet sb_fjern_fil-resultat %s (ikke ny revision) er ikke succes", async (data) => {
     render(ui(afventer(1, true)));
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data, error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data, error: null });
     fireEvent.click(knap("Fjern fil"));
     await flush();
     expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");

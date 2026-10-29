@@ -19,6 +19,13 @@ const net = vi.hoisted(() => ({
   /** §4: valgfri kontrol af beskedopslag pr. id (kontrollerede promises). */
   vent: null as null | ((id: string) => Promise<Svar>),
 }));
+// B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
+
+const graense = vi.hoisted(() => ({
+  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
+  from: vi.fn<(t: string) => unknown>(),
+}));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (t: string) => {
     const b: Record<string, unknown> = {};
@@ -37,8 +44,8 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (t: string) => builder(t),
-      rpc: vi.fn(async () => ({ data: "e", error: null })),
-      functions: { invoke: vi.fn(async () => ({ error: null })) },
+      rpc: graense.rpc,
+      functions: { invoke: graense.invoke },
       // c3 §7: storage ved netværksgrænsen til den rigtige sbFil.
       storage: { from: () => ({ uploadToSignedUrl: (...a: unknown[]) => (lagerUpload.fn ? lagerUpload.fn(...a) : Promise.resolve({ error: null })) }) },
       auth: {
@@ -1307,9 +1314,9 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
       expect(editor().value).toBe("min rettelse 2");
       expect(screen.getAllByText(LAGER_TEKST)).toHaveLength(2); // komponist og redigering
     } finally { set.mockRestore(); }
-    vi.mocked(supabase.rpc).mockClear();
+    graense.rpc.mockClear();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
-    expect(vi.mocked(supabase.rpc)).toHaveBeenCalledWith("sb_ret", expect.objectContaining({ p_id: "m1", p_revision: 3, p_tekst: "min rettelse 2" }));
+    expect(graense.rpc).toHaveBeenCalledWith("sb_ret", expect.objectContaining({ p_id: "m1", p_revision: 3, p_tekst: "min rettelse 2" }));
     r.unmount();
   });
 
@@ -1348,7 +1355,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
   });
 
   it("offline-udløb: åben tekstfil, åbent billede, pågående hentning, svaruddrag og valgt svar fjernes straks uden netværk", async () => {
-    const frist = om(400);
+    const frist = om(2000); // B2b-3b: rummelig vægurfrist, så langsomme/blandede kørsler ikke udløber før klik
     const signaler: AbortSignal[] = [];
     let n = 0;
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: string, init?: RequestInit) => {
@@ -1383,7 +1390,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
     expect(screen.getByText("Svarer på:")).toBeTruthy();
     const kaldFoer = fetchSpy.mock.calls.length;
-    await vent(450);
+    await vent(2050);
     expect(screen.queryByText("hemmelig")).toBeNull();
     expect(screen.queryByText("filindhold")).toBeNull();
     expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
