@@ -2246,3 +2246,47 @@ describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
     r.unmount();
   });
 });
+
+// ---------- B2bc-5c-2 §3 – to klienter med tegnet visning gennem ChatView/MessageBubble (fælles netværksmodel = antagelse) ----------
+describe("B2bc-5c-2 §3 – to klienter, samme id, tegnet visning", () => {
+  it("klient 1's sene INSERT taber på primærnøglen mod den anden klients række → begge visninger tegner præcis én besked, intet »Ikke sendt«", async () => {
+    beskeder.ægteSend = true;
+    const { supabase } = await import("@/integrations/supabase/client");
+    const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { cb("SIGNED_IN", { user: { id: "u" } }); });
+    // Fælles model: INSERT er atomisk; primærnøglekonflikt = 23505 (antagelse, ikke SQL).
+    const rækker = new Map<string, Record<string, unknown>>();
+    const holdte: Array<() => void> = [];
+    net.insert.mockImplementation((row: unknown) => {
+      const r = row as { id: string };
+      const udfoer = () => (rækker.has(r.id) ? { error: { code: "23505", message: "duplicate key" } } : (rækker.set(r.id, { ...r }), { error: null }));
+      return new Promise((res) => holdte.push(() => res(udfoer())));
+    });
+    net.vent = async (id) => ({ data: rækker.has(id) ? { id, status: "leveret", revision: 1, content: "fælles tekst", attachment_path: null } : null, error: null });
+    const qc1 = qc, qc2 = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    const k1 = render(<QueryClientProvider client={qc1}><ChatView conversationId="A" /></QueryClientProvider>);
+    await waitFor(() => expect(hentAfsendelser("e", "A")).toBeDefined());
+    await tick();
+    fireEvent.change(within(k1.container).getByLabelText("besked"), { target: { value: "fælles tekst" } });
+    await act(async () => { fireEvent.click(within(k1.container).getByRole("button", { name: "Send" })); });
+    await waitFor(() => expect(holdte).toHaveLength(1));
+    const id = hentAfsendelser("e", "A")[0].id;
+    // Klient 2 (anden enhed) har allerede gemt rækken med samme id.
+    rækker.set(id, { id, content: "fælles tekst" });
+    const raekke = fremmed(id, "fælles tekst", { sender_id: "e" });
+    beskeder.liste = [raekke]; beskeder.opdateret++;
+    const k2 = render(<QueryClientProvider client={qc2}><ChatView conversationId="A" /></QueryClientProvider>);
+    await tick();
+    await act(async () => { holdte.splice(0).forEach((h) => h()); });
+    await tick(); await tick();
+    k1.rerender(<QueryClientProvider client={qc1}><ChatView conversationId="A" /></QueryClientProvider>);
+    await tick();
+    expect(rækker.size).toBe(1);
+    for (const k of [k1, k2]) {
+      expect(within(k.container).getAllByText("fælles tekst")).toHaveLength(1); // tegnet præcis én gang (ingen pending-dublet)
+      expect(within(k.container).queryByText(/Ikke sendt/)).toBeNull();
+    }
+    expect(hentAfsendelser("e", "A")).toHaveLength(0);
+    k1.unmount(); k2.unmount(); qc2.clear();
+  });
+});
