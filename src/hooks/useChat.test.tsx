@@ -2027,7 +2027,7 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     let ryddetVedStop: boolean | null = null;
     stop.mockImplementation(() => { ryddetVedStop = laesKladde("e", "S") === null; });
     const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
-    await act(async () => { await result.current.mutateAsync("S"); });
+    await act(async () => { await result.current.slet("S"); });
     expect(stop).toHaveBeenCalledWith("e", "S");
     expect(ryddetVedStop).toBe(false); // invalidering før rydning
     expect(laesKladde("e", "S")).toBeNull();
@@ -2042,12 +2042,12 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
   it("bekræftet forladelse af gruppe (ikke opretter) rydder; afvist forladelse og afvist sletning bevarer; retry:0", async () => {
     graense.from.mockImplementation(tabeller({ conv: { created_by: "anden", is_group: true, direct_key: null }, slettet: false }));
     const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
-    await act(async () => { await expect(result.current.mutateAsync("S")).rejects.toThrow("Kunne ikke forlade gruppen"); });
+    await act(async () => { await expect(result.current.slet("S")).rejects.toThrow("Kunne ikke forlade gruppen"); });
     expect(graense.from.mock.calls.filter(([t]) => t === "chat_conversations").length).toBe(1); // ingen automatisk gentagelse
     expect(laesKladde("e", "S")?.tekst).toBe("kladde");
     expect(stop).not.toHaveBeenCalled();
     graense.from.mockImplementation(tabeller({ conv: { created_by: "anden", is_group: true, direct_key: null }, slettet: true }));
-    await act(async () => { await result.current.mutateAsync("S"); });
+    await act(async () => { await result.current.slet("S"); });
     expect(laesKladde("e", "S")).toBeNull();
   });
 
@@ -2055,7 +2055,7 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     const kaldte: string[] = [];
     graense.from.mockImplementation((t: string) => { kaldte.push(t); return tabeller({ conv: { created_by: "e", is_group: false, direct_key: "k" }, slettet: true })(t); });
     const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
-    await act(async () => { await expect(result.current.mutateAsync("S")).rejects.toThrow("Direkte samtaler kan ikke slettes"); });
+    await act(async () => { await expect(result.current.slet("S")).rejects.toThrow("Direkte samtaler kan ikke slettes"); });
     expect(kaldte).toEqual(["chat_conversations"]);
     expect(laesKladde("e", "S")?.tekst).toBe("kladde");
   });
@@ -2069,7 +2069,7 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     });
     const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
     let p!: Promise<unknown>;
-    act(() => { p = result.current.mutateAsync("S"); });
+    act(() => { p = result.current.slet("S"); });
     await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
     rydAlleKladder(); // logud/brugerskift
     expect(laesKladde("e", "S")).toBeNull(); // logud rydder brugerens tilstand
