@@ -6,6 +6,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { ConversationList } from "@/components/messages/ConversationList";
 import { ChatView } from "@/components/messages/ChatView";
 import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
+import { BeskederInfoKnap } from "@/components/messages/BeskederInfo";
 import { EmployeeSmsTab } from "@/components/messages/EmployeeSmsTab";
 import { Button } from "@/components/ui/button";
 import { Plus, MessageSquare, PenSquare, ArrowLeft, Phone } from "lucide-react";
@@ -76,6 +77,7 @@ export default function Messages() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <BeskederInfoKnap />
                 <TabsList>
                   <TabsTrigger value="chat" className="gap-2 max-md:min-h-11" aria-label="Chat">
                     <MessageSquare className="h-4 w-4" />
@@ -141,8 +143,10 @@ export default function Messages() {
               Kommuniker med dine kollegaer
             </p>
           </div>
-          <Button 
-            onClick={() => setShowNewDialog(true)} 
+          <div className="flex items-center gap-1">
+            <BeskederInfoKnap />
+            <Button
+            onClick={() => setShowNewDialog(true)}
             size="sm"
             className="gap-2 max-md:min-h-11"
             aria-label="Ny samtale"
@@ -150,6 +154,7 @@ export default function Messages() {
             <PenSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Ny samtale</span>
           </Button>
+          </div>
         </div>
 
         {/* Main content - full screen on mobile */}

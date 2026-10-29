@@ -16,6 +16,7 @@ import { MessageSearch } from "./MessageSearch";
 import { kanMiniature, AttachmentPreview, kraeverGenvalg, type LokalFil } from "./AttachmentPreview";
 import { TypingIndicator } from "./TypingIndicator";
 import { MentionInput } from "./MentionInput";
+import { BeskederInfoIkon, BeskederInfoSheet } from "./BeskederInfo";
 import { toast } from "sonner";
 import { SkeletonList, useDraftGuard } from "@/components/mobile";
 import { validerFil, udstedUpload, uploadTilSti, udstedFejlTekst, erForaeldetOperation, FIL_ACCEPT, FIL_GRAENSER_TEKST } from "@/lib/sbFil";
@@ -317,6 +318,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const drift = useSbDrift(!!meId, currentEmployee?.authId ?? null, conversationId);
   const pause = drift.beskederPause;
   const filAaben = drift.filTilladt && !pause;
+  const [infoAaben, setInfoAaben] = useState(false);
+  const infoAabner = useRef<HTMLElement | null>(null);
+  const infoIkon = useRef<HTMLButtonElement | null>(null);
+  const aabnInfo = (e: { currentTarget: HTMLElement }) => { infoAabner.current = e.currentTarget; setInfoAaben(true); };
   const driftRef = useRef({ pause, filAaben });
   driftRef.current = { pause, filAaben };
 
@@ -814,10 +819,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
     <div className="h-full flex flex-col min-w-0">
       {pause && (
         <div role="status" className="px-2 md:px-4 py-2 border-b bg-muted text-[14px] md:text-sm text-foreground">
-          Beskeder er under vedligeholdelse – du kan læse, men ikke sende. Din kladde bevares.
+          Beskeder er under vedligeholdelse – du kan læse, men ikke sende. Din kladde bevares.{" "}
+          <button type="button" className="-my-3 ml-1 inline-flex min-h-11 items-center px-1 align-middle font-medium underline underline-offset-2" onClick={aabnInfo}>Læs mere</button>
         </div>
       )}
-      <div className="border-b p-2 flex justify-end">
+      <BeskederInfoSheet open={infoAaben} onOpenChange={setInfoAaben} status={{ kendt: drift.status === "kendt", pause, filTilladt: drift.filTilladt }} returFokus={infoAabner} reserveFokus={infoIkon} />
+      <div className="border-b p-2 flex justify-end gap-1">
+        <BeskederInfoIkon knapRef={infoIkon} onClick={aabnInfo} />
         <Button variant="ghost" size="sm" onClick={() => setShowSearch(!showSearch)} className="h-8 px-2 md:px-3 max-md:h-11 max-md:w-11" aria-label="Søg i beskeder">
           <Search className="h-4 w-4 md:mr-1" />
           <span className="hidden md:inline">Søg</span>
@@ -948,7 +956,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
           )}
           </div>
         )}
-        {!drift.filTilladt && <p className="pb-1 text-[14px] md:text-xs text-muted-foreground">Filer kan ikke sendes lige nu</p>}
+        {!drift.filTilladt && (
+          <div className="flex items-center gap-2 pb-1">
+            <p className="text-[14px] md:text-xs text-muted-foreground">Filer kan ikke sendes lige nu</p>
+            <button type="button" className="min-h-11 md:min-h-0 text-[14px] md:text-xs text-muted-foreground underline underline-offset-2" onClick={aabnInfo}>Hvorfor?</button>
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
           {drift.filTilladt && (

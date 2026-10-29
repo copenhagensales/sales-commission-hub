@@ -2404,6 +2404,23 @@ describe("24d2 §2 – driftsvisning i ChatView", () => {
     skriv("hej");
     expect(send().hasAttribute("disabled")).toBe(false);
   });
+  it("»Hvorfor?« åbner infoarket med Lige nu-status uden at røre kladden", async () => {
+    driftT.v = { status: "kendt", beskederPause: false, filTilladt: false, tjekTilladt: true };
+    await klar();
+    skriv("hej");
+    fireEvent.click(screen.getByRole("button", { name: "Hvorfor?" }));
+    const ark = await screen.findByRole("dialog");
+    expect(within(ark).getByRole("heading", { name: "Sådan virker Beskeder" })).toBeTruthy();
+    expect(within(ark).getByRole("status").textContent).toContain("Filer kan ikke sendes lige nu");
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("hej");
+  });
+  it("ukendt driftsstatus → arket lover intet om filer", async () => {
+    driftT.v = { status: "ukendt", beskederPause: false, filTilladt: false, tjekTilladt: false };
+    await klar();
+    fireEvent.click(screen.getByRole("button", { name: "Hvorfor?" }));
+    const ark = await screen.findByRole("dialog");
+    expect(within(ark).getByRole("status").textContent).toContain("Driftsstatus kan ikke hentes lige nu");
+  });
   it("ukendt status → filknap skjult, Send aktiv", async () => {
     driftT.v = { status: "ukendt", beskederPause: false, filTilladt: false, tjekTilladt: false };
     await klar();
