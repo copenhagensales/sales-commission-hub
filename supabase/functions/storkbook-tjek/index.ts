@@ -125,9 +125,23 @@ Deno.serve(async (req) => {
     let body: Record<string, unknown> | null = null;
     if (krop.ok) { try { body = JSON.parse(new TextDecoder().decode(krop.bytes)); } catch { body = null; } }
     if (!body || typeof body !== "object" || Object.keys(body).some((k) => !["type", "id", "revision"].includes(k))
-      || body.type !== "besked" || typeof body.id !== "string" || !UUID.test(body.id)
+      || !["besked", "opslag", "kommentar"].includes(body.type as string) || typeof body.id !== "string" || !UUID.test(body.id)
       || typeof body.revision !== "number" || !Number.isInteger(body.revision) || body.revision < 1) return json({ kode: "ugyldig" }, 400);
     id = body.id as string; rev = body.revision as number;
+    // S7-b: samme tjekforløb for besked, opslag og kommentar. Kilde → tabel/felter; rækken normaliseres til beskedens form.
+    // Opslag/kommentar tjekkes som tekst (ingen fil i denne udgave); kommentarens ejer er auth-brugeren (feed_comments.user_id).
+    const kilde = body.type as "besked" | "opslag" | "kommentar";
+    const tabel = kilde === "besked" ? "chat_messages" : kilde === "opslag" ? "pulsen_posts" : "feed_comments";
+    const felter = kilde === "besked" ? "id, sender_id, revision, content, attachment_path, conversation_id, status"
+      : kilde === "opslag" ? "id, author_employee_id, revision, body, status" : "id, user_id, revision, body, status";
+    type Raekke = { revision: number; sender_id: string; status: string; content: string | null; attachment_path: string | null; conversation_id: string };
+    const normaliser = (r: Record<string, unknown> | null): Raekke | null => r ? {
+      revision: r.revision as number, status: String(r.status ?? ""),
+      sender_id: String((kilde === "besked" ? r.sender_id : kilde === "opslag" ? r.author_employee_id : r.user_id) ?? ""),
+      content: (kilde === "besked" ? r.content : r.body) as string | null,
+      attachment_path: kilde === "besked" ? (r.attachment_path as string | null) : null,
+      conversation_id: kilde === "besked" ? String(r.conversation_id ?? "") : "",
+    } : null;
 
     const auth = req.headers.get("Authorization") ?? "";
     if (!auth.startsWith("Bearer ")) return json({ kode: "jwt" }, 401);
@@ -137,9 +151,10 @@ Deno.serve(async (req) => {
     if (uErr || !u?.user) { log("jwt"); return json({ kode: "jwt" }, 401); }
     const { data: emp, error: eErr } = await bruger.rpc("get_current_employee_id");
     if (eErr || typeof emp !== "string") { log("ingen_medarbejder"); return json({ kode: "ingen_medarbejder" }, 403); }
-    const { data: m, error: mErr } = await bruger.from("chat_messages")
-      .select("id, sender_id, revision, content, attachment_path, conversation_id").eq("id", id).maybeSingle();
-    if (mErr || !m || m.sender_id !== emp) { log("ingen_adgang"); return json({ kode: "ingen_adgang" }, 403); }
+    const ejer = kilde === "kommentar" ? u.user.id : emp;  // S7-b: kommentarens ejer er auth-brugeren
+    const { data: m0, error: mErr } = await bruger.from(tabel).select(felter).eq("id", id).maybeSingle();
+    const m = normaliser(m0 as Record<string, unknown> | null);
+    if (mErr || !m || m.sender_id !== ejer) { log("ingen_adgang"); return json({ kode: "ingen_adgang" }, 403); }
 
     // Serviceklienten bruges først efter bruger- og rækkekontrol.
     const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -149,7 +164,7 @@ Deno.serve(async (req) => {
     const { data: em, error: amErr } = await svc.from("employee_master_data").select("is_active").eq("id", emp).maybeSingle();
     if (amErr || em?.is_active !== true) { log("inaktiv"); return json({ kode: "inaktiv" }, 403); }
 
-    const { data: token, error: rErr } = await svc.rpc("sb_tjek_reserver", { p_kilde: "besked", p_id: id, p_revision: rev });
+    const { data: token, error: rErr } = await svc.rpc("sb_tjek_reserver", { p_kilde: kilde, p_id: id, p_revision: rev });
     if (rErr) { log("reserver_fejl"); return json({ kode: "reserver_fejl" }, 500); }
     if (!token) { log("optaget"); return json({ status: "optaget" }); }
 
@@ -169,14 +184,13 @@ Deno.serve(async (req) => {
     if (!model && !stubAktiv()) { log("ikke_konfigureret"); await afslut(udfald); return json({ status: "ikke_konfigureret" }); }
     try {
       // Indholdet, der tjekkes, skal tilhøre den reserverede revision. Genlæsningsfejl → UKENDT (intet modelkald).
-      let akt: { revision: number; sender_id: string; status: string; content: string | null; attachment_path: string | null; conversation_id: string } | null = null;
+      let akt: Raekke | null = null;
       let laest = false;
       try {
-        const r = await svc.from("chat_messages")
-          .select("id, sender_id, revision, content, attachment_path, conversation_id, status").eq("id", id).maybeSingle();
-        if (r.error) log("genlaes_fejl"); else { akt = r.data; laest = true; }
+        const r = await svc.from(tabel).select(felter).eq("id", id).maybeSingle();
+        if (r.error) log("genlaes_fejl"); else { akt = normaliser(r.data as Record<string, unknown> | null); laest = true; }
       } catch { log("genlaes_fejl"); }
-      if (laest && (!akt || akt.revision !== rev || akt.sender_id !== emp || akt.status !== "tjekkes")) { log("foraeldet"); return json({ status: "forældet" }); }
+      if (laest && (!akt || akt.revision !== rev || akt.sender_id !== ejer || akt.status !== "tjekkes")) { log("foraeldet"); return json({ status: "forældet" }); }
       if (laest && akt) udfald = await vurder(akt);
     } catch { log("behandling_afbrudt"); udfald = { ...UKENDT }; }
     // A4 §1: en dom, der først er færdigbehandlet ved/efter arbejdsfristen, er ikke gyldig → hele UKENDT
@@ -218,7 +232,7 @@ Deno.serve(async (req) => {
       if (samletSlut - Date.now() <= 0) { log("afslut_frist"); return json({ kode: "afslut_fejl" }, 500); }
       let ok: unknown = null;
       try {
-        const r = await svcAfslut.rpc("sb_tjek_afslut", { p_kilde: "besked", p_id: id, p_revision: rev, p_token: token, p_udfald: u });
+        const r = await svcAfslut.rpc("sb_tjek_afslut", { p_kilde: kilde, p_id: id, p_revision: rev, p_token: token, p_udfald: u });
         if (r.error) { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }
         ok = r.data;
       } catch { log("afslut_fejl"); return json({ kode: "afslut_fejl" }, 500); }

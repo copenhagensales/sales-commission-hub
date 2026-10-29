@@ -1475,3 +1475,39 @@ klientTest("1d (b) sb-fil: .jfif-sti med PNG-bytes → 410 (type_afvist)", async
   assertEquals(r.status, 410); assertEquals(await r.json(), { kode: "vaek" });
 });
 test("1d sb-fil: EXT_FOR uændret – TYPER.jfif er image/jpeg", () => { assertEquals(fil.TYPER.jfif, "image/jpeg"); });
+
+// ---------------------------------------------------------------- S7-b: tjek af opslag og kommentarer (samme forløb som besked)
+const POST_RAEKKE = () => jsonR([{ id: TJEK_ID, author_employee_id: "e1", revision: 1, body: "opslag med 12 34 56 78", status: "tjekkes" }]);
+test("S7-b tjek: type opslag → læser pulsen_posts, reserverer/afslutter med p_kilde opslag, ingen chat_messages, intet filopslag", async () => {
+  const basis = tjekRute({ sti: null });
+  nulstil((k) => tabel(k, "pulsen_posts") ? POST_RAEKKE() : basis(k));
+  const r = await hTjek(tjekReq(JSON.stringify({ type: "opslag", id: TJEK_ID, revision: 1 })));
+  assertEquals(await r.json(), { status: "tjekket" });
+  assertEquals(JSON.parse(kaldTil((k) => rpc(k, "sb_tjek_reserver"))[0].krop).p_kilde, "opslag");
+  assertEquals(JSON.parse(afslutKald()[0].krop).p_kilde, "opslag");
+  assertEquals(kaldTil((k) => tabel(k, "chat_messages")).length, 0); assertEquals(kaldTil((k) => tabel(k, "sb_stier")).length, 0);
+  assertEquals(udfaldSendt().fil_tjekket, false); assertEquals(gwKald().length, 1); ingenUkendte();
+});
+test("S7-b tjek: opslag af en anden forfatter → ingen_adgang (403), ingen reservation", async () => {
+  const basis = tjekRute({ sti: null });
+  nulstil((k) => tabel(k, "pulsen_posts") ? jsonR([{ id: TJEK_ID, author_employee_id: "e2", revision: 1, body: "x", status: "tjekkes" }]) : basis(k));
+  const r = await hTjek(tjekReq(JSON.stringify({ type: "opslag", id: TJEK_ID, revision: 1 })));
+  assertEquals(r.status, 403); assertEquals(kaldTil((k) => rpc(k, "sb_tjek_reserver")).length, 0);
+});
+test("S7-b tjek: type kommentar → ejer = auth-brugeren (feed_comments.user_id), p_kilde kommentar", async () => {
+  const UID = "00000000-0000-4000-8000-000000000099";
+  const basis = tjekRute({ sti: null, auth: () => jsonR({ id: UID, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" }) });
+  nulstil((k) => tabel(k, "feed_comments") ? jsonR([{ id: TJEK_ID, user_id: UID, revision: 1, body: "kommentar", status: "tjekkes" }]) : basis(k));
+  const r = await hTjek(tjekReq(JSON.stringify({ type: "kommentar", id: TJEK_ID, revision: 1 })));
+  assertEquals(await r.json(), { status: "tjekket" });
+  assertEquals(JSON.parse(afslutKald()[0].krop).p_kilde, "kommentar"); ingenUkendte();
+});
+test("S7-b tjek: kommentar med anden user_id → 403", async () => {
+  const basis = tjekRute({ sti: null, auth: () => jsonR({ id: "00000000-0000-4000-8000-000000000099", aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" }) });
+  nulstil((k) => tabel(k, "feed_comments") ? jsonR([{ id: TJEK_ID, user_id: "00000000-0000-4000-8000-000000000098", revision: 1, body: "k", status: "tjekkes" }]) : basis(k));
+  assertEquals((await hTjek(tjekReq(JSON.stringify({ type: "kommentar", id: TJEK_ID, revision: 1 })))).status, 403);
+});
+test("S7-b tjek: ukendt type → 400", async () => {
+  nulstil(tjekRute({ sti: null }));
+  assertEquals((await hTjek(tjekReq(JSON.stringify({ type: "x", id: TJEK_ID, revision: 1 })))).status, 400);
+});
