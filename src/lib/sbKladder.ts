@@ -463,6 +463,14 @@ export const sessionGyldig = (s: SessionsKontekst | null | undefined): boolean =
 /** Fejl for en handling, hvis session er ophørt; kalderen viser intet. */
 export class ForaeldetSession extends Error { constructor() { super("forældet session"); this.name = "ForaeldetSession"; } }
 export function kraevSession(s: SessionsKontekst): void { if (!sessionGyldig(s)) throw new ForaeldetSession(); }
+/**
+ * B2-7 §1: afbrydelsessignal bundet til den fastholdte operations session. Er ejerens generation allerede ophørt,
+ * returneres et afbrudt signal; ellers den aktuelle sessions signal, som afbrydes ved logud/brugerskift.
+ */
+export function ejerSignal(e: OperationsEjer): AbortSignal {
+  if (e.gen !== generation || (lytterAktiv && aktivBruger !== e.bruger)) return AbortSignal.abort();
+  return sessionStyring.signal;
+}
 
 let registreret = false;
 let sidsteBruger: string | null | undefined;
