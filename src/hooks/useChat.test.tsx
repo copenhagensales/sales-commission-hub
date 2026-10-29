@@ -1296,8 +1296,8 @@ describe("B2b-4a §1 – resultat frigiver ikke det gamle grundlag før faktisk 
     await vi.waitFor(() => expect(n).toBe(1));
     const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
     const e = ejer(); expect(tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(true);
-    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
-    onlineManager.setOnline(false);
+    // Nettet falder bort, mens sb_afgoer svarer: genhentningen pauses (refetchQueries afslutter uden opdatering).
+    graense.rpc.mockImplementationOnce(async () => { onlineManager.setOnline(false); return { data: true, error: null }; });
     await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
     expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
     expect(aktiveHandlinger()).toBe(0); // ingen permanent lås – beskyttelsen er den synlige bekræftet-tilstand
