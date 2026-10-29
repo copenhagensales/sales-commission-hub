@@ -10,7 +10,7 @@ const MAKS = MAKS_BYTES;
 const SAMLET_MS = 55_000;
 const KALD_MS = 15_000;
 const RATE = 60;
-export const TYPER: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", txt: "text/plain" };
+export const TYPER: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", jfif: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", txt: "text/plain" };
 const EXT_FOR: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "text/plain": "txt" };
 
 const cors = {
