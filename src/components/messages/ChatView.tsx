@@ -281,6 +281,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [filFejl, setFilFejl] = useState<string | null>(null);
   const [kladdeVersion, setKladdeVersion] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // r4 §1: skrivelinjens faktiske højde (inkl. fil/filfejl/hjælpetekst) giver beskedlistens bundafstand på telefon.
+  const composerRef = useRef<HTMLDivElement>(null);
+  const [composerH, setComposerH] = useState(0);
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setComposerH(Math.ceil(el.getBoundingClientRect().height)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const sendLaas = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const genvalgFor = useRef<string | null>(null);
@@ -893,6 +903,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
           )}
         </div>
         <TypingIndicator users={otherTypingUsers} />
+        {/* r4 §1: kun telefon – sticky composer løftes 64 px + safe area over bundbjælken og dækker ellers listens bund. */}
+        <div aria-hidden="true" className="md:hidden" style={{ height: `calc(${composerH}px + 64px + env(safe-area-inset-bottom, 0px))` }} />
         <div ref={bottomRef} aria-hidden="true" />
       </ScrollArea>
 
@@ -918,7 +930,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       {lagerFejl && <p className="px-2 md:px-4 py-1 border-t text-[14px] text-muted-foreground" role="status">{LAGER_FEJL}</p>}
 
       {/* B2-6A §A: på telefon står composeren fast over bundbjælken (BOTTOM_NAV_HEIGHT = 64) og safe area. */}
-      <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
+      <div ref={composerRef} className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
         {/* r2 §2(b): fil og filfejl ligger i den faste composer, så de aldrig skjules bag den på telefon. */}
         {(fil || filFejl) && (
           <div className="-mx-2 md:-mx-4 -mt-2 md:-mt-4 mb-2">
