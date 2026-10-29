@@ -91,7 +91,8 @@ export function BottomSheet({ open, onOpenChange, title, description, children, 
           {description ? <DrawerDescription>{description}</DrawerDescription> : <DrawerDescription className="sr-only">{title}</DrawerDescription>}
         </DrawerHeader>
         <SheetNavigateContext.Provider value={sheetNavigate}>
-          <div onClickCapture={onClickCapture} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">{children}</div>
+          {/* data-vaul-no-drag: indholdet ruller; arket trækkes kun i håndtag/hoved (hold på en flise flyttede ellers arket, Mathias 29/10). */}
+          <div data-vaul-no-drag onClickCapture={onClickCapture} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">{children}</div>
         </SheetNavigateContext.Provider>
       </DrawerContent>
     </Drawer>
