@@ -948,7 +948,9 @@ export function useDeleteConversation() {
   const mutation = useMutation({
     // B2d-2 §12: sletning/forladelse gentages aldrig automatisk (appens mutations.retry=1).
     retry: 0,
-    mutationFn: async ({ conversationId, session: s }: { conversationId: string; session: SessionsKontekst }) => {
+    mutationFn: ({ conversationId, session: s }: { conversationId: string; session: SessionsKontekst }) => sletForloeb(conversationId, s).catch(foraeldetVed(s)),
+  });
+  async function sletForloeb(conversationId: string, s: SessionsKontekst): Promise<string> {
       // B2-6B §B: sessionen er fastholdt ved brugerhandlingen; den kontrolleres efter hvert ventepunkt og før hvert
       // efterfølgende netværks-/cachetrin, og SDK-kaldene afbrydes ved sessionsophør (også under tokenventen).
       kraevSession(s);
@@ -986,11 +988,7 @@ export function useDeleteConversation() {
       // Kun efter bekræftelse; afvisning (kast ovenfor) bevarer kladden.
       rydSlettetSamtale(employeeId, conversationId, s.gen);
       return conversationId;
-    },
-    onSettled: (_d, _e, v) => {
-      if (v && sessionGyldig(v.session)) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
-    },
-  });
+  }
 
   /** B2-7 §1: en afvisning efter sessionsophør (fx identitetsopslag eller afbrudt SDK-kald) bliver ForaeldetSession. */
 function foraeldetVed(s: SessionsKontekst): (e: unknown) => never {
