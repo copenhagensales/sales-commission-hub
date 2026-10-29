@@ -1705,14 +1705,16 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
 
   it("budget 500 ms + 2/4/8/16/32 s pr. fristforløb gennem remount og andre rækkers udløb/bortfald; SQL-pladsholder afslutter", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const inval = vi.spyOn(qc, "invalidateQueries");
+    // B2bc-5c-1 §2: henteforsøget afsluttes først, når netværkssvaret (svar()) foreligger.
+    const venter: Array<() => void> = [];
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
     const n = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
     const nu = Date.now();
     const a = fremmed("a", "A-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
     const b = fremmed("b", "B-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
     beskeder.liste = [a, b];
     let r = render(wrap(<ChatView conversationId="A" />));
-    const svar = async (liste: unknown[]) => { beskeder.liste = liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    const svar = async (liste: unknown[]) => { for (const v of venter.splice(0)) v(); beskeder.liste = liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(n()).toBe(1); // ét fælles kald for begge forfaldne forløb
     await svar([a]); // b bortfalder – nulstiller ikke a (ingen ny 500 ms-start)
