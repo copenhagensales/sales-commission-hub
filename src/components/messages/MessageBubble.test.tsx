@@ -519,6 +519,26 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("min");
   });
+
+  // B2b-4a §2
+  it("bevist aktiv tjektimer → klik på Gem i editoren afslutter timeren; intet transportgenforsøg", async () => {
+    const { startTjekHvisNoedvendigt, aktiveTjekTimere } = await import("@/hooks/useChat");
+    const { fastholdEjer, ejerGyldig } = await import("@/lib/sbKladder");
+    raekke = { data: { status: "tjekkes", revision: 1 }, error: null };
+    graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null });
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m1", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    graense.rpc.mockResolvedValueOnce({ data: 2, error: null });
+    render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    expect(aktiveTjekTimere()).toBe(0);
+    await p;
+    await new Promise((x) => setTimeout(x, 50));
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+  });
 });
 
 
@@ -741,26 +761,5 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       expect(kladde()?.tekst).toBe("ny generation");
       r2.unmount();
     } finally { slut(); }
-  });
-});
-
-describe("B2b-4a §2 – manuel Gem via den faktiske editorovergang afslutter et aktivt tjekforløb", () => {
-  it("bevist aktiv tjektimer → klik på Gem i editoren afslutter timeren; intet transportgenforsøg", async () => {
-    const { startTjekHvisNoedvendigt, aktiveTjekTimere } = await import("@/hooks/useChat");
-    const { fastholdEjer, ejerGyldig } = await import("@/lib/sbKladder");
-    raekke = { data: { status: "tjekkes", revision: 1 }, error: null };
-    graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null });
-    const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m1", () => ejerGyldig(ejer), ejer);
-    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
-    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
-    graense.rpc.mockResolvedValueOnce({ data: 2, error: null });
-    render(ui(besked("m1", "gammel"), "e"));
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
-    expect(aktiveTjekTimere()).toBe(0);
-    await p;
-    await new Promise((x) => setTimeout(x, 50));
-    expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 });
