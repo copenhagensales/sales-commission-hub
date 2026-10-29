@@ -17,8 +17,10 @@ const ARBEJDE_MS = SAMLET_MS - AFSLUT_RESERVE_MS;
 const KALD_MS = 15_000;
 const AFSLUT_MS = 5_000;
 const MAKS_KROP = 4096;
-/** Eksplicit outputgrænse: det lukkede skema fylder < 80 tokens. */
-export const MAKS_OUTPUT_TOKENS = 200;
+/** Eksplicit outputgrænse: det lukkede skema fylder < 80 tokens; resten dækker modellens tænketokens (24d2-edge-1c). */
+export const MAKS_OUTPUT_TOKENS = 1000;
+/** Begrænset tænkning (OpenAI-kompatibelt felt; accepteret af gatewayen i prøvekald 24d2-edge-1c). */
+export const TAENKNING = "low";
 
 const TONE_TYPER = new Set(["nedladende", "truende", "chikane", "personangreb"]);
 const PO_TYPER = new Set(["telefon", "email", "konto", "adresse", "helbred", "cpr", "andet"]);
@@ -92,7 +94,7 @@ async function spoergModel(model: string, dele: Del[], arbejdsFrist: number): Pr
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model, temperature: 0, stream: false, max_tokens: MAKS_OUTPUT_TOKENS, response_format: { type: "json_object" },
+        model, temperature: 0, stream: false, max_tokens: MAKS_OUTPUT_TOKENS, reasoning_effort: TAENKNING, response_format: { type: "json_object" },
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: dele }],
       }),
     });
