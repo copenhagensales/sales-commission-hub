@@ -75,7 +75,7 @@ export default function StorkbookIndlaeg() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8">
+      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8 max-md:pb-[76px]">
         <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4">
           <Link to={backTo} className="inline-flex min-h-[44px] w-fit items-center gap-2 rounded-full px-2 text-[15px] font-extrabold text-foreground hover:bg-card">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Storkbook

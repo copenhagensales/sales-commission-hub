@@ -60,7 +60,7 @@ export function PulsenBegivenheder() {
       {me.canManageEvents && (
         <div className="flex justify-end">
           <button type="button" onClick={() => setAddOpen(true)}
-            className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[15px] font-extrabold text-[hsl(var(--cph-light-blue))] active:opacity-80">
+            className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))]">
             Opret begivenhed
           </button>
         </div>
@@ -86,13 +86,13 @@ export function PulsenBegivenheder() {
                     </p>
                   </div>
                 </div>
-                <div role="radiogroup" aria-label={`Dit svar til ${e.title}`} className="mt-3 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
+                <div role="radiogroup" aria-label={`Dit svar til ${e.title}`} className="mt-3 grid grid-cols-3 gap-1 rounded-full bg-[hsl(var(--cph-light-blue))] p-1">
                   {RSVP.map((o) => (
                     <button key={o.status} type="button" role="radio" aria-checked={my === o.status}
                       disabled={!me.employeeId || toggle.isPending}
                       onClick={() => toggle.mutate({ eventId: e.id, status: o.status })}
                       className={cn("min-h-[44px] rounded-full text-[14px] font-extrabold",
-                        my === o.status ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]" : "text-foreground")}>
+                        my === o.status ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground hover:bg-card")}>
                       {o.label}
                     </button>
                   ))}
@@ -112,7 +112,7 @@ export function PulsenBegivenheder() {
             const n = counts.data?.[e.id] ?? 0;
             return (
               <li key={e.id}>
-                <Link to={`/storkbook/begivenhed/${e.id}`} className="flex min-h-[64px] items-center gap-3 rounded-[20px] bg-card p-3 hover:opacity-90">
+                <Link to={`/storkbook/begivenhed/${e.id}`} className="flex min-h-[64px] items-center gap-3 rounded-[24px] bg-card p-3 hover:bg-[hsl(var(--cph-light-blue)/0.6)]">
                   <DateBadge date={e.event_date} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[16px] font-extrabold text-foreground">{e.title}</p>
@@ -130,7 +130,7 @@ export function PulsenBegivenheder() {
           <SectionTitle>Fotos uden begivenhed</SectionTitle>
           <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
             {(unlinked.data ?? []).map((ph) => (
-              <li key={ph.id} className="flex flex-col gap-2 rounded-[20px] bg-card p-2">
+              <li key={ph.id} className="flex flex-col gap-2 rounded-[24px] bg-card p-2">
                 <div className="aspect-square overflow-hidden rounded-[14px] bg-muted">
                   {ph.url ? <img src={ph.url} alt={ph.title ?? ""} loading="lazy" className="h-full w-full object-cover" />
                     : <div className="flex h-full items-center justify-center"><ImageOff className="h-6 w-6 text-muted-foreground" aria-hidden="true" /></div>}
@@ -145,7 +145,7 @@ export function PulsenBegivenheder() {
                       onError: () => { ryd(); toast.error("Kunne ikke knytte fotoet", { description: "Prøv igen." }); },
                     });
                   }}>
-                  <SelectTrigger className="min-h-[44px] rounded-xl text-[14px]" aria-label="Knyt til begivenhed">
+                  <SelectTrigger className="min-h-[44px] rounded-full border-0 bg-[hsl(var(--cph-light-blue))] text-[14px] font-extrabold" aria-label="Knyt til begivenhed">
                     <SelectValue placeholder="Knyt til begivenhed" />
                   </SelectTrigger>
                   <SelectContent>

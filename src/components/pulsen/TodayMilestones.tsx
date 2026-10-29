@@ -155,12 +155,12 @@ export function TodayMilestonesCard({ isHouse, teamId, teamName, enabled, layout
       <section aria-label="Dagens milepæle" className="-mx-4 lg:hidden">
         <div className="mb-2 flex items-center gap-2 px-4">
           <LiveDot flash={flash} />
-          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted-foreground">Dagens milepæle</h2>
+          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Dagens milepæle</h2>
           <button type="button" onClick={() => setOpen(true)} className="ml-auto min-h-[44px] text-[12px] font-extrabold">{count} i dag →</button>
         </div>
         <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
           {items.slice(0, 10).map((m) => (
-            <div key={m.id} className={cn("flex-none snap-start rounded-[20px] bg-card px-3", items.length === 1 ? "w-full" : "w-[min(85%,300px)]")}>
+            <div key={m.id} className={cn("flex-none snap-start rounded-[24px] bg-card px-3", items.length === 1 ? "w-full" : "w-[min(85%,300px)]")}>
               <MilestoneRow m={m} fr={fr} interactive={isHouse} isNew={fresh.has(m.id)} />
             </div>
           ))}
@@ -174,7 +174,7 @@ export function TodayMilestonesCard({ isHouse, teamId, teamName, enabled, layout
     <section aria-label="Dagens milepæle" className="rounded-[24px] bg-card p-5">
       <div className="flex items-center gap-2">
         <LiveDot flash={flash} />
-        <h2 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted-foreground">Dagens milepæle</h2>
+        <h2 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Dagens milepæle</h2>
         <span className="ml-auto whitespace-nowrap text-[12px] font-extrabold tabular-nums">{count} i dag</span>
       </div>
       {q.isLoading ? (
@@ -186,7 +186,7 @@ export function TodayMilestonesCard({ isHouse, teamId, teamName, enabled, layout
           <div className="mt-1 divide-y divide-border">
             {items.slice(0, 5).map((m) => <MilestoneRow key={m.id} m={m} fr={fr} interactive={isHouse} isNew={fresh.has(m.id)} />)}
           </div>
-          <button type="button" onClick={() => setOpen(true)} className="mt-1 flex min-h-[44px] items-center gap-1 text-[13px] font-extrabold hover:text-primary">
+          <button type="button" onClick={() => setOpen(true)} className="mt-1 flex min-h-[44px] items-center gap-1 text-[13px] font-extrabold hover:underline">
             Se alle {count} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </>

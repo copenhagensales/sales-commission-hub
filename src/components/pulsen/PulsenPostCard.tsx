@@ -272,12 +272,12 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
   const handlinger = (c: PostInteractions["comments"][number]) => (
     <>
       {!c.isMine && interactions.onReportComment && (
-        <button type="button" aria-label="Anmeld kommentar" onClick={() => onReason({ art: "anmeld_kommentar", id: c.id })} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
+        <button type="button" aria-label="Anmeld kommentar" onClick={() => onReason({ art: "anmeld_kommentar", id: c.id })} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
           <Flag className="h-4 w-4" aria-hidden="true" />
         </button>
       )}
       {canModerate && !c.isMine && interactions.onModerateComment && (
-        <button type="button" aria-label={c.hiddenAt ? "Vis kommentaren igen" : "Skjul kommentaren"} onClick={() => (c.hiddenAt ? void interactions.onModerateComment?.(c.id, false) : onReason({ art: "skjul_kommentar", id: c.id }))} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
+        <button type="button" aria-label={c.hiddenAt ? "Vis kommentaren igen" : "Skjul kommentaren"} onClick={() => (c.hiddenAt ? void interactions.onModerateComment?.(c.id, false) : onReason({ art: "skjul_kommentar", id: c.id }))} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
           {c.hiddenAt ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
         </button>
       )}
@@ -320,13 +320,13 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
       <div className="flex items-center gap-1">
         <ReactButton summary={interactions.summary} onSet={interactions.onReact} disabled={!interactions.canInteract} />
         {post.comments_closed_at ? (
-          <p className="flex min-h-[44px] items-center px-3 text-[14px] font-semibold text-muted-foreground">Kommentarer er lukket · <span className="tabular-nums">{comments.length}</span></p>
+          <p className="flex min-h-[44px] items-center px-3 text-[14px] font-extrabold text-muted-foreground">Kommentarer er lukket · <span className="tabular-nums">{comments.length}</span></p>
         ) : (
         <button
           type="button"
           onClick={() => setComposing(true)}
           disabled={!interactions.canInteract}
-          className="min-h-[44px] rounded-xl px-3 text-[14px] font-semibold text-muted-foreground hover:bg-muted active:bg-muted disabled:opacity-50"
+          className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))] active:bg-[hsl(var(--cph-light-blue))] disabled:opacity-50"
         >
           Kommentér · <span className="tabular-nums">{comments.length}</span>
         </button>
@@ -340,7 +340,7 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
           {best.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{best.hiddenKode ? ` · ${anmeldTekst(best.hiddenKode)}` : ""}</p>}
           <div className="flex items-center gap-1">{handlinger(best)}</div>
           {canPickBest && (
-            <button type="button" onClick={() => onBestAnswer(null)} className="mt-1 min-h-[44px] text-[13px] font-semibold text-muted-foreground hover:underline">Fjern som bedste svar</button>
+            <button type="button" onClick={() => onBestAnswer(null)} className="mt-1 min-h-[44px] text-[13px] font-extrabold text-muted-foreground hover:underline">Fjern som bedste svar</button>
           )}
         </div>
       )}
@@ -372,7 +372,7 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
         </ul>
       )}
       {rest.length > 1 && (
-        <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-1 min-h-[44px] text-[13px] font-semibold text-muted-foreground hover:underline">
+        <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-1 min-h-[44px] text-[13px] font-extrabold text-muted-foreground hover:underline">
           {showAll ? "Vis færre" : `Se alle ${rest.length} kommentarer`}
         </button>
       )}
@@ -438,15 +438,15 @@ function OpslagTjekStatus({ post, onDecide, onRet }: { post: PulsenPost; onDecid
   if (post.status === "tjekkes") return <p className="mt-2 text-[13px] text-muted-foreground">✓ Tjekkes … Andre ser opslaget, når tjekket er færdigt.</p>;
   if (!afventer) return null;
   return (
-    <div className="mt-3 rounded-2xl border border-border bg-card p-3" role="status">
+    <div className="mt-3 rounded-2xl bg-[hsl(var(--cph-light-blue))] p-3" role="status">
       <p className="text-[14px] font-extrabold text-foreground">Dit opslag afventer dig</p>
       <p className="mt-1 text-[14px] text-foreground">{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data, "opslag")}</p>
       <div className="mt-2 grid grid-cols-3 gap-2">
         {begr.data !== "cpr_fil" && begr.data !== "ikke_tjekket_fil" && (
-          <button type="button" disabled={optaget} onClick={() => void afgoer("send")} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send alligevel</button>
+          <button type="button" disabled={optaget} onClick={() => void afgoer("send")} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:opacity-50">Send alligevel</button>
         )}
-        <button type="button" disabled={optaget} onClick={onRet} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[14px] font-extrabold text-foreground disabled:opacity-50">Ret</button>
-        <button type="button" disabled={optaget} onClick={() => void afgoer("traek")} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[14px] font-extrabold text-foreground disabled:opacity-50">Træk tilbage</button>
+        <button type="button" disabled={optaget} onClick={onRet} className="min-h-[44px] rounded-full bg-card px-3 text-[14px] font-extrabold text-foreground hover:bg-muted disabled:opacity-50">Ret</button>
+        <button type="button" disabled={optaget} onClick={() => void afgoer("traek")} className="min-h-[44px] rounded-full bg-card px-3 text-[14px] font-extrabold text-foreground hover:bg-muted disabled:opacity-50">Træk tilbage</button>
       </div>
     </div>
   );
@@ -467,7 +467,7 @@ function KommentarAfventer({ id, revision, onDecide, onDelete }: { id: string; r
       <p>{begr.isLoading ? "Henter begrundelse …" : begrundelseTekst(begr.data, "kommentar")}</p>
       <div className="mt-1 flex gap-2">
         <button type="button" disabled={optaget} onClick={() => void send()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-3 text-[13px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-50">Send alligevel</button>
-        <button type="button" disabled={optaget} onClick={() => void onDelete()} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-3 text-[13px] font-extrabold text-foreground disabled:opacity-50">Slet</button>
+        <button type="button" disabled={optaget} onClick={() => void onDelete()} className="min-h-[44px] rounded-full bg-card px-3 text-[13px] font-extrabold text-foreground hover:bg-muted disabled:opacity-50">Slet</button>
       </div>
     </div>
   );

@@ -39,9 +39,9 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
   const greetings = summary.total + comments.length;
   const what = c.type === "birthday" ? "har fødselsdag 🇩🇰" : `${c.years} års jubilæum`;
   return (
-    <div className={cn(variant === "line" ? "rounded-[20px] bg-card px-4 py-2" : "rounded-[16px] border border-dashed border-border px-3 py-1")}>
+    <div className={cn(variant === "line" ? "rounded-[24px] bg-card px-4 py-2" : "rounded-[16px] border border-dashed border-border px-3 py-1")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {variant === "line" && <span className="hidden whitespace-nowrap text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground sm:inline">I dag</span>}
+        {variant === "line" && <span className="hidden whitespace-nowrap text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground sm:inline">I dag</span>}
         <PulsenAvatar employeeId={c.employeeId} name={c.name} size={32} />
         <p className="min-w-0 flex-1 truncate text-[14px]">
           <b className="font-extrabold">{short(c.name)}</b> {what}
@@ -61,7 +61,7 @@ function Line({ c, fr, variant }: { c: Celebration; fr: ReturnType<typeof useFee
         <div className="pb-2 pt-1">
           <div className="flex items-center gap-1 border-y border-border py-0.5">
             <button type="button" disabled={!fr.canInteract} onClick={() => setComposing(true)}
-              className="min-h-[44px] rounded-xl px-3 text-[14px] font-semibold text-muted-foreground hover:bg-muted">Skriv besked</button>
+              className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">Skriv besked</button>
           </div>
           <div className="mt-2">
             <FeedCommentList targetType={c.type} targetKey={key} comments={comments} composing={composing}

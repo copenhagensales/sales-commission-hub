@@ -213,9 +213,9 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           {mode === "praise" && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {praised.map((c) => (
-                <span key={c.id} className="flex min-h-[40px] items-center gap-1 rounded-full bg-[hsl(var(--cph-praise))] pl-4 pr-1 text-[14px] font-extrabold text-[hsl(var(--cph-praise-foreground))]">
+                <span key={c.id} className="flex min-h-[44px] items-center gap-1 rounded-full bg-[hsl(var(--cph-praise))] md:min-h-[40px] pl-4 pr-1 text-[14px] font-extrabold text-[hsl(var(--cph-praise-foreground))]">
                   {`${c.first_name ?? ""} ${c.last_name ?? ""}`.trim()}
-                  <button type="button" aria-label={`Fjern ${c.first_name ?? ""}`} onClick={() => setPraised((l) => l.filter((x) => x.id !== c.id))} className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <button type="button" aria-label={`Fjern ${c.first_name ?? ""}`} onClick={() => setPraised((l) => l.filter((x) => x.id !== c.id))} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/10">
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </span>
@@ -223,7 +223,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
               {praised.length < 10 && (
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                   <PopoverTrigger asChild>
-                    <button type="button" className="flex min-h-[40px] items-center gap-2 rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[14px] font-extrabold text-foreground">
+                    <button type="button" className="flex min-h-[44px] items-center gap-2 rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[14px] font-extrabold text-foreground hover:bg-muted md:min-h-[40px]">
                       <HandHeart className="h-4 w-4" aria-hidden="true" />
                       {praised.length ? "Tilføj kollega" : "Vælg kollega"}
                     </button>
@@ -265,7 +265,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
                     onChange={(e) => setPollOptions((l) => l.map((x, j) => (j === i ? e.target.value : x)))}
                     placeholder={`Svar ${i + 1}`}
                     aria-label={`Svar ${i + 1}, højst ${POLL_OPTION_MAX} tegn`}
-                    className="h-11 min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-4 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-11 min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-4 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))]"
                   />
                   {pollOptions.length > 2 && (
                     <button type="button" aria-label={`Fjern svar ${i + 1}`} onClick={() => setPollOptions((l) => l.filter((_, j) => j !== i))} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
@@ -326,7 +326,8 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-1">
+      {/* Type-piller i én række med vandret rulle (ombrød før i to rækker på telefon – D2a) */}
+      <div className="-mx-1 mt-3 flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {MODES.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -334,7 +335,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
             onClick={() => pickMode(key)}
             aria-pressed={open && mode === key}
             className={cn(
-              "flex min-h-[44px] items-center gap-2 rounded-full px-3 text-[14px] font-extrabold transition-colors",
+              "flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 text-[14px] font-extrabold transition-colors",
               open && mode === key ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground hover:bg-[hsl(var(--cph-light-blue))]"
             )}
           >
@@ -342,7 +343,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           </button>
         ))}
         {canManageEvents && (
-          <button type="button" onClick={onOpenEvent} className="flex min-h-[44px] items-center gap-2 rounded-full px-3 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
+          <button type="button" onClick={onOpenEvent} className="flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
             <CalendarPlus className="h-4 w-4" aria-hidden="true" /> Begivenhed
           </button>
         )}

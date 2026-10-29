@@ -84,8 +84,9 @@ export function EventRsvpCard({
     { status: "not_attending", label: "Afbud" },
   ];
 
+  // D2a: ikonknapper er runde og 44 px (var 22 px i feedet)
   const iconBtn = cn(
-    "rounded-md p-1 transition-colors",
+    "flex h-11 w-11 items-center justify-center rounded-full transition-colors",
     featured
       ? "text-[hsl(var(--cph-light-blue)/0.7)] hover:bg-[hsl(var(--cph-light-blue)/0.1)] hover:text-[hsl(var(--cph-light-blue))]"
       : "text-foreground/60 hover:bg-[hsl(var(--cph-onyx)/0.06)] hover:text-foreground",
@@ -136,14 +137,14 @@ export function EventRsvpCard({
                   <button type="button" title="Rediger" onClick={onEdit} className={iconBtn}>
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button type="button" title="Slet" onClick={onDelete} className="rounded-md p-1 text-destructive transition-colors hover:bg-destructive/15">
+                  <button type="button" title="Slet" onClick={onDelete} className="flex h-11 w-11 items-center justify-center rounded-full text-destructive transition-colors hover:bg-destructive/10">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </>
               )}
             </div>
           </div>
-          <button type="button" onClick={onOpenDetail} className="mt-1 block text-left text-[16px] font-extrabold leading-tight hover:underline">
+          <button type="button" onClick={onOpenDetail} className="mt-1 flex min-h-[44px] items-center text-left text-[16px] font-extrabold leading-tight hover:underline">
             {title}
           </button>
           {meta && <p className={cn("mt-0.5 text-[13px]", featured ? "opacity-75" : "text-foreground/60")}>{meta}</p>}
@@ -155,7 +156,7 @@ export function EventRsvpCard({
         aria-label="Dit svar"
         className={cn(
           "mt-4 grid grid-cols-3 gap-1 rounded-full p-1",
-          featured ? "bg-[hsl(var(--cph-light-blue)/0.1)]" : "bg-[hsl(var(--cph-onyx)/0.06)]",
+          featured ? "bg-[hsl(var(--cph-light-blue)/0.1)]" : "bg-[hsl(var(--cph-light-blue))]",
         )}
       >
         {options.map((o) => {
@@ -170,11 +171,12 @@ export function EventRsvpCard({
               onClick={() => onRespond(o.status)}
               className={cn(
                 "flex min-h-[44px] items-center justify-center gap-1 rounded-full px-2 py-2 text-[13px] font-extrabold transition-colors",
+                // valgt: onyx på lyse kort (som faner og RSVP i Begivenheder); lys blå på det mørke forsidekort
                 active
-                  ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]"
+                  ? (featured ? "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]" : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]")
                   : featured
                     ? "hover:bg-[hsl(var(--cph-light-blue)/0.1)]"
-                    : "hover:bg-[hsl(var(--cph-onyx)/0.08)]",
+                    : "hover:bg-card",
               )}
             >
               {active && <Check className="h-3.5 w-3.5" />}

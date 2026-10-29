@@ -34,7 +34,7 @@ export function ReactButton({ summary, onSet, disabled, className, compact = fal
           aria-pressed={!!mine}
           aria-label={mine ? `Din reaktion: ${mine.label}. Klik for at fjerne` : "Reagér med Godt gået"}
           className={cn(
-            "flex min-h-[44px] items-center gap-2 rounded-l-xl px-3 text-[14px] font-semibold transition-colors hover:bg-muted disabled:opacity-50",
+            "flex min-h-[44px] items-center gap-2 rounded-l-full px-3 text-[14px] font-semibold transition-colors hover:bg-muted disabled:opacity-50",
             mine ? "text-primary" : "text-muted-foreground"
           )}
         >
@@ -53,7 +53,7 @@ export function ReactButton({ summary, onSet, disabled, className, compact = fal
             type="button"
             disabled={disabled}
             aria-label="Vælg reaktion"
-            className="flex min-h-[44px] min-w-[32px] items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted active:bg-muted disabled:opacity-50"
+            className="flex min-h-[44px] min-w-[32px] items-center justify-center rounded-r-full text-muted-foreground transition-colors hover:bg-[hsl(var(--cph-light-blue))] active:bg-[hsl(var(--cph-light-blue))] disabled:opacity-50"
           >
             <ChevronDown className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -71,7 +71,7 @@ export function ReactButton({ summary, onSet, disabled, className, compact = fal
                 setOpen(false);
               }}
               className={cn(
-                "flex min-h-[56px] min-w-[60px] flex-col items-center justify-center gap-1 rounded-xl px-1.5 transition-colors hover:bg-muted",
+                "flex min-h-[56px] min-w-[60px] flex-col items-center justify-center gap-1 rounded-full px-1.5 transition-colors hover:bg-muted",
                 summary.myReaction === r.key && "bg-muted"
               )}
             >

@@ -79,25 +79,25 @@ export default function StorkbookBegivenhed() {
           )}
           {event.description && <p className="mt-3 whitespace-pre-wrap break-words text-[16px] leading-[1.5] text-foreground">{event.description}</p>}
 
-          <div role="radiogroup" aria-label="Dit svar" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
+          <div role="radiogroup" aria-label="Dit svar" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-[hsl(var(--cph-light-blue))] p-1">
             {RSVP.map((o) => (
               <button key={o.status} type="button" role="radio" aria-checked={myStatus === o.status}
                 disabled={!me.employeeId || toggle.isPending}
                 onClick={() => toggle.mutate({ eventId: event.id, status: o.status })}
                 className={cn("min-h-[44px] rounded-full text-[14px] font-extrabold",
-                  myStatus === o.status ? "bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))]" : "text-foreground")}>
+                  myStatus === o.status ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground hover:bg-card")}>
                 {o.label}
               </button>
             ))}
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={copyLink} className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-muted px-4 text-[14px] font-extrabold text-foreground active:opacity-80">
+            <button type="button" onClick={copyLink} className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[14px] font-extrabold text-foreground hover:bg-muted">
               <Link2 className="h-4 w-4" aria-hidden="true" /> Kopiér link
             </button>
             {me.canManageEvents && (
               <>
-                <button type="button" onClick={() => setEditOpen(true)} className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-muted px-4 text-[14px] font-extrabold text-foreground active:opacity-80">
+                <button type="button" onClick={() => setEditOpen(true)} className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[hsl(var(--cph-light-blue))] px-4 text-[14px] font-extrabold text-foreground hover:bg-muted">
                   <Pencil className="h-4 w-4" aria-hidden="true" /> Redigér
                 </button>
                 <button type="button" disabled={deleteEvent.isPending}
@@ -115,7 +115,7 @@ export default function StorkbookBegivenhed() {
           {yes.length ? <ul className="mt-2 flex flex-wrap gap-2">{yes.map((n, i) => <li key={`y${i}`} className="rounded-full bg-[hsl(var(--cph-light-blue))] px-3 py-1.5 text-[14px] font-semibold text-foreground">{n}</li>)}</ul>
             : <p className="mt-2 text-[15px] text-muted-foreground">Ingen endnu.</p>}
           <h2 className="mt-4 text-[13px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Måske · <span className="tabular-nums">{maybe.length}</span></h2>
-          {maybe.length ? <ul className="mt-2 flex flex-wrap gap-2">{maybe.map((n, i) => <li key={`m${i}`} className="rounded-full bg-muted px-3 py-1.5 text-[14px] font-semibold text-foreground">{n}</li>)}</ul>
+          {maybe.length ? <ul className="mt-2 flex flex-wrap gap-2">{maybe.map((n, i) => <li key={`m${i}`} className="rounded-full bg-card px-3 py-1.5 text-[14px] font-semibold text-foreground ring-1 ring-border">{n}</li>)}</ul>
             : <p className="mt-2 text-[15px] text-muted-foreground">Ingen endnu.</p>}
         </section>
 
@@ -127,7 +127,7 @@ export default function StorkbookBegivenhed() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8">
+      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-8 max-md:pb-[76px]">
         <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4">
           <Link to={BACK} className="inline-flex min-h-[44px] w-fit items-center gap-2 rounded-full px-2 text-[15px] font-extrabold text-foreground hover:bg-card">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Storkbook
@@ -170,7 +170,7 @@ function EventGallerySection({ eventId }: { eventId: string }) {
           <>
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
             <button type="button" disabled={upload.isPending} onClick={() => fileRef.current?.click()}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] disabled:opacity-60 active:opacity-80">
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:opacity-50">
               <ImagePlus className="h-4 w-4" aria-hidden="true" /> {upload.isPending ? "Gemmer …" : "Tilføj fotos"}
             </button>
           </>

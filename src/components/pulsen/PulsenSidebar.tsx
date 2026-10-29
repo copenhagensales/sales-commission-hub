@@ -52,8 +52,8 @@ export function PulsenSidebar({ employeeId, onOpenQuestion, top, className, show
                     aria-label={mine === "attending" ? `Du deltager i ${e.title}` : `Tilmeld dig ${e.title}`}
                     onClick={() => toggle.mutate({ eventId: e.id, status: mine === "attending" ? "not_attending" : "attending" })}
                     className={cn(
-                      "min-h-[36px] flex-none rounded-full px-3 text-[12px] font-extrabold",
-                      mine === "attending" ? "bg-[#d6f7e5] text-[#146c3c]" : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                      "min-h-[44px] flex-none rounded-full px-3 text-[12px] font-extrabold lg:min-h-[36px]",
+                      mine === "attending" ? "bg-[hsl(var(--cph-emerald)/0.18)] text-foreground" : "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))]"
                     )}
                   >
                     {mine === "attending" ? "✓ Tilmeldt" : "Tilmeld"}

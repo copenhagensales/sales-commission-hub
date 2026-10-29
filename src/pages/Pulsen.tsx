@@ -229,7 +229,7 @@ function PulsenFeed() {
             type="button"
             onClick={() => { if (!feed.isFetching) feed.fetchNextPage(); }}
             disabled={feed.isFetching}
-            className="mx-auto min-h-[44px] rounded-full bg-card px-6 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-onyx))] hover:text-[hsl(var(--cph-light-blue))] disabled:opacity-60"
+            className="mx-auto min-h-[44px] rounded-full bg-[hsl(var(--cph-light-blue))] px-6 text-[14px] font-extrabold text-foreground hover:bg-muted disabled:opacity-50"
           >
             {feed.isFetching ? "Henter …" : "Indlæs flere"}
           </button>
@@ -273,14 +273,14 @@ function PulsenFeed() {
               </div>
               <div role="tablist" aria-label="Feed" className="flex min-w-0 overflow-hidden rounded-full bg-card p-1">
                 <button type="button" role="tab" aria-selected={isHouse} onClick={() => setTab("house")}
-                  className={cn("min-h-[40px] rounded-full px-4 text-[14px] font-extrabold", isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                  className={cn("min-h-[44px] rounded-full px-4 text-[14px] font-extrabold md:min-h-[40px]", isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                   Huset
                 </button>
                 {team && me.teams.length > 1 ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button type="button" role="tab" aria-selected={!isHouse} aria-label={`Team: ${team.name}. Vælg team`}
-                        className={cn("flex min-w-0 overflow-hidden min-h-[40px] max-w-[45%] md:max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                        className={cn("flex min-w-0 overflow-hidden min-h-[44px] md:min-h-[40px] max-w-[45%] md:max-w-[220px] items-center gap-1 rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                         <span className="truncate">{team.name}</span><ChevronDown className="h-4 w-4 flex-none" aria-hidden="true" />
                       </button>
                     </DropdownMenuTrigger>
@@ -292,7 +292,7 @@ function PulsenFeed() {
                   </DropdownMenu>
                 ) : team && (
                   <button type="button" role="tab" aria-selected={!isHouse} onClick={() => setTab("team")}
-                    className={cn("min-w-0 overflow-hidden min-h-[40px] max-w-[45%] md:max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
+                    className={cn("min-w-0 overflow-hidden min-h-[44px] md:min-h-[40px] max-w-[45%] md:max-w-[200px] truncate rounded-full px-4 text-[14px] font-extrabold", !isHouse ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground")}>
                     {team.name}
                   </button>
                 )}
