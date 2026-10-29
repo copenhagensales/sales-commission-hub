@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -124,18 +124,27 @@ function rydAndreGenerationer(m: Map<string, unknown>): void {
   for (const k of [...m.keys()]) if (!k.startsWith(pre)) m.delete(k);
 }
 /*
- * B2c-2b-2 (rest fra B2c-2a): kaldes under render og skriver i et modul-lager (ingen React-state). Det er sikkert:
- * skrivningen er idempotent for samme (generation, samtale, id, frist, nu) – StrictMode-dobbeltrender og en kasseret
- * concurrent render giver samme resultat; den markerer kun en frist, som klientens ur allerede har passeret
- * (erUdloebet), og sletter kun gamle generationers nøgler, som aldrig kan matche igen. Ingen lyttere meldes.
+ * B2bc-5b §2 (erstatter begrundelsen fra B2c-2b-2): render læser kun lageret. Registrering sker udelukkende i
+ * effekter/callbacks via `kontrollerUdloeb`, så en suspenderet eller kasseret render aldrig ændrer andre visningers
+ * udløbsbevis. Rent læsende: kendt registreret frist ELLER frist passeret ved `nu`.
  */
 export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): boolean {
+  if (!frist) return false;
+  if (kendteUdloebne.get(kuNoegle(emp, conv, id)) === frist) return true;
+  return erUdloebet(frist, nu);
+}
+/**
+ * B2bc-5b §2: skrivende fristkontrol – kun i effekt/callback (aldrig under render). Registrerer en passeret frist
+ * som kendt udløbet (urhop tilbage genopliver intet), afslutter forløbet ved ny frist eller ingen frist
+ * (SQL-pladsholder). Returnerer true, når rækken er (kendt) udløbet; `nyRegistreret` meldes via returværdien `ny`.
+ */
+export function kontrollerUdloeb(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): { udloebet: boolean; ny: boolean } {
   const k = kuNoegle(emp, conv, id);
-  if (!frist) { kendteUdloebne.delete(k); return false; }
-  if (kendteUdloebne.get(k) === frist) return true;
-  if (erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, frist); return true; }
+  if (!frist) { kendteUdloebne.delete(k); return { udloebet: false, ny: false }; }
+  if (kendteUdloebne.get(k) === frist) return { udloebet: true, ny: false };
+  if (erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, frist); return { udloebet: true, ny: true }; }
   kendteUdloebne.delete(k); // ny gyldig frist: gammelt forløb afsluttet
-  return false;
+  return { udloebet: false, ny: false };
 }
 /** Er id'et knyttet til en kendt udløbet serverrække (også efter at rækken er forsvundet fra RLS)? */
 export const harKendtUdloebet = (emp: string | null | undefined, conv: string, id: string) => kendteUdloebne.has(kuNoegle(emp, conv, id));
@@ -1665,8 +1674,13 @@ export function stopEfterbehandling(emp: string, conv: string, id?: string): voi
  * arbejde beholdes til egen afslutning; andre afsendelser og kladder i samtalen røres ikke.
  */
 export function fristOprydning(emp: string, conv: string, id: string): void {
+  // B2bc-5b §2: invalidér først (stopvejen), ryd derefter – uafhængigt af om boblen er monteret.
   stopEfterbehandling(emp, conv, id);
   if (ukendte.delete(hNoegle(sessionsGeneration(), emp, conv, id))) hMeld();
+  // Åben/gemt redigeringskladde og lokal Ret-lås for det udløbne indhold. En fysisk igangværende Gem (art 'gem')
+  // beholder sin lås til egen afslutning; dens operation er allerede annulleret ovenfor.
+  sletRetKladde(emp, conv, id);
+  frigivRet(emp, conv, id);
 }
 /** Efter bekræftet INSERT/sb_ret/sb_fjern_fil: genhent og tjek rigtig revision; ejerskab før hvert kald og cachetrin. */
 function efterHandling(qc: QueryClient, ejer: OperationsEjer, conversationId: string, messageId: string) {
