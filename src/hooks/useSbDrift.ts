@@ -46,11 +46,11 @@ export const erPauseKendt = (qc: QueryClient, bruger: string, gen: number) => pa
  * åben kun hvis mindst én klient kender porten åben for sessionen og ingen klient har den lukket (fail-closed).
  */
 const modelPorte = new WeakMap<QueryClient, Map<string, boolean>>();
-const portKlienter = new Set<WeakRef<QueryClient>>();
+const alleporte = new Set<Map<string, boolean>>(); // kun portkort (små), ikke QueryClients
 const testPorte = new Map<string, boolean>(); // kun saetModelPort uden qc (eksisterende prøveopsætninger)
 function portMap(qc: QueryClient): Map<string, boolean> {
   let m = modelPorte.get(qc);
-  if (!m) { m = new Map(); modelPorte.set(qc, m); portKlienter.add(new WeakRef(qc)); }
+  if (!m) { m = new Map(); modelPorte.set(qc, m); alleporte.add(m); }
   return m;
 }
 export function tjekPortAaben(bruger: string | null | undefined, gen: number, qc?: QueryClient): boolean {
@@ -59,10 +59,8 @@ export function tjekPortAaben(bruger: string | null | undefined, gen: number, qc
   if (qc) return modelPorte.get(qc)?.get(k) === true;
   let aaben = testPorte.get(k);
   if (aaben === false) return false;
-  for (const r of portKlienter) {
-    const c = r.deref();
-    if (!c) { portKlienter.delete(r); continue; }
-    const v = modelPorte.get(c)?.get(k);
+  for (const m of alleporte) {
+    const v = m.get(k);
     if (v === false) return false;
     if (v === true) aaben = true;
   }
