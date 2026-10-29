@@ -2001,7 +2001,7 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     const b: Record<string, unknown> = {};
     const res = () => ({ data: t === "chat_conversations" || t === "chat_conversation_members" ? (o.slettet ? [{ id: "x" }] : []) : null, error: null });
     Object.assign(b, {
-      select: () => b, eq: () => b, delete: () => b,
+      select: () => b, eq: () => b, delete: () => b, abortSignal: () => b,
       single: () => Promise.resolve({ data: o.conv, error: null }),
       then: (ok: (v: unknown) => unknown, f?: (e: unknown) => unknown) => Promise.resolve(res()).then(ok, f),
     });
