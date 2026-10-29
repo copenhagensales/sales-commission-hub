@@ -1373,7 +1373,7 @@ async function laesRaekke(id: string): Promise<Raekke | null | "fejl"> {
     const { data, error } = await supabase.from("chat_messages").select("status, revision, content, attachment_path").eq("id", id).maybeSingle();
     if (error) return "fejl";
     if (!data) return null;
-    return { status: String(data.status), revision: Number(data.revision), content: String(data.content ?? ""), attachment_path: (data.attachment_path as string | null) ?? null };
+    return { status: String(data.status), revision: Number(data.revision), content: String(data.content ?? ""), attachment_path: typeof data.attachment_path === "string" ? data.attachment_path : null };
   } catch { return "fejl"; }
 }
 export type Vurdering = "bekraeftet" | "konflikt" | "ukendt";
@@ -1510,7 +1510,7 @@ export async function tjekUdfaldIgen(qc: QueryClient, emp: string, conv: string,
 const tjekAktive = new Set<string>();
 export const aktiveTjek = () => tjekAktive.size;
 const erTransport = (error: unknown) => {
-  const navn = (error as { name?: string } | null)?.name;
+  const navn = typeof error === "object" && error !== null && "name" in error ? error.name : undefined;
   return navn === "FunctionsFetchError" || navn === "FunctionsRelayError";
 };
 async function laesStatus(id: string): Promise<{ status: string; revision: number } | null> {

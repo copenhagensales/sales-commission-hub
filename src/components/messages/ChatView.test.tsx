@@ -4,9 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 
+/** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
+const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const mutateAsync = vi.fn();
-const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false, ægteFil: false, opdateret: 0 }));
-const kvitMutate = vi.hoisted(() => ({ fn: (() => undefined) as (...a: unknown[]) => void }));
+const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0 }; });
+const kvitMutate = vi.hoisted(() => { const fn: (...a: unknown[]) => void = () => undefined; return { fn }; });
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
 const udstedUpload = vi.fn();
@@ -1443,7 +1445,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     ];
     await klar();
     fokus.mockRestore();
-    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds: string[] }).messageIds);
+    const ids = kvit.mock.calls.flatMap((c) => { const v = arg(c[0], "messageIds"); return Array.isArray(v) ? v : []; });
     expect(ids).toContain("vist");
     expect(ids).not.toContain("skjult");
   });
@@ -1599,7 +1601,7 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
     vi.setSystemTime(T0 + 1500);
     fokus.mockReturnValue(true);
     await act(async () => { window.dispatchEvent(new Event("focus")); });
-    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds?: string[] }).messageIds ?? []);
+    const ids = kvit.mock.calls.flatMap((c) => { const v = arg(c[0], "messageIds"); return Array.isArray(v) ? v : []; });
     expect(ids).not.toContain("u1");
     expect(ids).toContain("v1");
     fokus.mockRestore();
@@ -1656,7 +1658,7 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     const b = fremmed("b", "B-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
     beskeder.liste = [a, b];
     let r = render(wrap(<ChatView conversationId="A" />));
-    const svar = async (liste: unknown[]) => { beskeder.liste = liste as typeof beskeder.liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    const svar = async (liste: unknown[]) => { beskeder.liste = liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(n()).toBe(1); // ét fælles kald for begge forfaldne forløb
     await svar([a]); // b bortfalder – nulstiller ikke a (ingen ny 500 ms-start)

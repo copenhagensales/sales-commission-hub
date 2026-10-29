@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { fastholdEjer, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
 
 /** c3 §7: rigtige auth-callbacks (registreret én gang i modulet). */
+/** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
+const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const auth = (e: string, bruger: string | null) => {
   registrerKladdeOprydning();
   const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
@@ -799,7 +801,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       const c = startTjekHvisNoedvendigt("m", () => true, ejer);
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(2);
-      expect(graense.invoke.mock.calls.map((x) => (x[1] as { body: { revision: number } }).body.revision)).toEqual([2, 3]);
+      expect(graense.invoke.mock.calls.map((x) => arg(x[1], "body", "revision"))).toEqual([2, 3]);
       for (const f of slip) f();
       await vi.advanceTimersByTimeAsync(0);
       await Promise.all([a, b, c]); // alle forløb afsluttet før timerreset
@@ -858,7 +860,7 @@ describe("B2b-2 – auth-skift efter mutate, men før mutationFn", () => {
     auth("SIGNED_IN", "anden");
     const e = await p;
     expect(supabase.rpc).not.toHaveBeenCalled();
-    expect((e as Error).name).toBe("HandlingsFejl");
+    expect(e instanceof Error ? e.name : null).toBe("HandlingsFejl");
     auth("SIGNED_IN", "u");
     unmount(); qc.clear();
   });
@@ -959,7 +961,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     rpc().mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     svar.chat_messages = [r(3)];
     const f = await result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }).then(() => null, (x) => x);
-    expect(f).toBeInstanceOf(HandlingsFejl); expect((f as HandlingsFejl).art).toBe("konflikt");
+    expect(f).toBeInstanceOf(HandlingsFejl); expect(f instanceof HandlingsFejl ? f.art : null).toBe("konflikt");
     expect(rpc()).toHaveBeenCalledTimes(1);
     expect(udfaldSnapshot("e", "c", ID)).toBeNull();
     expect(aktiveHandlinger()).toBe(0);
@@ -972,7 +974,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     rpc().mockResolvedValueOnce({ data: 7, error: null });
     svar.chat_messages = [r(1)];
     const f = await result.current.mutateAsync({ messageId: ID, content: "ny", conversationId: "c", revision: 1, ejer: e, kladdeVersion: 9 }).then(() => null, (x) => x);
-    expect((f as HandlingsFejl).art).toBe("ukendt");
+    expect(f instanceof HandlingsFejl ? f.art : null).toBe("ukendt");
     expect(udfaldSnapshot("e", "c", ID)).toMatchObject({ art: "gem", startRevision: 1, forventet: { revision: 2, content: "ny" }, kladdeVersion: 9, bekraeftet: false });
     await afslut();
   });
@@ -1089,7 +1091,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     stopEfterbehandling("e", "c");
     slip(r(1));
     const f = await p;
-    expect((f as HandlingsFejl).art).toBe("stoppet");
+    expect(f instanceof HandlingsFejl ? f.art : null).toBe("stoppet");
     expect(udfaldSnapshot("e", "c", ID)).toBeNull();
     expect(toast.error).not.toHaveBeenCalled();
     expect(inv).not.toHaveBeenCalled();
@@ -1400,7 +1402,7 @@ describe("B2b-4a §1 – resultat frigiver ikke det gamle grundlag før faktisk 
     graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
     svar.chat_messages = [r(5, { status: "leveret" })];
     const f = await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e2, fejltekst: "x" }).then(() => null, (x) => x);
-    expect((f as HandlingsFejl).art).toBe("afvist");
+    expect(f instanceof HandlingsFejl ? f.art : null).toBe("afvist");
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith("Kun afventende indhold kan sendes"));
     expect(graense.rpc).toHaveBeenCalledTimes(2);
   });
@@ -1417,14 +1419,14 @@ describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek",
     // Mock af SDK-grænsen (rigtig SDK-prøve er B2b-4b): token afventes inde i invoke, derefter fetch med signal.
     let slipToken!: () => void; let http = 0;
     graense.invoke.mockImplementationOnce(async (...a: unknown[]) => {
-      const o = a[1] as { signal?: AbortSignal };
+      const signal = arg(a[1], "signal");
       await new Promise<void>((x) => { slipToken = x; });
-      if (o.signal?.aborted) return { error: { name: "FunctionsFetchError" } };
+      if (signal instanceof AbortSignal && signal.aborted) return { error: { name: "FunctionsFetchError" } };
       http++; return { error: null };
     });
     const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
     await vi.waitFor(() => expect(graense.invoke).toHaveBeenCalledTimes(1));
-    const sig = (graense.invoke.mock.calls[0][1] as { signal?: AbortSignal }).signal;
+    const sig0 = arg(graense.invoke.mock.calls[0][1], "signal"); const sig = sig0 instanceof AbortSignal ? sig0 : null;
     expect(sig).toBeInstanceOf(AbortSignal);
     expect(sig?.aborted).toBe(false);
     stopEfterbehandling("e", "c", "m");
@@ -1445,7 +1447,7 @@ describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek",
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
     await vi.waitFor(() => expect(graense.invoke).toHaveBeenCalledTimes(1));
-    const sig = (graense.invoke.mock.calls[0][1] as { signal?: AbortSignal }).signal;
+    const sig0 = arg(graense.invoke.mock.calls[0][1], "signal"); const sig = sig0 instanceof AbortSignal ? sig0 : null;
     auth("SIGNED_OUT", null);
     expect(sig?.aborted).toBe(true);
     slip(); await p;
