@@ -2080,4 +2080,14 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     rydSlettetSamtale("e", "S", genNu() - 1);
     expect(laesKladde("e", "S")?.tekst).toBe("ny brugers kladde");
   });
+
+  it("lokale editorlåse ryddes; fysisk Gem beholder sin lås til egen afslutning", async () => {
+    auth("SIGNED_IN", "u");
+    const ejer = fastholdEjer("e", "S", "u")!;
+    expect(tagHandling(ejer, "r", "ret")).toBe(true);
+    expect(tagHandling(fastholdEjer("e", "S", "u"), "g", "gem")).toBe(true);
+    rydSlettetSamtale("e", "S", genNu());
+    expect(handlingFor("e", "S", "r").art).toBeNull();
+    expect(handlingFor("e", "S", "g").art).toBe("gem");
+  });
 });
