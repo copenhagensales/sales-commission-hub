@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, afslutFristForsoeg, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, registrerSamtaleStop, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, svarHentStart, synkFristForloeb, fyrFristForloeb, afslutFristForsoeg, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, registrerSamtaleStop, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -388,13 +388,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
     // Render før frist → effekt efter frist: en nyregistreret, endnu vist række udløser én ny render.
     const t = Date.now();
     let ny = false;
-    const reg = (id: string | undefined, frist: string | null | undefined) => {
+    // B2-6C §C: hver kilde registreres med sit eget startbevis; kun en læsning startet efter registreringen kan
+    // ophæve et kendt udløb (ophævelse udløser én ny render, så legitim nyere servertilstand vises).
+    const reg = (id: string | undefined, frist: string | null | undefined, start: number) => {
       if (!id) return;
       const vist = !erKendtUdloebet(meId, conversationId, id, frist, fristNu);
-      if (kontrollerUdloeb(meId, conversationId, id, frist, t).ny && vist) ny = true;
+      const r = kontrollerUdloeb(meId, conversationId, id, frist, t, start);
+      if ((r.ny && vist) || r.ophaevet) ny = true;
     };
-    for (const m of messages ?? []) { reg(m.id, m.slettes_efter); if (m.reply_to) reg(m.reply_to.id, m.reply_to.slettes_efter); }
-    if (!svarITraad && svarOpslag.data) reg(svarOpslag.data.id, svarOpslag.data.slettes_efter);
+    for (const m of messages ?? []) { reg(m.id, m.slettes_efter, hentStart); if (m.reply_to) reg(m.reply_to.id, m.reply_to.slettes_efter, hentStart); }
+    if (!svarITraad && svarOpslag.data) reg(svarOpslag.data.id, svarOpslag.data.slettes_efter, svarHentStart(svarOpslag.data));
     if (ny) setUdloebSlag((x) => x + 1);
   });
 

@@ -425,7 +425,8 @@ export function useMessages(conversationId: string | null) {
     structuralSharing: false,
     queryFn: async ({ pageParam }): Promise<Message[]> => {
       if (!conversationId) return [];
-      const start = traadHentSekvens(conversationId) + 1;
+      // B2-6C §C: samme globale læsesekvens som fristbeviset (strengt stigende, også pr. samtale).
+      const start = laesStart();
       traadSekvens.set(conversationId, start);
       const ud = await hentSide(conversationId, pageParam);
       sideStart.set(ud, start);

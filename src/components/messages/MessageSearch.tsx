@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useSearchMessages, onChatSignal, useFristUr, erKendtUdloebet, kontrollerUdloeb, type SoegeResultat } from "@/hooks/useChat";
-import { sessionsGeneration } from "@/lib/sbKladder";
+import { sessionsGeneration, laesStart } from "@/lib/sbKladder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,8 +34,9 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
     const sg = sessionsGeneration();
     sidst.current = q;
     setFase({ art: "henter", q, sg });
+    const start = laesStart(); // B2-6C §C: startbevis før læsningen sendes
     searchMessages.mutateAsync(q).then(
-      (data) => { if (g === gen.current && sg === sessionsGeneration()) setFase({ art: "resultat", q, sg, data }); },
+      (data) => { if (g === gen.current && sg === sessionsGeneration()) setFase({ art: "resultat", q, sg, data, start }); },
       () => { if (g === gen.current && sg === sessionsGeneration()) setFase({ art: "fejl", q, sg }); },
     );
   };
