@@ -4,9 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 
+/** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
+const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const mutateAsync = vi.fn();
-const beskeder = vi.hoisted(() => ({ liste: [] as unknown[], ægteSend: false, ægteFil: false, opdateret: 0 }));
-const kvitMutate = vi.hoisted(() => ({ fn: (() => undefined) as (...a: unknown[]) => void }));
+const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0 }; });
+const kvitMutate = vi.hoisted(() => { const fn: (...a: unknown[]) => void = () => undefined; return { fn }; });
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
 const udstedUpload = vi.fn();
@@ -120,11 +122,23 @@ beforeEach(() => {
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
 // d2 §4: afmontér komponenter og ryd QueryClient efter hver prøve (ikke kun generationsreset).
-afterEach(() => { cleanup(); qc.clear(); });
+// B2b-4b §3: tilbageholdte prøvepromises afsluttes altid (afvises), og alle køforløb stoppes før næste prøve.
+const aabne: Array<() => void> = [];
+function holdt<T>(): Promise<T> { return new Promise<T>((_r, rej) => { aabne.push(() => rej(new Error("prøveslut"))); }); }
+afterEach(async () => {
+  cleanup();
+  for (const x of aabne.splice(0)) x();
+  await new Promise((x) => setTimeout(x, 0));
+  const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
+  for (const conv of ["A", "B", "c"]) stopAfstemninger("e", conv);
+  // Kontrol: ingen aktive pladser, ventere eller køposter lækker til næste prøve.
+  expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
+  qc.clear();
+});
 
 describe("T1 – ChatView afsendelse", () => {
   it("dobbelt Send og Enter+klik giver én afsendelse", async () => {
-    mutateAsync.mockReturnValue(new Promise(() => undefined));
+    mutateAsync.mockReturnValue(holdt());
     await klar();
     skriv("hej");
     await act(async () => {
@@ -148,10 +162,11 @@ describe("T1 – ChatView afsendelse", () => {
     expect(hentAfsendelser("e", "A").map((x) => x.tekst)).toEqual(["B"]);
     expect(hentAfsendelser("e", "A").some((x) => x.id === idA)).toBe(false);
     expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("ny kladde");
+    await act(async () => { b.res({}); await b.p; }); // B2b-4b: kontrolleret promise afsluttes
   });
 
   it("A–B–A: pending A overlever samtaleskift, kladde skrives ikke under ny nøgle", async () => {
-    mutateAsync.mockReturnValue(new Promise(() => undefined));
+    mutateAsync.mockReturnValue(holdt());
     const r = await klar("A");
     skriv("til A"); await act(async () => { fireEvent.click(send()); });
     skriv("kladde A");
@@ -166,7 +181,7 @@ describe("T1 – ChatView afsendelse", () => {
   });
 
   it("valgt fil under upload: Send er låst", async () => {
-    udstedUpload.mockReturnValue(new Promise(() => undefined));
+    udstedUpload.mockReturnValue(holdt());
     const { container } = await klar();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(input, { target: { files: [new File(["x"], "x.txt", { type: "text/plain" })] } }); });
@@ -369,7 +384,7 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
     await klar();
     expect(screen.getByText("Filen kunne ikke uploades – prøv igen")).toBeInTheDocument();
     expect(send()).toBeDisabled();
-    udstedUpload.mockReturnValueOnce(new Promise(() => undefined));
+    udstedUpload.mockReturnValueOnce(holdt());
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prøv igen" })); });
     expect(udstedUpload).toHaveBeenCalledTimes(2);
     expect(screen.getByText("Uploader …")).toBeInTheDocument();
@@ -458,7 +473,7 @@ describe("§3 – lageret ejer uploadforløbet (B2a-b3)", () => {
 
   it("filbytes, token og preview-URL gemmes aldrig i sessionStorage", async () => {
     udstedUpload.mockResolvedValueOnce({ sti: "c/e/x.png", token: "HEMMELIGT-TOKEN", conversationId: "A" });
-    uploadTilSti.mockReturnValueOnce(new Promise(() => undefined));
+    uploadTilSti.mockReturnValueOnce(holdt());
     const r = await klar();
     await vaelg(r.container, new File(["BYTES"], "x.png", { type: "image/png" }));
     await tick();
@@ -1363,14 +1378,14 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     const frist = om(300);
     const signaler: AbortSignal[] = [];
     let n = 0;
-    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: string, init?: RequestInit) => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((_u: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       if (init?.signal) signaler.push(init.signal);
       n++;
       if (n === 1) return Promise.resolve(new Response("filindhold", { status: 200, headers: { "Content-Type": "text/plain" } }));
       if (n === 2) return Promise.resolve(new Response(new Uint8Array([1, 2]), { status: 200, headers: { "Content-Type": "image/png" } }));
       // Pågående hentning, der skal aborteres (afvises ved abort, så sbFil's plads frigives).
-      return new Promise((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
-    }) as typeof fetch);
+      return new Promise<Response>((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
+    });
     // jsdom mangler Blob.text(); læses via FileReader (kun prøvemiljø).
     if (!Blob.prototype.text) {
       Blob.prototype.text = function (this: Blob) {
@@ -1443,7 +1458,7 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     ];
     await klar();
     fokus.mockRestore();
-    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds: string[] }).messageIds);
+    const ids = kvit.mock.calls.flatMap((c) => { const v = arg(c[0], "messageIds"); return Array.isArray(v) ? v : []; });
     expect(ids).toContain("vist");
     expect(ids).not.toContain("skjult");
   });
@@ -1599,7 +1614,7 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
     vi.setSystemTime(T0 + 1500);
     fokus.mockReturnValue(true);
     await act(async () => { window.dispatchEvent(new Event("focus")); });
-    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds?: string[] }).messageIds ?? []);
+    const ids = kvit.mock.calls.flatMap((c) => { const v = arg(c[0], "messageIds"); return Array.isArray(v) ? v : []; });
     expect(ids).not.toContain("u1");
     expect(ids).toContain("v1");
     fokus.mockRestore();
@@ -1656,7 +1671,7 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     const b = fremmed("b", "B-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
     beskeder.liste = [a, b];
     let r = render(wrap(<ChatView conversationId="A" />));
-    const svar = async (liste: unknown[]) => { beskeder.liste = liste as typeof beskeder.liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    const svar = async (liste: unknown[]) => { beskeder.liste = liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(n()).toBe(1); // ét fælles kald for begge forfaldne forløb
     await svar([a]); // b bortfalder – nulstiller ikke a (ingen ny 500 ms-start)

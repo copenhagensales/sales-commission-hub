@@ -1,3 +1,4 @@
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -29,17 +30,28 @@ vi.mock("./FilVedhaeftning", () => ({ FilVedhaeftning: () => null }));
 import { MessageBubble } from "./MessageBubble";
 import { gemRetKladde, laesRetKladde, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
 import { supabase } from "@/integrations/supabase/client";
+
+// B2b-4b §3: typede auth-callbacks uden typeomgåelse – fuld Session bygges fra bruger-id.
+const sessionFor = (id: string): Session => ({ access_token: `jwt-${id}`, refresh_token: "r", expires_in: 3600, token_type: "bearer",
+  user: { id, app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" } });
+const authCb = (e: AuthChangeEvent, s: { user: { id: string } } | null): void => {
+  const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0];
+  void cb(e, s ? sessionFor(s.user.id) : null);
+};
 import { toast } from "sonner";
 import { hasUnsentDrafts } from "@/components/mobile";
 import type { Message } from "@/hooks/useChat";
 
 const besked = (id: string, content: string, revision = 1): Message => ({
   id, conversation_id: "c", sender_id: "e", content, status: "leveret", revision, created_at: "2026-10-28T10:00:00Z",
-  leveret_at: "2026-10-28T10:00:00Z", edited_at: null, reactions: [], read_receipts: [],
-} as unknown as Message);
+  leveret_at: "2026-10-28T10:00:00Z", edited_at: null, reactions: [], read_receipts: [], attachment_path: null,
+  updated_at: "2026-10-28T10:00:00Z", afventer_fra: null, trukket_tilbage_at: null, slettes_efter: null, personoplysning: false, vaern_niveau: 0,
+});
 
 let qc: QueryClient;
 const wrap = (n: ReactNode) => <QueryClientProvider client={qc}>{n}</QueryClientProvider>;
+/** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
+const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const felt = () => screen.queryByRole("textbox") as HTMLTextAreaElement | null;
 // B2b-4a: den cachede InfiniteData-liste (samme form som useMessages) – kun en indarbejdet række beviser opdateret visning.
 const liste = (r: { id?: string; status: string; revision: number }) =>
@@ -54,7 +66,7 @@ beforeEach(() => {
   // c3 §7: fast udgangspunkt uafhængigt af rækkefølge: mocket hook, aktiv auth-bruger "u" via rigtig callback.
   aegte.brug = false;
   registrerKladdeOprydning();
-  (vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void)("SIGNED_IN", { user: { id: "u" } });
+  authCb("SIGNED_IN", { user: { id: "u" } });
 });
 
 describe("§7 – gemt redigeringskladde gendannes ved asynkron identitet", () => {
@@ -128,7 +140,7 @@ describe("§1 – prop-skift i MessageBubble giver ingen krydsskrivning", () => 
 });
 
 describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEditMessage)", () => {
-  let auth!: (e: string, s: unknown) => void;
+  let auth: typeof authCb = authCb;
   let svar!: (v: { data: unknown; error: unknown }) => void;
   let afvis!: (e: unknown) => void;
   const kontrolRet = () => graense.rpc.mockImplementationOnce(() =>
@@ -143,7 +155,7 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
     graense.from.mockImplementation((() => chain()));
     vi.mocked(toast.error).mockReset();
     registrerKladdeOprydning();
-    auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    auth = authCb;
     auth("SIGNED_IN", { user: { id: "u" } });
     inv = vi.spyOn(qc, "invalidateQueries");
   });
@@ -236,20 +248,20 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
 });
 
 describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessage, mocket rpc)", () => {
-  let auth!: (e: string, s: unknown) => void;
+  let auth: typeof authCb = authCb;
   const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
   const gem = () => fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
   const konfliktSvar = () => graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } });
   const okSvar = (rev: number) => graense.rpc.mockResolvedValueOnce({ data: rev, error: null });
-  const sendtRevision = (i: number) => (graense.rpc.mock.calls[i][1] as { p_revision: number }).p_revision;
-  const m = (rev: number, content = "server", status = "leveret") => ({ ...besked("m1", content, rev), status } as Message);
+  const sendtRevision = (i: number) => arg(graense.rpc.mock.calls[i][1], "p_revision");
+  const m = (rev: number, content = "server", status: Message["status"] = "leveret"): Message => ({ ...besked("m1", content, rev), status });
 
   beforeEach(() => {
     aegte.brug = true;
     graense.rpc.mockReset();
     graense.from.mockImplementation((() => chain()));
     vi.mocked(toast.error).mockReset();
-    auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    auth = authCb;
     auth("SIGNED_IN", { user: { id: "u" } });
   });
 
@@ -338,7 +350,7 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
     okSvar(2);
     await act(async () => { gem(); });
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
-    expect((graense.rpc.mock.calls[0][1] as { p_tekst: string }).p_tekst.length).toBe(4000);
+    expect(String(arg(graense.rpc.mock.calls[0][1], "p_tekst")).length).toBe(4000);
   });
 });
 
@@ -353,7 +365,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     graense.from.mockImplementation((() => chain()));
     graense.invoke.mockResolvedValue({ data: null, error: null });
     vi.mocked(toast.error).mockReset();
-    const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    const auth = authCb;
     auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } });
   });
 
@@ -407,7 +419,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
 
   it("boblens Træk tilbage: dobbeltklik giver ét sb_afgoer", async () => {
     const nu = new Date().toISOString();
-    const m = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu } as Message;
+    const m: Message = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu };
     let svar!: (v: unknown) => void;
     graense.rpc.mockImplementationOnce((() => new Promise((r) => { svar = r; })));
     render(ui(m, "e"));
@@ -443,7 +455,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
 
   it("B2b-3a: ukendt Træk tilbage fra leveret boble vises i boblen; »Tjek igen« afklarer ved læsning uden ny skrivning", async () => {
     const nu = new Date().toISOString();
-    const m = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu } as Message;
+    const m: Message = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu };
     graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     raekke = { data: { status: "leveret", revision: m.revision, content: "hej", attachment_path: null }, error: null };
     render(ui(m, "e"));
@@ -539,7 +551,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await p;
     await flush();
     await new Promise((x) => setTimeout(x, 2100));
-    const rev = (n: number) => graense.invoke.mock.calls.filter((c) => (c[1] as { body: { revision: number } }).body.revision === n).length;
+    const rev = (n: number) => graense.invoke.mock.calls.filter((c) => arg(c[1], "body", "revision") === n).length;
     expect(rev(1)).toBe(1); // intet genforsøg for det gamle tjek
   });
 });
@@ -551,7 +563,7 @@ describe("B2c-1 §5 – editorspærring ved udløbet indhold (klientens ur)", ()
     try {
       aegte.brug = true;
       graense.rpc.mockReset();
-      const m = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() + 1000).toISOString() } as Message;
+      const m: Message = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() + 1000).toISOString() };
       gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
       render(ui(m, "e"));
       expect(felt()?.value).toBe("min rettelse");
@@ -566,7 +578,7 @@ describe("B2c-1 §5 – editorspærring ved udløbet indhold (klientens ur)", ()
   });
 
   it("gendannet kladde til allerede udløbet række genskabes ikke", () => {
-    const m = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() - 1).toISOString() } as Message;
+    const m: Message = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() - 1).toISOString() };
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
     render(ui(m, "e"));
     expect(felt()).toBeNull();
@@ -575,7 +587,7 @@ describe("B2c-1 §5 – editorspærring ved udløbet indhold (klientens ur)", ()
   });
 
   it("svaruddrag med lokalt udløbet original viser ingen originaltekst", () => {
-    const m = { ...besked("m2", "svar"), reply_to: { id: "o", content: "gammel", sender_id: "s", status: "leveret", slettes_efter: new Date(Date.now() - 1).toISOString(), deleted_at: null } } as Message;
+    const m: Message = { ...besked("m2", "svar"), reply_to: { id: "o", content: "gammel", sender_id: "s", status: "leveret", slettes_efter: new Date(Date.now() - 1).toISOString(), deleted_at: null } };
     render(ui(m, "e"));
     expect(screen.queryByText("gammel")).toBeNull();
     expect(screen.getByText("Beskeden er ikke længere tilgængelig")).toBeTruthy();
@@ -755,7 +767,7 @@ describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", 
       vi.setSystemTime(T0 + 1001);
       r.rerender(ui({ ...m }, "e"));
       r.unmount();
-      const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+      const cb = authCb;
       cb("SIGNED_OUT", null); cb("SIGNED_IN", { user: { id: "u" } }); // ny generation, samme bruger
       vi.setSystemTime(T0 + 310); // ur før fristen i den nye generation
       gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny generation", revision: 1 });

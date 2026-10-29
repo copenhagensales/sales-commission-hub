@@ -1,3 +1,4 @@
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -21,6 +22,14 @@ import { MessageBubble } from "./MessageBubble";
 import { aktiveHandlinger } from "@/hooks/useChat";
 import { rydAlleKladder, registrerKladdeOprydning, laesRetKladde } from "@/lib/sbKladder";
 import { supabase } from "@/integrations/supabase/client";
+
+// B2b-4b §3: typede auth-callbacks uden typeomgåelse – fuld Session bygges fra bruger-id.
+const sessionFor = (id: string): Session => ({ access_token: `jwt-${id}`, refresh_token: "r", expires_in: 3600, token_type: "bearer",
+  user: { id, app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" } });
+const authCb = (e: AuthChangeEvent, s: { user: { id: string } } | null): void => {
+  const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0];
+  void cb(e, s ? sessionFor(s.user.id) : null);
+};
 import { toast } from "sonner";
 import type { Message } from "@/hooks/useChat";
 
@@ -28,14 +37,15 @@ const afventer = (rev: number, fil = false): Message => ({
   id: "m1", conversation_id: "c", sender_id: "e", content: "vist tekst", status: "afventer_afsender", revision: rev,
   created_at: "2026-10-28T10:00:00Z", leveret_at: null, edited_at: null, reactions: [], read_receipts: [],
   attachment_path: fil ? "e/c/f" : null,
-} as unknown as Message);
+  updated_at: "2026-10-28T10:00:00Z", afventer_fra: null, trukket_tilbage_at: null, slettes_efter: null, personoplysning: false, vaern_niveau: 0,
+});
 
 let qc: QueryClient;
-let auth!: (e: string, s: unknown) => void;
+let auth: typeof authCb = authCb;
 const ui = (m: Message, bruger: string | null = "u") => (
   <QueryClientProvider client={qc}>
     <MessageBubble message={m} isOwn currentEmployeeId="e" authBrugerId={bruger} conversationId="c" onReply={() => undefined} />
-  </QueryClientProvider>) as ReactNode;
+  </QueryClientProvider>);
 // Rækkeopslag (antagelse om SQL-adfærd): chat_messages giver `raekke`, begrundelse giver `haard_tone`.
 let raekke: { data: unknown; error: unknown } = { data: null, error: null };
 const chain = (tabel: string) => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b;
@@ -43,6 +53,8 @@ const chain = (tabel: string) => { const b: Record<string, unknown> = {}; for (c
 // B2b-4a: den cachede InfiniteData-liste (samme form som useMessages) – kun en indarbejdet række beviser opdateret visning.
 const liste = (r: { id?: string; status: string; revision: number }) =>
   qc.setQueryData(["chat-messages", "c"], { pages: [[{ id: "m1", ...r }]], pageParams: [0] });
+/** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
+const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const kald = (navn: string) => graense.rpc.mock.calls.filter((c) => c[0] === navn);
 
 beforeEach(() => {
@@ -54,7 +66,7 @@ beforeEach(() => {
   raekke = { data: null, error: null };
   vi.mocked(toast.error).mockReset();
   registrerKladdeOprydning();
-  auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+  auth = authCb;
   auth("SIGNED_OUT", null); // ny generation pr. prøve: ingen låse fra tidligere prøver
   auth("SIGNED_IN", { user: { id: "u" } });
 });
@@ -63,13 +75,12 @@ describe("T3 (B2b-1) – Ret fra statuskortet fastholder den viste revision", ()
   it("Ret åbner editor med vist tekst; Gem sender den viste revision selv efter genhentning til ny revision", async () => {
     const r = render(ui(afventer(3)));
     fireEvent.click(screen.getByRole("button", { name: "Ret" }));
-    const felt = screen.getByRole("textbox") as HTMLTextAreaElement;
-    expect(felt.value).toBe("vist tekst");
+    expect(screen.getByRole("textbox")).toHaveProperty("value", "vist tekst");
     r.rerender(ui(afventer(4)));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "rettet" } });
     graense.rpc.mockResolvedValueOnce({ data: 4, /* SQL-kontrakt: startrevision 3 + 1 */ error: null });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
-    expect((kald("sb_ret")[0][1] as { p_revision: number }).p_revision).toBe(3);
+    expect(arg(kald("sb_ret")[0][1], "p_revision")).toBe(3);
   });
 
   it("uden auth-bruger åbner Ret ikke editoren", () => {
