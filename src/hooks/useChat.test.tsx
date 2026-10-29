@@ -2091,3 +2091,129 @@ describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
     expect(handlingFor("e", "S", "g").art).toBe("gem");
   });
 });
+
+// ---------- B2-6B §B: sletning/forladelse ved sessionsskift, genoptaget gruppe, rigtig SDK ----------
+import { fastholdSession, sessionGyldig, rydSamtale, laesStart, genoptagSamtale, samtaleRyddet, ejerGyldig as ejerOk, tilfoejAfsendelse as tilfoej6, hentAfsendelser as hent6, gemKladde as gem6, laesKladde as laes6, saetAfsendelsesFil, afsendelsesFil, sessionsGeneration as gen6 } from "@/lib/sbKladder";
+import { useDeleteConversation as useSlet6, ForaeldetSession as Foraeldet6 } from "./useChat";
+import { createClient } from "@supabase/supabase-js";
+describe("B2-6B §B sletning/forladelse: sessionsskift ved hvert ventepunkt", () => {
+  let qc6: QueryClient;
+  const w6 = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc6 }, children);
+  afterEach(() => { graense.from.mockReset(); graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null })); qc6.clear(); });
+  // Trin 0 = medarbejderopslag (rpc), 1 = samtaleopslag, 2–4 = DELETE beskeder/medlemmer/samtale (opretter-sletning).
+  for (const trin of [0, 1, 2, 3, 4]) {
+    it(`trin ${trin} holdt + sessionsskift: nul efterfølgende skrivninger, ingen rydning, ingen genvalidering`, async () => {
+      rydAlleKladder();
+      qc6 = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } } });
+      const inval = vi.spyOn(qc6, "invalidateQueries");
+      gem6("e", "S", { tekst: "kladde", svarId: null });
+      let løs!: () => void;
+      const holdt = <T,>(v: T) => new Promise<T>((r) => { løs = () => r(v); });
+      let n = 0;
+      const skriv: string[] = [];
+      graense.rpc.mockImplementation(() => { const r = { data: "e", error: null }; const p = n++ === trin ? holdt(r) : Promise.resolve(r); return Object.assign(p, { abortSignal: () => p }); });
+      graense.from.mockImplementation((t: string) => {
+        const b: Record<string, unknown> = {};
+        let sletter = false;
+        const svarFor = () => ({ data: t === "chat_messages" ? null : [{ id: "x" }], error: null });
+        const vent = <T,>(v: T) => (n++ === trin ? holdt(v) : Promise.resolve(v));
+        Object.assign(b, {
+          select: () => b, eq: () => b, abortSignal: () => b,
+          delete: () => { sletter = true; skriv.push(t); return b; },
+          single: () => vent({ data: { created_by: "e", is_group: true, direct_key: null }, error: null }),
+          then: (ok: (v: unknown) => unknown, f?: (e: unknown) => unknown) => (sletter ? vent(svarFor()) : Promise.resolve(svarFor())).then(ok, f),
+        });
+        return b;
+      });
+      const { result } = renderHook(() => useSlet6(), { wrapper: w6 });
+      let p!: Promise<unknown>;
+      act(() => { p = result.current.slet("S"); });
+      await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
+      const skrevetFoer = skriv.length;
+      rydAlleKladder(); // logud/brugerskift
+      gem6("e", "S", { tekst: "ny session", svarId: null });
+      const invFoer = inval.mock.calls.length;
+      await act(async () => { løs(); await expect(p).rejects.toBeInstanceOf(Foraeldet6); });
+      expect(skriv.length).toBe(skrevetFoer);
+      expect(laes6("e", "S")?.tekst).toBe("ny session");
+      expect(inval.mock.calls.length).toBe(invFoer);
+    });
+  }
+});
+
+describe("B2-6B §B genoptaget gruppe i samme session", () => {
+  beforeEach(() => { rydAlleKladder(); });
+  it("lukning spærrer; kun læsning startet EFTER lukning genoptager; gamle ejere/callbacks forbliver ugyldige", () => {
+    auth("SIGNED_IN", "u");
+    const gammel = fastholdEjer("e", "G", "u")!;
+    const gammelStart = laesStart(); // læsning startet før lukningen
+    rydSamtale("e", "G");
+    expect(samtaleRyddet("e", "G")).toBe(true);
+    expect(genoptagSamtale("e", "G", gammelStart, gen6())).toBe(false); // vilkårlig gammel cacheindlæsning
+    expect(samtaleRyddet("e", "G")).toBe(true);
+    const a = { id: "n1", tekst: "t", svarId: null, fil: null, tilstand: "sender" as const, fejl: null, tidligereUkendt: false, oprettet: 1 };
+    expect(tilfoej6("e", "G", a)).toBe(false); // tavs bortkastning er nu et kontrollerbart resultat
+    expect(genoptagSamtale("e", "G", laesStart(), gen6())).toBe(true);
+    // Ny forløb: gem kladde, send tekst og fil → præcis én accepteret afsendelse pr. handling.
+    gem6("e", "G", { tekst: "ny kladde", svarId: null });
+    const ny = fastholdEjer("e", "G", "u")!;
+    expect(tilfoej6("e", "G", a, null, ny)).toBe(true);
+    const f = new File(["x"], "f.txt");
+    expect(tilfoej6("e", "G", { ...a, id: "n2" }, f, ny)).toBe(true);
+    expect(hent6("e", "G").map((x) => x.id)).toEqual(["n1", "n2"]);
+    // Gamle callbacks fra det tidligere forløb: ugyldig ejer, ingen ny post, ingen File, kladden urørt.
+    expect(ejerOk(gammel)).toBe(false);
+    expect(tilfoej6("e", "G", { ...a, id: "g1" }, null, gammel)).toBe(false);
+    saetAfsendelsesFil("e", "G", "g2", new File(["y"], "g.txt"));
+    expect(afsendelsesFil("e", "G", "g2")).toBeNull();
+    expect(hent6("e", "G").map((x) => x.id)).toEqual(["n1", "n2"]);
+    expect(laes6("e", "G")?.tekst).toBe("ny kladde");
+  });
+
+  it("fastholdt session: tokenrefresh for samme bruger gyldig; logud/brugerskift ugyldig og signal afbrudt", () => {
+    auth("SIGNED_IN", "u");
+    const s = fastholdSession();
+    auth("TOKEN_REFRESHED", "u");
+    expect(sessionGyldig(s)).toBe(true);
+    expect(s.signal.aborted).toBe(false);
+    auth("SIGNED_IN", "v"); // brugerskift
+    expect(sessionGyldig(s)).toBe(false);
+    expect(s.signal.aborted).toBe(true);
+  });
+});
+
+describe("B2-6B §B rigtig SDK med mocket HTTP: stop under tokenventepunkt", () => {
+  // Rigtig supabase-js-klient; HTTP mockes ved fetch. Mocken opfører sig som platformens fetch: et afbrudt signal
+  // afvises uden transport. Kun ikke-afbrudte kald tælles som transport.
+  async function kør(stop: boolean) {
+    rydAlleKladder();
+    let tokenLøs!: (t: string) => void;
+    const transport: string[] = [];
+    const hentFn = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw new DOMException("afbrudt", "AbortError");
+      transport.push(String(url));
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const klient = createClient("http://lokal.test", "anon", {
+      accessToken: () => new Promise<string>((r) => { tokenLøs = r; }),
+      global: { fetch: hentFn },
+    });
+    const s = fastholdSession();
+    const p = klient.from("chat_conversation_members").delete().eq("conversation_id", "S").abortSignal(s.signal);
+    const r = p.then((x) => x, (e: unknown) => ({ data: null, error: e }));
+    await vi.waitFor(() => expect(tokenLøs).toBeTypeOf("function"));
+    if (stop) rydAlleKladder();
+    tokenLøs("jwt");
+    await r;
+    return { transport, gyldig: sessionGyldig(s) };
+  }
+  it("stop under tokenventen forhindrer gammel transport", async () => {
+    const { transport, gyldig } = await kør(true);
+    expect(gyldig).toBe(false);
+    expect(transport).toEqual([]);
+  });
+  it("positiv kontrol uden stop: præcis én transport", async () => {
+    const { transport } = await kør(false);
+    expect(transport.length).toBe(1);
+  });
+});
