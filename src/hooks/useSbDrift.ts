@@ -40,14 +40,39 @@ function pauseMap(qc: QueryClient): Map<string, PauseTilstand> {
 }
 export const erPauseKendt = (qc: QueryClient, bruger: string, gen: number) => pauseMap(qc).get(sk(bruger, gen))?.pause === true;
 
-/** Modelport for startTjekHvisNoedvendigt: kun kendt tjek_tilladt=true for (bruger, generation) åbner. */
-const modelPorte = new Map<string, boolean>();
-export function tjekPortAaben(bruger: string | null | undefined, gen: number): boolean {
-  return !!bruger && gen === sessionsGeneration() && modelPorte.get(sk(bruger, gen)) === true;
+/**
+ * Modelport for startTjekHvisNoedvendigt, afgrænset pr. QueryClient og (bruger, generation) som pausebeviset.
+ * Med qc: kun denne klients kendte tjek_tilladt=true åbner. Uden qc (kaldere uden QueryClient, fx useChat):
+ * åben kun hvis mindst én klient kender porten åben for sessionen og ingen klient har den lukket (fail-closed).
+ */
+const modelPorte = new WeakMap<QueryClient, Map<string, boolean>>();
+const portKlienter = new Set<WeakRef<QueryClient>>();
+const testPorte = new Map<string, boolean>(); // kun saetModelPort uden qc (eksisterende prøveopsætninger)
+function portMap(qc: QueryClient): Map<string, boolean> {
+  let m = modelPorte.get(qc);
+  if (!m) { m = new Map(); modelPorte.set(qc, m); portKlienter.add(new WeakRef(qc)); }
+  return m;
+}
+export function tjekPortAaben(bruger: string | null | undefined, gen: number, qc?: QueryClient): boolean {
+  if (!bruger || gen !== sessionsGeneration()) return false;
+  const k = sk(bruger, gen);
+  if (qc) return modelPorte.get(qc)?.get(k) === true;
+  let aaben = testPorte.get(k);
+  if (aaben === false) return false;
+  for (const r of portKlienter) {
+    const c = r.deref();
+    if (!c) { portKlienter.delete(r); continue; }
+    const v = modelPorte.get(c)?.get(k);
+    if (v === false) return false;
+    if (v === true) aaben = true;
+  }
+  return aaben === true;
 }
 
-/** Intern: sætter modelporten direkte (bruges af anvendLaesning og prøver ved Supabase-grænsen). */
-export function saetModelPort(bruger: string, gen: number, aaben: boolean): void { modelPorte.set(sk(bruger, gen), aaben); }
+/** Kun prøveopsætninger: sætter modelporten uden at gå gennem RPC-grænsen. */
+export function saetModelPort(bruger: string, gen: number, aaben: boolean, qc?: QueryClient): void {
+  if (qc) portMap(qc).set(sk(bruger, gen), aaben); else testPorte.set(sk(bruger, gen), aaben);
+}
 
 export const driftNoegle = (bruger: string | null, gen: number) => ["sb-24d2-drift", bruger, gen] as const;
 
@@ -58,6 +83,7 @@ export const driftNoegle = (bruger: string | null, gen: number) => ["sb-24d2-dri
 export function registrerPause(qc: QueryClient, bruger: string, gen: number): void {
   if (gen !== sessionsGeneration()) return;
   pauseMap(qc).set(sk(bruger, gen), { pause: true, bevis: ++sekvens });
+  portMap(qc).set(sk(bruger, gen), false); // modelporten lukkes straks for sessionen
   meld();
   void qc.invalidateQueries({ queryKey: driftNoegle(bruger, gen) });
 }
@@ -65,8 +91,11 @@ export function registrerPause(qc: QueryClient, bruger: string, gen: number): vo
 function anvendLaesning(qc: QueryClient, bruger: string, gen: number, l: Laesning): void {
   if (gen !== sessionsGeneration()) return; // gammelt sessionssvar
   const k = sk(bruger, gen);
-  saetModelPort(bruger, gen, l.raekke?.tjek_tilladt === true);
   const m = pauseMap(qc); const nu = m.get(k);
+  // En læsning startet før seneste pausebevis (også forsinket/annulleret) må hverken ophæve pausen eller åbne porten.
+  const aeldre = !!nu && l.start < nu.bevis;
+  if (aeldre) { portMap(qc).set(k, false); meld(); return; }
+  portMap(qc).set(k, l.raekke?.tjek_tilladt === true);
   if (l.raekke?.beskeder_pause) m.set(k, { pause: true, bevis: Math.max(nu?.bevis ?? 0, l.start) });
   else if (l.raekke && nu?.pause && l.start > nu.bevis) m.set(k, { pause: false, bevis: nu.bevis });
   meld();
@@ -105,6 +134,15 @@ export function useSbDrift(enabled: boolean, bruger: string | null | undefined, 
   const { refetch: rq } = q;
   // Samtidige hændelser samles: en igangværende hentning genbruges (cancelRefetch:false).
   const refetch = useCallback(() => { if (aktiv) void rq({ cancelRefetch: false }); }, [aktiv, rq]);
+  // Ægte window focus og synlig fane genhenter ud over focusManager; samles med den til én hentning.
+  useEffect(() => {
+    if (!aktiv) return;
+    const fokus = () => refetch();
+    const synlig = () => { if (document.visibilityState === "visible") refetch(); };
+    window.addEventListener("focus", fokus);
+    document.addEventListener("visibilitychange", synlig);
+    return () => { window.removeEventListener("focus", fokus); document.removeEventListener("visibilitychange", synlig); };
+  }, [aktiv, refetch]);
   const foerste = useRef(true);
   useEffect(() => {
     if (foerste.current) { foerste.current = false; return; }
