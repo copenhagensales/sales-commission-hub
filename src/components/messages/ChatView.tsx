@@ -917,16 +917,21 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {/* B2-6A §A: på telefon står composeren fast over bundbjælken (BOTTOM_NAV_HEIGHT = 64) og safe area. */}
       <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
-        {fil && (
-          <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
-            onRetry={fil.fejl && fil.file && filAaben ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
-        )}
-        {filFejl && (
-          <div className="-mx-2 md:-mx-4 -mt-2 md:-mt-4 mb-2 px-2 md:px-4 py-2 border-b text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
-            <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk filfejl">
-              <X className="h-4 w-4" />
-            </Button>
+        {/* r2 §2(b): fil og filfejl ligger i den faste composer, så de aldrig skjules bag den på telefon. */}
+        {(fil || filFejl) && (
+          <div className="-mx-2 md:-mx-4 -mt-2 md:-mt-4 mb-2">
+          {fil && (
+            <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
+              onRetry={fil.fejl && fil.file && filAaben ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
+          )}
+          {filFejl && (
+            <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
+              <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk filfejl">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           </div>
         )}
         {!drift.filTilladt && <p className="pb-1 text-[14px] md:text-xs text-muted-foreground">Filer kan ikke sendes lige nu</p>}
