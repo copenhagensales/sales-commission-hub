@@ -1954,3 +1954,39 @@ describe("B2bc-5a §3 – trådens hentesekvens: kun requests startet efter hæn
     expect(result.current.hentStart).toBeGreaterThan(haendelse);
   });
 });
+
+describe("B2bc-5b §2 – fristlager: render læser, effekt registrerer; oprydning uden monteret boble", () => {
+  it("erKendtUdloebet skriver ikke: kasseret render efterlader intet udløbsbevis; urhop −690 ms efter registrering genopliver intet", async () => {
+    const { erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet } = await import("./useChat");
+    const frist = new Date(10_000).toISOString();
+    expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001)).toBe(true); // render ser udløb ved eget ur
+    expect(harKendtUdloebet("e", "c5b", "m1")).toBe(false);              // men intet er registreret
+    expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001 - 690)).toBe(false); // uregistreret: ingen bevis
+    expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toEqual({ udloebet: true, ny: true });
+    expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toEqual({ udloebet: true, ny: false }); // ingen løkke
+    expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001 - 690)).toBe(true);
+    // Ny gyldig frist og SQL-pladsholder (null) afslutter forløbet – ingen permanent blokliste.
+    expect(kontrollerUdloeb("e", "c5b", "m1", new Date(99_000).toISOString(), 10_500).udloebet).toBe(false);
+    expect(harKendtUdloebet("e", "c5b", "m1")).toBe(false);
+    kontrollerUdloeb("e", "c5b", "m2", frist, 10_001);
+    expect(kontrollerUdloeb("e", "c5b", "m2", null, 10_001).udloebet).toBe(false);
+    expect(harKendtUdloebet("e", "c5b", "m2")).toBe(false);
+  });
+  it("fristOprydning rydder gemt redigeringskladde og Ret-lås for id'et; andre id'ers kladder og en fysisk Gem-lås røres ikke", async () => {
+    const { fristOprydning, tagHandling, handlingFor, overtagTilGem } = await import("./useChat");
+    const { gemRetKladde, laesRetKladde } = await import("@/lib/sbKladder");
+    gemRetKladde("e", "c5o", { beskedId: "x", tekst: "kladde", revision: 1 });
+    gemRetKladde("e", "c5o", { beskedId: "y", tekst: "anden", revision: 1 });
+    const ejer = fastholdEjer("e", "c5o", "u")!;
+    expect(tagHandling(ejer, "x", "ret")).toBe(true);
+    const ejer2 = fastholdEjer("e", "c5o", "u")!;
+    expect(tagHandling(ejer2, "g", "ret")).toBe(true);
+    expect(overtagTilGem(ejer2, "g", { revision: 1, status: "leveret" })).toBe(true);
+    fristOprydning("e", "c5o", "x");
+    fristOprydning("e", "c5o", "g");
+    expect(laesRetKladde("e", "c5o", "x")).toBeNull();
+    expect(laesRetKladde("e", "c5o", "y")?.tekst).toBe("anden");
+    expect(handlingFor("e", "c5o", "x").art).toBeNull();
+    expect(handlingFor("e", "c5o", "g").art).toBe("gem"); // fysisk arbejde beholder pladsen til egen afslutning
+  });
+});
