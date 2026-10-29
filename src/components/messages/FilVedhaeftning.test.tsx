@@ -15,9 +15,10 @@ import { filHentningsKapacitet } from "@/lib/sbFil";
 
 const sessionFor = (id: string): Session => ({ access_token: `jwt-${id}`, refresh_token: "r", expires_in: 3600, token_type: "bearer",
   user: { id, app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" } });
+let authLytter: ((e: AuthChangeEvent, s: Session | null) => void) | null = null;
 const authCb = (e: AuthChangeEvent, id: string | null) => {
-  const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0];
-  void cb(e, id ? sessionFor(id) : null);
+  if (!authLytter) authLytter = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0];
+  void authLytter(e, id ? sessionFor(id) : null);
 };
 
 type Ctl<T> = { p: Promise<T>; res: (v: T) => void; rej: (e: unknown) => void };
@@ -61,8 +62,8 @@ beforeEach(() => {
   });
   fetchMock = vi.fn(async () => svar(200));
   vi.stubGlobal("fetch", fetchMock);
-  vi.spyOn(URL, "createObjectURL").mockImplementation(() => { const u = `blob:t${++urlNr}`; oprettet.push(u); return u; });
-  vi.spyOn(URL, "revokeObjectURL").mockImplementation((u: string) => { revoked.push(u); });
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, writable: true, value: vi.fn(() => { const u = `blob:t${++urlNr}`; oprettet.push(u); return u; }) });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, writable: true, value: vi.fn((u: string) => { revoked.push(u); }) });
 });
 
 afterEach(async () => {
