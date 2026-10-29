@@ -2409,3 +2409,88 @@ describe("24d2 §1 (g) – modelport i startTjekHvisNoedvendigt", () => {
     expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------- 24d2 §2(c): driftsafvisninger ved modtagelsen (mock ved Supabase-grænsen) ----------
+import { erPauseKendt, driftNoegle } from "@/hooks/useSbDrift";
+import { driftKode, DRIFT_TEKST } from "./useChat";
+
+describe("24d2 §2(c) – pause, filport og optaget barriere", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const ID = "m1";
+  const PAUSE = { code: "P0001", message: "SB24D2_PAUSE" };
+  const r = (revision: number) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null });
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    graense.rpc.mockReset(); insert.mockReset(); kald.length = 0;
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { graense.rpc.mockReset(); for (const k of Object.keys(svar)) delete svar[k]; });
+  const ejer = () => fastholdEjer("e", "c", "u")!;
+  const driftGenhentet = (spy: ReturnType<typeof vi.spyOn>) =>
+    spy.mock.calls.some((c) => JSON.stringify(arg(c[0], "queryKey")) === JSON.stringify(driftNoegle("u", sessionsGeneration())));
+
+  it("driftKode kræver præcis P0001 + ordret kode", () => {
+    expect(driftKode(PAUSE)).toBe("SB24D2_PAUSE");
+    expect(driftKode({ code: "P0002", message: "SB24D2_PAUSE" })).toBeNull();
+    expect(driftKode({ code: "P0001", message: "SB24D2_PAUSE " })).toBeNull();
+    expect(serverTekst({ code: "P0001", message: "SB24D2_FIL_LUKKET" }, "x")).toBe("Filen kunne ikke sendes: filer er lukket lige nu");
+    expect(serverTekst({ code: "P0001", message: "SB24D2_BUSY" }, "x")).toBe("Prøv igen om et øjeblik");
+  });
+
+  it("INSERT afvist med PAUSE: pause registreres og drift genhentes; kendt afvist (samme pending)", async () => {
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    insert.mockResolvedValue({ error: PAUSE });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.art : null).toBe("server");
+    expect(f instanceof SendFejl ? f.message : null).toBe(DRIFT_TEKST.SB24D2_PAUSE);
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
+    expect(driftGenhentet(spy)).toBe(true);
+    expect(kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
+  });
+
+  it("PAUSE efter tidligere ukendt udfald afklarer ikke: forbliver ukendt (Afstemmer), pause registreres", async () => {
+    insert.mockResolvedValue({ error: PAUSE });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, tidligereUkendt: true, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.art : null).toBe("ukendt");
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
+  });
+
+  it("BUSY: ét INSERT uden automatisk gentagelse (retry:0), tekst »Prøv igen om et øjeblik«, ingen pause", async () => {
+    insert.mockResolvedValue({ error: { code: "P0001", message: "SB24D2_BUSY" } });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.message : null).toBe("Prøv igen om et øjeblik");
+    await act(async () => { await new Promise((x) => setTimeout(x, 20)); });
+    expect(kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(false);
+  });
+
+  it("FIL_LUKKET ved kendt afvisning → filteksten", async () => {
+    insert.mockResolvedValue({ error: { code: "P0001", message: "SB24D2_FIL_LUKKET" } });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.message : null).toBe("Filen kunne ikke sendes: filer er lukket lige nu");
+  });
+
+  it.each([
+    ["sb_ret", () => useEditMessage(), (e: ReturnType<typeof fastholdEjer>) => ({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e! }), "gem"],
+    ["sb_fjern_fil", () => useFjernFil(), (e: ReturnType<typeof fastholdEjer>) => ({ messageId: ID, revision: 1, conversationId: "c", ejer: e!, filRef: "e/c/f", fejltekst: "x" }), "fjern"],
+    ["sb_afgoer send", () => useAfgoer(), (e: ReturnType<typeof fastholdEjer>) => ({ messageId: ID, revision: 1, handling: "send" as const, conversationId: "c", ejer: e!, fejltekst: "x" }), "send"],
+  ] as const)("%s afvist med PAUSE: pause registreres og drift genhentes; ét kald", async (navn, hook, input, art) => {
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    graense.rpc.mockResolvedValue({ data: null, error: PAUSE });
+    svar.chat_messages = [r(1)];
+    const { result } = renderHook(() => hook(), { wrapper: wrap });
+    const e = ejer(); expect(tagHandling(e, ID, art)).toBe(true);
+    // @ts-expect-error – it.each samler tre mutationstyper; input matcher hver hook.
+    const f = await result.current.mutateAsync(input(e)).then(() => null, (x: unknown) => x);
+    expect(f instanceof HandlingsFejl ? f.art : null).toBe("afvist");
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
+    expect(driftGenhentet(spy)).toBe(true);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+    expect(String(graense.rpc.mock.calls[0][0])).toBe(navn.split(" ")[0]);
+  });
+});
