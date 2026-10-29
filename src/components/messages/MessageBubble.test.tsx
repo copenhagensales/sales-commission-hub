@@ -311,7 +311,7 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
     r.unmount();
     render(ui(m(4, "v4"), "e"));
     expect(felt()?.value).toBe("før navigation");
-    okSvar(5);
+    okSvar(2) /* SQL-kontrakt: startrevision 1 + 1 */;
     await act(async () => { gem(); });
     expect(sendtRevision(0)).toBe(1);
   });
