@@ -93,6 +93,7 @@ describe("T6 – §6 filhentning og langsom afkodning (B2c-2b-1)", () => {
     await act(async () => { fireEvent.click(b); fireEvent.click(b); });
     await flush();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1); // andet klik startede intet forløb (heller ikke JWT-opslag)
     await act(async () => { c.res(svar(200)); });
     expect(await screen.findByText("hej")).toBeInTheDocument();
   });
@@ -162,14 +163,16 @@ describe("T6 – §6 filhentning og langsom afkodning (B2c-2b-1)", () => {
 
   it("gammelt catch/finally ignoreres: gammel fejl vises ikke og frigiver ikke ny hentning", async () => {
     const c1 = hold<Response>(), c2 = hold<Response>();
-    fetchMock.mockImplementationOnce((_u: string, i: RequestInit) => { i.signal?.addEventListener("abort", () => c1.rej(new TypeError("x"))); return c1.p; })
-      .mockImplementationOnce(() => c2.p);
+    // Den gamle transport ignorerer abort og afsluttes først, efter at den nye hentning er startet.
+    fetchMock.mockImplementationOnce(() => c1.p).mockImplementationOnce(() => c2.p);
     const r = render(vis());
     await klik(); await flush();
     r.rerender(vis({ sti: "c/x/ny.txt" }));
     await flush();
     await klik(); await flush();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    await act(async () => { c1.rej(new TypeError("gammel")); });
+    await flush();
     // Den nye hentning er stadig låst: et tredje klik starter intet.
     fireEvent.click(screen.getByRole("button", { name: "Åbn f.txt" }));
     await flush();
@@ -241,6 +244,15 @@ describe("T6 – §6 filhentning og langsom afkodning (B2c-2b-1)", () => {
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByText("hej")).toBeNull();
+  });
+
+  it("logud/genlogin (ny generation) rydder allerede viste bytes", async () => {
+    render(vis());
+    await klik();
+    expect(await screen.findByText("hej")).toBeInTheDocument();
+    await act(async () => { authCb("SIGNED_OUT", null); });
+    expect(screen.queryByText("hej")).toBeNull();
+    expect(screen.getByRole("button", { name: "Åbn f.txt" })).toBeInTheDocument();
   });
 
   it("session tilhører anden bruger ved JWT-opslag: nul GET", async () => {
