@@ -68,6 +68,7 @@ import {
   HiperMonthlyGoalBoard,
   ShortLinkRedirect,
   PublicUnsubscribe,
+  Komponenter,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -282,6 +283,8 @@ export const routes: RouteConfig[] = [
 
   // KPI Definitions (Owner only)
   { path: "/admin/kpi-definitions", component: redirectTo("/admin?tab=kpi-definitioner"), access: "protected" },
+  // D0 designgrundlag: referenceside for komponentsættet (ikke i menuen)
+  { path: "/admin/komponenter", component: Komponenter, access: "protected" },
 
   // Salary
   { path: "/salary/types", component: redirectTo("/admin?tab=indstillinger&side=types"), access: "protected" },

@@ -162,6 +162,7 @@ export const CommissionLeague = lazyPage(() => import("@/pages/CommissionLeague"
 
 // KPI Definitions (Owner only)
 export const KpiDefinitions = lazyPage(() => import("@/pages/admin/KpiDefinitions"));
+export const Komponenter = lazyPage(() => import("@/pages/admin/Komponenter"));
 
 // Salary
 export const SalaryTypes = lazyPage(() => import("@/pages/SalaryTypes"));
