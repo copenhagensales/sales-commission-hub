@@ -36,6 +36,7 @@ async function startForlad() {
   fireEvent.click(await screen.findByText("Forlad gruppe"));
   fireEvent.click(await screen.findByRole("button", { name: "Forlad" }));
   await vi.waitFor(() => expect(h.afvis).toBeTypeOf("function"));
+  onSelect.mockClear(); // tastaturåbning af menuen bobler til kortet; kun afslutningens kald tæller
   return onSelect;
 }
 
