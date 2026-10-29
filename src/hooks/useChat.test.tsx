@@ -37,13 +37,20 @@ function builder(tabel: string) {
   };
   return b;
 }
+// B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
+
+const graense = vi.hoisted(() => ({
+  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
+  from: vi.fn<(t: string) => unknown>(),
+}));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (t: string) => builder(t),
-    rpc: vi.fn(async () => ({ data: "e", error: null })),
+    rpc: graense.rpc,
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
       getSession: vi.fn(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })) },
-    functions: { invoke: vi.fn(async () => ({ error: null })) },
+    functions: { invoke: graense.invoke },
   },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
@@ -67,7 +74,7 @@ beforeEach(() => {
   for (const k of Object.keys(svar)) delete svar[k];
   for (const k of Object.keys(dyn)) delete dyn[k];
   dynInsert.fn = undefined;
-  vi.mocked(supabase.functions.invoke).mockClear();
+  graense.invoke.mockClear();
   auth("SIGNED_IN", "u"); // fast udgangspunkt: aktiv auth-bruger "u" (uafhængigt af prøverækkefølge)
 });
 
@@ -270,7 +277,7 @@ describe("§1 – gammelt forløb sender aldrig som den nye session (B2a-b1)", (
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     return { inv, ...renderHook(() => useSendMessage(), { wrapper }) };
   };
-  beforeEach(() => { vi.mocked(supabase.rpc).mockClear(); });
+  beforeEach(() => { graense.rpc.mockClear(); });
 
   it("fastholdt ejer: ingen identitetsopslag undervejs, sender_id er den fastholdte", async () => {
     const { result } = opsaet();
@@ -580,8 +587,8 @@ describe("c3 §7 – logud under tjek-genforsøgets ventetid", () => {
       const { result, unmount } = renderHook(() => useSendMessage(), { wrapper });
       svar.chat_messages = [msg(null), msg({ status: "tjekkes", revision: 1 })];
       insert.mockResolvedValueOnce({ error: null });
-      vi.mocked(supabase.functions.invoke).mockClear();
-      vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } } as never);
+      graense.invoke.mockClear();
+      graense.invoke.mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } });
       await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
       await vi.advanceTimersByTimeAsync(0);
       expect(supabase.functions.invoke).toHaveBeenCalledTimes(1); // første tjek er sendt; ventetiden løber
@@ -733,18 +740,18 @@ import { ejerGyldig } from "@/lib/sbKladder";
 describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
   const transport = { error: { name: "FunctionsFetchError" } };
   const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
-  const invokes = () => vi.mocked(supabase.functions.invoke).mock.calls.length;
-  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); vi.mocked(supabase.functions.invoke).mockReset(); });
-  const slut = () => { vi.useRealTimers(); vi.mocked(supabase.functions.invoke).mockReset().mockImplementation((async () => ({ error: null })) as never); };
+  const invokes = () => graense.invoke.mock.calls.length;
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); graense.invoke.mockReset(); });
+  const slut = () => { vi.useRealTimers(); graense.invoke.mockReset().mockImplementation((async () => ({ error: null }))); };
 
   it("samme revision og stadig tjekkes efter transportfejl → præcis ét genforsøg (højst to kald i alt)", async () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2), tjekkes(2)];
-      vi.mocked(supabase.functions.invoke).mockResolvedValue(transport as never);
+      graense.invoke.mockResolvedValue(transport);
       const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
       await vi.advanceTimersByTimeAsync(10000); await p;
       expect(invokes()).toBe(2);
-      expect(vi.mocked(supabase.functions.invoke).mock.calls[1][1]).toMatchObject({ body: { type: "besked", id: "m", revision: 2 } });
+      expect(graense.invoke.mock.calls[1][1]).toMatchObject({ body: { type: "besked", id: "m", revision: 2 } });
       expect(aktiveTjek()).toBe(0);
     } finally { slut(); }
   });
@@ -753,7 +760,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
     "%s efter ventetiden stopper det gamle forløb (intet genforsøg)", async (_n, r2) => {
       try {
         svar.chat_messages = [tjekkes(2), r2];
-        vi.mocked(supabase.functions.invoke).mockResolvedValue(transport as never);
+        graense.invoke.mockResolvedValue(transport);
         const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
         await vi.advanceTimersByTimeAsync(3000); await p;
         expect(invokes()).toBe(1);
@@ -763,7 +770,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
   it("brugerskift under ventetiden stopper det gamle forløb", async () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2)];
-      vi.mocked(supabase.functions.invoke).mockResolvedValue(transport as never);
+      graense.invoke.mockResolvedValue(transport);
       const ejer = fastholdEjer("e", "c", "u")!;
       const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
       await vi.advanceTimersByTimeAsync(0);
@@ -779,7 +786,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2), tjekkes(3)];
       const slip: Array<() => void> = [];
-      vi.mocked(supabase.functions.invoke).mockImplementation((() => new Promise((r) => { slip.push(() => r({ error: null })); })) as never);
+      graense.invoke.mockImplementation((() => new Promise((r) => { slip.push(() => r({ error: null })); })));
       const ejer = fastholdEjer("e", "c", "u")!;
       const a = startTjekHvisNoedvendigt("m", () => true, ejer);
       const b = startTjekHvisNoedvendigt("m", () => true, ejer);
@@ -788,19 +795,19 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       const c = startTjekHvisNoedvendigt("m", () => true, ejer);
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(2);
-      expect(vi.mocked(supabase.functions.invoke).mock.calls.map((x) => (x[1] as { body: { revision: number } }).body.revision)).toEqual([2, 3]);
+      expect(graense.invoke.mock.calls.map((x) => (x[1] as { body: { revision: number } }).body.revision)).toEqual([2, 3]);
       for (const f of slip) f();
       await vi.advanceTimersByTimeAsync(0);
       await Promise.all([a, b, c]); // alle forløb afsluttet før timerreset
       expect(aktiveTjek()).toBe(0);
-      vi.mocked(supabase.functions.invoke).mockReset();
+      graense.invoke.mockReset();
     } finally { slut(); }
   });
 
   it.each([["optaget"], ["forældet"], ["ikke_konfigureret"]])("edge-resultat %s ændrer aldrig status direkte (kun læsninger)", async (status) => {
     try {
       svar.chat_messages = [tjekkes(2)];
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({ data: { status }, error: null } as never);
+      graense.invoke.mockResolvedValue({ data: { status }, error: null });
       await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
       expect(kald.filter((k) => !k.startsWith("select:"))).toEqual([]);
     } finally { slut(); }
@@ -817,7 +824,7 @@ describe("B2b-2 stophul 2 – bekræftet INSERT stoppes under detached statusops
     let statusSvar!: (r: { data: unknown; error: unknown }) => void;
     svar.chat_messages = [msg(null), new Promise((r) => { statusSvar = r; })];
     insert.mockResolvedValueOnce({ error: null });
-    vi.mocked(supabase.functions.invoke).mockClear();
+    graense.invoke.mockClear();
     await result.current.mutateAsync({ ...v, ejer: fastholdEjer("e", "c", "u")! });
     await new Promise((x) => setTimeout(x, 0));
     expect(aktiveEfterbehandlinger()).toBe(1); // detached efterbehandling er synlig for stopvejen
@@ -839,7 +846,7 @@ describe("B2b-2 – auth-skift efter mutate, men før mutationFn", () => {
     const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
     const { result, unmount } = renderHook(() => useEditMessage(), { wrapper });
-    vi.mocked(supabase.rpc).mockClear();
+    graense.rpc.mockClear();
     const ejer = fastholdEjer("e", "c", "u")!;
     expect(tagHandling(ejer, "m", "gem")).toBe(true);
     const p = result.current.mutateAsync({ messageId: "m", content: "x", conversationId: "c", revision: 1, ejer }).catch((e) => e);
@@ -928,7 +935,7 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
   let qc: QueryClient;
   const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
   const ID = "m1";
-  const rpc = () => vi.mocked(supabase.rpc);
+  const rpc = () => graense.rpc;
   const laesninger = () => kald.filter((k) => k === "select:chat_messages").length;
   const r = (revision: number, o: Record<string, unknown> = {}) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null, ...o });
   beforeEach(() => {

@@ -4,8 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 // Netværket mockes ved grænsen; MessageBubble og useDraftGuard er de rigtige.
+// B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
+
+const graense = vi.hoisted(() => ({
+  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
+  from: vi.fn<(t: string) => unknown>(),
+}));
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { onAuthStateChange: vi.fn(), getSession: vi.fn() }, from: vi.fn(), rpc: vi.fn(), functions: { invoke: vi.fn() } },
+  supabase: { auth: { onAuthStateChange: vi.fn(), getSession: vi.fn() }, from: graense.from, rpc: graense.rpc, functions: { invoke: graense.invoke } },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 const editMutate = vi.fn();
@@ -120,7 +127,7 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
   let auth!: (e: string, s: unknown) => void;
   let svar!: (v: { data: unknown; error: unknown }) => void;
   let afvis!: (e: unknown) => void;
-  const kontrolRet = () => vi.mocked(supabase.rpc).mockImplementationOnce((() =>
+  const kontrolRet = () => graense.rpc.mockImplementationOnce((() =>
     new Promise((a, r) => { svar = a; afvis = r; })) as never);
   const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
   const gem = () => fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
@@ -128,8 +135,8 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
 
   beforeEach(() => {
     aegte.brug = true;
-    vi.mocked(supabase.rpc).mockReset();
-    vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
+    graense.rpc.mockReset();
+    graense.from.mockImplementation((() => chain()));
     vi.mocked(toast.error).mockReset();
     registrerKladdeOprydning();
     auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
@@ -228,15 +235,15 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
   let auth!: (e: string, s: unknown) => void;
   const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
   const gem = () => fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
-  const konfliktSvar = () => vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } } as never);
-  const okSvar = (rev: number) => vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: rev, error: null } as never);
-  const sendtRevision = (i: number) => (vi.mocked(supabase.rpc).mock.calls[i][1] as { p_revision: number }).p_revision;
+  const konfliktSvar = () => graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } });
+  const okSvar = (rev: number) => graense.rpc.mockResolvedValueOnce({ data: rev, error: null });
+  const sendtRevision = (i: number) => (graense.rpc.mock.calls[i][1] as { p_revision: number }).p_revision;
   const m = (rev: number, content = "server", status = "leveret") => ({ ...besked("m1", content, rev), status } as Message);
 
   beforeEach(() => {
     aegte.brug = true;
-    vi.mocked(supabase.rpc).mockReset();
-    vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
+    graense.rpc.mockReset();
+    graense.from.mockImplementation((() => chain()));
     vi.mocked(toast.error).mockReset();
     auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     auth("SIGNED_IN", { user: { id: "u" } });
@@ -327,7 +334,7 @@ describe("T3 (B2b-1 §3) – revision og redigeringskladder (rigtig useEditMessa
     okSvar(2);
     await act(async () => { gem(); });
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
-    expect((vi.mocked(supabase.rpc).mock.calls[0][1] as { p_tekst: string }).p_tekst.length).toBe(4000);
+    expect((graense.rpc.mock.calls[0][1] as { p_tekst: string }).p_tekst.length).toBe(4000);
   });
 });
 
@@ -338,9 +345,9 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   beforeEach(() => {
     aegte.brug = true;
     raekke = { data: null, error: null };
-    vi.mocked(supabase.rpc).mockReset();
-    vi.mocked(supabase.from).mockImplementation((() => chain()) as never);
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({ data: null, error: null } as never);
+    graense.rpc.mockReset();
+    graense.from.mockImplementation((() => chain()));
+    graense.invoke.mockResolvedValue({ data: null, error: null });
     vi.mocked(toast.error).mockReset();
     const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     auth("SIGNED_OUT", null); auth("SIGNED_IN", { user: { id: "u" } });
@@ -349,7 +356,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   it("dobbeltklik på Gem giver ét sb_ret", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny", revision: 1 });
     let svar!: (v: unknown) => void;
-    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
+    graense.rpc.mockImplementationOnce((() => new Promise((r) => { svar = r; })));
     render(ui(besked("m1", "gammel"), "e"));
     const gem = screen.getByRole("button", { name: "Gem ændring" });
     fireEvent.click(gem); fireEvent.click(gem);
@@ -363,7 +370,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   it("tabt succes-svar på Gem afstemmes mod rækken (tekst og ny revision) → editor lukkes uden toast", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny tekst", revision: 1 });
     raekke = { data: { status: "tjekkes", revision: 2, content: "ny tekst", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
@@ -375,7 +382,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   it("forældet svar, men rækken har en anden tekst i nyere revision → konflikt vises, kladden bevares", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
     raekke = { data: { status: "leveret", revision: 2, content: "en andens", attachment_path: null }, error: null };
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Forældet revision" } });
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
@@ -385,7 +392,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
 
   it("uventet null fra sb_ret er ikke succes: kladden bevares, ukendt udfald ved editoren", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: null });
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
@@ -398,7 +405,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     const nu = new Date().toISOString();
     const m = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu } as Message;
     let svar!: (v: unknown) => void;
-    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
+    graense.rpc.mockImplementationOnce((() => new Promise((r) => { svar = r; })));
     render(ui(m, "e"));
     const aabn = async () => { const t = screen.getByRole("button", { name: "Flere handlinger" }); fireEvent.keyDown(t, { key: "Enter" }); await flush(); };
     await aabn();
@@ -408,7 +415,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     const punkt = screen.queryByRole("menuitem", { name: "Træk tilbage" });
     if (punkt) fireEvent.click(punkt);
     await flush();
-    expect(vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === "sb_afgoer")).toHaveLength(1);
+    expect(graense.rpc.mock.calls.filter((c) => c[0] === "sb_afgoer")).toHaveLength(1);
     await act(async () => { svar({ data: true, error: null }); });
     await flush();
   });
@@ -416,7 +423,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   // ---------- B2b-3a §1: holdbart ukendt udfald (statuskort/boble/editor) ----------
   it("B2b-3a: ukendt Gem overlever remount – editoren viser tilstanden og »Tjek igen« igen efter genåbning", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
-    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     const r = render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
@@ -433,7 +440,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   it("B2b-3a: ukendt Træk tilbage fra leveret boble vises i boblen; »Tjek igen« afklarer ved læsning uden ny skrivning", async () => {
     const nu = new Date().toISOString();
     const m = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu } as Message;
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
     raekke = { data: { status: "leveret", revision: m.revision, content: "hej", attachment_path: null }, error: null };
     render(ui(m, "e"));
     fireEvent.keyDown(screen.getByRole("button", { name: "Flere handlinger" }), { key: "Enter" });
@@ -446,12 +453,12 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
     await flush();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === "sb_afgoer")).toHaveLength(1);
+    expect(graense.rpc.mock.calls.filter((c) => c[0] === "sb_afgoer")).toHaveLength(1);
   });
 
   it("B2b-3a: sen succes via »Tjek igen« mod nyere kladdeversion bevarer den nyere kladde og editoren", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: null });
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
@@ -466,7 +473,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
 
   it("B2b-3a: sen succes via »Tjek igen« for samme kladdeversion rydder kladden og lukker editoren", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as never);
+    graense.rpc.mockResolvedValueOnce({ data: null, error: null });
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
@@ -480,7 +487,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   it("B2b-3a: sen fejl efter remount mod nyere kladdeversion bevarer den nyere kladde (én toast)", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
     let svar!: (v: unknown) => void;
-    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
+    graense.rpc.mockImplementationOnce((() => new Promise((r) => { svar = r; })));
     const r = render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     r.unmount();
@@ -499,7 +506,7 @@ describe("B2c-1 §5 – editorspærring ved udløbet indhold (klientens ur)", ()
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     try {
       aegte.brug = true;
-      vi.mocked(supabase.rpc).mockReset();
+      graense.rpc.mockReset();
       const m = { ...besked("m1", "original"), slettes_efter: new Date(Date.now() + 1000).toISOString() } as Message;
       gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
       render(ui(m, "e"));
