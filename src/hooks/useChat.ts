@@ -144,9 +144,11 @@ export function synkFristForloeb(emp: string | null | undefined, conv: string, u
   const aktuelle = new Set(udloebne.map((u) => `${pre}${u.id}@${u.frist}`));
   for (const k of [...fristForloeb.keys()]) if (k.startsWith(pre) && !aktuelle.has(k)) fristForloeb.delete(k);
   let min: number | null = null;
-  for (const k of aktuelle) {
+  for (const u of udloebne) {
+    const k = `${pre}${u.id}@${u.frist}`;
     let f = fristForloeb.get(k);
-    if (!f) { f = { n: 0, due: nu + FRIST_GENHENT_MS[0] }; fristForloeb.set(k, f); }
+    // Ur-skævhed: første genhentning ved frist + 500 ms (aldrig før nu).
+    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]) }; fristForloeb.set(k, f); }
     if (f.n >= FRIST_GENHENT_MS.length) continue;
     if (min === null || f.due < min) min = f.due;
   }
