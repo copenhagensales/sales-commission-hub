@@ -2359,3 +2359,26 @@ describe("B2-6C §C fristidentitet på tværs af original og svaruddrag", () => 
     }
   }
 });
+
+// ---------- B2-6A §D: handleSend kræver fastholdt ejer (auth-bruger + session) ----------
+describe("B2-6A §D handleSend uden gyldig auth-ejer", () => {
+  it("auth-lytteren melder anden bruger: intet accepteres, composeren bevares, ingen RPC", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { registrerKladdeOprydning } = await import("@/lib/sbKladder");
+    registrerKladdeOprydning();
+    const kald = vi.mocked(supabase.auth.onAuthStateChange).mock.calls;
+    expect(kald.length).toBeGreaterThan(0);
+    const lyt = kald[0][0];
+    await klar();
+    skriv("hej");
+    try {
+      await act(async () => { lyt("SIGNED_IN", null); }); // ingen leveret auth-bruger
+      await act(async () => { fireEvent.click(send()); });
+      expect(hentAfsendelser("e", "A") ?? []).toHaveLength(0);
+      expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("hej");
+      expect(mutateAsync).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => { lyt("SIGNED_IN", { access_token: "t", user: { id: "u" } } as Parameters<typeof lyt>[1]); });
+    }
+  });
+});
