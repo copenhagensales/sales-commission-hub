@@ -162,6 +162,7 @@ describe("T1 – ChatView afsendelse", () => {
     expect(hentAfsendelser("e", "A").map((x) => x.tekst)).toEqual(["B"]);
     expect(hentAfsendelser("e", "A").some((x) => x.id === idA)).toBe(false);
     expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("ny kladde");
+    await act(async () => { b.res({}); await b.p; }); // B2b-4b: kontrolleret promise afsluttes
   });
 
   it("A–B–A: pending A overlever samtaleskift, kladde skrives ikke under ny nøgle", async () => {
