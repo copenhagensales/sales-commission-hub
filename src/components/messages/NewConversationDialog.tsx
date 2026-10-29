@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst } from "@/hooks/useChat";
+import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst, OpretFejl, OPRETTET_IKKE_HENTET_TEKST } from "@/hooks/useChat";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -90,16 +90,22 @@ export function NewConversationDialog({
     }
   };
 
+  const [hentFejl, setHentFejl] = useState(false);
   const handleCreate = async () => {
-    if (createConversation.isPending) return;
-    const v = validerSamtale(deltagere.length, groupName, isGroup);
-    if ("fejl" in v) { toast.error(v.fejl); return; }
+    // B2d-1 §8: kendt id → kun genhentning; ellers validering og én oprettelse (synkron lås i hooken).
+    if (!createConversation.kendtId) {
+      const v = validerSamtale(deltagere.length, groupName, isGroup);
+      if ("fejl" in v) { toast.error(v.fejl); return; }
+    }
+    const kald = createConversation.opret({
+      name: isGroup ? groupName.trim() : undefined,
+      memberIds: deltagere,
+      isGroup,
+    });
+    if (!kald) return;
     try {
-      const conversation = await createConversation.mutateAsync({
-        name: isGroup ? groupName.trim() : undefined,
-        memberIds: deltagere,
-        isGroup,
-      });
+      const conversation = await kald;
+      setHentFejl(false);
       toast.success("Samtale oprettet");
       onCreated(conversation.id);
       setSelectedIds([]);
@@ -108,10 +114,11 @@ export function NewConversationDialog({
       setSearch("");
     } catch (error) {
       // Valg og navn bevares ved fejl.
+      if (error instanceof OpretFejl && error.art === "hent") { setHentFejl(true); return; }
       toast.error(serverTekst(error, "Kunne ikke oprette samtale"));
     }
   };
-
+  const visHentFejl = hentFejl || !!createConversation.kendtId;
   const isPhone = useIsPhone();
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
