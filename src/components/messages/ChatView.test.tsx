@@ -1409,9 +1409,18 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     await waitFor(() => expect(screen.getByRole("img", { name: "b.png" })).toBeTruthy());
     expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
     expect(screen.getByText("Svarer på:")).toBeTruthy();
+    // B2c-2b-2 (Codex): filåbningernes opsætning er afsluttet og kontrolleret FØR fristen passeres:
+    // tre GET startet, a.txt og b.png vist, c.png står i hentning (abortsignal ikke udløst).
+    expect(n).toBe(3);
+    expect(signaler[2]?.aborted).toBe(false);
+    expect(screen.getByRole("button", { name: "Åbn c.png" })).toBeDisabled();
     const kaldFoer = fetchSpy.mock.calls.length;
-    await act(async () => { vi.setSystemTime(Date.now() + 400); });
-    await vent(700);
+    // Kontrolleret passage: Date.now() sættes eksplicit efter fristen (urhop) og vurderes via forgrundssignalet –
+    // ingen relativ ventetid, ingen vægurfrist. Date er fastfrosset, så den rigtige planlægningstimer ikke kan udløse noget før.
+    await act(async () => { vi.setSystemTime(new Date(frist).getTime() + 1); });
+    expect(Date.now()).toBeGreaterThan(new Date(frist).getTime());
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await act(async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); });
     expect(screen.queryByText("hemmelig")).toBeNull();
     expect(screen.queryByText("filindhold")).toBeNull();
     expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
