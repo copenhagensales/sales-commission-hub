@@ -29,7 +29,7 @@ export function ReadReceipts({ receipts, isOwn }: ReadReceiptsProps) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-0.5 text-xs text-primary-foreground/70 mt-1">
+          <div className="flex items-center gap-0.5 text-xs max-md:text-[14px] text-primary-foreground/70 mt-1">
             <CheckCheck className="h-3 w-3" />
             <span>Læst af {receipts.length}</span>
           </div>
