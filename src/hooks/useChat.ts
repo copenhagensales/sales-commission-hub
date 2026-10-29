@@ -110,6 +110,60 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
   return Date.now();
 }
 
+/**
+ * B2c-2a §1: kendt udløbet pr. (generation, medarbejder, samtale, id) med den konkrete slettes_efter-værdi.
+ * Et urhop tilbage genopliver ikke en kendt udløbet række; ny frist, ingen frist (SQL-pladsholder) eller ny
+ * generation afslutter det gamle forløb (ingen permanent id-blokliste).
+ */
+const kendteUdloebne = new Map<string, string>();
+const kuNoegle = (emp: string | null | undefined, conv: string, id: string) => `${sessionsGeneration()}:${emp ?? ""}:${conv}:${id}`;
+function rydAndreGenerationer(m: Map<string, unknown>): void {
+  const pre = `${sessionsGeneration()}:`;
+  for (const k of [...m.keys()]) if (!k.startsWith(pre)) m.delete(k);
+}
+export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): boolean {
+  const k = kuNoegle(emp, conv, id);
+  if (!frist) { kendteUdloebne.delete(k); return false; }
+  if (kendteUdloebne.get(k) === frist) return true;
+  if (erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, frist); return true; }
+  kendteUdloebne.delete(k); // ny gyldig frist: gammelt forløb afsluttet
+  return false;
+}
+/** Er id'et knyttet til en kendt udløbet serverrække (også efter at rækken er forsvundet fra RLS)? */
+export const harKendtUdloebet = (emp: string | null | undefined, conv: string, id: string) => kendteUdloebne.has(kuNoegle(emp, conv, id));
+
+/**
+ * B2c-2a §1: ur-skævhedsgenhentning pr. konkret fristforløb (generation, medarbejder, samtale, id, slettes_efter).
+ * Budgettet (FRIST_GENHENT_MS: 500 ms + 2/4/8/16/32 s) overlever remount og andre rækkers udløb/bortfald;
+ * gentagne svar med samme frist nulstiller det ikke. Række væk/ændret frist afslutter forløbet.
+ */
+const fristForloeb = new Map<string, { n: number; due: number }>();
+export function synkFristForloeb(emp: string | null | undefined, conv: string, udloebne: ReadonlyArray<{ id: string; frist: string }>, nu: number): number | null {
+  rydAndreGenerationer(fristForloeb);
+  const pre = `${kuNoegle(emp, conv, "")}`;
+  const aktuelle = new Set(udloebne.map((u) => `${pre}${u.id}@${u.frist}`));
+  for (const k of [...fristForloeb.keys()]) if (k.startsWith(pre) && !aktuelle.has(k)) fristForloeb.delete(k);
+  let min: number | null = null;
+  for (const k of aktuelle) {
+    let f = fristForloeb.get(k);
+    if (!f) { f = { n: 0, due: nu + FRIST_GENHENT_MS[0] }; fristForloeb.set(k, f); }
+    if (f.n >= FRIST_GENHENT_MS.length) continue;
+    if (min === null || f.due < min) min = f.due;
+  }
+  return min;
+}
+/** Forbruger ét genforsøg for hvert forfaldent forløb; returnerer om der skal genhentes. */
+export function fyrFristForloeb(emp: string | null | undefined, conv: string, nu: number): boolean {
+  const pre = `${kuNoegle(emp, conv, "")}`;
+  let fyr = false;
+  for (const [k, f] of fristForloeb) {
+    if (!k.startsWith(pre) || f.n >= FRIST_GENHENT_MS.length || f.due > nu) continue;
+    f.n++; fyr = true;
+    if (f.n < FRIST_GENHENT_MS.length) f.due = nu + FRIST_GENHENT_MS[f.n];
+  }
+  return fyr;
+}
+
 /** Ventetider for genhentning, når serveren stadig returnerer en lokalt udløbet række (ure kan afvige). */
 export const FRIST_GENHENT_MS = [500, 2000, 4000, 8000, 16000, 32000] as const;
 
