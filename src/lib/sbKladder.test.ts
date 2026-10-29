@@ -361,9 +361,12 @@ describe("c2 §4 – rydning tåler fejl på selve sessionStorage-getteren", () 
 
 describe("B2a-d1 §2 – annullerOperation", () => {
   it("ugyldiggør kun den annullerede operation; andre operationer i samme session forbliver gyldige", async () => {
-    const m = await import("./sbKladder");
+    // B2c-2a: årsag til ustabilitet – den cachede sbKladder kunne være registreret mod en ældre (resetModules) mock-instans
+    // af klienten, så denne instans havde ingen kald. Friske moduler for både sbKladder og klienten giver ét sikkert kald.
+    const m = await ny();
     const { supabase } = await import("@/integrations/supabase/client");
     m.registrerKladdeOprydning(); // fast udgangspunkt uafhængigt af rækkefølge: aktiv auth-bruger via rigtig callback
+    expect(vi.mocked(supabase.auth.onAuthStateChange).mock.calls.length).toBeGreaterThan(0);
     (vi.mocked(supabase.auth.onAuthStateChange).mock.calls.at(-1)![0] as (e: string, s: unknown) => void)("SIGNED_IN", { user: { id: "u" } });
     const a = m.fastholdEjer("e", "A", "u"), b = m.fastholdEjer("e", "A", "u");
     expect(m.ejerGyldig(a) && m.ejerGyldig(b)).toBe(true);

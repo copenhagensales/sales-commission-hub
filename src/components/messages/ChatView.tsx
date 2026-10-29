@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, FRIST_GENHENT_MS, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -353,7 +353,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
     ...(messages ?? []).flatMap((m) => [m.slettes_efter, m.reply_to?.slettes_efter]),
     svarITraad?.slettes_efter, svarOpslag.data?.slettes_efter,
   ]);
-  const visBeskeder = useMemo(() => (messages ?? []).filter((m) => !erUdloebet(m.slettes_efter, fristNu)), [messages, fristNu]);
+  // B2c-2a §1: kendt udløbet pr. (generation, bruger, samtale, id, frist) – et urhop tilbage genopliver intet.
+  const visBeskeder = useMemo(() => (messages ?? []).filter((m) => !erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu)), [messages, fristNu, meId, conversationId]);
 
   // Ryd valgt svar, når originalen er tilbagetrukket, slettet, udløbet eller bevist utilgængelig (tomt RLS-opslag).
   useEffect(() => {
@@ -420,7 +421,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const kvitter = () => {
       // B2c-1b §1: aktuel frist ved selve kvitteringen – fokus før fristtimeren kvitterer aldrig udløbne id'er.
       const nuNu = Date.now();
-      const ids = ukvitterede.filter((id) => !erUdloebet(fristPrId.current.get(id), nuNu));
+      const ids = ukvitterede.filter((id) => !erKendtUdloebet(meRef.current, conversationId, id, fristPrId.current.get(id), nuNu));
       if (ids.length && erSynligMedFokus() && !markAsRead.isPending) markAsRead.mutate({ conversationId, messageIds: ids });
     };
     kvitter();
@@ -433,20 +434,23 @@ export function ChatView({ conversationId }: ChatViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, ukvitteretNoegle]);
 
-  // B2c-1 §5: lokalt udløbne rækker genhentes (frist + 500 ms). Returnerer serveren stadig rækken med samme frist
-  // (ure kan afvige), planlægges én ny genhentning med voksende ventetid 2/4/8/16/32 s – højst fem gange.
-  const udloebne = (messages ?? []).filter((m) => erUdloebet(m.slettes_efter, fristNu)).map((m) => `${m.id}@${m.slettes_efter}`).join(",");
-  const genhent = useRef({ noegle: "", n: 0, opd: 0 });
+  // B2c-1 §5 / B2c-2a §1: lokalt udløbne rækker genhentes (frist + 500 ms, derefter 2/4/8/16/32 s). Budgettet ejes
+  // af det konkrete fristforløb (id + slettes_efter) i useChat og overlever remount og andre rækkers udløb/bortfald.
+  const udloebneListe = (messages ?? []).filter((m) => m.slettes_efter && erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu));
+  const udloebne = udloebneListe.map((m) => `${m.id}@${m.slettes_efter}`).join(",");
+  const [fristSlag, setFristSlag] = useState(0);
   useEffect(() => {
-    const r = genhent.current;
-    if (!udloebne) { genhent.current = { noegle: "", n: 0, opd: opdateret }; return; }
-    if (r.noegle !== udloebne) genhent.current = { noegle: udloebne, n: 0, opd: opdateret };
-    else if (r.opd !== opdateret) { r.n++; r.opd = opdateret; }
-    const n = genhent.current.n;
-    if (n >= FRIST_GENHENT_MS.length) return;
-    const t = setTimeout(() => void queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] }), FRIST_GENHENT_MS[n]);
+    if (!messages) return; // ukendt liste: intet forløb afsluttes
+    const liste = udloebne ? udloebne.split(",").map((x) => { const i = x.indexOf("@"); return { id: x.slice(0, i), frist: x.slice(i + 1) }; }) : [];
+    const due = synkFristForloeb(meId, conversationId, liste, Date.now(), opdateret);
+    if (due === null) return;
+    const t = setTimeout(() => {
+      if (fyrFristForloeb(meId, conversationId, Date.now(), opdateret)) void queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+      setFristSlag((x) => x + 1);
+    }, Math.max(0, due - Date.now()));
     return () => clearTimeout(t);
-  }, [udloebne, opdateret, conversationId, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [udloebne, opdateret, conversationId, queryClient, meId, fristSlag, !!messages]);
 
   const nyesteId = messages?.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
@@ -692,7 +696,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === meId} currentEmployeeId={meId} authBrugerId={currentEmployee?.authId ?? null}
               conversationId={conversationId} onReply={(m) => { setReplyTo(m); setSvarId(m.id); }} />
           ))}
-          {afsendelser.filter((p) => !messages?.some((m) => m.id === p.id)).map((p) => (
+          {afsendelser.filter((p) => !messages?.some((m) => m.id === p.id) && !harKendtUdloebet(meId, conversationId, p.id)).map((p) => (
             <div key={p.id} className="flex justify-end" aria-live="polite">
               <div className="max-w-[80%] min-w-0">
                 {p.tilstand === "gemt_vaek" ? (
@@ -751,7 +755,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               </div>
             </div>
           ))}
-          {visBeskeder.length === 0 && !afsendelser.some((p) => !messages?.some((m) => m.id === p.id)) && (
+          {visBeskeder.length === 0 && !afsendelser.some((p) => !messages?.some((m) => m.id === p.id) && !harKendtUdloebet(meId, conversationId, p.id)) && (
             <div className="text-center text-muted-foreground py-8">Ingen beskeder endnu. Start samtalen!</div>
           )}
         </div>

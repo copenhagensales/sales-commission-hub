@@ -548,10 +548,13 @@ describe("B2c-1b §1 – aktuel frist i editor, Gem og kvittering", () => {
   it("åben editor modtager allerede udløbet frist → tekst skjult, ingen Gem, nul sb_ret", async () => {
     try {
       gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
-      const m = { ...besked("m1", "server"), slettes_efter: iso(60_000) };
+      // B2c-2a: fejlfangende mod f42d62a81 – fristen passerer EFTER montering (gemt nu = T0), og rækken ankommer
+      // som ny objektidentitet uden ny frist; et gemt nu ville stadig vise editoren.
+      const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
       const r = render(ui(m, "e"));
       expect(felt()?.value).toBe("min rettelse");
-      r.rerender(ui({ ...m, slettes_efter: iso(-1) }));
+      vi.setSystemTime(T0 + 1500);
+      r.rerender(ui({ ...m }, "e"));
       expect(felt()).toBeNull();
       expect(screen.queryByText("min rettelse")).toBeNull();
       expect(screen.queryByText("server")).toBeNull();
@@ -584,6 +587,138 @@ describe("B2c-1b §1 – aktuel frist i editor, Gem og kvittering", () => {
       expect(qc.getMutationCache().getAll()).toHaveLength(0); // ingen kvitteringsmutation startet
       fokus.mockRestore();
       r.unmount();
+    } finally { slut(); }
+  });
+});
+
+describe("B2c-2a §1 – editorværn ved udløb, sletning, tjek og generation", () => {
+  const T0 = new Date("2026-10-29T00:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  const sbRet = () => graense.rpc.mock.calls.filter((c) => c[0] === "sb_ret").length;
+  const kladde = () => laesRetKladde("e", "c", "m1");
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0); aegte.brug = true; graense.rpc.mockReset(); });
+  const slut = () => { vi.useRealTimers(); aegte.brug = false; graense.rpc.mockReset(); };
+  const aaben = (m: Message) => { gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: m.revision }); return render(ui(m, "e")); };
+
+  it("udløb med åben editor (offline) → editor lukket, kladde ryddet, nul sb_ret", async () => {
+    try {
+      const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+      const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
+      const r = aaben(m);
+      expect(felt()?.value).toBe("min rettelse");
+      vi.setSystemTime(T0 + 1001);
+      r.rerender(ui({ ...m }, "e"));
+      expect(felt()).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(kladde()).toBeNull();
+      expect(sbRet()).toBe(0);
+      online.mockRestore(); r.unmount();
+    } finally { slut(); }
+  });
+
+  it("gendannet editor med allerede udløbet frist åbnes ikke og kladden ryddes", async () => {
+    try {
+      const r = aaben({ ...besked("m1", "server"), slettes_efter: iso(-5) });
+      expect(felt()).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(kladde()).toBeNull();
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  for (const udfald of ["succes", "fejl"] as const) it(`sen RPC-${udfald} efter udløb genskaber hverken tekst eller kladde`, async () => {
+    try {
+      let svar: (v: unknown) => void = () => undefined;
+      graense.rpc.mockImplementationOnce(() => new Promise((a) => { svar = a; }));
+      const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
+      const r = aaben(m);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+      expect(sbRet()).toBe(1);
+      vi.setSystemTime(T0 + 1001);
+      r.rerender(ui({ ...m }, "e"));
+      expect(felt()).toBeNull();
+      await act(async () => { svar(udfald === "succes" ? { data: 2, error: null } : { data: null, error: { code: "P0001", message: "Kun afventende indhold kan rettes" } }); });
+      r.rerender(ui({ ...m }, "e"));
+      expect(felt()).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(kladde()).toBeNull();
+      expect(sbRet()).toBe(1);
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  it("gammel frist mod nyere gyldigt grundlag: ny frist/revision vises, ny kladde rammes ikke af gammel oprydning", async () => {
+    try {
+      const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
+      const r = render(ui(m, "e"));
+      vi.setSystemTime(T0 + 1001);
+      r.rerender(ui({ ...m }, "e"));
+      expect(screen.queryByText("server")).toBeNull();
+      const ny = { ...besked("m1", "ny tekst", 2), slettes_efter: iso(60_000) };
+      r.rerender(ui(ny, "e"));
+      expect(screen.getByText("ny tekst")).toBeTruthy();
+      gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny rettelse", revision: 2 });
+      r.rerender(ui({ ...ny }, "e"));
+      expect(kladde()?.tekst).toBe("ny rettelse");
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  it("kendt udløbet kladde efter urhop på -690 ms og genåbning: ingen editor, ingen tekst", async () => {
+    try {
+      const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
+      const r = aaben(m);
+      vi.setSystemTime(T0 + 1000); // fristen nået
+      r.rerender(ui({ ...m }, "e"));
+      expect(felt()).toBeNull();
+      r.unmount();
+      vi.setSystemTime(T0 + 310); // urhop -690 ms: klientens ur er nu før fristen
+      gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 }); // fx skrevet af en anden fane
+      const r2 = render(ui({ ...m }, "e"));
+      expect(felt()).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(screen.queryByText("server")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+      r2.unmount();
+    } finally { slut(); }
+  });
+
+  it("deleted_at i editorværnet: ingen editor, ingen Gem, kladde ryddet", async () => {
+    try {
+      const r = aaben({ ...besked("m1", "server"), deleted_at: iso(-1) });
+      expect(felt()).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+      expect(kladde()).toBeNull();
+      expect(sbRet()).toBe(0);
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  it("tjekkes: Gem spærret, legitim kladde bevares", async () => {
+    try {
+      const r = aaben({ ...besked("m1", "server"), status: "tjekkes" });
+      expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+      expect(kladde()?.tekst).toBe("min rettelse");
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  it("samme bruger i ny generation: gammel kendt-udløbet status rammer ikke den nye generations kladde", async () => {
+    try {
+      const m = { ...besked("m1", "server"), slettes_efter: iso(1000) };
+      const r = render(ui(m, "e"));
+      vi.setSystemTime(T0 + 1001);
+      r.rerender(ui({ ...m }, "e"));
+      r.unmount();
+      const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+      cb("SIGNED_OUT", null); cb("SIGNED_IN", { user: { id: "u" } }); // ny generation, samme bruger
+      vi.setSystemTime(T0 + 310); // ur før fristen i den nye generation
+      gemRetKladde("e", "c", { beskedId: "m1", tekst: "ny generation", revision: 1 });
+      const r2 = render(ui({ ...m }, "e"));
+      expect(felt()?.value).toBe("ny generation");
+      expect(kladde()?.tekst).toBe("ny generation");
+      r2.unmount();
     } finally { slut(); }
   });
 });

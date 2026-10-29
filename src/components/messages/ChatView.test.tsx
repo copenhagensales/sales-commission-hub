@@ -91,7 +91,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
 
 import { ChatView } from "./ChatView";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
-import { rydAlleKladder, hentAfsendelser, gemKladde, laesKladde, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
+import { rydAlleKladder, hentAfsendelser, gemKladde, laesKladde, tilfoejAfsendelse, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
 import { hasUnsentDrafts } from "@/components/mobile";
 
 // Én stabil QueryClient pr. prøve (også gennem rerender/navigation), mutations.retry=1 som App.tsx.
@@ -1592,14 +1592,98 @@ describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () =>
     const kvit = vi.fn();
     kvitMutate.fn = kvit;
     const fokus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
-    beskeder.liste = [fremmed("u1", "udløber", { slettes_efter: iso(1000) }), fremmed("v1", "varig")];
+    // B2c-2a: fremmed() har som standard egen kvittering (read_receipts: e) – prøven var derfor tom. Nu ukvitterede rækker
+    // og en positiv kontrol (v1 kvitteres).
+    beskeder.liste = [fremmed("u1", "udløber", { slettes_efter: iso(1000), read_receipts: [] }), fremmed("v1", "varig", { read_receipts: [] })];
     const r = await klar();
     vi.setSystemTime(T0 + 1500);
     fokus.mockReturnValue(true);
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds?: string[] }).messageIds ?? []);
     expect(ids).not.toContain("u1");
+    expect(ids).toContain("v1");
     fokus.mockRestore();
+    r.unmount();
+  });
+});
+
+describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
+  const T0 = new Date("2026-10-29T00:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  const pend = (id: string, tekst: string, tilstand: Afsendelse["tilstand"] = "afvist"): Afsendelse => ({ id, tekst, svarId: null, fil: null, tilstand, fejl: null, tidligereUkendt: false, oprettet: 1 });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("udløb uden genoplivet pending-tekst; heller ikke når den kendte udløbne række forsvinder fra RLS", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0);
+    // Fysisk igangværende afsendelse (rigtig useSendMessage, INSERT holdt ved grænsen) holder pending-posten (B2b-3a).
+    beskeder.ægteSend = true;
+    const hold = kontrol<{ error: unknown }>();
+    net.insert.mockImplementation(() => hold.p);
+    const r = await klar();
+    skriv("pending-tekst");
+    await act(async () => { fireEvent.click(send()); });
+    await waitFor(() => expect(net.kald).toContain("insert:chat_messages"));
+    const id = hentAfsendelser("e", "A")[0]?.id;
+    expect(id).toBeTruthy();
+    // Serveren viser rækken (samme id) med en frist, der allerede er passeret efter klientens ur.
+    beskeder.liste = [fremmed(id!, "server-tekst", { sender_id: "e", slettes_efter: iso(-1) })]; beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    expect(screen.queryByText("server-tekst")).toBeNull();
+    expect(screen.queryByText("pending-tekst")).toBeNull();
+    beskeder.liste = []; beskeder.opdateret++; // rækken er væk fra RLS
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    expect(hentAfsendelser("e", "A").some((a) => a.id === id)).toBe(true); // posten findes – kun visningen er værnet
+    expect(screen.queryByText("pending-tekst")).toBeNull();
+    r.unmount();
+    hold.res({ error: { message: "Failed to fetch" } }); await act(async () => { await hold.p; });
+  });
+
+  it("pending uden kendt udløbet serverrække vises fortsat (ingen opfundet frist)", async () => {
+    tilfoejAfsendelse("e", "A", pend("p2", "uafsendt"));
+    const r = await klar();
+    expect(screen.getByText("uafsendt")).toBeTruthy();
+    r.unmount();
+  });
+
+  it("budget 500 ms + 2/4/8/16/32 s pr. fristforløb gennem remount og andre rækkers udløb/bortfald; SQL-pladsholder afslutter", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const inval = vi.spyOn(qc, "invalidateQueries");
+    const n = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
+    const nu = Date.now();
+    const a = fremmed("a", "A-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
+    const b = fremmed("b", "B-tekst", { slettes_efter: new Date(nu - 1).toISOString() });
+    beskeder.liste = [a, b];
+    let r = render(wrap(<ChatView conversationId="A" />));
+    const svar = async (liste: unknown[]) => { beskeder.liste = liste as typeof beskeder.liste; beskeder.opdateret++; r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(n()).toBe(1); // ét fælles kald for begge forfaldne forløb
+    await svar([a]); // b bortfalder – nulstiller ikke a (ingen ny 500 ms-start)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(n()).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(n()).toBe(2);
+    await svar([a]);
+    r.unmount(); // remount bevarer a's budget (næste ventetid 4 s, ikke 500 ms)
+    r = render(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(3999); });
+    expect(n()).toBe(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(n()).toBe(3);
+    // en anden række udløber undervejs: eget forløb, a's budget uændret
+    const c = fremmed("c", "C-tekst", { slettes_efter: new Date(Date.now() - 1).toISOString() });
+    await svar([a, c]);
+    for (const ms of [8000, 16000, 32000]) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); await svar([a, c]); }
+    const efterA = n();
+    await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+    expect(n() - efterA).toBeLessThanOrEqual(5); // kun c's resterende budget; a er udtømt
+    const totalFoerPladsholder = n();
+    // SQL-pladsholder for a: forløbet afsluttes, pladsholderen vises og rammes ikke af gammel oprydning
+    await svar([fremmed("a", "Beskeden er slettet efter fristen", { status: "trukket_tilbage", slettes_efter: null })]);
+    expect(screen.getByText("Beskeden er slettet efter fristen")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+    expect(n()).toBe(totalFoerPladsholder);
     r.unmount();
   });
 });
