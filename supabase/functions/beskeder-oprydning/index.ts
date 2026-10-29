@@ -85,7 +85,8 @@ async function kald<T extends { data: unknown; error: unknown }>(f: () => Promis
   try { const r = await f(); return { data: r.data, error: r.error }; } catch (e) { return { data: null, error: e ?? "undtagelse" }; }
 }
 
-/** Storage-remove-udfald → kode til sb_koe_afslut (null = bekræftet succes eller objekt findes ikke). */
+/** Storage-remove-udfald → kode til sb_koe_afslut. null = ingen fejl (manglende objekt giver tom liste uden fejl).
+ *  Enhver fejl MED HTTP-status – også 404 (TenantNotFound, bucket, HTML-404) – er et kendt Storage-svar → storage_fejl. */
 export function removeUdfald(e: unknown): null | "storage_fejl" | "transport_ukendt" {
   if (!e) return null;
   if (typeof e !== "object") return "transport_ukendt";
@@ -96,7 +97,7 @@ export function removeUdfald(e: unknown): null | "storage_fejl" | "transport_uke
     : orig instanceof Response ? orig.status
     : typeof orig?.status === "number" ? orig.status : null;
   if (st === null) return "transport_ukendt";
-  return st === 404 ? null : "storage_fejl";
+  return "storage_fejl";
 }
 
 Deno.serve(async (req) => {
