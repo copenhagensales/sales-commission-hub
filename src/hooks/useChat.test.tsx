@@ -1001,6 +1001,11 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     expect(tagHandling(ejer(), ID, "ret")).toBe(true);
     expect(udfaldSnapshot("e", "c", ID)).not.toBeNull();
     svar.chat_messages = [r(4, { status: "leveret" })];
+    // B2b-4a: uden indarbejdet visning (ingen aktiv observer) er resultatet bekræftet, men det gamle grundlag beskyttes.
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    qc.setQueryData(["chat-messages", "c"], { pages: [[{ id: ID, status: "leveret", revision: 4 }]], pageParams: [0] });
     expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("bekraeftet");
     expect(udfaldSnapshot("e", "c", ID)).toBeNull();
     expect(rpc()).toHaveBeenCalledTimes(1);

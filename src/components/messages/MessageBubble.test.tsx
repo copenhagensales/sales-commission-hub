@@ -40,6 +40,9 @@ const besked = (id: string, content: string, revision = 1): Message => ({
 let qc: QueryClient;
 const wrap = (n: ReactNode) => <QueryClientProvider client={qc}>{n}</QueryClientProvider>;
 const felt = () => screen.queryByRole("textbox") as HTMLTextAreaElement | null;
+// B2b-4a: den cachede InfiniteData-liste (samme form som useMessages) – kun en indarbejdet række beviser opdateret visning.
+const liste = (r: { id?: string; status: string; revision: number }) =>
+  qc.setQueryData(["chat-messages", "c"], { pages: [[{ id: "m1", ...r }]], pageParams: [0] });
 const ui = (m: Message, emp?: string, bruger: string | null = "u") => wrap(<MessageBubble message={m} isOwn currentEmployeeId={emp} authBrugerId={bruger} conversationId="c" onReply={() => undefined} />);
 
 beforeEach(() => {
@@ -450,6 +453,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
     expect(toast.error).not.toHaveBeenCalled();
     raekke = { data: { status: "trukket_tilbage", revision: m.revision, content: "", attachment_path: null }, error: null };
+    liste({ status: "trukket_tilbage", revision: m.revision });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
     await flush();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -464,6 +468,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await flush();
     fireEvent.change(felt()!, { target: { value: "nyere" } });
     raekke = { data: { status: "leveret", revision: 2, content: "min", attachment_path: null }, error: null };
+    liste({ status: "leveret", revision: 2 });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
     await flush();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -478,13 +483,15 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
     raekke = { data: { status: "leveret", revision: 2, content: "min", attachment_path: null }, error: null };
+    liste({ status: "leveret", revision: 2 });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
     await flush();
     expect(felt()).toBeNull();
     expect(laesRetKladde("e", "c", "m1")).toBeNull();
   });
 
-  it("B2b-3a: sen fejl efter remount mod nyere kladdeversion bevarer den nyere kladde (én toast)", async () => {
+  // B2b-4a §1: rettet forventning – en sen fejl mod en nyere kladdeversion viser ikke længere toast.
+  it("B2b-4a: sen fejl efter remount mod nyere kladdeversion bevarer den nyere kladde uden toast", async () => {
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
     let svar!: (v: unknown) => void;
     graense.rpc.mockImplementationOnce((() => new Promise((r) => { svar = r; })));
@@ -496,7 +503,21 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await act(async () => { svar({ data: null, error: { code: "P0001", message: "Forældet revision" } }); });
     await flush();
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("nyere");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.queryByText("Beskeden er ændret – prøv igen")).toBeNull();
+  });
+
+  it("B2b-4a: sen fejl efter navigation for samme kladdeversion viser fejlen én gang og bevarer kladden", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    let svar!: (v: unknown) => void;
+    graense.rpc.mockImplementationOnce((() => new Promise((r) => { svar = r; })));
+    const r = render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    r.unmount();
+    await act(async () => { svar({ data: null, error: { code: "P0001", message: "Forældet revision" } }); });
+    await flush();
     expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("min");
   });
 });
 

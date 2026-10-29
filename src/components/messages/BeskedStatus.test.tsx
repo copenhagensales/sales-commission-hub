@@ -263,6 +263,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it.each([[false], [null]])("B2b-3a: uventet %s fra sb_afgoer + samme revision i målstatus ved læsning → bekræftet uden toast", async (data) => {
     render(ui(afventer(4)));
     raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
+    liste({ status: "trukket_tilbage", revision: 4 });
     graense.rpc.mockResolvedValueOnce({ data, error: null });
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
