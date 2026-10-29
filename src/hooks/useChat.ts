@@ -683,9 +683,18 @@ export interface SendInput {
  * B2-7 §1: binder et afbrydelsessignal til et SDK-kald (insert/rpc), så et afbrudt signal også stopper det senere
  * tokenventepunkt inde i SDK'et. Kald uden abortSignal (fx grænsemocks) returneres uændret.
  */
-export function medSignal<T extends PromiseLike<unknown>>(b: T & { abortSignal?: (s: AbortSignal) => T }, signal: AbortSignal | null): T {
-  return signal && typeof b.abortSignal === "function" ? b.abortSignal(signal) : b;
+export function medSignal<T>(b: T, signal: AbortSignal | null): T {
+  return signal && harAfbrydelse(b) ? b.abortSignal(signal) : b;
 }
+function harAfbrydelse<T>(b: T): b is T & { abortSignal(s: AbortSignal): T } {
+  return typeof b === "object" && b !== null && typeof Reflect.get(b, "abortSignal") === "function";
+}
+
+/** B2-7 §1: en afvisning efter sessionsophør (fx identitetsopslag eller afbrudt SDK-kald) bliver ForaeldetSession. */
+function foraeldetVed(s: SessionsKontekst): (e: unknown) => never {
+  return (e) => { throw sessionGyldig(s) ? e : new ForaeldetSession(); };
+}
+
 
 /** Forældet operation (logud/brugerskift): intet efterfølgende kald startes. */
 const foraeldet = () => new SendFejl("ukendt", "Ikke sendt – prøv igen", false);
@@ -993,12 +1002,7 @@ export function useDeleteConversation() {
       return conversationId;
   }
 
-  /** B2-7 §1: en afvisning efter sessionsophør (fx identitetsopslag eller afbrudt SDK-kald) bliver ForaeldetSession. */
-function foraeldetVed(s: SessionsKontekst): (e: unknown) => never {
-  return (e) => { throw sessionGyldig(s) ? e : new ForaeldetSession(); };
-}
-
-/** Fastholder sessionen synkront ved klik. Sen afslutning efter sessionsophør afvises med ForaeldetSession. */
+  /** Fastholder sessionen synkront ved klik. Sen afslutning efter sessionsophør afvises med ForaeldetSession. */
   const slet = useCallback((conversationId: string): Promise<string> => {
     const session = fastholdSession();
     return mutation.mutateAsync({ conversationId, session }).then((id) => { kraevSession(session); return id; }, foraeldetVed(session));
