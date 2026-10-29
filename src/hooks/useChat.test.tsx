@@ -657,18 +657,20 @@ function lavModel(bindFoerPk = false) {
   const stier = new Map<string, Sti>();
   const rækker = new Map<string, { id: string; attachment_path: string | null }>();
   const holdte: Array<() => void> = [];
+  /** B2b-4b: observeret rækkefølge af binding, PK-kontrol og tilbageførsel (model = antagelse, ikke SQL). */
+  const log: string[] = [];
   let hold = 0;
   const nySti = (sti: string, status = "uploadet") => stier.set(sti, { bucket: "chat-attachments", sti, ejer_employee_id: "e", samtale_id: "c", status, besked_id: null });
   const oprydning = (sti: string) => { const s = stier.get(sti); if (s && s.besked_id === null && s.status === "uploadet") s.status = "slettes"; };
   const udfoer = (row: { id: string; conversation_id: string; sender_id: string; attachment_path: string | null }) => {
-    if (!bindFoerPk && rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } }; // tilbageført, ingen binding
+    if (!bindFoerPk && rækker.has(row.id)) { log.push(`pk:${row.id}`); return { error: { code: "23505", message: "duplicate key" } }; } // tilbageført, ingen binding
     if (row.attachment_path) {
       const s = stier.get(row.attachment_path);
       if (!s || s.besked_id !== null || s.status !== "uploadet" || s.ejer_employee_id !== row.sender_id || s.samtale_id !== row.conversation_id)
         return { error: { code: "P0001", message: IKKE_REGISTRERET_TEKST } }; // tilbageført
-      s.besked_id = row.id; s.status = "bundet";
+      s.besked_id = row.id; s.status = "bundet"; log.push(`bind:${row.attachment_path}`);
       // B2b-3b §3: bindingen udføres før primærnøglekonflikten; konflikten tilbagefører taberens binding.
-      if (bindFoerPk && rækker.has(row.id)) { s.besked_id = null; s.status = "uploadet"; return { error: { code: "23505", message: "duplicate key" } }; }
+      if (bindFoerPk && rækker.has(row.id)) { log.push(`pk:${row.id}`); s.besked_id = null; s.status = "uploadet"; log.push(`rollback:${row.attachment_path}`); return { error: { code: "23505", message: "duplicate key" } }; }
     }
     if (bindFoerPk && rækker.has(row.id)) return { error: { code: "23505", message: "duplicate key" } };
     rækker.set(row.id, { id: row.id, attachment_path: row.attachment_path });
@@ -681,7 +683,7 @@ function lavModel(bindFoerPk = false) {
     if (hold > 0) { hold--; return new Promise((res) => holdte.push(() => res(udfoer(row)))); }
     return Promise.resolve(udfoer(row));
   };
-  return { stier, rækker, holdte, nySti, oprydning, holdNaeste: () => { hold++; } };
+  return { stier, rækker, holdte, log, nySti, oprydning, holdNaeste: () => { hold++; } };
 }
 
 describe("d2 §5 – sent gammelt INSERT og to klienter mod fælles netværksmodel (antagelse, ikke SQL)", () => {
@@ -1541,5 +1543,113 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
     expect(http).toHaveLength(0);
     expect(aktiveTjekTimere()).toBe(0);
     auth("SIGNED_IN", "u");
+  });
+});
+
+// ---------- B2b-4b §3: to isolerede klientforløb gennem rigtig sbFil (udstedelse + upload) og faktisk beskedvisning ----------
+import { udstedUpload, uploadTilSti } from "@/lib/sbFil";
+
+describe("B2b-4b §3 – to isolerede klienter: rigtig sbFil, binding før PK-konflikt, taberens rollback (model = antagelse, ikke SQL)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn> | null = null;
+  const klienter: Array<{ qc: QueryClient; unmount: () => void }> = [];
+  const lav = () => {
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+    const h = renderHook(() => useSendMessage(), { wrapper });
+    klienter.push({ qc, unmount: h.unmount });
+    return { qc, ...h };
+  };
+  /** Mocket sb-fil-edge (udsted): hver klient får sin egen sti; Storage-upload registrerer stien i modellen. */
+  const opsaetFil = (m: ReturnType<typeof lavModel>) => {
+    let n = 0;
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((): Promise<Response> => {
+      n++;
+      return Promise.resolve(new Response(JSON.stringify({ sti: `c/e/klient${n}.png`, token: `tok${n}` }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    });
+    graense.upload.mockReset().mockImplementation(async (sti: unknown) => { m.nySti(String(sti)); return { error: null }; });
+  };
+  const filFor = () => new File([new Uint8Array([1, 2, 3])], "x.png", { type: "image/png" });
+  /** Hver klient: udsted → upload gennem rigtig sbFil → send med den udstedte sti. Klient 1 holdes ved INSERT. */
+  const forloeb = async (m: ReturnType<typeof lavModel>) => {
+    auth("SIGNED_IN", "u");
+    const k1 = lav(), k2 = lav();
+    const kontekst = (e: ReturnType<typeof fastholdEjer>) => ({ vagt: () => ejerGyldig(e), bruger: "u" });
+    const e1 = fastholdEjer("e", "c", "u")!, e2 = fastholdEjer("e", "c", "u")!;
+    const u1 = await udstedUpload("c", { name: "x.png", size: 3 }, "image/png", kontekst(e1));
+    await uploadTilSti(u1, filFor(), "image/png", kontekst(e1));
+    const u2 = await udstedUpload("c", { name: "x.png", size: 3 }, "image/png", kontekst(e2));
+    await uploadTilSti(u2, filFor(), "image/png", kontekst(e2));
+    expect(u1.sti).not.toBe(u2.sti);
+    m.holdNaeste();
+    const p1 = fejl(k1.result.current.mutateAsync({ ...vf, attachmentPath: u1.sti, ejer: e1 }));
+    await vi.waitFor(() => expect(m.holdte).toHaveLength(1));
+    await k2.result.current.mutateAsync({ ...vf, attachmentPath: u2.sti, ejer: e2 });
+    return { u1, u2, p1 };
+  };
+  afterEach(() => {
+    fetchSpy?.mockRestore(); fetchSpy = null;
+    graense.upload.mockReset().mockImplementation(async () => ({ error: null }));
+    for (const k of klienter.splice(0)) { k.unmount(); k.qc.clear(); }
+    graense.from.mockReset();
+  });
+
+  it("taberen binder først; PK-konflikten tilbagefører bindingen; vinderens række vises faktisk i beskedlisten", async () => {
+    const m = lavModel(true);
+    opsaetFil(m);
+    const { u1, u2, p1 } = await forloeb(m);
+    expect(graense.upload.mock.calls.map((c) => c[0])).toEqual([u1.sti, u2.sti]); // rigtig sbFil → Storage, hver sin sti
+    m.holdte[0]();
+    expect(await p1).toBeNull(); // afstemt som allerede gemt (ingen fejl, intet nyt INSERT)
+    // Observeret rækkefølge: vinderen binder; taberen binder FØR PK-konflikten, som derefter tilbagefører taberens binding.
+    expect(m.log).toEqual([`bind:${u2.sti}`, `bind:${u1.sti}`, `pk:${vf.id}`, `rollback:${u1.sti}`]);
+    expect(m.rækker.size).toBe(1);
+    expect(m.stier.get(u2.sti)).toMatchObject({ besked_id: vf.id, status: "bundet" });
+    expect(m.stier.get(u1.sti)).toMatchObject({ besked_id: null, status: "uploadet" });
+    // Faktisk beskedvisning gennem rigtig useMessages mod modellens rækker.
+    const rows = [...m.rækker.values()].map((r) => ({ id: r.id, conversation_id: "c", sender_id: "e", content: "hej", status: "leveret", revision: 1,
+      created_at: "2026-10-29T00:00:00Z", attachment_path: r.attachment_path, reply_to_id: null }));
+    const thenable = (data: unknown) => {
+      const b: Record<string, unknown> = {};
+      for (const k of ["select", "eq", "is", "order", "in", "range", "neq"]) b[k] = () => b;
+      b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok);
+      return b;
+    };
+    graense.from.mockImplementation((t: string) => thenable(t === "chat_messages" ? rows : []));
+    const qcV = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } } });
+    klienter.push({ qc: qcV, unmount: () => undefined });
+    const w = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qcV }, children);
+    const vis = renderHook(() => useMessages("c"), { wrapper: w });
+    await waitFor(() => expect(vis.result.current.data).toBeDefined());
+    expect(vis.result.current.data?.map((x) => [x.id, x.attachment_path])).toEqual([[vf.id, u2.sti]]);
+    vis.unmount();
+  });
+
+  it("kontrol: flyttes PK-kontrollen foran bindingen, ændres den observerede rækkefølge (hovedprøvens forventning fejler)", async () => {
+    const m = lavModel(false);
+    opsaetFil(m);
+    const { u1, u2, p1 } = await forloeb(m);
+    m.holdte[0]();
+    await p1;
+    expect(m.log).toEqual([`bind:${u2.sti}`, `pk:${vf.id}`]);
+    expect(m.log).not.toEqual([`bind:${u2.sti}`, `bind:${u1.sti}`, `pk:${vf.id}`, `rollback:${u1.sti}`]);
+  });
+
+  for (const [navn, opsaet] of [
+    ["fejlet beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: { message: "Failed to fetch" } }); }],
+    ["registerfejl efter tomt beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: null }); dyn.sb_stier = async () => ({ data: null, error: { message: "x" } }); }],
+    ["manglende register efter tomt beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: null }); dyn.sb_stier = async () => ({ data: null, error: null }); }],
+    ["minimeret register efter tomt beskedopslag", () => { dyn.chat_messages = async () => ({ data: null, error: null }); dyn.sb_stier = async () => ({ data: { besked_id: null }, error: null }); }],
+  ] as const) it(`negativt bevis gennem rigtig sbFil: ${navn} → taberen ukendt, intet nyt INSERT, taberens sti ubundet`, async () => {
+    const m = lavModel(true);
+    opsaetFil(m);
+    const { u1, p1 } = await forloeb(m);
+    opsaet();
+    const inserts = kald.filter((k) => k === "insert:chat_messages").length;
+    m.holdte[0]();
+    const e = await p1;
+    expect(e?.art).toBe("ukendt");
+    expect(kald.filter((k) => k === "insert:chat_messages").length).toBe(inserts);
+    expect(m.rækker.size).toBe(1);
+    expect(m.stier.get(u1.sti)).toMatchObject({ besked_id: null, status: "uploadet" });
   });
 });
