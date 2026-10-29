@@ -1759,6 +1759,8 @@ describe("B2c-2b-2 (Codex) – fristoprydning via stopvejen", () => {
     // Fysisk igangværende arbejde på x3 (låsen ejes af sit kald).
     const e3 = fastholdEjer("e", "c", "u")!; expect(tagHandling(e3, "x3", "send")).toBe(true);
     const laase = aktiveHandlinger();
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    const ref = vi.spyOn(qc, "refetchQueries");
     fristOprydning("e", "c", "x1");
     fristOprydning("e", "c", "x3");
     slip(msg({ status: "leveret", revision: 4, content: "x", attachment_path: null }));
@@ -1767,6 +1769,8 @@ describe("B2c-2b-2 (Codex) – fristoprydning via stopvejen", () => {
     expect(udfaldSnapshot("e", "c", "x2")).toBe(x2); // andre afsendelser røres ikke
     expect(aktiveHandlinger()).toBe(laase); // lås beholdes til egen afslutning
     expect(toast.error).not.toHaveBeenCalled();
+    expect(inv).not.toHaveBeenCalled(); // stopvejen: sent tjeksvar giver ingen cacheeffekt
+    expect(ref).not.toHaveBeenCalled();
     frigivHandling(e3, "x3");
   });
 });
