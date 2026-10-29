@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
             // Remove lykkedes, men afslutning er ukendt: ét genforsøg; stadig ukendt → databasen holder ordren udleveret.
             if (ok && Date.now() < slut) { af = await afslut(); bekraeftet = !af.error && af.data === true; }
           }
-          if (!ok) { fejl.push(kode); rester.koe = true; } else if (bekraeftet) slettet++;
+          if (kode !== null) { fejl.push(kode); rester.koe = true; } else if (bekraeftet) slettet++;
         }));
       }
       if (poster.length < 50) break;
