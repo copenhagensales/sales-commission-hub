@@ -82,10 +82,12 @@ export function svarUtilgaengeligt(r: { status: BeskedStatusVaerdi | null; slett
  * planlægges næste. Allerede udløbne frister armeres aldrig (ingen 0-ms-løkke). Forgrund/genforbindelse kontrollerer straks.
  */
 export function useFristUr(frister: ReadonlyArray<string | null | undefined>): number {
-  const [nu, setNu] = useState(() => Date.now());
+  // B2c-1b §1: intet gemt nu – kun et slag-tal, der tvinger ny render og ny planlægning. En timer, der fyrer før
+  // fristen (fx ur-justering), planlægger næste fremtidige frist igen (aldrig 0 ms, da kun d > 0 armeres).
+  const [slag, setSlag] = useState(0);
   const noegle = [...new Set(frister.filter((f): f is string => !!f))].sort().join("|");
   useEffect(() => {
-    const opd = () => setNu(Date.now());
+    const opd = () => setSlag((x) => x + 1);
     const synlig = () => { if (document.visibilityState === "visible") opd(); };
     const start = Date.now();
     let min = Infinity;
@@ -103,9 +105,9 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
       window.removeEventListener("focus", opd);
       document.removeEventListener("visibilitychange", synlig);
     };
-  }, [noegle, nu]);
-  // B2c-1b §1: hver render vurderer mod klientens AKTUELLE ur – et gemt nu fra montering/sidste timer autoriserer aldrig visning.
-  return Math.max(nu, Date.now());
+  }, [noegle, slag]);
+  // Hver render vurderer mod klientens AKTUELLE ur.
+  return Date.now();
 }
 
 /** Ventetider for genhentning, når serveren stadig returnerer en lokalt udløbet række (ure kan afvige). */

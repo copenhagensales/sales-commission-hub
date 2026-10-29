@@ -1394,7 +1394,8 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
     expect(screen.getByText("Svarer på:")).toBeTruthy();
     const kaldFoer = fetchSpy.mock.calls.length;
-    await act(async () => { vi.setSystemTime(Date.now() + 400); }).then(() => vent(700));
+    await act(async () => { vi.setSystemTime(Date.now() + 400); });
+    await vent(700);
     expect(screen.queryByText("hemmelig")).toBeNull();
     expect(screen.queryByText("filindhold")).toBeNull();
     expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
