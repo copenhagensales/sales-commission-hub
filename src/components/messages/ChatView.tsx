@@ -6,6 +6,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
+import { useSbDrift } from "@/hooks/useSbDrift";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { findEmployeeByAuth } from "@/lib/employeeLookup";
@@ -302,6 +303,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const meRef = useRef(meId);
   meRef.current = meId;
   const noegle = meId ? `${meId}:${conversationId}` : null;
+  // 24d2 §2: driftsstatus. Ukendt status lukker filvejen; kendt pause lukker alle skrive-/filveje (læsning uændret).
+  const drift = useSbDrift(!!meId, currentEmployee?.authId ?? null, conversationId);
+  const pause = drift.beskederPause;
+  const filAaben = drift.filTilladt && !pause;
+  const driftRef = useRef({ pause, filAaben });
+  driftRef.current = { pause, filAaben };
 
   // Afsendelser pr. (bruger, samtale) i et delt lager – overlever samtaleskift og afmontering.
   const afsendelser = useSyncExternalStore(abonnerAfsendelser, () => (meId ? hentAfsendelser(meId, conversationId) : TOM));
@@ -569,6 +576,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const kon = { vagt, bruger: ejer.bruger };
     const a = hentAfsendelser(emp, conv).find((x) => x.id === id);
     if (!a) return;
+    // 24d2 §2(b): lukket skrive-/filvej starter intet (ren afstemning går gennem køen og fortsætter).
+    if (driftRef.current.pause || (a.fil && !driftRef.current.filAaben)) return;
     // §4/§8(4): højst ét netværksforløb pr. id – også mod baggrundsafstemning.
     // c2 §5: optaget id tilsluttes det eksisterende forløb (genstart efter dets afslutning), intet konkurrerende kald.
     if (afsOps.has(fk) || !tagLaas(fk, op)) { const f = sikrForloeb(ejer, id, queryClient); if (f && !f.manuel) f.genstartVenter = true; return; }
@@ -669,11 +678,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const udtoemt = { has: (id: string) => !!meId && erUdtoemt(gen, meId, conversationId, id) };
 
   const composerTom = !message.trim() && !fil && !retId && !svarId && !replyTo;
-  const kanSende = !!meId && (!!message.trim() || !!fil) && !fil?.uploader && !fil?.fejl && !(fil && kraeverGenvalg(fil))
+  const kanSende = !!meId && !pause && (!fil || filAaben) && (!!message.trim() || !!fil) && !fil?.uploader && !fil?.fejl && !(fil && kraeverGenvalg(fil))
     && filErSendeklar(fil ? metaFra(fil) : null);
 
   const handleSend = () => {
-    if (sendLaas.current || !meId || !kanSende) return;
+    if (sendLaas.current || !meId || !kanSende || driftRef.current.pause) return;
     if (message.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     sendLaas.current = true; // synkront, før id dannes
     const emp = meId, conv = conversationId;
@@ -723,6 +732,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   /** §3: ét uploadforsøg ejet af lageret; sene svar opdaterer kun den filpost, forsøget stadig ejer. */
   const upload = async (file: File, type: string) => {
     // §1/§3 (c1): fuld kontekst fastholdes synkront; uploadforsøgets id er adskilt fra operations-id.
+    if (!driftRef.current.filAaben) return; // 24d2 §2(b): lukket filvej – filen bevares, intet upload
     const ejer = fastholdEjer(meId, conversationId, brugerRef.current);
     if (!ejer) return;
     const forsoeg = startKladdeUpload(ejer, file, { name: file.name, type, size: file.size });
@@ -746,6 +756,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const maal = genvalgFor.current;
     genvalgFor.current = null;
     if (!file) return;
+    if (!driftRef.current.filAaben) return;
     const v = validerFil(file);
     if ("fejl" in v) { setFilFejl(v.fejl); return; }
     setFilFejl(null);
@@ -760,7 +771,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     void upload(file, v.type);
   };
 
-  const vaelgFil = (afsendelsesId: string | null) => { genvalgFor.current = afsendelsesId; fileInputRef.current?.click(); };
+  const vaelgFil = (afsendelsesId: string | null) => { if (!driftRef.current.filAaben) return; genvalgFor.current = afsendelsesId; fileInputRef.current?.click(); };
 
   const fjernFil = () => {
     frigivPreview();
@@ -777,6 +788,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   return (
     <div className="h-full flex flex-col min-w-0">
+      {pause && (
+        <div role="status" className="px-2 md:px-4 py-2 border-b bg-muted text-[14px] md:text-sm text-foreground">
+          Beskeder er under vedligeholdelse – du kan læse, men ikke sende. Din kladde bevares.
+        </div>
+      )}
       <div className="border-b p-2 flex justify-end">
         <Button variant="ghost" size="sm" onClick={() => setShowSearch(!showSearch)} className="h-8 px-2 md:px-3 max-md:h-11 max-md:w-11" aria-label="Søg i beskeder">
           <Search className="h-4 w-4 md:mr-1" />
@@ -821,8 +837,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
                       <div className="mt-1 flex flex-col items-end">
                         <p className="text-right text-[14px] text-muted-foreground">Afstemmer …</p>
                         {udtoemt.has(p.id) && (
-                          <button type="button" onClick={() => meId && void deliver(meId, conversationId, p.id)}
-                            className="flex min-h-11 items-center text-[14px] font-medium text-muted-foreground active:opacity-70">
+                          <button type="button" disabled={pause || (!!p.fil && !filAaben)} onClick={() => meId && void deliver(meId, conversationId, p.id)}
+                            className="flex min-h-11 items-center text-[14px] font-medium text-muted-foreground active:opacity-70 disabled:opacity-50">
                             Prøv igen
                           </button>
                         )}
@@ -830,7 +846,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
                     ) : p.tilstand === "vaelg_fil" ? (
                       <div className="mt-1 flex flex-col items-end">
                         <p className="text-right text-[14px] text-destructive">Vælg filen igen</p>
-                        <button type="button" onClick={() => vaelgFil(p.id)} className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70">
+                        <button type="button" disabled={!filAaben} onClick={() => vaelgFil(p.id)} className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70 disabled:opacity-50">
                           Vælg filen igen
                         </button>
                       </div>
@@ -838,8 +854,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
                       <div className="mt-1 flex flex-col items-end">
                         {p.fejl && p.fejl !== "Ikke sendt – prøv igen" && <p className="text-right text-[14px] text-destructive">{p.fejl}</p>}
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => meId && void deliver(meId, conversationId, p.id, p.tilstand === "genudsted")}
-                            className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70">
+                          <button type="button" disabled={pause || (!!p.fil && !filAaben)} onClick={() => meId && void deliver(meId, conversationId, p.id, p.tilstand === "genudsted")}
+                            className="flex min-h-11 items-center text-[14px] font-medium text-destructive active:opacity-70 disabled:opacity-50">
                             Ikke sendt – prøv igen
                           </button>
                           {p.tilstand === "afvist" && (
@@ -887,7 +903,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {fil && (
         <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
-          onRetry={fil.fejl && fil.file ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
+          onRetry={fil.fejl && fil.file && filAaben ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
       )}
       {filFejl && (
         <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
@@ -901,12 +917,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {/* B2-6A §A: på telefon står composeren fast over bundbjælken (BOTTOM_NAV_HEIGHT = 64) og safe area. */}
       <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
+        {!drift.filTilladt && <p className="pb-1 text-[14px] md:text-xs text-muted-foreground">Filer kan ikke sendes lige nu</p>}
         <div className="flex gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
-          <Button variant="ghost" size="icon" onClick={() => vaelgFil(null)} disabled={!!fil?.uploader}
-            className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11" aria-label="Vedhæft fil" title={FIL_GRAENSER_TEKST}>
-            {fil?.uploader ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-          </Button>
+          {drift.filTilladt && (
+            <Button variant="ghost" size="icon" onClick={() => vaelgFil(null)} disabled={!!fil?.uploader || pause}
+              className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11" aria-label="Vedhæft fil" title={FIL_GRAENSER_TEKST}>
+              {fil?.uploader ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+            </Button>
+          )}
           <div className="flex-1 min-w-0">
             <MentionInput value={message} onChange={setMessage} onKeyDown={handleKeyDown} placeholder="Skriv en besked..." onTyping={handleTyping} />
           </div>
