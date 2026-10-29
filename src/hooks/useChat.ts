@@ -1163,7 +1163,10 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
 
   useEffect(() => {
     if (!on || !employeeId) return;
+    // B2d-1 §11: callbacks bindes til abonnementets session; gamle callbacks virker ikke under en anden bruger.
+    const gen = sessionsGeneration();
     const invalidate = () => {
+      if (gen !== sessionsGeneration()) return;
       planlaeg(queryClient, CHAT_UNREAD_KEY);
       planlaeg(queryClient, ["chat-conversations"]);
     };
@@ -1176,10 +1179,14 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
         invalidate();
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "sb_signaler" }, (p) => {
-        void behandlSignal(queryClient, p.new as SignalRaekke, employeeId);
+        void behandlSignal(queryClient, p.new as SignalRaekke, employeeId, gen);
       })
       .subscribe((s) => { if (s === "SUBSCRIBED") invalidate(); });
-    const forgrund = () => { if (document.visibilityState === "visible") { invalidate(); planlaeg(queryClient, ["chat-messages"]); } };
+    // Forgrund/genforbindelse: genvalidér også søgning/svar (§5) via signalgrænsen uden payloadindhold.
+    const forgrund = () => {
+      if (document.visibilityState !== "visible" || gen !== sessionsGeneration()) return;
+      invalidate(); planlaeg(queryClient, ["chat-messages"]);
+    };
     document.addEventListener("visibilitychange", forgrund);
     return () => { document.removeEventListener("visibilitychange", forgrund); supabase.removeChannel(channel); };
   }, [on, employeeId, queryClient]);
@@ -1200,12 +1207,54 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
 
 interface SignalRaekke { id: number; kilde: string; kilde_id: string; haendelse: string; privat: boolean; conversation_id: string | null }
 
-const planlagt = new Map<string, ReturnType<typeof setTimeout>>();
-/** Debounce 300 ms pr. query-nøgle, delt på tværs af hookinstanser. */
+/**
+ * B2d-1 §11: delt signal-/debouncetilstand ejes pr. QueryClient og sessionsgeneration.
+ * En hookinstans' afmontering rører den ikke; brugerskift/logud (ny generation) annullerer timere og sæt.
+ */
+interface SignalTilstand {
+  gen: number;
+  timere: Map<string, ReturnType<typeof setTimeout>>;
+  /** Igangværende behandling pr. bruger:signal-id (samtidige dubletter deler løftet). */
+  igang: Map<string, Promise<void>>;
+  /** Vellykket behandling. */
+  faerdig: Set<string>;
+  /** Vist toast (særskilt fra behandling). */
+  toastet: Set<string>;
+}
+const signalTilstande = new Map<QueryClient, SignalTilstand>();
+function nulstil(t: SignalTilstand, gen: number): void {
+  for (const x of t.timere.values()) clearTimeout(x);
+  t.timere.clear(); t.igang.clear(); t.faerdig.clear(); t.toastet.clear(); t.gen = gen;
+}
+function signalTilstand(qc: QueryClient): SignalTilstand {
+  const gen = sessionsGeneration();
+  let t = signalTilstande.get(qc);
+  if (!t) { t = { gen, timere: new Map(), igang: new Map(), faerdig: new Set(), toastet: new Set() }; signalTilstande.set(qc, t); }
+  else if (t.gen !== gen) nulstil(t, gen);
+  return t;
+}
+// Én modulabonnent med appens levetid: sessionsskift annullerer straks alle gamle timere/sæt.
+abonnerAfsendelser(() => {
+  const gen = sessionsGeneration();
+  for (const t of signalTilstande.values()) if (t.gen !== gen) nulstil(t, gen);
+});
+/** Kun til prøver: glem tilstand for en QueryClient (annullerer dens timere). */
+export function glemSignalTilstand(qc: QueryClient): void {
+  const t = signalTilstande.get(qc);
+  if (t) { nulstil(t, t.gen); signalTilstande.delete(qc); }
+}
+
+/** Debounce 300 ms pr. query-nøgle, delt på tværs af hookinstanser for samme QueryClient og session. */
 export function planlaeg(qc: QueryClient, key: readonly unknown[]): void {
+  const t = signalTilstand(qc);
   const k = JSON.stringify(key);
-  if (planlagt.has(k)) return;
-  planlagt.set(k, setTimeout(() => { planlagt.delete(k); void qc.invalidateQueries({ queryKey: [...key] }); }, 300));
+  if (t.timere.has(k)) return;
+  const gen = t.gen;
+  t.timere.set(k, setTimeout(() => {
+    t.timere.delete(k);
+    if (gen !== sessionsGeneration()) return;
+    void qc.invalidateQueries({ queryKey: [...key] });
+  }, 300));
 }
 
 type SignalLytter = (s: { conversationId: string | null; kildeId: string; haendelse: string }) => void;
@@ -1218,35 +1267,67 @@ export function onChatSignal(cb: SignalLytter): () => void {
 
 /** Fordeler et allerede behandlet signal til lytterne (også prøvernes grænse). Indhold læses aldrig herfra. */
 export function meldChatSignal(s: { conversationId: string | null; kildeId: string; haendelse: string }): void {
-  for (const l of signalLyttere) l(s);
+  for (const l of [...signalLyttere]) l(s);
 }
 
-const sete = new Set<string>();
-const toastet = new Set<number>();
+/** Fallback ved fejlet/tomt opslag: alle relevante visninger genvalideres. */
+function genvaliderAlt(qc: QueryClient, employeeId: string): void {
+  planlaeg(qc, ["chat-conversations"]);
+  planlaeg(qc, ["chat-messages"]);
+  planlaeg(qc, CHAT_UNREAD_KEY);
+  planlaeg(qc, ["sb-begrundelse", employeeId]);
+}
 
-/** Kun kilde='besked'. Indhold/status læses aldrig fra payload – kun genhentning. */
-async function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: string): Promise<void> {
-  if (!s || s.kilde !== "besked") return;
-  const noegle = `${s.id}`;
-  let conv = s.conversation_id;
-  if (!s.privat) {
-    if (sete.has(noegle)) return;
-    sete.add(noegle);
-    if (conv) planlaeg(qc, ["chat-messages", conv]);
-    planlaeg(qc, ["chat-conversations"]);
-    planlaeg(qc, CHAT_UNREAD_KEY);
-  } else {
-    if (toastet.has(s.id)) return;
-    toastet.add(s.id);
-    const { data } = await supabase.from("chat_messages").select("conversation_id").eq("id", s.kilde_id).eq("sender_id", employeeId).maybeSingle();
-    conv = data?.conversation_id ?? null;
-    if (conv) planlaeg(qc, ["chat-messages", conv]);
-    planlaeg(qc, ["sb-begrundelse", employeeId]);
-    if (s.haendelse === "afventer") toast("Din besked afventer dig");
-    else if (s.haendelse === "udloeb") toast("Din besked blev trukket tilbage");
-  }
-  meldChatSignal({ conversationId: conv, kildeId: s.kilde_id, haendelse: s.haendelse });
-  if (sete.size > 2000) sete.clear();
+/**
+ * Kun kilde='besked'. Indhold/status læses aldrig fra payload – kun genhentning.
+ * B2d-1 §11: samtidige dubletter deler behandling; færdig markeres først efter lykket behandling;
+ * opslagfejl tillader senere behandling; tomt opslag er færdigt (ingen retry-løkke); højst én toast pr. bruger/session.
+ */
+export function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: string, gen: number = sessionsGeneration()): Promise<void> {
+  if (!s || s.kilde !== "besked" || !employeeId) return Promise.resolve();
+  if (gen !== sessionsGeneration()) return Promise.resolve();
+  const t = signalTilstand(qc);
+  const noegle = `${employeeId}:${s.id}`;
+  if (t.faerdig.has(noegle)) return Promise.resolve();
+  const igang = t.igang.get(noegle);
+  if (igang) return igang;
+  const gyldig = () => gen === sessionsGeneration() && t.gen === gen;
+  const p = (async () => {
+    let conv = s.conversation_id;
+    let lykkedes = true;
+    if (!s.privat) {
+      if (conv) planlaeg(qc, ["chat-messages", conv]);
+      planlaeg(qc, ["chat-conversations"]);
+      planlaeg(qc, CHAT_UNREAD_KEY);
+    } else {
+      conv = null;
+      try {
+        const { data, error } = await supabase.from("chat_messages").select("conversation_id")
+          .eq("id", s.kilde_id).eq("sender_id", employeeId).maybeSingle();
+        if (error) lykkedes = false;
+        else conv = data?.conversation_id ?? null;
+      } catch {
+        lykkedes = false;
+      }
+      if (!gyldig()) return;
+      if (conv) {
+        planlaeg(qc, ["chat-messages", conv]);
+        planlaeg(qc, ["sb-begrundelse", employeeId]);
+      } else genvaliderAlt(qc, employeeId);
+      if (!t.toastet.has(noegle)) {
+        if (s.haendelse === "afventer") { t.toastet.add(noegle); toast("Din besked afventer dig"); }
+        else if (s.haendelse === "udloeb") { t.toastet.add(noegle); toast("Din besked blev trukket tilbage"); }
+      }
+    }
+    if (!gyldig()) return;
+    meldChatSignal({ conversationId: conv, kildeId: s.kilde_id, haendelse: s.haendelse });
+    if (lykkedes) {
+      if (t.faerdig.size > 2000) t.faerdig.clear();
+      t.faerdig.add(noegle);
+    }
+  })().finally(() => { if (t.igang.get(noegle) === p) t.igang.delete(noegle); });
+  t.igang.set(noegle, p);
+  return p;
 }
 
 // ---------- Status, begrundelser og handlinger (S6) ----------
