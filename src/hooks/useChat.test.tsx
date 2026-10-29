@@ -1475,8 +1475,12 @@ import { createClient } from "@supabase/supabase-js";
 
 describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og mocket HTTP", () => {
   let http: Array<{ url: string; authorization: string | null }> = [];
-  let slipToken: () => void = () => undefined;
+  const ventende: Array<() => void> = [];
+  const slipToken = () => { for (const x of ventende.splice(0)) x(); };
   let tokenOpslag = 0;
+  /** Tokenopslag startet af invoke (SDK'et kan også slå token op til realtime ved oprettelse). */
+  let tokenVedInvoke = -1;
+  const iSdkTokenopslag = () => tokenVedInvoke >= 0 && tokenOpslag > tokenVedInvoke;
   /** Mocket HTTP (ingen netværk): et allerede afbrudt signal afvises uden transport, som fetch-specifikationen kræver. */
   const httpMock = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (init?.signal?.aborted) return Promise.reject(new DOMException("aborted", "AbortError"));
@@ -1486,18 +1490,18 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
   };
   const lavSdk = () => createClient("http://lokal.test", "anon-noegle", {
     // SDK'ets eget, senere tokenopslag (fetchWithAuth venter på det, også når Authorization er sat eksplicit).
-    accessToken: () => { tokenOpslag++; return new Promise<string>((x) => { slipToken = () => x("sdk-token"); }); },
+    accessToken: () => { tokenOpslag++; return new Promise<string>((x) => { ventende.push(() => x("sdk-token")); }); },
     global: { fetch: httpMock },
   });
   const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
   beforeEach(() => {
-    http = []; tokenOpslag = 0;
+    http = []; tokenOpslag = 0; tokenVedInvoke = -1;
     const sdk = lavSdk();
-    graense.invoke.mockReset().mockImplementation((navn: unknown, o: unknown) => sdk.functions.invoke(String(navn), {
+    graense.invoke.mockReset().mockImplementation((navn: unknown, o: unknown) => (tokenVedInvoke = tokenOpslag, sdk.functions.invoke(String(navn), {
       headers: { Authorization: String(arg(o, "headers", "Authorization")) },
       body: (() => { const b = arg(o, "body"); return typeof b === "object" && b !== null ? { ...b } : undefined; })(),
       signal: (() => { const s = arg(o, "signal"); return s instanceof AbortSignal ? s : undefined; })(),
-    }));
+    })));
     auth("SIGNED_IN", "u");
   });
   afterEach(() => { graense.invoke.mockReset(); });
@@ -1505,7 +1509,7 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
   it("positiv kontrol: uden stop sendes præcis ét HTTP-kald med den eksplicitte JWT", async () => {
     svar.chat_messages = [tjekkes(2)];
     const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
-    await vi.waitFor(() => expect(tokenOpslag).toBe(1));
+    await vi.waitFor(() => expect(iSdkTokenopslag()).toBe(true));
     slipToken();
     await p;
     expect(http).toHaveLength(1);
@@ -1516,12 +1520,12 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
   it("stop under SDK'ets tokenopslag → ingen efterfølgende HTTP-transport, intet genforsøg", async () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
-    await vi.waitFor(() => expect(tokenOpslag).toBe(1)); // inde i SDK'et, efter vores sidste kontrol før invoke
+    await vi.waitFor(() => expect(iSdkTokenopslag()).toBe(true)); // inde i SDK'et, efter vores sidste kontrol før invoke
     stopEfterbehandling("e", "c", "m");
     slipToken();
     await p;
     expect(http).toHaveLength(0);
-    expect(tokenOpslag).toBe(1);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
     expect(aktiveTjek()).toBe(0);
     expect(aktiveTjekTimere()).toBe(0);
   });
@@ -1530,7 +1534,7 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
-    await vi.waitFor(() => expect(tokenOpslag).toBe(1));
+    await vi.waitFor(() => expect(iSdkTokenopslag()).toBe(true));
     auth("SIGNED_OUT", null);
     slipToken();
     await p;
