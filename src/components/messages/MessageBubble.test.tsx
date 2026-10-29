@@ -412,6 +412,85 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await act(async () => { svar({ data: true, error: null }); });
     await flush();
   });
+
+  // ---------- B2b-3a §1: holdbart ukendt udfald (statuskort/boble/editor) ----------
+  it("B2b-3a: ukendt Gem overlever remount – editoren viser tilstanden og »Tjek igen« igen efter genåbning", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    vi.mocked(supabase.rpc).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const r = render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    r.unmount();
+    render(ui(besked("m1", "gammel"), "e"));
+    await flush();
+    expect(felt()?.value).toBe("min");
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("button", { name: "Tjek igen" })).toBeTruthy();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("B2b-3a: ukendt Træk tilbage fra leveret boble vises i boblen; »Tjek igen« afklarer ved læsning uden ny skrivning", async () => {
+    const nu = new Date().toISOString();
+    const m = { ...besked("m1", "hej"), leveret_at: nu, created_at: nu } as Message;
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } } as never);
+    raekke = { data: { status: "leveret", revision: m.revision, content: "hej", attachment_path: null }, error: null };
+    render(ui(m, "e"));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Flere handlinger" }), { key: "Enter" });
+    await flush();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Træk tilbage" }));
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(toast.error).not.toHaveBeenCalled();
+    raekke = { data: { status: "trukket_tilbage", revision: m.revision, content: "", attachment_path: null }, error: null };
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    await flush();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === "sb_afgoer")).toHaveLength(1);
+  });
+
+  it("B2b-3a: sen succes via »Tjek igen« mod nyere kladdeversion bevarer den nyere kladde og editoren", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as never);
+    render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await flush();
+    fireEvent.change(felt()!, { target: { value: "nyere" } });
+    raekke = { data: { status: "leveret", revision: 2, content: "min", attachment_path: null }, error: null };
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    await flush();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(felt()?.value).toBe("nyere");
+    expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("nyere");
+  });
+
+  it("B2b-3a: sen succes via »Tjek igen« for samme kladdeversion rydder kladden og lukker editoren", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as never);
+    render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await flush();
+    raekke = { data: { status: "leveret", revision: 2, content: "min", attachment_path: null }, error: null };
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    await flush();
+    expect(felt()).toBeNull();
+    expect(laesRetKladde("e", "c", "m1")).toBeNull();
+  });
+
+  it("B2b-3a: sen fejl efter remount mod nyere kladdeversion bevarer den nyere kladde (én toast)", async () => {
+    gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
+    let svar!: (v: unknown) => void;
+    vi.mocked(supabase.rpc).mockImplementationOnce((() => new Promise((r) => { svar = r; })) as never);
+    const r = render(ui(besked("m1", "gammel"), "e"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    r.unmount();
+    render(ui(besked("m1", "gammel"), "e"));
+    fireEvent.change(felt()!, { target: { value: "nyere" } });
+    await act(async () => { svar({ data: null, error: { code: "P0001", message: "Forældet revision" } }); });
+    await flush();
+    expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("nyere");
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
 });
 
 
