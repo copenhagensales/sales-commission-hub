@@ -750,7 +750,7 @@ describe("B2b-4a §2 – manuel Gem via den faktiske editorovergang afslutter et
     const { fastholdEjer, ejerGyldig } = await import("@/lib/sbKladder");
     raekke = { data: { status: "tjekkes", revision: 1 }, error: null };
     graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null } as never);
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null });
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m1", () => ejerGyldig(ejer), ejer);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
