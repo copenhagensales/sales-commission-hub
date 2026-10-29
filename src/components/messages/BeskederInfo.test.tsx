@@ -11,6 +11,7 @@ describe("BeskederInfo", () => {
     expect(screen.queryByText(BESKEDER_INFO_KNAP_TEKST)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: BESKEDER_INFO_KNAP_TEKST }));
     expect(screen.getByRole("heading", { name: BESKEDER_INFO_KNAP_TEKST })).toBeTruthy();
+    expect(screen.getByText(/Stork tjekker automatisk hver besked/)).toBeTruthy(); // indledningen forklarer tjekket før afsnittene
     for (const a of BESKEDER_INFO) expect(screen.getByText(a.titel)).toBeTruthy();
     expect(screen.queryByText("Lige nu")).toBeNull();
     expect(screen.getByText(`Version ${BESKEDER_INFO_VERSION}`)).toBeTruthy();

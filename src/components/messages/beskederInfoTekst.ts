@@ -2,6 +2,8 @@
 // Ordlyden ejes af ledelsen (Mathias/Kasper) og kan rettes her. Versionen noteres i ændringsloggen som bevis for, hvad der blev vist hvornår.
 export const BESKEDER_INFO_VERSION = "2026-10-29";
 export const BESKEDER_INFO_KNAP_TEKST = "Sådan virker Beskeder";
+/** Indledning øverst i arket: forklarer tjekket, før afsnittene henviser til det (Mathias 29/10). */
+export const BESKEDER_INFO_INDLEDNING = "Stork tjekker automatisk hver besked for hård tone og personoplysninger, før den leveres til modtageren. Her kan du se, hvad det betyder for dig.";
 
 export interface BeskederInfoStatus {
   /** false = driftsopslaget mangler eller fejlede (useSbDrift status "ukendt"); så loves intet om filer/tekst. */
@@ -31,8 +33,8 @@ export const BESKEDER_INFO: InfoAfsnit[] = [
     titel: "Dine samtaler er stadig private",
     punkter: [
       "Kun deltagerne i en samtale kan læse den. Det er uændret.",
-      "Tjekket er automatisk. Ingen kollega eller leder læser dine beskeder som led i tjekket.",
-      "Resultatet af tjekket vises kun for dig. Modtageren ser bare beskeden, når den er leveret.",
+      "Tjekket er automatisk: et program læser beskeden, før den leveres. Ingen kollega eller leder læser dine beskeder som led i tjekket.",
+      "Finder tjekket noget, er det kun dig, der får besked. Modtageren ser bare beskeden, når den er leveret.",
       "Tjekkets logfiler indeholder ingen beskedtekst – kun tekniske koder.",
     ],
   },

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
-import { BESKEDER_INFO, BESKEDER_INFO_VERSION, BESKEDER_INFO_KNAP_TEKST, ligeNuTekster, type BeskederInfoStatus } from "./beskederInfoTekst";
+import { BESKEDER_INFO, BESKEDER_INFO_VERSION, BESKEDER_INFO_KNAP_TEKST, BESKEDER_INFO_INDLEDNING, ligeNuTekster, type BeskederInfoStatus } from "./beskederInfoTekst";
 
 /** Telefon → ark fra bunden; ellers panel fra højre. Læses ved hver visning; uden matchMedia (prøver) → panel. */
 function erTelefon(): boolean {
@@ -44,7 +44,7 @@ export function BeskederInfoSheet({ open, onOpenChange, status, returFokus, rese
         onCloseAutoFocus={fokusTilbage}>
         <SheetHeader className="text-left">
           <SheetTitle>{BESKEDER_INFO_KNAP_TEKST}</SheetTitle>
-          <SheetDescription>Tjek, slettefrister og filer i Storkbook Beskeder.</SheetDescription>
+          <SheetDescription>{BESKEDER_INFO_INDLEDNING}</SheetDescription>
         </SheetHeader>
         {ligeNu.length > 0 && (
           <div role="status" className="mt-3 rounded-lg border border-border bg-card p-3 text-[14px] text-card-foreground">
