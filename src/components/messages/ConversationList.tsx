@@ -134,7 +134,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
       onDelete();
       toast.success(conversation.is_group ? "Du har forladt gruppen" : "Samtalen er slettet");
     } catch (error) {
-      if (e instanceof ForaeldetSession) return;
+      if (error instanceof ForaeldetSession) return;
       toast.error(conversation.is_group ? "Kunne ikke forlade gruppen" : "Kunne ikke slette samtalen");
     }
     setShowDeleteDialog(false);

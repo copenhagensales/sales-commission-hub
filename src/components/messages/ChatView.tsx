@@ -680,7 +680,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
       id, tekst: message.trim(), svarId: svarId ?? replyTo?.id ?? null,
       fil: fil ? metaFra(fil) : null, tilstand: "sender", fejl: null, tidligereUkendt: false, oprettet: Date.now(),
     };
-    tilfoejAfsendelse(emp, conv, a, fil?.file ?? null);
+    // B2-6B §B: composeren tømmes først, når afsendelsen faktisk er accepteret i det lokale lager.
+    const ejer = fastholdEjer(emp, conv, brugerRef.current);
+    if (!tilfoejAfsendelse(emp, conv, a, fil?.file ?? null, ejer)) {
+      sendLaas.current = false;
+      toast.error("Kunne ikke sende beskeden");
+      return;
+    }
     setMessage("");
     setReplyTo(null);
     setSvarId(null);
