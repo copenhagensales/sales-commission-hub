@@ -3,7 +3,8 @@ import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fastholdEjer, rydAlleKladder, registrerKladdeOprydning } from "@/lib/sbKladder";
+import { fastholdEjer, rydAlleKladder, registrerKladdeOprydning, sessionsGeneration } from "@/lib/sbKladder";
+import { saetModelPort, tjekPortAaben } from "@/hooks/useSbDrift";
 
 /** c3 §7: rigtige auth-callbacks (registreret én gang i modulet). */
 /** B2b-4b §3: typesikker læsning af et felt i et mock-argument (ingen cast). */
@@ -83,6 +84,8 @@ const msg = (data: unknown, error: unknown = null) => ({ data, error });
 const fejl = (p: Promise<unknown>) => p.then(() => null, (x) => x as SendFejl);
 
 beforeEach(() => {
+  for (let g = 0; g <= sessionsGeneration() + 5; g++) saetModelPort("u", g, true); // 24d2: kendt tjek_tilladt=true
+
   insert.mockReset();
   kald.length = 0;
   for (const k of Object.keys(svar)) delete svar[k];

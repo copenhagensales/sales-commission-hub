@@ -46,6 +46,9 @@ export function tjekPortAaben(bruger: string | null | undefined, gen: number): b
   return !!bruger && gen === sessionsGeneration() && modelPorte.get(sk(bruger, gen)) === true;
 }
 
+/** Intern: sætter modelporten direkte (bruges af anvendLaesning og prøver ved Supabase-grænsen). */
+export function saetModelPort(bruger: string, gen: number, aaben: boolean): void { modelPorte.set(sk(bruger, gen), aaben); }
+
 export const driftNoegle = (bruger: string | null, gen: number) => ["sb-24d2-drift", bruger, gen] as const;
 
 /**
@@ -62,7 +65,7 @@ export function registrerPause(qc: QueryClient, bruger: string, gen: number): vo
 function anvendLaesning(qc: QueryClient, bruger: string, gen: number, l: Laesning): void {
   if (gen !== sessionsGeneration()) return; // gammelt sessionssvar
   const k = sk(bruger, gen);
-  modelPorte.set(k, l.raekke?.tjek_tilladt === true);
+  saetModelPort(bruger, gen, l.raekke?.tjek_tilladt === true);
   const m = pauseMap(qc); const nu = m.get(k);
   if (l.raekke?.beskeder_pause) m.set(k, { pause: true, bevis: Math.max(nu?.bevis ?? 0, l.start) });
   else if (l.raekke && nu?.pause && l.start > nu.bevis) m.set(k, { pause: false, bevis: nu.bevis });
