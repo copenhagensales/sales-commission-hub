@@ -47,6 +47,8 @@ const graense = vi.hoisted(() => ({
   from: vi.fn<(t: string) => unknown>(),
   session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })),
   upload: vi.fn<(...a: unknown[]) => Promise<{ error: unknown }>>(async () => ({ error: null })),
+  // B2c-2b-2 §7: presence-kanaler ved grænsen (kun tællere, intet netværk).
+  kanaler: [] as Array<{ navn: string; track: ReturnType<typeof vi.fn>; fjernet: boolean }>,
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -56,6 +58,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       getSession: graense.session },
     functions: { invoke: graense.invoke },
     storage: { from: () => ({ uploadToSignedUrl: graense.upload }) },
+    channel: (navn: string) => {
+      const k = { navn, track: vi.fn(async () => "ok"), fjernet: false };
+      graense.kanaler.push(k);
+      const ch = { on: () => ch, subscribe: () => ch, presenceState: () => ({}), track: k.track, k };
+      return ch;
+    },
+    removeChannel: (ch: { k: { fjernet: boolean } }) => { ch.k.fjernet = true; return Promise.resolve("ok"); },
   },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
@@ -1651,5 +1660,117 @@ describe("B2b-4b §3 – to isolerede klienter: rigtig sbFil, binding før PK-ko
     expect(kald.filter((k) => k === "insert:chat_messages").length).toBe(inserts);
     expect(m.rækker.size).toBe(1);
     expect(m.stier.get(u1.sti)).toMatchObject({ besked_id: null, status: "uploadet" });
+  });
+});
+
+
+// ---------- B2c-2b-2 – fristur, presence-kanal og fristoprydning ----------
+import { useFristUr, erUdloebet, useTypingIndicator, fristOprydning } from "./useChat";
+
+describe("B2c-2b-2 (Codex) – fristur: callback før fristen, render efter fristen", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  const T0 = new Date("2026-10-29T08:00:00.000Z").getTime();
+  const FRIST = new Date(T0 + 1000).toISOString();
+
+  it("gemt nu = frist − 1 ms og aktuelt ur efter fristen: render vurderer det aktuelle ur (udløbet)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(T0 + 999); // »gemt nu« = frist − 1 ms
+    const { result } = renderHook(() => { const nu = useFristUr([FRIST]); return { nu, ude: erUdloebet(FRIST, nu) }; });
+    expect(result.current.ude).toBe(false);
+    expect(vi.getTimerCount()).toBe(1); // planlagt 1 ms frem
+    // Callbacken (forgrund) måles før fristen, men render/effekt sker efter: uret flyttes uden at timeren kører.
+    vi.setSystemTime(T0 + 1001);
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(result.current.nu).toBe(T0 + 1001);
+    expect(result.current.ude).toBe(true);
+    expect(vi.getTimerCount()).toBe(0); // udløbet frist armeres aldrig igen (ingen 0-ms-løkke)
+  });
+
+  it("timer fyrer før fristen (urhop tilbage): intet gammelt indhold uden ny timer; senere passage udløser", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(T0 + 999);
+    const { result } = renderHook(() => { const nu = useFristUr([FRIST]); return erUdloebet(FRIST, nu); });
+    vi.setSystemTime(T0 + 500); // urhop tilbage, før timeren fyrer
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(result.current).toBe(false);
+    expect(vi.getTimerCount()).toBe(1); // ny timer mod den stadig fremtidige frist
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(Date.now()).toBeGreaterThan(new Date(FRIST).getTime());
+    expect(result.current).toBe(true);
+  });
+
+  it("urhop frem uden timer: forgrundssignal vurderer straks mod aktuelt ur", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(T0);
+    const { result } = renderHook(() => { const nu = useFristUr([FRIST]); return erUdloebet(FRIST, nu); });
+    vi.setSystemTime(T0 + 60_000);
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("online")); });
+    expect(result.current).toBe(true);
+  });
+});
+
+describe("B2c-2b-2 §7 – presence-kanal ved samtaleskift og afmontering", () => {
+  beforeEach(() => { graense.kanaler.length = 0; });
+  it("gammel callback kalder hverken fjernet eller forkert samtales kanal", async () => {
+    const { result, rerender, unmount } = renderHook(({ c }) => useTypingIndicator(c), { initialProps: { c: "A" } });
+    const gammel = result.current.setTyping;
+    await act(async () => { await gammel(true, "e", "N", "A"); });
+    const [a] = graense.kanaler;
+    expect(a.track).toHaveBeenCalledTimes(1);
+    rerender({ c: "B" });
+    const b = graense.kanaler[1];
+    expect(a.fjernet).toBe(true);
+    await act(async () => { await gammel(false, "e", "N", "A"); }); // sen timer fra samtale A
+    expect(a.track).toHaveBeenCalledTimes(1);
+    expect(b.track).not.toHaveBeenCalled();
+    unmount();
+    await act(async () => { await gammel(false, "e", "N", "B"); });
+    expect(b.track).not.toHaveBeenCalled();
+  });
+});
+
+describe("B2c-2b-2 (Codex) – fristoprydning via stopvejen", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const r = (revision: number) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null });
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    graense.rpc.mockReset(); vi.mocked(toast.error).mockReset();
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { graense.rpc.mockReset(); vi.mocked(toast.error).mockReset(); for (const k of Object.keys(svar)) delete svar[k]; qc.clear(); });
+
+  it("når snapshot og »Tjek igen« for netop det udløbne id; andre snapshots og fysisk lås bevares", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    for (const id of ["x1", "x2"]) {
+      const e = fastholdEjer("e", "c", "u")!; expect(tagHandling(e, id, "send")).toBe(true);
+      graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+      svar.chat_messages = [r(4)];
+      await result.current.mutateAsync({ messageId: id, revision: 4, handling: "send", conversationId: "c", ejer: e }).catch(() => null);
+    }
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    expect(udfaldSnapshot("e", "c", "x1")).not.toBeNull();
+    const x2 = udfaldSnapshot("e", "c", "x2");
+    expect(x2).not.toBeNull();
+    // Igangværende »Tjek igen« for x1 (tilbageholdt læsning).
+    let slip!: (x: unknown) => void;
+    svar.chat_messages = [new Promise((x) => { slip = x; })];
+    const p = tjekUdfaldIgen(qc, "e", "c", "x1");
+    // Fysisk igangværende arbejde på x3 (låsen ejes af sit kald).
+    const e3 = fastholdEjer("e", "c", "u")!; expect(tagHandling(e3, "x3", "send")).toBe(true);
+    const laase = aktiveHandlinger();
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    const ref = vi.spyOn(qc, "refetchQueries");
+    fristOprydning("e", "c", "x1");
+    fristOprydning("e", "c", "x3");
+    slip(msg({ status: "leveret", revision: 4, content: "x", attachment_path: null }));
+    expect(await p).toBe("stoppet");
+    expect(udfaldSnapshot("e", "c", "x1")).toBeNull();
+    expect(udfaldSnapshot("e", "c", "x2")).toBe(x2); // andre afsendelser røres ikke
+    expect(aktiveHandlinger()).toBe(laase); // lås beholdes til egen afslutning
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(inv).not.toHaveBeenCalled(); // stopvejen: sent tjeksvar giver ingen cacheeffekt
+    expect(ref).not.toHaveBeenCalled();
+    frigivHandling(e3, "x3");
   });
 });

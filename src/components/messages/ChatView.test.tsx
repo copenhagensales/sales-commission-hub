@@ -8,6 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 const arg = (o: unknown, ...sti: string[]): unknown => sti.reduce<unknown>((x, k) => (typeof x === "object" && x !== null ? Reflect.get(x, k) : undefined), o);
 const mutateAsync = vi.fn();
 const beskeder = vi.hoisted(() => { const liste: unknown[] = []; return { liste, ægteSend: false, ægteFil: false, opdateret: 0 }; });
+const skriver = vi.hoisted(() => { const fn: (...a: unknown[]) => unknown = () => undefined; return { fn }; });
 const kvitMutate = vi.hoisted(() => { const fn: (...a: unknown[]) => void = () => undefined; return { fn }; });
 const lagerUpload = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => Promise<{ error: unknown }>) }));
 const afstemKun = vi.fn(async () => "ikke_fundet");
@@ -27,7 +28,8 @@ const graense = vi.hoisted(() => ({
   rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
-  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "t" } } })),
+  // B2c-2b-2: sessionen bærer auth-brugeren (som en rigtig session), så §6-bindingen ikke afhænger af prøverækkefølge.
+  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "t", user: { id: "u" } } } })),
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (t: string) => {
@@ -66,8 +68,8 @@ vi.mock("./MessageSearch", () => ({ MessageSearch: () => null }));
 vi.mock("./TypingIndicator", () => ({ TypingIndicator: () => null }));
 vi.mock("./MentionInput", async (orig) => ({
   ...(await orig<typeof import("./MentionInput")>()),
-  MentionInput: ({ value, onChange, onKeyDown }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void }) => (
-    <textarea aria-label="besked" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} />
+  MentionInput: ({ value, onChange, onKeyDown, onTyping }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void; onTyping?: () => void }) => (
+    <textarea aria-label="besked" value={value} onChange={(e) => { onChange(e.target.value); onTyping?.(); }} onKeyDown={onKeyDown} />
   ),
 }));
 vi.mock("@/lib/sbFil", async (orig) => ({
@@ -85,7 +87,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
     useSendMessage: () => (beskeder.ægteSend ? ægte.useSendMessage() : { mutateAsync }),
     useRealtimeMessages: () => undefined,
     useMarkAsRead: () => ({ mutate: (...a: unknown[]) => kvitMutate.fn(...a), isPending: false }),
-    useTypingIndicator: () => ({ typingUsers: [], setTyping: vi.fn() }),
+    useTypingIndicator: () => ({ typingUsers: [], setTyping: (...a: unknown[]) => skriver.fn(...a) }),
     useChatAktiv: () => undefined,
     afstemKun: (...a: Parameters<typeof ægte.afstemKun>) => (beskeder.ægteSend ? ægte.afstemKun(...a) : afstemKun()),
   };
@@ -767,6 +769,36 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(hentAfsendelser("e", "A")).toEqual([]);
   });
 
+  it("B2c-2b-2 (Codex): afstemning holder id → egen række kendt udløbet → RLS fjerner rækken → gammelt opslag afslutter: pending-tekst/fil genopstår aldrig; plads til egen afslutning", async () => {
+    const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
+    const fil: FilMeta = { name: "vedh.png", type: "image/png", size: 3, sti: "A/e/vedh.png", trin: "uploadet" };
+    tilfoejAfsendelse("e", "A", { ...afs("A1", fil), tekst: "ventende-tekst" });
+    const r = await klarFake();
+    const usynlig = () => { expect(screen.queryByText("ventende-tekst")).toBeNull(); expect(screen.queryByText("vedh.png")).toBeNull(); };
+    // Trin 1: fysisk afstemning holder id'et (ét aktivt opslag, plads optaget).
+    expect(opslag("A1")).toBe(1);
+    expect(screen.getByText("ventende-tekst")).toBeTruthy();
+    const { afstemningsKapacitet } = await import("./ChatView");
+    expect(afstemningsKapacitet().aktive).toBe(1);
+    // Trin 2: egen serverrække med kendt udløbet frist i rå messages (beviser gemning, vises ikke).
+    beskeder.liste = [{ ...fremmed("A1", "server-tekst", { attachment_path: fil.sti, attachment_name: fil.name, attachment_type: fil.type }),
+      sender_id: "e", status: "leveret", read_receipts: [], slettes_efter: new Date(Date.now() - 1).toISOString() }];
+    beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />)); await fremad(0);
+    usynlig(); expect(screen.queryByText("server-tekst")).toBeNull();
+    expect(afstemningsKapacitet().aktive).toBe(1); // pladsen beholdes af det fysiske opslag
+    // Trin 3: næste genhentning – RLS skjuler rækken (antagelse, ikke SQL).
+    beskeder.liste = []; beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />)); await fremad(0);
+    usynlig();
+    expect(afstemningsKapacitet().aktive).toBe(1);
+    // Trin 4: det gamle opslag afslutter senere (RLS: ingen række).
+    await svarFor("A1", null); await fremad(0);
+    usynlig();
+    expect(afstemningsKapacitet().aktive).toBe(0); // frigivet af egen afslutning
+    expect(net.insert).not.toHaveBeenCalled();
+  });
+
   it("mange pending id'er: målt maksimal samtidighed er 3", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     for (let i = 0; i < 8; i++) tilfoejAfsendelse("e", "A", afs(`P${i}`));
@@ -1409,9 +1441,18 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     await waitFor(() => expect(screen.getByRole("img", { name: "b.png" })).toBeTruthy());
     expect(screen.getAllByText("hemmelig").length).toBeGreaterThanOrEqual(2); // tråd + svaruddrag (+ valgt svar)
     expect(screen.getByText("Svarer på:")).toBeTruthy();
+    // B2c-2b-2 (Codex): filåbningernes opsætning er afsluttet og kontrolleret FØR fristen passeres:
+    // tre GET startet, a.txt og b.png vist, c.png står i hentning (abortsignal ikke udløst).
+    expect(n).toBe(3);
+    expect(signaler[2]?.aborted).toBe(false);
+    expect(screen.getByRole("button", { name: "Åbn c.png" })).toBeDisabled();
     const kaldFoer = fetchSpy.mock.calls.length;
-    await act(async () => { vi.setSystemTime(Date.now() + 400); });
-    await vent(700);
+    // Kontrolleret passage: Date.now() sættes eksplicit efter fristen (urhop) og vurderes via forgrundssignalet –
+    // ingen relativ ventetid, ingen vægurfrist. Date er fastfrosset, så den rigtige planlægningstimer ikke kan udløse noget før.
+    await act(async () => { vi.setSystemTime(new Date(frist).getTime() + 1); });
+    expect(Date.now()).toBeGreaterThan(new Date(frist).getTime());
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await act(async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); });
     expect(screen.queryByText("hemmelig")).toBeNull();
     expect(screen.queryByText("filindhold")).toBeNull();
     expect(screen.queryByRole("img", { name: "b.png" })).toBeNull();
@@ -1700,5 +1741,99 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
     expect(n()).toBe(totalFoerPladsholder);
     r.unmount();
+  });
+});
+
+
+// ---------- B2c-2b-2 T7 (§7) – preview-ejerskab, komponenttimere og navigation ----------
+describe("T7 (B2c-2b-2 §7) – preview og oprydning", () => {
+  let oprettet: string[] = [];
+  let revoked: string[] = [];
+  beforeEach(() => {
+    oprettet = []; revoked = [];
+    let nr = 0;
+    globalThis.URL.createObjectURL = () => { const u = `blob:p${++nr}`; oprettet.push(u); return u; };
+    globalThis.URL.revokeObjectURL = (u: string) => { revoked.push(u); };
+    udstedUpload.mockImplementation(() => holdt());
+  });
+  afterEach(() => { vi.useRealTimers(); skriver.fn = () => undefined; });
+  const png = (n: string) => new File([new Uint8Array([1, 2, 3])], n, { type: "image/png" });
+  const vistPreview = () => screen.queryAllByRole("img").map((i) => i.getAttribute("src"));
+
+  it("fjernelse: preview-URL revokes direkte, intet billede tilbage", async () => {
+    const r = await klar();
+    await vaelg(r.container, png("a.png"));
+    expect(oprettet).toEqual(["blob:p1"]);
+    expect(vistPreview()).toEqual(["blob:p1"]);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Fjern fil" })); });
+    expect(revoked).toEqual(["blob:p1"]);
+    expect(vistPreview()).toEqual([]);
+  });
+
+  it("erstatning: gammel URL revokes, ny vises; afmontering revokes den aktuelle", async () => {
+    const r = await klar();
+    await vaelg(r.container, png("a.png"));
+    await vaelg(r.container, png("b.png"));
+    expect(revoked).toContain("blob:p1");
+    expect(vistPreview()).toEqual([oprettet[oprettet.length - 1]]);
+    r.unmount();
+    for (const u of oprettet) expect(revoked).toContain(u);
+  });
+
+  it("send: preview frigives ved afsendelse", async () => {
+    udstedUpload.mockResolvedValue({ sti: "A/e/a.png", token: "k", conversationId: "A" });
+    uploadTilSti.mockResolvedValue(undefined);
+    mutateAsync.mockImplementation(() => holdt());
+    const r = await klar();
+    await vaelg(r.container, png("a.png"));
+    await waitFor(() => expect(send()).not.toBeDisabled());
+    await act(async () => { fireEvent.click(send()); });
+    expect(revoked).toContain("blob:p1");
+    expect(vistPreview()).not.toContain("blob:p1");
+  });
+
+  it("navigation: URL frigives, File bevares i kladdelageret; genåbning danner nyt preview", async () => {
+    const { kladdeFilTilstand } = await import("@/lib/sbKladder");
+    const f = png("a.png");
+    const r = await klar();
+    await vaelg(r.container, f);
+    await navigér(r, "B");
+    expect(revoked).toEqual(["blob:p1"]);
+    expect(kladdeFilTilstand("e", "A")?.file).toBe(f);
+    await navigér(r, "A");
+    expect(oprettet).toEqual(["blob:p1", "blob:p2"]);
+    expect(vistPreview()).toEqual(["blob:p2"]);
+  });
+
+  it("navigation stopper og sletter ikke bevarede afsendelser", async () => {
+    mutateAsync.mockImplementation(() => holdt());
+    const r = await klar();
+    skriv("bevaret");
+    await act(async () => { fireEvent.click(send()); });
+    const foer = hentAfsendelser("e", "A").map((a) => a.id);
+    expect(foer).toHaveLength(1);
+    await navigér(r, "B");
+    await navigér(r, "A");
+    expect(hentAfsendelser("e", "A").map((a) => a.id)).toEqual(foer);
+    expect(screen.getByText("bevaret")).toBeTruthy();
+  });
+
+  it("skrive-timer ryddes ved samtaleskift og afmontering: ingen sen presence-skrivning", async () => {
+    const kald: unknown[][] = [];
+    skriver.fn = (...a: unknown[]) => { kald.push(a); };
+    const r = await klar();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    skriv("h");
+    expect(kald.at(-1)?.[0]).toBe(true);
+    expect(kald.at(-1)?.[3]).toBe("A");
+    r.rerender(wrap(<ChatView conversationId="B" />));
+    const efterSkift = kald.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    expect(kald.slice(efterSkift).filter((k) => k[0] === false)).toEqual([]);
+    skriv("x");
+    r.unmount();
+    const efterAfmont = kald.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    expect(kald.length).toBe(efterAfmont);
   });
 });

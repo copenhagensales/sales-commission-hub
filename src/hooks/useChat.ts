@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef } from "react";
 import { toast } from "sonner";
 import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, type OperationsEjer } from "@/lib/sbKladder";
 
@@ -123,6 +123,12 @@ function rydAndreGenerationer(m: Map<string, unknown>): void {
   const pre = `${sessionsGeneration()}:`;
   for (const k of [...m.keys()]) if (!k.startsWith(pre)) m.delete(k);
 }
+/*
+ * B2c-2b-2 (rest fra B2c-2a): kaldes under render og skriver i et modul-lager (ingen React-state). Det er sikkert:
+ * skrivningen er idempotent for samme (generation, samtale, id, frist, nu) – StrictMode-dobbeltrender og en kasseret
+ * concurrent render giver samme resultat; den markerer kun en frist, som klientens ur allerede har passeret
+ * (erUdloebet), og sletter kun gamle generationers nøgler, som aldrig kan matche igen. Ingen lyttere meldes.
+ */
 export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): boolean {
   const k = kuNoegle(emp, conv, id);
   if (!frist) { kendteUdloebne.delete(k); return false; }
@@ -139,7 +145,7 @@ export const harKendtUdloebet = (emp: string | null | undefined, conv: string, i
  * Budgettet (FRIST_GENHENT_MS: 500 ms + 2/4/8/16/32 s) overlever remount og andre rækkers udløb/bortfald;
  * gentagne svar med samme frist nulstiller det ikke. Række væk/ændret frist afslutter forløbet.
  */
-const fristForloeb = new Map<string, { n: number; due: number; opd: number | null; fyret: number }>();
+const fristForloeb = new Map<string, { n: number; due: number; opd: number | null }>();
 /**
  * Ventetiden måles fra svaret på den foregående genhentning (opdateret ændret). Udebliver svaret (fejlet
  * genhentning, afmontering), bruges en sikkerhedsgrænse på dobbelt ventetid fra genhentningen.
@@ -154,7 +160,7 @@ export function synkFristForloeb(emp: string | null | undefined, conv: string, u
     const k = `${pre}${u.id}@${u.frist}`;
     let f = fristForloeb.get(k);
     // Ur-skævhed: første genhentning ved frist + 500 ms (aldrig før nu).
-    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]), opd: null, fyret: 0 }; fristForloeb.set(k, f); }
+    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]), opd: null }; fristForloeb.set(k, f); }
     if (f.n >= FRIST_GENHENT_MS.length) continue;
     if (f.opd !== null && opdateret !== f.opd) { f.due = nu + FRIST_GENHENT_MS[f.n]; f.opd = null; }
     if (min === null || f.due < min) min = f.due;
@@ -167,7 +173,7 @@ export function fyrFristForloeb(emp: string | null | undefined, conv: string, nu
   let fyr = false;
   for (const [k, f] of fristForloeb) {
     if (!k.startsWith(pre) || f.n >= FRIST_GENHENT_MS.length || f.due > nu) continue;
-    f.n++; fyr = true; f.fyret = nu; f.opd = opdateret;
+    f.n++; fyr = true; f.opd = opdateret;
     if (f.n < FRIST_GENHENT_MS.length) f.due = nu + 2 * FRIST_GENHENT_MS[f.n];
   }
   return fyr;
@@ -953,7 +959,9 @@ export function useRealtimeMessages(conversationId: string | null) {
 // Typing indicator using presence
 export function useTypingIndicator(conversationId: string | null) {
   const [typingUsers, setTypingUsers] = useState<{id: string; name: string}[]>([]);
-  const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
+  // B2c-2b-2 §7: kanalen ejes af en ref, der nulstilles ved samtaleskift/afmontering, så gamle callbacks
+  // (fx en sen skrive-timer) aldrig kalder en fjernet eller forkert samtales presence-kanal.
+  const kanal = useRef<{ ch: ReturnType<typeof supabase.channel>; conv: string } | null>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -974,18 +982,19 @@ export function useTypingIndicator(conversationId: string | null) {
     });
 
     ch.subscribe();
-    setChannel(ch);
+    kanal.current = { ch, conv: conversationId };
 
     return () => {
+      if (kanal.current?.ch === ch) kanal.current = null;
       supabase.removeChannel(ch);
     };
   }, [conversationId]);
 
-  const setTyping = useCallback(async (isTyping: boolean, userId: string, userName: string) => {
-    if (channel) {
-      await channel.track({ id: userId, name: userName, isTyping });
-    }
-  }, [channel]);
+  const setTyping = useCallback(async (isTyping: boolean, userId: string, userName: string, conv?: string) => {
+    const k = kanal.current;
+    if (!k || (conv !== undefined && k.conv !== conv)) return;
+    await k.ch.track({ id: userId, name: userName, isTyping });
+  }, []);
 
   return { typingUsers, setTyping };
 }
@@ -1614,6 +1623,15 @@ export function stopEfterbehandling(emp: string, conv: string, id?: string): voi
   for (const [k, e] of [...efterOps]) {
     if (e.ejer.gen === gen && e.ejer.emp === emp && e.conv === conv && (id === undefined || e.id === id)) { annullerOperation(e.ejer.op); efterOps.delete(k); }
   }
+}
+/**
+ * B2c-2b-2: fristoprydning for én kendt udløbet serverrække. Går gennem stopvejen (efterbehandling, statusopslag,
+ * »Tjek igen« og tjektimere for netop id'et) og fjerner rækkens resultatsnapshot. Låsen for fysisk igangværende
+ * arbejde beholdes til egen afslutning; andre afsendelser og kladder i samtalen røres ikke.
+ */
+export function fristOprydning(emp: string, conv: string, id: string): void {
+  stopEfterbehandling(emp, conv, id);
+  if (ukendte.delete(hNoegle(sessionsGeneration(), emp, conv, id))) hMeld();
 }
 /** Efter bekræftet INSERT/sb_ret/sb_fjern_fil: genhent og tjek rigtig revision; ejerskab før hvert kald og cachetrin. */
 function efterHandling(qc: QueryClient, ejer: OperationsEjer, conversationId: string, messageId: string) {

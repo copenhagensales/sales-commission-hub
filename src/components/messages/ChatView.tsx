@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -308,8 +308,28 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // §3: filposten og uploadforløbet ejes af lageret; komponenten abonnerer (overlever afmontering og navigation).
   const filTilstand = useSyncExternalStore(abonnerAfsendelser, () => (meId ? kladdeFilTilstand(meId, conversationId) : null));
   const visFil = filTilstand?.file && filTilstand.meta.type.startsWith("image/") ? filTilstand.file : null;
-  const previewUrl = useMemo(() => (visFil ? URL.createObjectURL(visFil) : null), [visFil]);
-  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+  // B2c-2b-2 §7: preview-URL'en ejes af en ref og revokes direkte (ikke i en setState-updater) ved fjernelse,
+  // erstatning, afsendelse, samtaleskift og afmontering. File bevares i kladdelageret; nyt preview dannes ved genåbning.
+  const previewRef = useRef<{ file: File; url: string } | null>(null);
+  const [preview, setPreview] = useState<{ file: File; url: string } | null>(null);
+  const frigivPreview = useCallback(() => {
+    const p = previewRef.current;
+    if (!p) return;
+    previewRef.current = null;
+    URL.revokeObjectURL(p.url);
+    setPreview(null);
+  }, []);
+  useEffect(() => {
+    if (!visFil) { frigivPreview(); return; }
+    if (previewRef.current?.file === visFil) return;
+    frigivPreview();
+    const p = { file: visFil, url: URL.createObjectURL(visFil) };
+    previewRef.current = p;
+    setPreview(p);
+  }, [visFil, frigivPreview]);
+  useEffect(() => frigivPreview, [conversationId, frigivPreview]);
+  // Kun en URL, der stadig ejes for netop den viste File, vises (aldrig en revoket eller fremmed).
+  const previewUrl = preview && preview.file === visFil && previewRef.current === preview ? preview.url : null;
   const fil: LokalFil | null = filTilstand ? {
     file: filTilstand.file, name: filTilstand.meta.name, type: filTilstand.meta.type, size: filTilstand.meta.size, previewUrl,
     uploader: filTilstand.aktiv, sti: filTilstand.meta.sti ?? undefined, trin: filTilstand.meta.trin, fejl: filTilstand.fejl ?? undefined,
@@ -438,6 +458,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // af det konkrete fristforløb (id + slettes_efter) i useChat og overlever remount og andre rækkers udløb/bortfald.
   const udloebneListe = (messages ?? []).filter((m) => m.slettes_efter && erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu));
   const udloebne = udloebneListe.map((m) => `${m.id}@${m.slettes_efter}`).join(",");
+  // B2c-2b-2: fristoprydning via stopvejen for netop de kendt udløbne id'er (én gang pr. frist og generation).
+  // Låsen for fysisk igangværende arbejde og andre afsendelser/kladder røres ikke.
+  const fristRyddet = useRef(new Set<string>());
+  useEffect(() => {
+    if (!meId || !udloebne) return;
+    for (const x of udloebne.split(",")) {
+      const k = `${sessionsGeneration()}:${conversationId}:${x}`;
+      if (fristRyddet.current.has(k)) continue;
+      fristRyddet.current.add(k);
+      fristOprydning(meId, conversationId, x.slice(0, x.indexOf("@")));
+    }
+  }, [udloebne, meId, conversationId]);
   const [fristSlag, setFristSlag] = useState(0);
   useEffect(() => {
     if (!messages) return; // ukendt liste: intet forløb afsluttes
@@ -459,10 +491,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const handleTyping = () => {
     if (!currentEmployee) return;
-    setTyping(true, currentEmployee.id, currentEmployee.full_name);
+    const conv = conversationId, id = currentEmployee.id, navn = currentEmployee.full_name;
+    setTyping(true, id, navn, conv);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => setTyping(false, currentEmployee.id, currentEmployee.full_name), 2000);
+    typingTimeoutRef.current = setTimeout(() => { typingTimeoutRef.current = null; void setTyping(false, id, navn, conv); }, 2000);
   };
+  // §7: skrive-timeren er komponentejet og ryddes ved samtaleskift og afmontering (ingen sen presence-skrivning).
+  useEffect(() => () => {
+    if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+  }, [conversationId]);
 
   /** Ét afsendelsesforsøg for samme id. Bruger, samtale og sessionsgeneration fastholdes fra starten. */
   const deliver = useCallback(async (emp: string, conv: string, id: string, genudsted = false) => {
@@ -584,7 +621,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (message.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     sendLaas.current = true; // synkront, før id dannes
     const emp = meId, conv = conversationId;
-    if (currentEmployee) setTyping(false, currentEmployee.id, currentEmployee.full_name);
+    if (currentEmployee) setTyping(false, currentEmployee.id, currentEmployee.full_name, conv);
+    if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+    frigivPreview(); // §7: preview frigives ved afsendelse; File følger afsendelsen i lageret
     const id = retId ?? crypto.randomUUID();
     const a: Afsendelse = {
       id, tekst: message.trim(), svarId: svarId ?? replyTo?.id ?? null,
@@ -661,6 +700,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const vaelgFil = (afsendelsesId: string | null) => { genvalgFor.current = afsendelsesId; fileInputRef.current?.click(); };
 
   const fjernFil = () => {
+    frigivPreview();
     if (meId) fjernKladdeFil(meId, conversationId);
   };
 
