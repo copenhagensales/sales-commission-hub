@@ -9,10 +9,11 @@ import type { ReactNode } from "react";
 const graense = vi.hoisted(() => ({
   rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
+  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })),
   from: vi.fn<(t: string) => unknown>(),
 }));
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { onAuthStateChange: vi.fn(), getSession: vi.fn() }, from: graense.from, rpc: graense.rpc, functions: { invoke: graense.invoke } },
+  supabase: { auth: { onAuthStateChange: vi.fn(), getSession: graense.session }, from: graense.from, rpc: graense.rpc, functions: { invoke: graense.invoke } },
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 const editMutate = vi.fn();
@@ -526,7 +527,6 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     const { fastholdEjer, ejerGyldig } = await import("@/lib/sbKladder");
     raekke = { data: { status: "tjekkes", revision: 1 }, error: null };
     graense.invoke.mockReset().mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } }).mockResolvedValue({ error: null });
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null });
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m1", () => ejerGyldig(ejer), ejer);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1)); // bevist aktiv ventetimer for revision 1
