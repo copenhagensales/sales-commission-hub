@@ -120,7 +120,7 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
-  beskeder.liste = []; beskeder.opdateret = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
+  beskeder.liste = []; beskeder.opdateret = 0; beskeder.hentStart = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
   net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
@@ -1753,6 +1753,7 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     expect(n() - efterA).toBeLessThanOrEqual(5); // kun c's resterende budget; a er udtømt
     const totalFoerPladsholder = n();
     // SQL-pladsholder for a: forløbet afsluttes, pladsholderen vises og rammes ikke af gammel oprydning
+    beskeder.hentStart = laesStartT(); // B2-6C: pladsholderen er fra en læsning startet efter registreringen
     await svar([fremmed("a", "Beskeden er slettet efter fristen", { status: "trukket_tilbage", slettes_efter: null })]);
     expect(screen.getByText("Beskeden er slettet efter fristen")).toBeTruthy();
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
