@@ -2407,6 +2407,16 @@ describe("24d2 §1 (g) – modelport i startTjekHvisNoedvendigt", () => {
     expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 
+  it("r3 (1) A åben, B ukendt → produktionskaldet for B lukket, for A åben", async () => {
+    const qcB = new QueryClient();
+    svar.chat_messages = [tjekkes(2)];
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, qcB);
+    expect(graense.invoke).not.toHaveBeenCalled();
+    svar.chat_messages = [tjekkes(2)];
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
+  });
+
   it("kontrol: åben port → modelkald", async () => {
     svar.chat_messages = [tjekkes(2)];
     await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
