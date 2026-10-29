@@ -116,7 +116,9 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
  * generation afslutter det gamle forløb (ingen permanent id-blokliste).
  */
 const kendteUdloebne = new Map<string, string>();
-const kuNoegle = (emp: string | null | undefined, conv: string, id: string) => `${sessionsGeneration()}:${emp ?? ""}:${conv}:${id}`;
+// Brugeren er bundet via sessionsgenerationen (logud/brugerskift øger den i kladdeoprydningen); medarbejder-id kan
+// ankomme asynkront og indgår derfor ikke, så samme forløb ikke dubleres, når identiteten ankommer.
+const kuNoegle = (_emp: string | null | undefined, conv: string, id: string) => `${sessionsGeneration()}:${conv}:${id}`;
 function rydAndreGenerationer(m: Map<string, unknown>): void {
   const pre = `${sessionsGeneration()}:`;
   for (const k of [...m.keys()]) if (!k.startsWith(pre)) m.delete(k);
