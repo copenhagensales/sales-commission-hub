@@ -57,7 +57,7 @@ describe("T3 (B2b-1) – Ret fra statuskortet fastholder den viste revision", ()
     expect(felt.value).toBe("vist tekst");
     r.rerender(ui(afventer(4)));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "rettet" } });
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 5, error: null } as never);
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 4, /* SQL-kontrakt: startrevision 3 + 1 */ error: null } as never);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     expect((kald("sb_ret")[0][1] as { p_revision: number }).p_revision).toBe(3);
   });
