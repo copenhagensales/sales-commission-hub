@@ -94,6 +94,7 @@ vi.mock("@/hooks/useChat", async (orig) => {
 });
 
 import { ChatView } from "./ChatView";
+import { laesStart as laesStartT } from "@/lib/sbKladder";
 import { SendFejl, IKKE_REGISTRERET_TEKST } from "@/hooks/useChat";
 import { rydAlleKladder, hentAfsendelser, gemKladde, laesKladde, tilfoejAfsendelse, type Afsendelse, type FilMeta } from "@/lib/sbKladder";
 import { hasUnsentDrafts } from "@/components/mobile";
@@ -119,7 +120,7 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
-  beskeder.liste = []; beskeder.opdateret = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
+  beskeder.liste = []; beskeder.opdateret = 0; beskeder.hentStart = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
   net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
@@ -1488,8 +1489,9 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     const r = await klar();
     expect(screen.queryByText("original")).toBeNull();
     expect(screen.getByText("Ingen beskeder endnu. Start samtalen!")).toBeTruthy(); // tomtilstand fra det viste indhold
+    // B2-6C: pladsholderen kommer fra en læsning startet efter registreringen (dokumenteret nyere serverdata).
     beskeder.liste = [fremmed("a", "Beskeden er slettet efter fristen", { status: "trukket_tilbage", slettes_efter: null })];
-    beskeder.opdateret = 1;
+    beskeder.opdateret = 1; beskeder.hentStart = laesStartT();
     r.rerender(wrap(<ChatView conversationId="A" />));
     await tick();
     expect(screen.getByText("Beskeden er slettet efter fristen")).toBeTruthy();
@@ -1751,6 +1753,7 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
     expect(n() - efterA).toBeLessThanOrEqual(5); // kun c's resterende budget; a er udtømt
     const totalFoerPladsholder = n();
     // SQL-pladsholder for a: forløbet afsluttes, pladsholderen vises og rammes ikke af gammel oprydning
+    beskeder.hentStart = laesStartT(); // B2-6C: pladsholderen er fra en læsning startet efter registreringen
     await svar([fremmed("a", "Beskeden er slettet efter fristen", { status: "trukket_tilbage", slettes_efter: null })]);
     expect(screen.getByText("Beskeden er slettet efter fristen")).toBeTruthy();
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
@@ -2319,4 +2322,40 @@ describe("B2-6B §B accepteret registrering", () => {
     expect(hentAfsendelser("e", "A")).toHaveLength(1);
     expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("");
   });
+});
+
+// ---------- B2-6C §C: ældre svarprojektion sletter ikke udløbsbevis fra nyere data ----------
+describe("B2-6C §C fristidentitet på tværs af original og svaruddrag", () => {
+  const forbi = () => new Date(Date.now() - 1000).toISOString();
+  const senere = () => new Date(Date.now() + 3_600_000).toISOString();
+  const projektion = (frist: string | null) => ({ id: "o", content: "original-hemmelig", sender_id: "anden", status: "leveret", slettes_efter: frist, deleted_at: null, sender: { id: "anden", full_name: "K" } });
+  for (const [navn, foerst] of [["original først", true], ["svar først", false]] as const) {
+    for (const frist of [null, "senere"] as const) {
+      it(`${navn}, ældre projektion med ${frist ?? "null"}-frist: urhop −690 ms og remount genopliver intet; nyere data accepteres`, async () => {
+        const orig = fremmed("o", "original-hemmelig", { slettes_efter: forbi() });
+        const svar = fremmed("r", "svaret", { reply_to: projektion(frist ? senere() : null), reply_to_id: "o" });
+        beskeder.hentStart = 0; // ingen af blokkene er startet efter registreringen
+        beskeder.liste = foerst ? [orig, svar] : [svar, orig];
+        let r = await klar();
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        expect(screen.queryByText("original-hemmelig")).toBeNull();
+        // Kun svarprojektionen (fra en ældre side) er tilbage.
+        beskeder.liste = [svar]; beskeder.opdateret++;
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        vi.setSystemTime(Date.now() - 690);
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        r.unmount(); r = await klar();
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        expect(screen.queryByText("original-hemmelig")).toBeNull();
+        expect(screen.getByText("svaret")).toBeTruthy();
+        // Dokumenteret nyere servertilstand (læsning startet efter registreringen) kan accepteres.
+        beskeder.liste = [fremmed("o", "frisk original", { slettes_efter: senere(), revision: 2 }), svar]; beskeder.hentStart = laesStartT(); beskeder.opdateret++;
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        expect(screen.getByText("frisk original")).toBeTruthy();
+        r.unmount();
+        vi.useRealTimers();
+      });
+    }
+  }
 });

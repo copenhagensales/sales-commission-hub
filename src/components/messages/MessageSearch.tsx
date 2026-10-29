@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useSearchMessages, onChatSignal, useFristUr, erKendtUdloebet, kontrollerUdloeb, type SoegeResultat } from "@/hooks/useChat";
-import { sessionsGeneration } from "@/lib/sbKladder";
+import { sessionsGeneration, laesStart } from "@/lib/sbKladder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,7 +17,7 @@ interface MessageSearchProps {
 type Fase =
   | { art: "ingen" }
   | { art: "henter"; q: string; sg: number }
-  | { art: "resultat"; q: string; sg: number; data: SoegeResultat[] }
+  | { art: "resultat"; q: string; sg: number; data: SoegeResultat[]; start: number }
   | { art: "fejl"; q: string; sg: number };
 
 export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) {
@@ -34,8 +34,9 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
     const sg = sessionsGeneration();
     sidst.current = q;
     setFase({ art: "henter", q, sg });
+    const start = laesStart(); // B2-6C §C: startbevis før læsningen sendes
     searchMessages.mutateAsync(q).then(
-      (data) => { if (g === gen.current && sg === sessionsGeneration()) setFase({ art: "resultat", q, sg, data }); },
+      (data) => { if (g === gen.current && sg === sessionsGeneration()) setFase({ art: "resultat", q, sg, data, start }); },
       () => { if (g === gen.current && sg === sessionsGeneration()) setFase({ art: "fejl", q, sg }); },
     );
   };
@@ -80,14 +81,16 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
   const resultater = aktuel.art === "resultat" ? aktuel.data : [];
   const nu = useFristUr(resultater.map((m) => m.slettes_efter));
   // B2bc-5b §2: samme fristgrundlag som tråden – kendt udløbet overlever urhop; render læser kun.
-  const viste = resultater.filter((m) => !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu));
+  const soegStart = aktuel.art === "resultat" ? aktuel.start : 0;
+  const viste = resultater.filter((m) => !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu, soegStart));
   const [, setFristSlag] = useState(0);
   useLayoutEffect(() => {
     const t = Date.now();
     let ny = false;
     for (const m of resultater) {
-      const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu);
-      if (kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t).ny && vist) ny = true;
+      const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu, soegStart);
+      const r = kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t, soegStart);
+      if ((r.ny && vist) || r.ophaevet) ny = true;
     }
     if (ny) setFristSlag((x) => x + 1); // render før frist → effekt efter frist: ny kontrol, ingen 0-ms-løkke
   });

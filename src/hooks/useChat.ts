@@ -116,7 +116,12 @@ export function useFristUr(frister: ReadonlyArray<string | null | undefined>): n
  * Et urhop tilbage genopliver ikke en kendt udløbet række; ny frist, ingen frist (SQL-pladsholder) eller ny
  * generation afslutter det gamle forløb (ingen permanent id-blokliste).
  */
-const kendteUdloebne = new Map<string, string>();
+/*
+ * B2-6C §C: hvert kendt udløb bærer sit registreringsnummer (`reg`, fra den fælles læsesekvens `laesStart`).
+ * Kun data fra en læsning STARTET efter registreringen (start > reg) er dokumenteret nyere og kan afslutte forløbet.
+ * En anden friststreng eller null fra et ældre svaruddrag, søgeresultat eller en ældre side er ikke bevis.
+ */
+const kendteUdloebne = new Map<string, { frist: string; reg: number; rev: number | null }>();
 // Brugeren er bundet via sessionsgenerationen (logud/brugerskift øger den i kladdeoprydningen); medarbejder-id kan
 // ankomme asynkront og indgår derfor ikke, så samme forløb ikke dubleres, når identiteten ankommer.
 const kuNoegle = (_emp: string | null | undefined, conv: string, id: string) => `${sessionsGeneration()}:${conv}:${id}`;
@@ -127,25 +132,35 @@ function rydAndreGenerationer(m: Map<string, unknown>): void {
 /*
  * B2bc-5b §2 (erstatter begrundelsen fra B2c-2b-2): render læser kun lageret. Registrering sker udelukkende i
  * effekter/callbacks via `kontrollerUdloeb`, så en suspenderet eller kasseret render aldrig ændrer andre visningers
- * udløbsbevis. Rent læsende: kendt registreret frist ELLER frist passeret ved `nu`.
+ * udløbsbevis. Rent læsende: kendt udløbet id (uanset projektionens frist) ELLER frist passeret ved `nu`.
  */
-export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): boolean {
-  if (!frist) return false;
-  if (kendteUdloebne.get(kuNoegle(emp, conv, id)) === frist) return true;
-  return erUdloebet(frist, nu);
+export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number, start = 0, revision: number | null = null): boolean {
+  const e = kendteUdloebne.get(kuNoegle(emp, conv, id));
+  if (e && (frist === e.frist || !erNyereEnd(e, start, revision))) return true;
+  return !!frist && erUdloebet(frist, nu);
+}
+/** Dokumenteret nyere end registreringen: læsning startet efter den ELLER højere revision for samme id. */
+function erNyereEnd(e: { reg: number; rev: number | null }, start: number, revision: number | null): boolean {
+  const rev = typeof revision === "number" ? revision : null;
+  return start > e.reg || (rev !== null && e.rev !== null && rev > e.rev);
 }
 /**
- * B2bc-5b §2: skrivende fristkontrol – kun i effekt/callback (aldrig under render). Registrerer en passeret frist
- * som kendt udløbet (urhop tilbage genopliver intet), afslutter forløbet ved ny frist eller ingen frist
- * (SQL-pladsholder). Returnerer true, når rækken er (kendt) udløbet; `nyRegistreret` meldes via returværdien `ny`.
+ * Skrivende fristkontrol – kun i effekt/callback (aldrig under render). `start` er læsningens startbevis
+ * (0 = ukendt → aldrig bevis for nyere data). Returnerer `ny` ved ny registrering og `ophaevet`, når dokumenteret
+ * nyere serverdata (ny gyldig frist eller SQL-pladsholder/null) afslutter forløbet – ingen permanent id-blokliste.
  */
-export function kontrollerUdloeb(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): { udloebet: boolean; ny: boolean } {
+export function kontrollerUdloeb(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number, start = 0, revision: number | null = null): { udloebet: boolean; ny: boolean; ophaevet: boolean } {
   const k = kuNoegle(emp, conv, id);
-  if (!frist) { kendteUdloebne.delete(k); return { udloebet: false, ny: false }; }
-  if (kendteUdloebne.get(k) === frist) return { udloebet: true, ny: false };
-  if (erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, frist); return { udloebet: true, ny: true }; }
-  kendteUdloebne.delete(k); // ny gyldig frist: gammelt forløb afsluttet
-  return { udloebet: false, ny: false };
+  const e = kendteUdloebne.get(k);
+  const rev = typeof revision === "number" ? revision : null;
+  if (e) {
+    if (frist === e.frist || !erNyereEnd(e, start, rev)) return { udloebet: true, ny: false, ophaevet: false };
+    if (frist && erUdloebet(frist, nu)) { kendteUdloebne.set(k, { frist, reg: laesStart(), rev }); return { udloebet: true, ny: false, ophaevet: false }; }
+    kendteUdloebne.delete(k);
+    return { udloebet: false, ny: false, ophaevet: true };
+  }
+  if (frist && erUdloebet(frist, nu)) { rydAndreGenerationer(kendteUdloebne); kendteUdloebne.set(k, { frist, reg: laesStart(), rev }); return { udloebet: true, ny: true, ophaevet: false }; }
+  return { udloebet: false, ny: false, ophaevet: false };
 }
 /** Er id'et knyttet til en kendt udløbet serverrække (også efter at rækken er forsvundet fra RLS)? */
 export const harKendtUdloebet = (emp: string | null | undefined, conv: string, id: string) => kendteUdloebne.has(kuNoegle(emp, conv, id));
@@ -207,6 +222,9 @@ export const FRIST_GENHENT_MS = [500, 2000, 4000, 8000, 16000, 32000] as const;
  * B2c-1 §5: svaroriginal uden for de indlæste sider valideres ved et afgrænset RLS-opslag (én række).
  * null = ingen synlig række (utilgængelig). Nøglen indeholder sessionsgenerationen, så et gammelt svar aldrig rammer en ny session.
  */
+/** B2-6C §C: startbevis for svaropslagets resultat (samme læsesekvens som fristbeviset); returfelterne er uændrede. */
+const svarStart = new WeakMap<object, number>();
+export const svarHentStart = (r: object | null | undefined) => (r ? svarStart.get(r) ?? 0 : 0);
 export function useSvarOriginal(id: string | null, forespGen = 0, aktiv = true) {
   const gen = sessionsGeneration();
   return useQuery({
@@ -217,6 +235,7 @@ export function useSvarOriginal(id: string | null, forespGen = 0, aktiv = true) 
     retry: false,
     queryFn: async (): Promise<ReplyPreview | null> => {
       if (!id) return null;
+      const start = laesStart();
       const { data, error } = await supabase
         .from("chat_messages")
         .select("id, content, sender_id, status, slettes_efter, deleted_at, sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name)")
@@ -227,11 +246,13 @@ export function useSvarOriginal(id: string | null, forespGen = 0, aktiv = true) 
       if (sessionsGeneration() !== gen) throw new Error("forældet session");
       if (!data) return null;
       const s = data.sender;
-      return {
+      const r: ReplyPreview = {
         id: data.id, content: data.content, sender_id: data.sender_id,
         status: tilStatus(data.status), slettes_efter: data.slettes_efter, deleted_at: data.deleted_at,
         sender: s && s.id ? { id: s.id, full_name: `${s.first_name || ""} ${s.last_name || ""}`.trim() } : undefined,
       };
+      svarStart.set(r, start);
+      return r;
     },
   });
 }
@@ -411,7 +432,8 @@ export function useMessages(conversationId: string | null) {
     structuralSharing: false,
     queryFn: async ({ pageParam }): Promise<Message[]> => {
       if (!conversationId) return [];
-      const start = traadHentSekvens(conversationId) + 1;
+      // B2-6C §C: samme globale læsesekvens som fristbeviset (strengt stigende, også pr. samtale).
+      const start = laesStart();
       traadSekvens.set(conversationId, start);
       const ud = await hentSide(conversationId, pageParam);
       sideStart.set(ud, start);
@@ -1310,6 +1332,7 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
     if (!on || !employeeId) return;
     // Callbacks bindes til abonnementets session; gamle callbacks virker ikke under en anden bruger.
     const gen = sessionGen;
+    let abonneret = false;
     const invalidate = () => {
       if (gen !== sessionsGeneration()) return;
       planlaeg(queryClient, CHAT_UNREAD_KEY);
@@ -1326,7 +1349,13 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "sb_signaler" }, (p) => {
         void behandlSignal(queryClient, p.new as SignalRaekke, employeeId, gen);
       })
-      .subscribe((s) => { if (s === "SUBSCRIBED") invalidate(); });
+      .subscribe((s) => {
+        if (s !== "SUBSCRIBED") return;
+        invalidate();
+        // B2-6C §C: socket-genabonnement (også uden online-event) genvaliderer søgning/svar; første abonnement ikke.
+        if (abonneret && gen === sessionsGeneration()) meldChatSignal({ conversationId: null, kildeId: "", haendelse: "genforbind" });
+        abonneret = true;
+      });
     // Forgrund/genforbindelse: genvalidér også søgning/svar (§5) via signalgrænsen uden payloadindhold.
     const forgrund = () => {
       if (document.visibilityState !== "visible" || gen !== sessionsGeneration()) return;
@@ -1446,6 +1475,9 @@ export function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: stri
       planlaeg(qc, CHAT_UNREAD_KEY);
     } else {
       conv = null;
+      // B2-6C §C: gamle søge-/svarforespørgsler ugyldiggøres straks, FØR det private opslag afventes
+      // (kilde_id + fallback uden kendt samtale). Hændelsen er neutral: ingen status udledes af payload.
+      meldChatSignal({ conversationId: null, kildeId: s.kilde_id, haendelse: "genvalider" });
       try {
         const { data, error } = await supabase.from("chat_messages").select("conversation_id")
           .eq("id", s.kilde_id).eq("sender_id", employeeId).maybeSingle();
