@@ -43,13 +43,14 @@ const graense = vi.hoisted(() => ({
   rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
+  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })),
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (t: string) => (graense.from.getMockImplementation() ? graense.from(t) : builder(t)),
     rpc: graense.rpc,
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
-      getSession: vi.fn(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })) },
+      getSession: graense.session },
     functions: { invoke: graense.invoke },
   },
 }));
@@ -1170,7 +1171,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
   const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
   const invokes = () => graense.invoke.mock.calls.length;
   beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); graense.invoke.mockReset(); auth("SIGNED_IN", "u"); });
-  afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset(); vi.mocked(supabase.auth.getSession).mockReset().mockImplementation(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null }) as Awaited<ReturnType<typeof supabase.auth.getSession>>); });
+  afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset(); graense.session.mockReset().mockImplementation(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })); });
 
   it("JWT bindes eksplicit til operationens session (Authorization-header)", async () => {
     svar.chat_messages = [tjekkes(2)];
@@ -1223,20 +1224,20 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
 
   it("sessionsskift under SDK/token-ventepunkt: gammelt arbejde sendes aldrig med den nye brugers JWT", async () => {
     svar.chat_messages = [tjekkes(2)];
-    let slip: (v: Awaited<ReturnType<typeof supabase.auth.getSession>>) => void = () => undefined;
-    vi.mocked(supabase.auth.getSession).mockImplementationOnce(() => new Promise((r) => { slip = r; }));
+    let slip: (v: unknown) => void = () => undefined;
+    graense.session.mockImplementationOnce(() => new Promise((r) => { slip = r; }));
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
     await vi.waitFor(() => expect(supabase.auth.getSession).toHaveBeenCalled());
     auth("SIGNED_IN", "anden");
-    slip({ data: { session: { access_token: "jwt-anden", user: { id: "anden" } } }, error: null } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+    slip({ data: { session: { access_token: "jwt-anden", user: { id: "anden" } } }, error: null });
     await p;
     expect(invokes()).toBe(0);
   });
 
   it("session med anden bruger end operationens (uden generationsskift) → intet kald", async () => {
     svar.chat_messages = [tjekkes(2)];
-    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: { access_token: "jwt-x", user: { id: "x" } } }, error: null } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+    graense.session.mockResolvedValueOnce({ data: { session: { access_token: "jwt-x", user: { id: "x" } } }, error: null });
     await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
     expect(invokes()).toBe(0);
   });

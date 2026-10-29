@@ -100,10 +100,16 @@ describe("T5 (B2c-1 §5) – søgning", () => {
     soeg.fn.mockReturnValueOnce(k.p);
     const v = vis();
     await soegEfter("x");
-    const fejl = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // B2c-1b: tidligere falsk grøn (React 18 advarer ikke ved setState efter afmontering). Nu: ejede timere/listeners
+    // ryddes, og hverken signal, genforbindelse eller debounce efter afmontering starter et nyt kald.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     v.unmount();
     await act(async () => { k.res([r("1", "sent")]); await k.p; });
-    expect(fejl).not.toHaveBeenCalled();
-    fejl.mockRestore();
+    window.dispatchEvent(new Event("online"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(soeg.fn).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("sent")).toBeNull();
   });
 });

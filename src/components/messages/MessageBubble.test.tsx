@@ -127,8 +127,8 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
   let auth!: (e: string, s: unknown) => void;
   let svar!: (v: { data: unknown; error: unknown }) => void;
   let afvis!: (e: unknown) => void;
-  const kontrolRet = () => graense.rpc.mockImplementationOnce((() =>
-    new Promise((a, r) => { svar = a; afvis = r; })) as never);
+  const kontrolRet = () => graense.rpc.mockImplementationOnce(() =>
+    new Promise((a, r) => { svar = a; afvis = r; }));
   const chain = () => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b; b.maybeSingle = async () => ({ data: null, error: null }); return b; };
   const gem = () => fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
   let inv: ReturnType<typeof vi.spyOn>;

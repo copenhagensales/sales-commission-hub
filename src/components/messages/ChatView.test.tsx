@@ -25,6 +25,7 @@ const graense = vi.hoisted(() => ({
   rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
+  session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "t" } } })),
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (t: string) => {
@@ -50,7 +51,7 @@ vi.mock("@/integrations/supabase/client", () => {
       storage: { from: () => ({ uploadToSignedUrl: (...a: unknown[]) => (lagerUpload.fn ? lagerUpload.fn(...a) : Promise.resolve({ error: null })) }) },
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
-        getSession: vi.fn(async () => ({ data: { session: { access_token: "t" } } })),
+        getSession: graense.session,
       },
     },
   };
@@ -473,7 +474,7 @@ describe("c3 §7 – uploadnavigation gennem rigtig sbFil (fetch/storage ved gr�
   beforeEach(async () => {
     beskeder.ægteSend = true; beskeder.ægteFil = true;
     const { supabase } = await import("@/integrations/supabase/client");
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } } as never);
+    graense.session.mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u" } } } });
     const auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
   });
@@ -529,7 +530,7 @@ describe("c3 §7 – uploadnavigation gennem rigtig sbFil (fetch/storage ved gr�
   it("fjern fil under rigtig sessionsopslag → nul POST", async () => {
     const { supabase } = await import("@/integrations/supabase/client");
     const sess = kontrol<unknown>();
-    vi.mocked(supabase.auth.getSession).mockReturnValueOnce(sess.p as never);
+    graense.session.mockReturnValueOnce(sess.p);
     fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await klar();
     await vaelg(r.container, new File(["x"], "x.txt", { type: "text/plain" }));
@@ -1254,7 +1255,7 @@ describe("d2 §4 – integrationsforløb med auth-callbacks", () => {
     // B2b-2: typet sessionsfixture uden as-never-omgåelse.
     const session: Session = { access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
       user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" } };
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session }, error: null });
+    graense.session.mockResolvedValue({ data: { session }, error: null });
     auth = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
     act(() => { auth("SIGNED_IN", { user: { id: "u" } }); });
   });
