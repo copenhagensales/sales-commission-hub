@@ -1615,24 +1615,29 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
 
   it("udløb uden genoplivet pending-tekst; heller ikke når den kendte udløbne række forsvinder fra RLS", async () => {
     vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0);
-    // Fysisk igangværende afstemning holder pending-posten (B2b-3a), så den overlever, mens serverrækken er synlig.
-    const hold = kontrol<Svar>();
-    beskeder.ægteSend = true; // rigtig afstemning; netværket holdes ved grænsen
-    net.vent = () => hold.p;
-    beskeder.liste = [fremmed("p1", "server-tekst", { sender_id: "e", slettes_efter: iso(-1) })];
-    tilfoejAfsendelse("e", "A", pend("p1", "pending-tekst", "afstemmer"));
+    // Fysisk igangværende afsendelse (rigtig useSendMessage, INSERT holdt ved grænsen) holder pending-posten (B2b-3a).
+    beskeder.ægteSend = true;
+    const hold = kontrol<{ error: unknown }>();
+    net.insert.mockImplementation(() => hold.p);
     const r = await klar();
-    await waitFor(() => expect(net.kald).toContain("select:chat_messages"));
-    expect(hentAfsendelser("e", "A").some((a) => a.id === "p1")).toBe(true);
+    skriv("pending-tekst");
+    await act(async () => { fireEvent.click(send()); });
+    await waitFor(() => expect(net.kald).toContain("insert:chat_messages"));
+    const id = hentAfsendelser("e", "A")[0]?.id;
+    expect(id).toBeTruthy();
+    // Serveren viser rækken (samme id) med en frist, der allerede er passeret efter klientens ur.
+    beskeder.liste = [fremmed(id!, "server-tekst", { sender_id: "e", slettes_efter: iso(-1) })]; beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
     expect(screen.queryByText("server-tekst")).toBeNull();
     expect(screen.queryByText("pending-tekst")).toBeNull();
     beskeder.liste = []; beskeder.opdateret++; // rækken er væk fra RLS
     r.rerender(wrap(<ChatView conversationId="A" />));
     await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
-    expect(hentAfsendelser("e", "A").some((a) => a.id === "p1")).toBe(true); // posten findes stadig – kun visningen er værnet
+    expect(hentAfsendelser("e", "A").some((a) => a.id === id)).toBe(true); // posten findes – kun visningen er værnet
     expect(screen.queryByText("pending-tekst")).toBeNull();
     r.unmount();
-    hold.res({ data: null, error: { message: "Failed to fetch" } }); await act(async () => { await hold.p; });
+    hold.res({ error: { message: "Failed to fetch" } }); await act(async () => { await hold.p; });
   });
 
   it("pending uden kendt udløbet serverrække vises fortsat (ingen opfundet frist)", async () => {
