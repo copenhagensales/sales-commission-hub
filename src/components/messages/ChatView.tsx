@@ -469,7 +469,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if ((rest?.size ?? 0) !== traadSvarSkjult.size) setTraadSvarSkjult(rest ?? new Map());
   }, [hentStart, traadSvarSkjult]);
   // B2bc-5c-1 §1: valgt svar bruger samme kendt-udløbet-grundlag (urhop genopliver ikke).
-  const svarVaekKendt = (s: { id: string; slettes_efter?: string | null }) => erKendtUdloebet(meId, conversationId, s.id, s.slettes_efter, fristNu);
+  const svarVaekKendt = (s: { id: string; slettes_efter?: string | null }) => erKendtUdloebet(meId, conversationId, s.id, s.slettes_efter, fristNu, s === svarOpslag.data ? svarHentStart(svarOpslag.data) : hentStart);
   const visSvar = svarSkjult ? null
     : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) && !svarVaekKendt(svarITraad) ? svarITraad
     : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) && !svarVaekKendt(svarOpslag.data) ? svarOpslag.data : null;

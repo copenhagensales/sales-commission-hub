@@ -166,7 +166,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   const handleSaveEdit = async () => {
     if (!kanGemme || !editContent.trim() || laas.art === "gem") return;
     // B2c-1b §1: fristen kontrolleres mod det aktuelle ur ved klik – en render fra før udløbet sender aldrig sb_ret.
-    if (message.deleted_at || erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now())) { setNu(Date.now()); return; }
+    if (message.deleted_at || erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now(), 0, message.revision)) { setNu(Date.now()); return; }
     if (editContent.length > 4000) { toast.error("Beskeden må højst være 4.000 tegn"); return; }
     // §1/§2 (c1): fuld kontekst og kladdeversion fastholdes synkront før mutateAsync.
     const ejerNoegle = noegle, conv = conversationId, msg = message.id;

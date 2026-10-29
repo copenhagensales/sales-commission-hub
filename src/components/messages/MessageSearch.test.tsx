@@ -131,3 +131,42 @@ describe("B2bc-5b §2 – søgning: fælles fristgrundlag", () => {
     expect(screen.getByText("bliver-urhop")).toBeTruthy();
   });
 });
+
+// ---------- B2-6C §C: ældre søgeresultat sletter ikke nyere udløbsbevis ----------
+import { kontrollerUdloeb, harKendtUdloebet, meldChatSignal } from "@/hooks/useChat";
+import { laesStart } from "@/lib/sbKladder";
+describe("B2-6C §C søgning og fristbevis", () => {
+  const forbi = () => new Date(Date.now() - 1000).toISOString();
+  const senere = () => new Date(Date.now() + 3_600_000).toISOString();
+  it("søgning startet før registreringen, svar med længere frist ankommer EFTER: teksten forbliver skjult, beviset bevares", async () => {
+    const k = kontrol<SoegeResultat[]>();
+    soeg.fn.mockReturnValueOnce(k.p);
+    vis();
+    await soegEfter("hemmelig");
+    kontrollerUdloeb("e", "A", "s1", forbi(), Date.now(), laesStart()); // nyere data registrerer udløb
+    await act(async () => { k.res([r("s1", "hemmelig A", senere())]); await k.p; });
+    expect(screen.queryByText("hemmelig A")).toBeNull();
+    expect(harKendtUdloebet("e", "A", "s1")).toBe(true);
+  });
+  it("svar med null-frist vist FØR registreringen: efter registrering og rerender skjult, beviset bevares", async () => {
+    soeg.fn.mockResolvedValueOnce([r("s2", "hemmelig B", null)]);
+    const v = vis();
+    await soegEfter("hemmelig");
+    expect(screen.getByText("hemmelig B")).toBeTruthy();
+    kontrollerUdloeb("e", "A", "s2", forbi(), Date.now(), laesStart());
+    v.rerender(<QueryClientProvider client={qc}><MessageSearch onClose={() => undefined} onSelectMessage={() => undefined} /></QueryClientProvider>);
+    await act(async () => { await Promise.resolve(); });
+    v.rerender(<QueryClientProvider client={qc}><MessageSearch onClose={() => undefined} onSelectMessage={() => undefined} /></QueryClientProvider>);
+    expect(screen.queryByText("hemmelig B")).toBeNull();
+    expect(harKendtUdloebet("e", "A", "s2")).toBe(true);
+  });
+  it("signal under holdt søgesvar: gammelt svar frigivet efter signalet vises ikke (regressionsværn for eksisterende abonnement)", async () => {
+    const k = kontrol<SoegeResultat[]>();
+    soeg.fn.mockReturnValueOnce(k.p).mockReturnValue(new Promise(() => undefined));
+    vis();
+    await soegEfter("hemmelig");
+    act(() => { meldChatSignal({ conversationId: null, kildeId: "s3", haendelse: "genvalider" }); });
+    await act(async () => { k.res([r("s3", "hemmelig C")]); await k.p; });
+    expect(screen.queryByText("hemmelig C")).toBeNull();
+  });
+});
