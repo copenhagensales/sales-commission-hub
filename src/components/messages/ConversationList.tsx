@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SkeletonList } from "@/components/mobile";
-import { useConversations, useOnlineStatus, useDeleteConversation, kanSletteSamtale, Conversation } from "@/hooks/useChat";
+import { useConversations, useOnlineStatus, useDeleteConversation, kanSletteSamtale, ForaeldetSession, Conversation } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Badge } from "@/components/ui/badge";
@@ -129,10 +129,12 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
   const handleDelete = async () => {
     if (!kanSletteSamtale(conversation)) { setShowDeleteDialog(false); return; }
     try {
-      await deleteConversation.mutateAsync(conversation.id);
+      // B2-6B §B: sessionen fastholdes ved klik; en sen afslutning efter logud/brugerskift viser intet og navigerer ikke.
+      await deleteConversation.slet(conversation.id);
       onDelete();
       toast.success(conversation.is_group ? "Du har forladt gruppen" : "Samtalen er slettet");
     } catch (error) {
+      if (error instanceof ForaeldetSession) return;
       toast.error(conversation.is_group ? "Kunne ikke forlade gruppen" : "Kunne ikke slette samtalen");
     }
     setShowDeleteDialog(false);

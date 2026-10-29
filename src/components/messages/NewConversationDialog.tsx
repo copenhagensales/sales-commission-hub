@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst, OpretFejl, OPRETTET_IKKE_HENTET_TEKST } from "@/hooks/useChat";
+import { useCreateConversation, useActiveChatColleagues, useTeamsForChat, useTeamMembers, normaliserDeltagere, validerSamtale, serverTekst, OpretFejl, ForaeldetSession, OPRETTET_IKKE_HENTET_TEKST } from "@/hooks/useChat";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -48,6 +48,14 @@ export function NewConversationDialog({
   const { data: teams, isLoading: teamsLoading } = useTeamsForChat();
   const { data: teamMembers } = useTeamMembers(selectedTeamId);
   const createConversation = useCreateConversation();
+  const { kendtId, kendtInput } = createConversation;
+  // B2-6B §B: ved genåbning med kendt oprettelses-id gendannes navn og deltagervalg fra hooken (kun hentning genforsøges).
+  useEffect(() => {
+    if (!open || !kendtId || !kendtInput) return;
+    setSelectedTeamId(null);
+    setSelectedIds(kendtInput.memberIds);
+    setGroupName(kendtInput.name ?? "");
+  }, [open, kendtId, kendtInput]);
 
   // When a team is selected, auto-select all team members
   useEffect(() => {
@@ -113,13 +121,15 @@ export function NewConversationDialog({
     } catch (error) {
       // Valg og navn bevares ved fejl.
       if (error instanceof OpretFejl && error.art === "hent") return; // vises via kendt id
+      if (error instanceof ForaeldetSession) return; // sen afslutning efter logud/brugerskift: ingen toast/navigation
       toast.error(serverTekst(error, "Kunne ikke oprette samtale"));
     }
   };
   const visHentFejl = !!createConversation.kendtId;
   const isPhone = useIsPhone();
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
+    // B2-6B §B: med kendt oprettelses-id bevares navn/valg gennem reel lukning (gendannes også fra hooken ved genåbning).
+    if (!isOpen && !createConversation.kendtId) {
       setSelectedIds([]);
       setSelectedTeamId(null);
       setGroupName("");

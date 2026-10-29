@@ -674,13 +674,20 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const emp = meId, conv = conversationId;
     if (currentEmployee) setTyping(false, currentEmployee.id, currentEmployee.full_name, conv);
     if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
-    frigivPreview(); // §7: preview frigives ved afsendelse; File følger afsendelsen i lageret
     const id = retId ?? crypto.randomUUID();
     const a: Afsendelse = {
       id, tekst: message.trim(), svarId: svarId ?? replyTo?.id ?? null,
       fil: fil ? metaFra(fil) : null, tilstand: "sender", fejl: null, tidligereUkendt: false, oprettet: Date.now(),
     };
-    tilfoejAfsendelse(emp, conv, a, fil?.file ?? null);
+    // B2-6B §B: composeren tømmes først, når afsendelsen faktisk er accepteret i det lokale lager.
+    const ejer = fastholdEjer(emp, conv, brugerRef.current);
+    // Uden auth-bruger (lytteren endnu ikke klar) kontrolleres kun lukning; med ejer også generation/epoke.
+    if (!tilfoejAfsendelse(emp, conv, a, fil?.file ?? null, ejer ?? undefined)) {
+      sendLaas.current = false;
+      toast.error("Kunne ikke sende beskeden");
+      return;
+    }
+    frigivPreview(); // §7: preview frigives ved (accepteret) afsendelse; File følger afsendelsen i lageret
     setMessage("");
     setReplyTo(null);
     setSvarId(null);

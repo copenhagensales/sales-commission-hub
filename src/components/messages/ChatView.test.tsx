@@ -2297,3 +2297,26 @@ describe("B2bc-5c-2 §3 – to klienter, samme id, tegnet visning", () => {
     k1.unmount(); k2.unmount(); qc2.clear();
   });
 });
+
+// ---------- B2-6B §B: accepteret afsendelse og genoptaget gruppe gennem rigtig ChatView ----------
+import { rydSamtale, laesStart, genoptagSamtale, sessionsGeneration as gen6 } from "@/lib/sbKladder";
+import { toast as toast6 } from "sonner";
+describe("B2-6B §B accepteret registrering", () => {
+  it("lukket samtale: Send tømmer ikke tekst, sender intet og siger det; efter dokumenteret genoptagelse præcis én afsendelse", async () => {
+    mutateAsync.mockReturnValue(holdt());
+    rydSamtale("e", "A"); // forladt i denne session
+    await klar();
+    skriv("hej igen");
+    await act(async () => { fireEvent.click(send()); });
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(hentAfsendelser("e", "A")).toHaveLength(0);
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("hej igen");
+    expect(vi.mocked(toast6.error)).toHaveBeenCalledWith("Kunne ikke sende beskeden");
+    // Dokumenteret genoptaget medlemskab: samtalelæsning startet efter lukningen.
+    act(() => { genoptagSamtale("e", "A", laesStart(), gen6()); });
+    await act(async () => { fireEvent.click(send()); });
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(hentAfsendelser("e", "A")).toHaveLength(1);
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("");
+  });
+});

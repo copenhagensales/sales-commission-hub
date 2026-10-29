@@ -136,3 +136,29 @@ describe("T11 §11 signaler, deduplikering og levetid", () => {
     expect(toast).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------- B2-6B §B: kold ulæstforbruger uden ChatView ----------
+import { supabase } from "@/integrations/supabase/client";
+describe("B2-6B §B kold ulæstforbruger uden ChatView", () => {
+  it("ulæst-hooken initialiserer sessionslivscyklussen; brugerskift under holdt privat opslag → sent svar giver ingen toast/debounce/cache", async () => {
+    const d = udskudt<Svar>();
+    g.opslag.mockReturnValue(d.p);
+    monter("e1");
+    // Den rigtige auth-callback er registreret af ulæst-hooken alene (ChatView er ikke importeret i denne fil).
+    const kald = vi.mocked(supabase.auth.onAuthStateChange).mock.calls;
+    expect(kald.length).toBe(1);
+    const authCb = kald[0][0] as (e: string, s: unknown) => void;
+    act(() => { authCb("SIGNED_IN", { user: { id: "u1" } }); });
+    const [k] = aktive();
+    act(() => { send(k, signal()); });
+    await vi.waitFor(() => expect(g.opslag).toHaveBeenCalledTimes(1));
+    // Tokenrefresh for samme bruger invaliderer intet.
+    act(() => { authCb("TOKEN_REFRESHED", { user: { id: "u1" } }); });
+    act(() => { authCb("SIGNED_IN", { user: { id: "u2" } }); }); // brugerskift
+    const foer = inval.mock.calls.length;
+    await act(async () => { d.løs({ data: { conversation_id: "c1" }, error: null }); await Promise.resolve(); });
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(toast).not.toHaveBeenCalled();
+    expect(inval.mock.calls.length).toBe(foer);
+  });
+});

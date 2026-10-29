@@ -13,9 +13,11 @@ const g = vi.hoisted(() => ({
   hent: vi.fn<() => Promise<{ data: unknown; error: unknown }>>(),
 }));
 const kolleger: Svar = { data: [{ id: "k1", first_name: "Anna", last_name: "A" }, { id: "k2", first_name: "Bo", last_name: "B" }, { id: "k3", first_name: "Cia", last_name: "C" }], error: null };
+/** PostgREST-byggerens abortSignal() returnerer samme thenable; mocken spejler det. */
+const medSignal = <T,>(p: Promise<T>) => Object.assign(p, { abortSignal: () => p });
 function kaede(tabel: string) {
   const b = {
-    select: () => b, eq: () => b, order: () => b, in: () => b, is: () => b, neq: () => b,
+    select: () => b, eq: () => b, abortSignal: () => b, order: () => b, in: () => b, is: () => b, neq: () => b,
     single: () => (tabel === "chat_conversations" ? g.hent() : Promise.resolve({ data: null, error: null })),
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
     then: (ok: (v: Svar) => unknown, fejl?: (e: unknown) => unknown) =>
@@ -26,7 +28,7 @@ function kaede(tabel: string) {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (t: string) => kaede(t),
-    rpc: (n: string, a?: unknown) => (n === "get_current_employee_id" ? Promise.resolve({ data: "mig", error: null }) : g.rpc(n, a)),
+    rpc: (n: string, a?: unknown) => medSignal(n === "get_current_employee_id" ? Promise.resolve({ data: "mig", error: null }) : g.rpc(n, a)),
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(), getSession: vi.fn(async () => ({ data: { session: null } })) },
     channel: () => { const c = { on: () => c, subscribe: () => c }; return c; },
     removeChannel: () => Promise.resolve("ok"),
@@ -156,5 +158,53 @@ describe("T8 §8 samtaleoprettelse uden gentaget RPC", () => {
     expect(result.current.kendtId).toBe("s1");
     expect(opretKald()).toBe(1);
     expect(g.hent).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------- B2-6B §B ----------
+import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+describe("B2-6B §B oprettelse: session og reel lukning", () => {
+  it("holdt identitetsopslag + sessionsskift: nul oprettelses-RPC, ingen toast, ingen navigation", async () => {
+    type Bruger = Awaited<ReturnType<typeof supabase.auth.getUser>>;
+    let løs!: (v: Bruger) => void;
+    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise<Bruger>((r) => { løs = r; }));
+    const onCreated = vi.fn();
+    render(createElement(Vis, { open: true, onCreated }));
+    await vælgGruppe();
+    fireEvent.click(screen.getByRole("button", { name: "Opret samtale" }));
+    await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
+    rydAlleKladder(); // logud/brugerskift
+    await act(async () => { løs({ data: { user: { id: "u" } } } as Bruger); await new Promise((r) => setTimeout(r, 0)); });
+    expect(opretKald()).toBe(0);
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("kendt oprettelses-id: faktisk Escape-lukning → genåbn bevarer navn/valg/id; kun hentning genforsøges", async () => {
+    g.rpc.mockResolvedValue({ data: "s1", error: null });
+    g.hent.mockResolvedValue({ data: null, error: { message: "netværk" } });
+    const onCreated = vi.fn();
+    let åbn!: () => void;
+    function Forælder() {
+      const [open, setOpen] = useState(true);
+      åbn = () => setOpen(true);
+      return createElement(QueryClientProvider, { client: qc }, createElement(NewConversationDialog, { open, onOpenChange: setOpen, onCreated }));
+    }
+    render(createElement(Forælder));
+    await vælgGruppe();
+    fireEvent.click(screen.getByRole("button", { name: "Opret samtale" }));
+    await screen.findByText(OPRETTET_IKKE_HENTET_TEKST);
+    fireEvent.keyDown(screen.getByPlaceholderText("Angiv gruppenavn..."), { key: "Escape", code: "Escape" });
+    await vi.waitFor(() => expect(screen.queryByPlaceholderText("Angiv gruppenavn...")).toBeNull());
+    act(() => { åbn(); });
+    expect(await screen.findByText(OPRETTET_IKKE_HENTET_TEKST)).toBeTruthy();
+    expect((screen.getByPlaceholderText("Angiv gruppenavn...") as HTMLInputElement).value).toBe("Holdet");
+    expect(screen.getByText("2 valgt")).toBeTruthy();
+    g.hent.mockResolvedValue({ data: samtale, error: null });
+    fireEvent.click(screen.getByRole("button", { name: "Prøv igen" }));
+    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith("s1"));
+    expect(opretKald()).toBe(1);
   });
 });

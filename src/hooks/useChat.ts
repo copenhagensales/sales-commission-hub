@@ -2,7 +2,8 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, registrerKladdeOprydning, fastholdSession, sessionGyldig, kraevSession, ForaeldetSession, laesStart, genoptagSamtale, type OperationsEjer, type SessionsKontekst } from "@/lib/sbKladder";
+export { ForaeldetSession } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -291,10 +292,20 @@ async function getCurrentEmployeeId(): Promise<string> {
   return data as string;
 }
 
+/**
+ * B2-6B §B: chatmodulets fælles sessionslivscyklus initialiseres af første chatforbruger (også ulæst-hooken uden
+ * ChatView). Én auth-lytter med appens levetid (idempotent); afmontering af en forbruger berører den ikke.
+ */
+export function brugChatSession(): void { registrerKladdeOprydning(); }
+
 export function useConversations() {
+  brugChatSession();
   return useQuery({
     queryKey: ["chat-conversations"],
     queryFn: async () => {
+      // B2-6B: startbevis før læsningen; kun en læsning startet efter en lukning kan genoptage samtalen.
+      const start = laesStart();
+      const gen = sessionsGeneration();
       const currentEmployeeId = await getCurrentEmployeeId();
       
       // Use secure view for employee data
@@ -323,7 +334,7 @@ export function useConversations() {
           }))
         };
       }));
-      
+      for (const c of conversations) genoptagSamtale(currentEmployeeId, c.id, start, gen);
       return conversations as Conversation[];
     },
   });
@@ -392,6 +403,7 @@ export function traadSiderStart(pages: readonly object[] | undefined): number {
 }
 
 export function useMessages(conversationId: string | null) {
+  brugChatSession();
   const query = useInfiniteQuery({
     queryKey: ["chat-messages", conversationId],
     initialPageParam: 0,
@@ -897,46 +909,63 @@ export function rydSlettetSamtale(emp: string, conv: string, gen: number): void 
 }
 
 export function useDeleteConversation() {
+  brugChatSession();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     // B2d-2 §12: sletning/forladelse gentages aldrig automatisk (appens mutations.retry=1).
     retry: 0,
-    mutationFn: async (conversationId: string) => {
-      // Generationen fastholdes ved handlingens start; medarbejderen ved første opslag.
-      const gen = sessionsGeneration();
+    mutationFn: async ({ conversationId, session: s }: { conversationId: string; session: SessionsKontekst }) => {
+      // B2-6B §B: sessionen er fastholdt ved brugerhandlingen; den kontrolleres efter hvert ventepunkt og før hvert
+      // efterfølgende netværks-/cachetrin, og SDK-kaldene afbrydes ved sessionsophør (også under tokenventen).
+      kraevSession(s);
       const employeeId = await getCurrentEmployeeId();
+      kraevSession(s);
       const { data: conversation, error: cErr } = await supabase
         .from("chat_conversations")
         .select("created_by, is_group, direct_key")
         .eq("id", conversationId)
+        .abortSignal(s.signal)
         .single();
+      kraevSession(s);
       if (cErr || !conversation) throw cErr ?? new Error("Samtalen findes ikke");
       // Afvis før nogen DELETE.
       if (conversation.direct_key) throw new Error("Direkte samtaler kan ikke slettes");
 
       if (conversation.created_by === employeeId || !conversation.is_group) {
-        const a = await supabase.from("chat_messages").delete().eq("conversation_id", conversationId);
+        const a = await supabase.from("chat_messages").delete().eq("conversation_id", conversationId).abortSignal(s.signal);
+        kraevSession(s);
         if (a.error) throw a.error;
-        const b = await supabase.from("chat_conversation_members").delete().eq("conversation_id", conversationId);
+        const b = await supabase.from("chat_conversation_members").delete().eq("conversation_id", conversationId).abortSignal(s.signal);
+        kraevSession(s);
         if (b.error) throw b.error;
-        const c = await supabase.from("chat_conversations").delete().eq("id", conversationId).select("id");
+        const c = await supabase.from("chat_conversations").delete().eq("id", conversationId).select("id").abortSignal(s.signal);
+        kraevSession(s);
         if (c.error) throw c.error;
         if (!c.data?.length) throw new Error("Sletningen blev afvist");
       } else {
         const d = await supabase.from("chat_conversation_members").delete()
-          .eq("conversation_id", conversationId).eq("employee_id", employeeId).select("id");
+          .eq("conversation_id", conversationId).eq("employee_id", employeeId).select("id").abortSignal(s.signal);
+        kraevSession(s);
         if (d.error) throw d.error;
         if (!d.data?.length) throw new Error("Kunne ikke forlade gruppen");
       }
       // Kun efter bekræftelse; afvisning (kast ovenfor) bevarer kladden.
-      rydSlettetSamtale(employeeId, conversationId, gen);
+      rydSlettetSamtale(employeeId, conversationId, s.gen);
       return conversationId;
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    onSettled: (_d, _e, v) => {
+      if (v && sessionGyldig(v.session)) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
+
+  /** Fastholder sessionen synkront ved klik. Sen afslutning efter sessionsophør afvises med ForaeldetSession. */
+  const slet = useCallback((conversationId: string): Promise<string> => {
+    const session = fastholdSession();
+    return mutation.mutateAsync({ conversationId, session }).then((id) => { kraevSession(session); return id; });
+  }, [mutation]);
+
+  return { ...mutation, slet };
 }
 
 export function useSearchMessages() {
@@ -971,12 +1000,13 @@ export function useSearchMessages() {
 }
 
 /** Henter samtalen med medlemmer i samme format som useConversations. */
-async function hentSamtale(id: string): Promise<Conversation> {
-  const { data, error } = await supabase
+async function hentSamtale(id: string, signal?: AbortSignal): Promise<Conversation> {
+  let q = supabase
     .from("chat_conversations")
     .select(`*, members:chat_conversation_members(*, employee:employee_basic_info(id, first_name, last_name))`)
-    .eq("id", id)
-    .single() as any;
+    .eq("id", id);
+  if (signal) q = q.abortSignal(signal);
+  const { data, error } = await q.single() as any;
   if (error || !data) throw error ?? new Error("Samtalen findes ikke");
   return {
     ...data,
@@ -994,15 +1024,16 @@ export const OPRETTET_IKKE_HENTET_TEKST = "Samtalen er oprettet, men kunne ikke 
 export class OpretFejl extends Error {
   constructor(public art: "hent" | "ukendt", public id: string | null = null) { super(art); this.name = "OpretFejl"; }
 }
-interface OpretTilstand { gen: number; laast: boolean; kendtId: string | null }
+export interface OpretInput { name?: string; memberIds: string[]; isGroup: boolean }
+interface OpretTilstand { gen: number; laast: boolean; kendtId: string | null; kendtInput: OpretInput | null }
 const opretTilstande = new WeakMap<QueryClient, OpretTilstand>();
 const opretLyttere = new Set<() => void>();
 const opretMeld = () => { for (const l of [...opretLyttere]) l(); };
 function opretTilstand(qc: QueryClient): OpretTilstand {
   const gen = sessionsGeneration();
   let t = opretTilstande.get(qc);
-  if (!t) { t = { gen, laast: false, kendtId: null }; opretTilstande.set(qc, t); }
-  else if (t.gen !== gen) { t.gen = gen; t.laast = false; t.kendtId = null; }
+  if (!t) { t = { gen, laast: false, kendtId: null, kendtInput: null }; opretTilstande.set(qc, t); }
+  else if (t.gen !== gen) { t.gen = gen; t.laast = false; t.kendtId = null; t.kendtInput = null; }
   return t;
 }
 abonnerAfsendelser(() => opretMeld());
@@ -1012,33 +1043,37 @@ abonnerAfsendelser(() => opretMeld());
  * Med kendt id genforsøges kun hentningen (også efter genåbning i samme session); RPC'en gentages aldrig.
  */
 export function useCreateConversation() {
+  brugChatSession();
   const queryClient = useQueryClient();
-  const kendtId = useSyncExternalStore(
-    (l) => { opretLyttere.add(l); return () => { opretLyttere.delete(l); }; },
-    () => opretTilstand(queryClient).kendtId,
-  );
+  const abonner = useCallback((l: () => void) => { opretLyttere.add(l); return () => { opretLyttere.delete(l); }; }, []);
+  const kendtId = useSyncExternalStore(abonner, () => opretTilstand(queryClient).kendtId);
+  const kendtInput = useSyncExternalStore(abonner, () => opretTilstand(queryClient).kendtInput);
 
   const mutation = useMutation({
     retry: 0,
-    mutationFn: async ({ name, memberIds, isGroup }: { name?: string; memberIds: string[]; isGroup: boolean }): Promise<Conversation> => {
+    mutationFn: async ({ input: { name, memberIds, isGroup }, session: s }: { input: OpretInput; session: SessionsKontekst }): Promise<Conversation> => {
+      // B2-6B §B: sessionen er fastholdt ved klik; kontrol efter hvert ventepunkt og før hvert netværks-/cachetrin.
+      kraevSession(s);
       const t = opretTilstand(queryClient);
-      const gen = t.gen;
       let id = t.kendtId;
       if (!id) {
         const mig = await getCurrentEmployeeId();
+        kraevSession(s); // skiftet session under identitetsopslaget → nul oprettelses-RPC
         const andre = [...new Set(memberIds)].filter((x) => x && x !== mig);
         const v = validerSamtale(andre.length, name, isGroup);
         if ("fejl" in v) throw Object.assign(new Error(v.fejl), { code: "P0001" });
         let res: { data: unknown; error: unknown };
         try {
           res = isGroup
-            ? await supabase.rpc("sb_chat_start_gruppe", { p_navn: (name ?? "").trim(), p_medlemmer: andre })
-            : await supabase.rpc("sb_chat_start_direkte", { p_anden: andre[0] });
+            ? await supabase.rpc("sb_chat_start_gruppe", { p_navn: (name ?? "").trim(), p_medlemmer: andre }).abortSignal(s.signal)
+            : await supabase.rpc("sb_chat_start_direkte", { p_anden: andre[0] }).abortSignal(s.signal);
         } catch {
+          kraevSession(s);
           // Svaret gik tabt: udfaldet er ukendt. Ingen automatisk ny oprettelse; listen genhentes.
           void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
           throw new OpretFejl("ukendt");
         }
+        kraevSession(s);
         if (res.error) {
           const kode = typeof res.error === "object" && res.error !== null ? Reflect.get(res.error, "code") : undefined;
           if (typeof kode === "string" && kode) throw res.error;
@@ -1050,37 +1085,45 @@ export function useCreateConversation() {
           throw new OpretFejl("ukendt");
         }
         id = res.data;
-        if (gen !== sessionsGeneration()) throw new OpretFejl("ukendt");
         t.kendtId = id;
+        t.kendtInput = { name, memberIds: [...memberIds], isGroup };
         opretMeld();
       }
       let conversation: Conversation;
       try {
-        conversation = await hentSamtale(id);
+        conversation = await hentSamtale(id, s.signal);
       } catch {
+        kraevSession(s);
         throw new OpretFejl("hent", id);
       }
-      if (gen !== sessionsGeneration()) throw new OpretFejl("hent", id);
+      kraevSession(s);
       queryClient.setQueryData<Conversation[]>(["chat-conversations"], (old) => [conversation, ...(old ?? []).filter((c) => c.id !== conversation.id)]);
-      if (t.kendtId === id) { t.kendtId = null; opretMeld(); }
+      if (t.kendtId === id) { t.kendtId = null; t.kendtInput = null; opretMeld(); }
       return conversation;
     },
-    onSettled: (_d, e) => {
+    onSettled: (_d, e, v) => {
+      if (!v || !sessionGyldig(v.session)) return;
       // Ved kendt id men fejlet hentning må listen ikke overskrive valget; ellers genvalideres den.
       if (!(e instanceof OpretFejl && e.art === "hent")) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     },
   });
 
-  /** Synkron lås på selve handlingen: dobbeltklik i samme tick giver ét kald. null = låst. */
-  const opret = useCallback((input: { name?: string; memberIds: string[]; isGroup: boolean }): Promise<Conversation> | null => {
+  /**
+   * Synkron lås på selve handlingen: dobbeltklik i samme tick giver ét kald. null = låst.
+   * Sessionen fastholdes her (før første asynkrone trin); sen afslutning efter sessionsophør → ForaeldetSession.
+   */
+  const opret = useCallback((input: OpretInput): Promise<Conversation> | null => {
     const t = opretTilstand(queryClient);
     if (t.laast) return null;
+    const session = fastholdSession();
     t.laast = true;
     const gen = t.gen;
-    return mutation.mutateAsync(input).finally(() => { if (t.gen === gen) t.laast = false; });
+    return mutation.mutateAsync({ input, session })
+      .then((c) => { kraevSession(session); return c; })
+      .finally(() => { if (t.gen === gen) t.laast = false; });
   }, [queryClient, mutation]);
 
-  return { ...mutation, opret, kendtId };
+  return { ...mutation, opret, kendtId, kendtInput };
 }
 
 export function useRealtimeMessages(conversationId: string | null) {
@@ -1257,6 +1300,7 @@ function kunAktivitet(old: Record<string, unknown> | null | undefined, ny: Recor
  * og uden læsekvittering fra brugeren i chat_message_read_receipts. Opdateres via realtime.
  */
 export function useChatUnreadTotal(employeeId: string | null | undefined, enabled = true) {
+  brugChatSession();
   const queryClient = useQueryClient();
   const on = enabled && !!employeeId;
   // B2d-1 §11: ny session (logud/brugerskift) genopretter abonnementet bundet til den nye generation.
@@ -1500,6 +1544,23 @@ const hNoegle = (gen: number, emp: string, conv: string, id: string) => `${gen}:
 const hLyttere = new Set<() => void>();
 let hVersion = 0;
 const hMeld = () => { hVersion++; for (const l of hLyttere) l(); };
+/**
+ * B2-6B §B: ved sessionsophør ryddes gamle lokale indholdssnapshots, editorlåse og kendte udløb straks.
+ * Fysisk igangværende handlinger (send/træk/fjern/gem) beholder deres lås til egen afslutning; nøglen indeholder
+ * den gamle generation, så den aldrig kan matche den nye session.
+ */
+let sidstSetGen = sessionsGeneration();
+export function rydForaeldedeSessioner(): void {
+  const gen = sessionsGeneration();
+  if (gen === sidstSetGen) return;
+  sidstSetGen = gen;
+  const pre = `${gen}:`;
+  for (const k of [...ukendte.keys()]) if (!k.startsWith(pre)) ukendte.delete(k);
+  for (const [k, h] of [...handlinger]) if (!k.startsWith(pre) && h.art === "ret") handlinger.delete(k);
+  for (const k of [...kendteUdloebne.keys()]) if (!k.startsWith(pre)) kendteUdloebne.delete(k);
+  hMeld();
+}
+abonnerAfsendelser(rydForaeldedeSessioner);
 /** Kobling til ChatViews afsendelsesejerskab (afsOps/netværkslås/pending) uden cirkulær import. */
 type AfsKoordinering = (gen: number, emp: string, conv: string, id: string) => boolean;
 let afsKoordinering: AfsKoordinering = () => false;
