@@ -40,6 +40,9 @@ const ui = (m: Message, bruger: string | null = "u") => (
 let raekke: { data: unknown; error: unknown } = { data: null, error: null };
 const chain = (tabel: string) => { const b: Record<string, unknown> = {}; for (const k of ["select", "eq", "in", "order", "limit"]) b[k] = () => b;
   b.maybeSingle = async () => (tabel === "sb_tjek_begrundelser" ? { data: { aarsag_kode: "haard_tone" }, error: null } : tabel === "chat_messages" ? raekke : { data: null, error: null }); return b; };
+// B2b-4a: den cachede InfiniteData-liste (samme form som useMessages) – kun en indarbejdet række beviser opdateret visning.
+const liste = (r: { id?: string; status: string; revision: number }) =>
+  qc.setQueryData(["chat-messages", "c"], { pages: [[{ id: "m1", ...r }]], pageParams: [0] });
 const kald = (navn: string) => graense.rpc.mock.calls.filter((c) => c[0] === navn);
 
 beforeEach(() => {
@@ -178,6 +181,7 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
   it("tabt succes-svar (transportfejl) afstemmes mod rækken: samme revision trukket tilbage → ingen toast", async () => {
     render(ui(afventer(4)));
     raekke = { data: { status: "trukket_tilbage", revision: 4, content: "", attachment_path: null }, error: null };
+    liste({ status: "trukket_tilbage", revision: 4 });
     graense.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === "Træk tilbage")!);
     await flush();
@@ -185,15 +189,54 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("B2b-3a: kendt P0001-statusafvisning vises ordret én gang, også når rækken er leveret i samme revision", async () => {
+  // B2b-4a §1: rettet forventning – B2b-3a accepterede her en falsk fejltoast efter en allerede gennemført sb_afgoer.
+  it("B2b-4a: P0001-statusafvisning efter allerede gennemført sb_afgoer (samme revision i målstatus) → ingen falsk fejltoast", async () => {
     render(ui(afventer(4)));
     await waitFor(() => knap("Send alligevel"));
     raekke = { data: { status: "leveret", revision: 4, content: "x", attachment_path: null }, error: null };
+    liste({ status: "leveret", revision: 4 });
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
+    fireEvent.click(knap("Send alligevel"));
+    await flush();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(kald("sb_afgoer")).toHaveLength(1);
+  });
+
+  it("B2b-4a: reel P0001-statusafvisning (rækken står stadig afventende) vises ordret én gang", async () => {
+    render(ui(afventer(4)));
+    await waitFor(() => knap("Send alligevel"));
+    raekke = { data: { status: "afventer_afsender", revision: 4, content: "x", attachment_path: null }, error: null };
     graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
     fireEvent.click(knap("Send alligevel"));
     await flush();
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenCalledWith("Kun afventende indhold kan sendes");
+  });
+
+  it("B2b-4a: P0001 + ulæselig række → den ordrette afvisning bevares (ingen godkendelse uden bevis)", async () => {
+    render(ui(afventer(4)));
+    await waitFor(() => knap("Send alligevel"));
+    raekke = { data: null, error: { message: "netværk" } };
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
+    fireEvent.click(knap("Send alligevel"));
+    await flush();
+    expect(toast.error).toHaveBeenCalledWith("Kun afventende indhold kan sendes");
+  });
+
+  it("B2b-4a: direkte succes uden indarbejdet visning (ingen aktiv observer) → synlig bekræftet-tilstand og nyt klik på gammelt grundlag giver intet skrivekald", async () => {
+    render(ui(afventer(4)));
+    await waitFor(() => knap("Send alligevel"));
+    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
+    fireEvent.click(knap("Send alligevel"));
+    await flush();
+    expect(screen.getByRole("alert").textContent).toBe("Handlingen er gennemført, men visningen kunne ikke opdateres");
+    expect(knap("Tjek igen")).toBeTruthy();
+    fireEvent.click(knap("Send alligevel"));
+    fireEvent.click(knap("Træk tilbage"));
+    await flush();
+    expect(kald("sb_afgoer")).toHaveLength(1);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("reel konflikt med samme status skjules ikke: leveret men nyere revision → afvisningen vises ordret én gang", async () => {
