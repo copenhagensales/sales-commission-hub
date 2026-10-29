@@ -2323,3 +2323,39 @@ describe("B2-6B §B accepteret registrering", () => {
     expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("");
   });
 });
+
+// ---------- B2-6C §C: ældre svarprojektion sletter ikke udløbsbevis fra nyere data ----------
+describe("B2-6C §C fristidentitet på tværs af original og svaruddrag", () => {
+  const forbi = () => new Date(Date.now() - 1000).toISOString();
+  const senere = () => new Date(Date.now() + 3_600_000).toISOString();
+  const projektion = (frist: string | null) => ({ id: "o", content: "original-hemmelig", sender_id: "anden", status: "leveret", slettes_efter: frist, deleted_at: null, sender: { id: "anden", full_name: "K" } });
+  for (const [navn, foerst] of [["original først", true], ["svar først", false]] as const) {
+    for (const frist of [null, "senere"] as const) {
+      it(`${navn}, ældre projektion med ${frist ?? "null"}-frist: urhop −690 ms og remount genopliver intet; nyere data accepteres`, async () => {
+        const orig = fremmed("o", "original-hemmelig", { slettes_efter: forbi() });
+        const svar = fremmed("r", "svaret", { reply_to: projektion(frist ? senere() : null), reply_to_id: "o" });
+        beskeder.hentStart = 0; // ingen af blokkene er startet efter registreringen
+        beskeder.liste = foerst ? [orig, svar] : [svar, orig];
+        let r = await klar();
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        expect(screen.queryByText("original-hemmelig")).toBeNull();
+        // Kun svarprojektionen (fra en ældre side) er tilbage.
+        beskeder.liste = [svar]; beskeder.opdateret++;
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        vi.setSystemTime(Date.now() - 690);
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        r.unmount(); r = await klar();
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        expect(screen.queryByText("original-hemmelig")).toBeNull();
+        expect(screen.getByText("svaret")).toBeTruthy();
+        // Dokumenteret nyere servertilstand (læsning startet efter registreringen) kan accepteres.
+        beskeder.liste = [fremmed("o", "frisk original", { slettes_efter: senere(), revision: 2 }), svar]; beskeder.hentStart = laesStartT(); beskeder.opdateret++;
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        r.rerender(wrap(<ChatView conversationId="A" />)); await tick();
+        expect(screen.getByText("frisk original")).toBeTruthy();
+        r.unmount();
+        vi.useRealTimers();
+      });
+    }
+  }
+});
