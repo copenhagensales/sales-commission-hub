@@ -737,7 +737,7 @@ describe("d2 §5 – sent gammelt INSERT og to klienter mod fælles netværksmod
 });
 
 // ---------- B2b-2: §9 tjek for rigtig revision, stophul 2 og auth-skift før mutationFn (netværk mocket; SQL antagelser) ----------
-import { startTjekHvisNoedvendigt, stopEfterbehandling, aktiveEfterbehandlinger, aktiveTjek, aktiveTjekTimere, useEditMessage, tagHandling } from "./useChat";
+import { startTjekHvisNoedvendigt, stopEfterbehandling, aktiveEfterbehandlinger, aktiveTjek, aktiveTjekTimere, useEditMessage, tagHandling, frigivHandling } from "./useChat";
 import { ejerGyldig } from "@/lib/sbKladder";
 
 describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
@@ -1251,5 +1251,6 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     expect(aktiveTjekTimere()).toBe(0);
     await p; await vi.advanceTimersByTimeAsync(5000);
     expect(invokes()).toBe(1);
+    frigivHandling(ejer, "m");
   });
 });
