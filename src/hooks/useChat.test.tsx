@@ -2409,3 +2409,93 @@ describe("24d2 §1 (g) – modelport i startTjekHvisNoedvendigt", () => {
     expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------- 24d2 §2(c): driftsafvisninger ved modtagelsen (mock ved Supabase-grænsen) ----------
+import { erPauseKendt, driftNoegle } from "@/hooks/useSbDrift";
+import { driftKode, DRIFT_TEKST } from "./useChat";
+
+describe("24d2 §2(c) – pause, filport og optaget barriere", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const ID = "m1";
+  const PAUSE = { code: "P0001", message: "SB24D2_PAUSE" };
+  const r = (revision: number) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null });
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    graense.rpc.mockReset(); insert.mockReset(); kald.length = 0;
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { graense.rpc.mockReset(); for (const k of Object.keys(svar)) delete svar[k]; });
+  const ejer = () => fastholdEjer("e", "c", "u")!;
+  const driftGenhentet = (spy: ReturnType<typeof vi.spyOn>) =>
+    spy.mock.calls.some((c) => JSON.stringify(arg(c[0], "queryKey")) === JSON.stringify(driftNoegle("u", sessionsGeneration())));
+
+  it("driftKode kræver præcis P0001 + ordret kode", () => {
+    expect(driftKode(PAUSE)).toBe("SB24D2_PAUSE");
+    expect(driftKode({ code: "P0002", message: "SB24D2_PAUSE" })).toBeNull();
+    expect(driftKode({ code: "P0001", message: "SB24D2_PAUSE " })).toBeNull();
+    expect(serverTekst({ code: "P0001", message: "SB24D2_FIL_LUKKET" }, "x")).toBe("Filen kunne ikke sendes: filer er lukket lige nu");
+    expect(serverTekst({ code: "P0001", message: "SB24D2_BUSY" }, "x")).toBe("Prøv igen om et øjeblik");
+  });
+
+  it("INSERT afvist med PAUSE: pause registreres og drift genhentes; kendt afvist (samme pending)", async () => {
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    insert.mockResolvedValue({ error: PAUSE });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.art : null).toBe("server");
+    expect(f instanceof SendFejl ? f.message : null).toBe(DRIFT_TEKST.SB24D2_PAUSE);
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
+    expect(driftGenhentet(spy)).toBe(true);
+    expect(kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
+  });
+
+  it("PAUSE efter tidligere ukendt udfald afklarer ikke: forbliver ukendt (Afstemmer), pause registreres", async () => {
+    insert.mockResolvedValue({ error: PAUSE });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, tidligereUkendt: true, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.art : null).toBe("ukendt");
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
+  });
+
+  it("BUSY: ét INSERT uden automatisk gentagelse (retry:0), tekst »Prøv igen om et øjeblik«, ingen pause", async () => {
+    insert.mockResolvedValue({ error: { code: "P0001", message: "SB24D2_BUSY" } });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.message : null).toBe("Prøv igen om et øjeblik");
+    await act(async () => { await new Promise((x) => setTimeout(x, 20)); });
+    expect(kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(false);
+  });
+
+  it("FIL_LUKKET ved kendt afvisning → filteksten", async () => {
+    insert.mockResolvedValue({ error: { code: "P0001", message: "SB24D2_FIL_LUKKET" } });
+    const { result } = renderHook(() => useSendMessage(), { wrapper: wrap });
+    const f = await result.current.mutateAsync({ ...v, ejer: ejer() }).then(() => null, (x) => x);
+    expect(f instanceof SendFejl ? f.message : null).toBe("Filen kunne ikke sendes: filer er lukket lige nu");
+  });
+
+  const pauseHandling = async (navn: string, kør: (e: NonNullable<ReturnType<typeof fastholdEjer>>) => Promise<unknown>) => {
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    graense.rpc.mockResolvedValue({ data: null, error: PAUSE });
+    svar.chat_messages = [r(1)];
+    const f = await kør(ejer()).then(() => null, (x: unknown) => x);
+    expect(f instanceof HandlingsFejl ? f.art : null).toBe("afvist");
+    expect(erPauseKendt(qc, "u", sessionsGeneration())).toBe(true);
+    expect(driftGenhentet(spy)).toBe(true);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+    expect(String(graense.rpc.mock.calls[0][0])).toBe(navn);
+  };
+  it("sb_ret afvist med PAUSE: pause + drift genhentes; ét kald", async () => {
+    const { result } = renderHook(() => useEditMessage(), { wrapper: wrap });
+    await pauseHandling("sb_ret", (e) => { tagHandling(e, ID, "gem"); return result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }); });
+  });
+  it("sb_fjern_fil afvist med PAUSE: pause + drift genhentes; ét kald", async () => {
+    const { result } = renderHook(() => useFjernFil(), { wrapper: wrap });
+    await pauseHandling("sb_fjern_fil", (e) => { tagHandling(e, ID, "fjern"); return result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: "e/c/f", fejltekst: "x" }); });
+  });
+  it("sb_afgoer send afvist med PAUSE: pause + drift genhentes; ét kald", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    await pauseHandling("sb_afgoer", (e) => { tagHandling(e, ID, "send"); return result.current.mutateAsync({ messageId: ID, revision: 1, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" }); });
+  });
+});

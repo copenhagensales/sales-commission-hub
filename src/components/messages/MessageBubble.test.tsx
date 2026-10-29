@@ -225,7 +225,7 @@ describe("c1 §2 – Gem afgrænset til session og kladdeoperation (rigtig useEd
     await act(async () => { afvis(new TypeError("Failed to fetch")); await new Promise((x) => setTimeout(x, 10)); });
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
     expect(toast.error).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("behold");
   });
 
@@ -414,7 +414,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     expect(laesRetKladde("e", "c", "m1")?.tekst).toBe("min");
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
   });
@@ -445,12 +445,12 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     const r = render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     r.unmount();
     render(ui(besked("m1", "gammel"), "e"));
     await flush();
     expect(felt()?.value).toBe("min");
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     expect(screen.getByRole("button", { name: "Tjek igen" })).toBeTruthy();
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
   });
@@ -465,7 +465,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     await flush();
     fireEvent.click(screen.getByRole("menuitem", { name: "Træk tilbage" }));
     await flush();
-    expect(screen.getByRole("alert").textContent).toBe("Udfaldet kunne ikke bekræftes");
+    expect(screen.getByRole("alert").textContent).toBe("Afstemmer … udfaldet kunne ikke bekræftes");
     expect(toast.error).not.toHaveBeenCalled();
     raekke = { data: { status: "trukket_tilbage", revision: m.revision, content: "", attachment_path: null }, error: null };
     liste({ status: "trukket_tilbage", revision: m.revision });

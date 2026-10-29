@@ -123,3 +123,12 @@ describe("c1 §3 – sidste await-hul før POST og sessionens bruger", () => {
     fetchSpy.mockRestore();
   });
 });
+
+describe("24d2 §2(c) udstedFejlTekst 503/vedligeholdelse", () => {
+  it("kun status 503 + kode vedligeholdelse giver filteksten; øvrige tekster uændrede", () => {
+    expect(udstedFejlTekst(new SbFilFejl(503, "vedligeholdelse"))).toBe("Filen kunne ikke sendes: filer er lukket lige nu");
+    expect(udstedFejlTekst(new SbFilFejl(503, "andet"))).toBe("Filen kunne ikke uploades – prøv igen");
+    expect(udstedFejlTekst(new SbFilFejl(500, "vedligeholdelse"))).toBe("Filen kunne ikke uploades – prøv igen");
+    expect(udstedFejlTekst(new SbFilFejl(429, "x"))).toBe("For mange forsøg – prøv igen om lidt");
+  });
+});

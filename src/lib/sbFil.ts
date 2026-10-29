@@ -99,6 +99,7 @@ export function udstedFejlTekst(e: unknown): string {
   if (e.status === 401) return "Log ind igen for at vedhæfte filer";
   if (e.status === 403) return "Du kan ikke vedhæfte filer i denne samtale";
   if (e.status === 429) return "For mange forsøg – prøv igen om lidt";
+  if (e.status === 503 && e.kode === "vedligeholdelse") return "Filen kunne ikke sendes: filer er lukket lige nu";
   return "Filen kunne ikke uploades – prøv igen";
 }
 

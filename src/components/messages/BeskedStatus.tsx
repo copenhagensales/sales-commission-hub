@@ -29,7 +29,7 @@ export function UkendtUdfald({ emp, conversationId, messageId, onAfklaret }: {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
       <p className="text-[14px]" role="alert">
-        {laas.bekraeftet ? "Handlingen er gennemført, men visningen kunne ikke opdateres" : "Udfaldet kunne ikke bekræftes"}
+        {laas.bekraeftet ? "Handlingen er gennemført, men visningen kunne ikke opdateres" : "Afstemmer … udfaldet kunne ikke bekræftes"}
         {ulaest && !laas.tjekker ? " – stadig ikke afklaret" : ""}
       </p>
       <Button size="sm" variant="outline" className="min-h-11" disabled={laas.tjekker} onClick={() => void tjek()}>

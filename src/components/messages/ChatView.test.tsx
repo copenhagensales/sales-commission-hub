@@ -78,6 +78,12 @@ vi.mock("@/lib/sbFil", async (orig) => ({
   udstedUpload: async (...a: Parameters<typeof import("@/lib/sbFil").udstedUpload>) => (beskeder.ægteFil ? (await orig<typeof import("@/lib/sbFil")>()).udstedUpload(...a) : udstedUpload(...a)),
   uploadTilSti: async (...a: Parameters<typeof import("@/lib/sbFil").uploadTilSti>) => (beskeder.ægteFil ? (await orig<typeof import("@/lib/sbFil")>()).uploadTilSti(...a) : uploadTilSti(...a)),
 }));
+// 24d2 §2: driftsstatus styres pr. prøve (standard: kendt, åben). Med ægte=true kører den rigtige hook mod rpc-grænsen.
+const driftT = vi.hoisted(() => ({ ægte: false, v: { status: "kendt" as "kendt" | "ukendt", beskederPause: false, filTilladt: true, tjekTilladt: true } }));
+vi.mock("@/hooks/useSbDrift", async (orig) => {
+  const ægte = await orig<typeof import("@/hooks/useSbDrift")>();
+  return { ...ægte, useSbDrift: (...a: Parameters<typeof ægte.useSbDrift>) => (driftT.ægte ? ægte.useSbDrift(...a) : { ...driftT.v, refetch: () => undefined }) };
+});
 vi.mock("@/hooks/useChat", async (orig) => {
   const ægte = await orig<typeof import("@/hooks/useChat")>();
   return {
@@ -120,7 +126,7 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
   rydAlleKladder();
   sessionStorage.clear();
-  beskeder.liste = []; beskeder.opdateret = 0; beskeder.hentStart = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null;
+  beskeder.liste = []; beskeder.opdateret = 0; beskeder.hentStart = 0; kvitMutate.fn = () => undefined; beskeder.ægteSend = false; beskeder.ægteFil = false; lagerUpload.fn = null; driftT.ægte = false; driftT.v = { status: "kendt", beskederPause: false, filTilladt: true, tjekTilladt: true };
   net.insert.mockReset(); net.kald.length = 0; net.vent = null; for (const k of Object.keys(net.svar)) delete net.svar[k];
   mutateAsync.mockReset(); udstedUpload.mockReset(); uploadTilSti.mockReset(); afstemKun.mockClear();
 });
@@ -2213,7 +2219,7 @@ describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
     expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
     expect(graense.rpc.mock.calls.length).toBe(rpcFoer);
     expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
-    expect(screen.queryByText("Udfaldet kunne ikke bekræftes")).toBeNull();
+    expect(screen.queryByText("Afstemmer … udfaldet kunne ikke bekræftes")).toBeNull();
     r.unmount();
   });
 
@@ -2251,7 +2257,7 @@ describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
     await tick(); await tick();
     expect(udfaldSnapshot("e", "A", "m1")).not.toBeNull(); // ukendt udfald bevaret
     expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
-    expect(screen.getByText("Udfaldet kunne ikke bekræftes")).toBeTruthy();
+    expect(screen.getByText("Afstemmer … udfaldet kunne ikke bekræftes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Tjek igen" })).toBeTruthy();
     r.unmount();
   });
@@ -2385,5 +2391,86 @@ describe("B2-6A §D handleSend uden gyldig auth-ejer", () => {
     } finally {
       await act(async () => { lyt("SIGNED_IN", sess("u")); });
     }
+  });
+});
+
+// ---------- 24d2 §2: visning og fejl ----------
+describe("24d2 §2 – driftsvisning i ChatView", () => {
+  it("filTilladt=false → ingen filknap, hjælpetekst synlig; Send aktiv med tekst", async () => {
+    driftT.v = { status: "kendt", beskederPause: false, filTilladt: false, tjekTilladt: true };
+    await klar();
+    expect(screen.queryByRole("button", { name: "Vedhæft fil" })).toBeNull();
+    expect(screen.getByText("Filer kan ikke sendes lige nu")).toBeTruthy();
+    skriv("hej");
+    expect(send().hasAttribute("disabled")).toBe(false);
+  });
+  it("ukendt status → filknap skjult, Send aktiv", async () => {
+    driftT.v = { status: "ukendt", beskederPause: false, filTilladt: false, tjekTilladt: false };
+    await klar();
+    expect(screen.queryByRole("button", { name: "Vedhæft fil" })).toBeNull();
+    skriv("hej");
+    expect(send().hasAttribute("disabled")).toBe(false);
+  });
+  it("beskederPause=true → banner, Send og Enter låst, kladdetekst uændret efter rerender", async () => {
+    driftT.v = { status: "kendt", beskederPause: true, filTilladt: true, tjekTilladt: true };
+    const r = await klar();
+    expect(screen.getByText(/Beskeder er under vedligeholdelse – du kan læse, men ikke sende\. Din kladde bevares\./)).toBeTruthy();
+    skriv("kladde");
+    expect(send().hasAttribute("disabled")).toBe(true);
+    fireEvent.keyDown(screen.getByLabelText("besked"), { key: "Enter" });
+    fireEvent.click(send());
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("kladde");
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(hentAfsendelser("e", "A")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Vedhæft fil" }).hasAttribute("disabled")).toBe(true);
+  });
+  it("pause: pending genforsøg låst (intet nyt kald); post med tekst bevares", async () => {
+    driftT.v = { status: "kendt", beskederPause: true, filTilladt: true, tjekTilladt: true };
+    await klar();
+    const { fastholdEjer } = await import("@/lib/sbKladder");
+    const e = fastholdEjer("e", "A", "u")!;
+    act(() => { tilfoejAfsendelse("e", "A", { id: "p1", tekst: "gammel", svarId: null, fil: null, tilstand: "afvist", fejl: null, tidligereUkendt: false, oprettet: 1 }, null, e); });
+    const knap = screen.getByRole("button", { name: "Ikke sendt – prøv igen" });
+    expect(knap.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(knap);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByText("gammel")).toBeTruthy();
+  });
+  it("rigtig useSendMessage + rigtig drift: INSERT afvist med PAUSE → banner, drift genhentet, pending og nyere kladde bevares", async () => {
+    beskeder.ægteSend = true; driftT.ægte = true;
+    const driftKald = () => graense.rpc.mock.calls.filter((c) => c[0] === "sb_24d2_drift").length;
+    // Serveren er i pause, når INSERT afvises; den efterfølgende driftslæsning bekræfter pausen.
+    let iPause = false;
+    graense.rpc.mockImplementation(async (fn: unknown) => fn === "sb_24d2_drift"
+      ? { data: [{ beskeder_pause: iPause, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
+    net.insert.mockImplementation(() => { iPause = true; return { error: { code: "P0001", message: "SB24D2_PAUSE" } }; });
+    await klar();
+    await waitFor(() => expect(driftKald()).toBeGreaterThan(0));
+    const foer = driftKald();
+    skriv("første");
+    await act(async () => { fireEvent.click(send()); });
+    await waitFor(() => expect(screen.getByText(/du kan læse, men ikke sende/)).toBeTruthy());
+    await waitFor(() => expect(driftKald()).toBeGreaterThan(foer));
+    expect(net.kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
+    skriv("nyere");
+    expect(screen.getByText("første")).toBeTruthy();
+    expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("nyere");
+    expect(send().hasAttribute("disabled")).toBe(true);
+    graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null }));
+  });
+  it("rigtig drift: BUSY → ét INSERT, ingen automatisk gentagelse, tekst vises", async () => {
+    beskeder.ægteSend = true; driftT.ægte = true;
+    graense.rpc.mockImplementation(async (fn: unknown) => fn === "sb_24d2_drift"
+      ? { data: [{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: true }], error: null } : { data: "e", error: null });
+    net.insert.mockReturnValue({ error: { code: "P0001", message: "SB24D2_BUSY" } });
+    await klar();
+    skriv("x");
+    await act(async () => { fireEvent.click(send()); });
+    await waitFor(() => expect(screen.getByText("Prøv igen om et øjeblik")).toBeTruthy());
+    await act(async () => { await new Promise((x) => setTimeout(x, 30)); });
+    expect(net.kald.filter((k) => k === "insert:chat_messages")).toHaveLength(1);
+    expect(screen.queryByText(/under vedligeholdelse/)).toBeNull();
+    graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null }));
   });
 });
