@@ -105,16 +105,40 @@ export function udstedFejlTekst(e: unknown): string {
 /** Højst 3 samtidige hentninger fra klienten. */
 let aktive = 0;
 const venter: (() => void)[] = [];
-async function medPlads<T>(fn: () => Promise<T>): Promise<T> {
-  if (aktive >= 3) await new Promise<void>((r) => venter.push(r));
+const afbrudt = () => new DOMException("Aborted", "AbortError");
+/** B2c-2b-1 §6: kø med abort – en afbrudt køventer fjernes fra køen og starter aldrig; en vækket venter kontrollerer abort/vagt før arbejdet. */
+async function medPlads<T>(fn: () => Promise<T>, signal?: AbortSignal, vagt?: Vagt): Promise<T> {
+  if (signal?.aborted) throw afbrudt();
+  tjekVagt(vagt);
+  if (aktive >= 3) {
+    await new Promise<void>((res, rej) => {
+      const vaek = () => { signal?.removeEventListener("abort", af); res(); };
+      const af = () => { const i = venter.indexOf(vaek); if (i >= 0) venter.splice(i, 1); rej(afbrudt()); };
+      venter.push(vaek);
+      signal?.addEventListener("abort", af, { once: true });
+    });
+  }
   aktive++;
-  try { return await fn(); } finally { aktive--; venter.shift()?.(); }
+  try {
+    if (signal?.aborted) throw afbrudt();
+    tjekVagt(vagt); // en gammel køventer må ikke starte GET under en ny session
+    return await fn();
+  } finally { aktive--; venter.shift()?.(); }
 }
+/** Til prøver: aktive pladser og køventere (ingen indhold). */
+export const filHentningsKapacitet = () => ({ aktive, ventere: venter.length });
 
-/** Autentificeret hentning af en beskeds vedhæftning. Typen tvinges til allowlisten; aldrig farligere MIME. */
-export function hentFil(messageId: string, signal?: AbortSignal): Promise<Blob> {
+/**
+ * Autentificeret hentning af en beskeds vedhæftning. Typen tvinges til allowlisten; aldrig farligere MIME.
+ * B2c-2b-1 §6: med kontekst kontrolleres abort og vagt (bruger/generation/hentningsnummer) efter køventning,
+ * sessions-/JWT-opslag (sessionen skal tilhøre konteksten), før GET, efter svar og efter bytes. En GET-fejl udsteder/uploader aldrig.
+ */
+export function hentFil(messageId: string, signal?: AbortSignal, k?: SbKontekst): Promise<Blob> {
+  const vagt = k?.vagt;
+  const tjek = () => { if (signal?.aborted) throw afbrudt(); tjekVagt(vagt); };
   return medPlads(async () => {
-    const h = await hoveder();
+    const h = await hoveder(vagt, k?.bruger);
+    tjek(); // sidste await-hul før transport
     let res: Response;
     try {
       res = await fetch(`${BASE}?action=laes&message_id=${encodeURIComponent(messageId)}`, { headers: h, signal, cache: "no-store" });
@@ -122,12 +146,14 @@ export function hentFil(messageId: string, signal?: AbortSignal): Promise<Blob> 
       if (e instanceof DOMException && e.name === "AbortError") throw e;
       throw new SbFilFejl(0, "net");
     }
+    tjek();
     if (res.status !== 200 && res.status !== 206) throw await fejlFra(res);
     const type = (res.headers.get("Content-Type") ?? "").split(";")[0].trim().toLowerCase();
     if (!TILLADTE.has(type)) throw new SbFilFejl(410, "type");
     const buf = await res.arrayBuffer();
+    tjek();
     return new Blob([buf], { type });
-  });
+  }, signal, vagt);
 }
 
 export const erPermanentFilFejl = (e: unknown) => e instanceof SbFilFejl && [403, 404, 410].includes(e.status);

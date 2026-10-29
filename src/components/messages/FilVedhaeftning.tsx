@@ -3,6 +3,7 @@ import { FileIcon, ImageIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { hentFil, filFejlTekst, erPermanentFilFejl, SbFilFejl } from "@/lib/sbFil";
+import { fastholdEjer, ejerGyldig, sessionsGeneration, abonnerAfsendelser } from "@/lib/sbKladder";
 
 interface Props {
   messageId: string;
@@ -11,8 +12,12 @@ interface Props {
   navn: string | null;
   type: string | null;
   isOwn: boolean;
-  /** Bruger-id; skift rydder tilstand. */
+  /** Medarbejder-id; skift rydder tilstand. */
   brugerId?: string;
+  /** Samtalen; indgår i hentningens fastholdte kontekst (B2c-2b-1 §6). */
+  conversationId?: string;
+  /** Auth-bruger-id ved render (null = fastholdes fra sessionslytteren). */
+  authBrugerId?: string | null;
 }
 
 /**
@@ -20,7 +25,7 @@ interface Props {
  * der ryddes ved ændret reference, tilbagetrækning/udløb (afmontering) og brugerskift.
  * Billeder hentes først ved tryk (ingen størrelsesgaranti for automatisk preview ≤ 200 KB).
  */
-export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId }: Props) {
+export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, conversationId, authBrugerId = null }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [tekst, setTekst] = useState<string | null>(null);
   const [fejl, setFejl] = useState<unknown>(null);
@@ -29,32 +34,64 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId }:
   const urlRef = useRef<string | null>(null);
   const erBillede = !!type?.startsWith("image/");
 
+  // B2c-2b-1 §6: hentningsnummer (identitet), synkron lås og monteringsstatus.
+  const nrRef = useRef(0);
+  const laasRef = useRef<number | null>(null);
+  const monteret = useRef(true);
+  const genRef = useRef(sessionsGeneration());
+
   const ryd = () => {
+    nrRef.current++; // alle igangværende forløb bliver forældede
+    laasRef.current = null;
     ctrl.current?.abort();
     ctrl.current = null;
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     urlRef.current = null;
     setUrl(null); setTekst(null); setFejl(null); setHenter(false);
   };
-  useEffect(() => ryd, []);
-  useEffect(() => { ryd(); }, [messageId, sti, brugerId]);
+  useEffect(() => {
+    monteret.current = true;
+    return () => { monteret.current = false; ryd(); };
+  }, []);
+  useEffect(() => { ryd(); }, [messageId, sti, brugerId, authBrugerId]);
+  // Logud/brugerskift (ny sessionsgeneration, også samme bruger efter genlogin) rydder bytes og stopper hentning.
+  useEffect(() => abonnerAfsendelser(() => {
+    const g = sessionsGeneration();
+    if (g !== genRef.current) { genRef.current = g; ryd(); }
+  }), []);
 
   const hent = async () => {
-    if (henter) return;
+    if (laasRef.current !== null) return; // synkron lås: to klik før render starter ikke to hentninger
+    const ejer = fastholdEjer(brugerId, conversationId ?? messageId, authBrugerId);
     ryd();
+    const nr = nrRef.current;
+    if (!ejer) { setFejl(new SbFilFejl(401, "jwt")); return; }
+    laasRef.current = nr;
     const c = new AbortController();
     ctrl.current = c;
+    const gyldig = () => monteret.current && nrRef.current === nr && !c.signal.aborted && ejerGyldig(ejer);
     setHenter(true);
     try {
-      const blob = await hentFil(messageId, c.signal);
-      if (c.signal.aborted) return;
-      if (blob.type === "text/plain") setTekst(await blob.text());
-      else { const u = URL.createObjectURL(blob); urlRef.current = u; setUrl(u); }
+      const blob = await hentFil(messageId, c.signal, { vagt: gyldig, bruger: ejer.bruger });
+      if (!gyldig()) return;
+      if (blob.type === "text/plain") {
+        const t = await blob.text();
+        if (!gyldig()) return;
+        setTekst(t);
+      } else {
+        const u = URL.createObjectURL(blob);
+        if (!gyldig()) { URL.revokeObjectURL(u); return; }
+        urlRef.current = u; setUrl(u);
+      }
     } catch (e) {
-      if (c.signal.aborted) return;
+      if (!gyldig()) return;
       setFejl(e);
     } finally {
-      if (!c.signal.aborted) setHenter(false);
+      // Kun eget forløb frigiver låsen; et gammelt finally rører ikke en ny hentning.
+      if (laasRef.current === nr) {
+        laasRef.current = null;
+        if (gyldig()) setHenter(false);
+      }
     }
   };
 
