@@ -133,11 +133,12 @@ export function MentionInput({
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className={cn("min-h-[60px] resize-none", className)}
+        rows={1}
+        className={cn("min-h-[44px] resize-none", className)}
       />
       
       {showSuggestions && filteredEmployees.length > 0 && (
-        <div className="absolute bottom-full left-0 mb-1 w-64 bg-popover border rounded-md shadow-lg z-50 overflow-hidden">
+        <div className="absolute bottom-full left-0 z-50 mb-1 w-64 overflow-hidden rounded-2xl border border-border bg-popover shadow-lg">
           {filteredEmployees.map((emp: Employee, index: number) => (
             <button
               key={emp.id}

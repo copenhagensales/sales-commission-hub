@@ -30,7 +30,7 @@ export function LinkPreview({ url }: LinkPreviewProps) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2 p-2 mt-2 rounded-md bg-background/20 hover:bg-background/30 transition-colors border border-border/30"
+      className="mt-2 flex items-center gap-2 rounded-2xl bg-[hsl(var(--cph-light-blue)/0.12)] p-2 ring-1 ring-current/10 hover:bg-[hsl(var(--cph-light-blue)/0.2)]"
     >
       <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
       <span className="text-sm truncate flex-1">{hostname}</span>

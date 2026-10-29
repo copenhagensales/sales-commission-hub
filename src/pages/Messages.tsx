@@ -4,12 +4,15 @@ import { toast } from "sonner";
 import { useConversations } from "@/hooks/useChat";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ConversationList } from "@/components/messages/ConversationList";
+import { samtaleNavn } from "@/components/messages/samtaleTekst";
+import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
+import { Pille } from "@/components/cph";
 import { ChatView } from "@/components/messages/ChatView";
 import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
 import { BeskederInfoKnap } from "@/components/messages/BeskederInfo";
 import { EmployeeSmsTab } from "@/components/messages/EmployeeSmsTab";
 import { Button } from "@/components/ui/button";
-import { Plus, MessageSquare, PenSquare, ArrowLeft, Phone } from "lucide-react";
+import { Plus, MessageSquare, PenSquare, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -59,6 +62,10 @@ export default function Messages() {
     }
   }, [selectedConversationId, samtalerHentet, samtaler, setSearchParams]);
   const [showNewDialog, setShowNewDialog] = useState(false);
+  // D2a: samtalens navn til tilbage-bjælken og trådens sidehoved (Messages kender samtalerne, ChatView kun id).
+  const valgtSamtale = selectedConversationId ? samtaler?.find((x) => x.id === selectedConversationId) : undefined;
+  const migId = useCurrentEmployeeId().data ?? null;
+  const valgtNavn = valgtSamtale ? samtaleNavn(valgtSamtale, migId) : undefined;
   const { canSendEmployeeSms } = usePermissions();
   const { data: smsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
 
@@ -69,12 +76,10 @@ export default function Messages() {
         <div className="flex flex-col h-[calc(100dvh-88px-64px-16px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] md:h-[calc(100vh-6rem)]">
           <Tabs defaultValue="chat" className="flex flex-col h-full">
             {/* Header with tabs */}
-            <div className="flex items-center justify-between mb-2 md:mb-4 px-2 md:px-0">
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold">Beskeder</h1>
-                <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">
-                  Kommuniker med dine kollegaer
-                </p>
+            <div className="mb-3 flex items-center justify-between gap-3 px-1 md:mb-4 md:px-0">
+              <div className="min-w-0">
+                <h1 className="text-[26px] font-extrabold leading-tight tracking-[-0.02em] text-foreground md:text-[32px]">Beskeder</h1>
+                <p className="hidden text-[14px] text-muted-foreground sm:block">Kommuniker med dine kollegaer</p>
               </div>
               <div className="flex items-center gap-2">
                 <BeskederInfoKnap />
@@ -104,12 +109,14 @@ export default function Messages() {
                 onTilbage={tilbage}
                 showNewDialog={showNewDialog}
                 setShowNewDialog={setShowNewDialog}
+                titel={valgtNavn}
+                nyKnapIListe
               />
             </TabsContent>
 
             {/* SMS Tab */}
             <TabsContent value="sms" className="flex-1 min-h-0 mt-0">
-              <div className="h-full border rounded-xl bg-card overflow-hidden">
+              <div className="h-full overflow-hidden rounded-3xl bg-card">
                 <EmployeeSmsTab />
               </div>
             </TabsContent>
@@ -134,91 +141,29 @@ export default function Messages() {
       <div className="flex flex-col h-[calc(100dvh-88px-64px-16px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] md:h-[calc(100vh-6rem)]">
         {/* Header - simplified on mobile */}
         <div className={cn(
-          "flex items-center justify-between mb-2 md:mb-4 px-2 md:px-0",
+          "mb-3 flex items-center justify-between gap-3 px-1 md:mb-4 md:px-0",
           selectedConversationId && "hidden md:flex"
         )}>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Beskeder</h1>
-            <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">
-              Kommuniker med dine kollegaer
-            </p>
+          <div className="min-w-0">
+            <h1 className="text-[26px] font-extrabold leading-tight tracking-[-0.02em] text-foreground md:text-[32px]">Beskeder</h1>
+            <p className="hidden text-[14px] text-muted-foreground sm:block">Kommuniker med dine kollegaer</p>
           </div>
           <div className="flex items-center gap-1">
             <BeskederInfoKnap />
-            <Button
-            onClick={() => setShowNewDialog(true)}
-            size="sm"
-            className="gap-2 max-md:min-h-11"
-            aria-label="Ny samtale"
-          >
-            <PenSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">Ny samtale</span>
-          </Button>
+            <Pille onClick={() => setShowNewDialog(true)} aria-label="Ny samtale" ikon={<PenSquare />} className="max-sm:h-11 max-sm:w-11 max-sm:px-0">
+              <span className="hidden sm:inline">Ny samtale</span>
+            </Pille>
           </div>
         </div>
 
-        {/* Main content - full screen on mobile */}
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-0 md:gap-4 min-h-0">
-          {/* Conversation list - full width on mobile when no conversation selected */}
-          <div className={cn(
-            "md:col-span-4 xl:col-span-3 border-0 md:border rounded-none md:rounded-xl bg-card overflow-hidden flex flex-col h-full",
-            selectedConversationId ? "hidden md:flex" : "flex"
-          )}>
-            <div className="p-3 md:p-4 border-b bg-muted/30">
-              <h2 className="font-semibold text-base md:text-lg">Samtaler</h2>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <ConversationList
-                selectedId={selectedConversationId}
-                onSelect={setSelectedConversationId}
-              />
-            </div>
-          </div>
-
-          {/* Chat view - full screen on mobile when conversation selected */}
-          <div className={cn(
-            "md:col-span-8 xl:col-span-9 border-0 md:border rounded-none md:rounded-xl bg-card overflow-hidden flex flex-col h-full",
-            !selectedConversationId ? "hidden md:flex" : "flex"
-          )}>
-            {selectedConversationId ? (
-              <>
-                {/* Mobile back button - sticky header */}
-                <div className="md:hidden p-2 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 sticky top-0 z-10">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={tilbage}
-                    className="gap-2 min-h-11"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Tilbage
-                  </Button>
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <ChatView conversationId={selectedConversationId} />
-                </div>
-              </>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-                  <MessageSquare className="h-10 w-10 text-primary" />
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">Vælg en samtale</h3>
-                <p className="text-center max-w-sm">
-                  Vælg en eksisterende samtale fra listen, eller start en ny for at begynde at chatte
-                </p>
-                <Button 
-                  onClick={() => setShowNewDialog(true)} 
-                  variant="outline" 
-                  className="mt-6 gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Start ny samtale
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+        <ChatTabContent
+          selectedConversationId={selectedConversationId}
+          setSelectedConversationId={setSelectedConversationId}
+          onTilbage={tilbage}
+          showNewDialog={showNewDialog}
+          setShowNewDialog={setShowNewDialog}
+          titel={valgtNavn}
+        />
       </div>
 
       <NewConversationDialog
@@ -240,33 +185,34 @@ interface ChatTabContentProps {
   onTilbage: () => void;
   showNewDialog: boolean;
   setShowNewDialog: (show: boolean) => void;
+  /** Samtalens navn (tilbage-bjælke på telefon, sidehoved på pc). */
+  titel?: string;
+  /** Vis »Ny samtale« i listens hoved (fane-varianten; standardvarianten har den i sidehovedet). */
+  nyKnapIListe?: boolean;
 }
 
+/** D2a: listepanel og trådpanel som Storkbook-kort (24 px) på pc; fuld bredde uden rammer på telefon. Samme opbygning i begge varianter. */
 function ChatTabContent({ 
   selectedConversationId, 
   setSelectedConversationId,
   onTilbage,
   showNewDialog,
-  setShowNewDialog 
+  setShowNewDialog,
+  titel,
+  nyKnapIListe = false,
 }: ChatTabContentProps) {
   return (
     <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-0 md:gap-4 h-full min-h-0">
       {/* Conversation list */}
       <div className={cn(
-        "md:col-span-4 xl:col-span-3 border-0 md:border rounded-none md:rounded-xl bg-card overflow-hidden flex flex-col h-full",
+        "flex h-full flex-col overflow-hidden md:col-span-4 md:rounded-3xl md:bg-card xl:col-span-3",
         selectedConversationId ? "hidden md:flex" : "flex"
       )}>
-        <div className="p-3 md:p-4 border-b bg-muted/30 flex items-center justify-between">
-          <h2 className="font-semibold text-base md:text-lg">Samtaler</h2>
-          <Button 
-            onClick={() => setShowNewDialog(true)} 
-            size="sm"
-            variant="ghost"
-            className="gap-2 max-md:h-11 max-md:w-11"
-            aria-label="Ny samtale"
-          >
-            <PenSquare className="h-4 w-4" />
-          </Button>
+        <div className={cn("flex items-center justify-between px-1 pb-2 md:px-4 md:pt-4", !nyKnapIListe && "max-md:hidden")}>
+          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Samtaler</h2>
+          {nyKnapIListe && (
+            <Pille variant="sekundaer" stoerrelse="ikon" onClick={() => setShowNewDialog(true)} aria-label="Ny samtale" ikon={<PenSquare />} />
+          )}
         </div>
         <div className="flex-1 overflow-hidden">
           <ConversationList
@@ -278,43 +224,25 @@ function ChatTabContent({
 
       {/* Chat view */}
       <div className={cn(
-        "md:col-span-8 xl:col-span-9 border-0 md:border rounded-none md:rounded-xl bg-card overflow-hidden flex flex-col h-full",
+        "flex h-full flex-col overflow-hidden rounded-3xl bg-card md:col-span-8 xl:col-span-9",
         !selectedConversationId ? "hidden md:flex" : "flex"
       )}>
         {selectedConversationId ? (
           <>
-            <div className="md:hidden p-2 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 sticky top-0 z-10">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={onTilbage}
-                className="gap-2 min-h-11"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Tilbage
-              </Button>
-            </div>
             <div className="flex-1 overflow-hidden">
-              <ChatView conversationId={selectedConversationId} />
+              <ChatView conversationId={selectedConversationId} titel={titel} onTilbage={onTilbage} />
             </div>
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-              <MessageSquare className="h-10 w-10 text-primary" />
+          <div className="flex h-full flex-col items-center justify-center p-8 text-muted-foreground">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--cph-emerald)/0.14)] text-[hsl(var(--cph-emerald))]">
+              <MessageSquare className="h-10 w-10" aria-hidden="true" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">Vælg en samtale</h3>
-            <p className="text-center max-w-sm">
+            <h3 className="mb-2 text-[18px] font-extrabold text-foreground">Vælg en samtale</h3>
+            <p className="max-w-sm text-center text-[15px]">
               Vælg en eksisterende samtale fra listen, eller start en ny for at begynde at chatte
             </p>
-            <Button 
-              onClick={() => setShowNewDialog(true)} 
-              variant="outline" 
-              className="mt-6 gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Start ny samtale
-            </Button>
+            <Pille variant="sekundaer" onClick={() => setShowNewDialog(true)} ikon={<Plus />} className="mt-6">Start ny samtale</Pille>
           </div>
         )}
       </div>

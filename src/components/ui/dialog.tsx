@@ -51,8 +51,8 @@ const DialogContent = React.forwardRef<
           <DialogPrimitive.Close asChild>
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-border backdrop-blur-sm active:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
-            >
+              className="absolute right-3 top-3 z-[100] flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground transition-colors hover:bg-foreground/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--cph-onyx))] disabled:pointer-events-none [&>svg]:h-5 [&>svg]:w-5"
+             aria-label="Luk">
               <X className="h-5 w-5" />
               <span className="sr-only">Luk</span>
             </button>

@@ -32,7 +32,7 @@ export function UkendtUdfald({ emp, conversationId, messageId, onAfklaret }: {
         {laas.bekraeftet ? "Handlingen er gennemført, men visningen kunne ikke opdateres" : "Afstemmer … udfaldet kunne ikke bekræftes"}
         {ulaest && !laas.tjekker ? " – stadig ikke afklaret" : ""}
       </p>
-      <Button size="sm" variant="outline" className="min-h-11" disabled={laas.tjekker} onClick={() => void tjek()}>
+      <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-foreground" disabled={laas.tjekker} onClick={() => void tjek()}>
         {laas.tjekker ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tjek igen"}
       </Button>
     </div>
@@ -61,7 +61,7 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
 
   if (message.status === "tjekkes") {
     return (
-      <p className="mt-1 flex items-center gap-1 text-[14px] text-muted-foreground" aria-live="polite">
+      <p className="mt-1 flex items-center gap-1 text-[13px] text-muted-foreground" aria-live="polite">
         <Check className="h-3.5 w-3.5" aria-hidden="true" /> Tjekkes …
       </p>
     );
@@ -90,14 +90,14 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
   };
 
   return (
-    <div className="mt-2 w-full min-w-0 rounded-lg border border-border bg-card p-3 text-card-foreground" role="status">
-      <p className="text-[14px] font-medium">Din besked afventer dig</p>
+    <div className="mt-2 w-full min-w-0 rounded-2xl bg-[hsl(var(--cph-light-blue))] p-3 text-foreground" role="status">
+      <p className="text-[14px] font-extrabold">Din besked afventer dig</p>
       {begr.isLoading || (!kode && !begr.isError && begr.isFetching) ? (
         <p className="mt-1 text-[14px] text-muted-foreground">Henter begrundelse …</p>
       ) : begr.isError || !kode ? (
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <p className="text-[14px] text-muted-foreground">Henter begrundelse …</p>
-          <Button size="sm" variant="outline" className="min-h-11" onClick={() => void begr.refetch()}>Prøv igen</Button>
+          <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-foreground" onClick={() => void begr.refetch()}>Prøv igen</Button>
         </div>
       ) : (
         <p className="mt-1 text-[14px]">{BEGRUNDELSE_TEKST[kode]}</p>
@@ -105,18 +105,18 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
       {currentEmployeeId && <UkendtUdfald emp={currentEmployeeId} conversationId={conversationId} messageId={message.id} />}
       <div className="mt-2 grid grid-cols-2 gap-2">
         {kanSende && (
-          <Button size="sm" className="min-h-11" disabled={optaget}
+          <Button size="sm" className="min-h-11 rounded-full bg-[hsl(var(--cph-onyx))] text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))]" disabled={optaget}
             onClick={() => afgoerKlik("send", "Kunne ikke sende beskeden")}>
             {laas.art === "send" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send alligevel"}
           </Button>
         )}
-        <Button size="sm" variant="outline" className="min-h-11" disabled={optaget} onClick={onRet}>Ret</Button>
+        <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-[14px] font-extrabold text-foreground" disabled={optaget} onClick={onRet}>Ret</Button>
         {message.attachment_path && (
-          <Button size="sm" variant="outline" className="min-h-11" disabled={optaget} onClick={fjernKlik}>
+          <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-[14px] font-extrabold text-foreground" disabled={optaget} onClick={fjernKlik}>
             {laas.art === "fjern" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fjern fil"}
           </Button>
         )}
-        <Button size="sm" variant="outline" className="min-h-11 text-destructive" disabled={optaget}
+        <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-[14px] font-extrabold text-destructive" disabled={optaget}
           onClick={() => afgoerKlik("traek", "Kunne ikke trække beskeden tilbage")}>
           {laas.art === "traek" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Træk tilbage"}
         </Button>

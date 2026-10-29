@@ -1,6 +1,7 @@
 import { createContext, MouseEvent, ReactNode, useCallback, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BottomSheetProps {
@@ -86,9 +87,15 @@ export function BottomSheet({ open, onOpenChange, title, description, children, 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className={cn("max-h-[85dvh] pb-[env(safe-area-inset-bottom,0px)]", className)}>
-        <DrawerHeader className="text-left">
+        {/* Ét luk-udtryk på tværs af Stork (Mathias 30/10): rund 44 px-knap øverst til højre, aria »Luk«. */}
+        <DrawerHeader className="relative pr-16 text-left">
           <DrawerTitle>{title}</DrawerTitle>
           {description ? <DrawerDescription>{description}</DrawerDescription> : <DrawerDescription className="sr-only">{title}</DrawerDescription>}
+          <DrawerClose asChild>
+            <button type="button" aria-label="Luk" className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground transition-colors hover:bg-foreground/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))]">
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </DrawerClose>
         </DrawerHeader>
         <SheetNavigateContext.Provider value={sheetNavigate}>
           {/* data-vaul-no-drag: indholdet ruller; arket trækkes kun i håndtag/hoved (hold på en flise flyttede ellers arket, Mathias 29/10). */}

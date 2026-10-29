@@ -415,7 +415,7 @@ function ReasonDialog({ art, onClose, onPick }: { art: keyof typeof ART_TITEL | 
         <p className="text-[14px] text-muted-foreground">{art?.startsWith("anmeld") ? "Hvad er problemet? Moderatorerne får besked." : "Forfatteren får en privat besked med begrundelsen."}</p>
         <div className="mt-2 flex flex-col gap-2">
           {ANMELD_KODER.map((k) => (
-            <button key={k.kode} type="button" onClick={() => onPick(k.kode)} className="min-h-[44px] rounded-2xl bg-[hsl(var(--cph-light-blue))] px-4 text-left text-[15px] font-semibold text-foreground hover:bg-muted">
+            <button key={k.kode} type="button" onClick={() => onPick(k.kode)} className="min-h-[44px] rounded-2xl bg-card px-4 text-left text-[15px] font-extrabold text-foreground hover:bg-muted active:bg-muted">
               {k.tekst}
             </button>
           ))}

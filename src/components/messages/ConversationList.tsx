@@ -22,8 +22,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { da } from "date-fns/locale";
+import { samtaleNavn, initialer, kortTid } from "./samtaleTekst";
+import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
 import { Users, MoreVertical, Trash2, LogOut, Loader2 } from "lucide-react";
 import { OnlineIndicator } from "./OnlineIndicator";
 import { toast } from "sonner";
@@ -39,6 +39,7 @@ let savedScrollTop = 0;
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
   const { data: conversations, isLoading } = useConversations();
   const onlineUsers = useOnlineStatus();
+  const migId = useCurrentEmployeeId().data ?? null;
   const rootRef = useRef<HTMLDivElement>(null);
   const viewport = () => rootRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]") ?? null;
 
@@ -64,17 +65,17 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
 
   if (!conversations?.length) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-6">
-        <Users className="h-12 w-12 mb-4 opacity-50" />
-        <p className="text-center">Ingen samtaler endnu</p>
-        <p className="text-sm text-center mt-1">Start en ny samtale for at komme i gang</p>
+      <div className="flex h-full flex-col items-center justify-center p-6 text-muted-foreground">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--cph-emerald)/0.14)] text-[hsl(var(--cph-emerald))]"><Users className="h-8 w-8" aria-hidden="true" /></div>
+        <p className="text-center text-[15px] font-extrabold text-foreground">Ingen samtaler endnu</p>
+        <p className="mt-1 text-center text-[14px]">Start en ny samtale for at komme i gang</p>
       </div>
     );
   }
 
   return (
     <ScrollArea className="h-full w-full [&_[data-radix-scroll-area-viewport]>div]:!block" ref={rootRef}>
-      <div className="p-2 space-y-1 max-md:space-y-2">
+      <div className="space-y-1 p-2 max-md:space-y-2 max-md:p-0">
         {conversations.map((conversation) => (
           <ConversationItem
             key={conversation.id}
@@ -87,6 +88,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
               }
             }}
             onlineUsers={onlineUsers}
+            migId={migId}
           />
         ))}
       </div>
@@ -100,22 +102,18 @@ interface ConversationItemProps {
   onClick: () => void;
   onDelete: () => void;
   onlineUsers: Set<string>;
+  migId?: string | null;
 }
 
-function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineUsers }: ConversationItemProps) {
+function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineUsers, migId }: ConversationItemProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const deleteConversation = useDeleteConversation();
 
-  const displayName = conversation.is_group
-    ? conversation.name || "Gruppe"
-    : conversation.members
-        ?.filter((m) => m.employee)
-        ?.map((m) => m.employee?.full_name)
-        .join(", ") || "Samtale";
+  const displayName = samtaleNavn(conversation, migId);
 
   // For direct messages, check if the other person is online
-  const otherMember = !conversation.is_group 
-    ? conversation.members?.find(m => m.employee)
+  const otherMember = !conversation.is_group
+    ? conversation.members?.find((m) => m.employee && m.employee_id !== migId) ?? conversation.members?.find((m) => m.employee)
     : null;
   const isOtherOnline = otherMember ? onlineUsers.has(otherMember.employee_id) : false;
 
@@ -148,69 +146,50 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
         aria-label={`${displayName}${unreadCount > 0 ? `, ${unreadCount} ulæste` : ""}`}
         className={cn(
-          "group relative flex w-full min-w-0 max-w-full overflow-hidden min-h-[64px] items-center gap-3 p-3 md:min-h-0 md:p-3 rounded-xl max-md:border max-md:border-border max-md:bg-card cursor-pointer transition-all duration-200 active:scale-[0.98] touch-manipulation",
-          isSelected 
-            ? "bg-primary text-primary-foreground shadow-md" 
-            : "hover:bg-accent/60 active:bg-accent/80"
+          // D2a: række som i Storkbook – hvid flise på telefon, lys blå flade når valgt (pc), 64 px, ingen skalering ved tryk
+          "group relative flex w-full min-w-0 max-w-full overflow-hidden min-h-[64px] items-center gap-3 rounded-2xl px-3 py-2.5 cursor-pointer transition-colors select-none touch-manipulation [-webkit-touch-callout:none] max-md:bg-card",
+          isSelected
+            ? "bg-[hsl(var(--cph-light-blue))] text-foreground"
+            : "hover:bg-[hsl(var(--cph-light-blue)/0.6)] active:bg-[hsl(var(--cph-light-blue))]"
         )}
         onClick={onClick}
       >
-        {/* Online indicator for direct messages */}
-        <div className="flex-shrink-0">
-          {conversation.is_group ? (
-            <div className={cn(
-              "h-8 w-8 rounded-full flex items-center justify-center",
-              isSelected ? "bg-primary-foreground/20" : "bg-primary/10"
-            )}>
-              <Users className={cn("h-4 w-4", isSelected ? "text-primary-foreground" : "text-primary")} />
-            </div>
-          ) : (
-            <OnlineIndicator 
-              isOnline={isOtherOnline} 
-              className="h-3 w-3"
-            />
+        {/* Avatar: initialer (1:1) eller gruppeikon; online-prik i hjørnet */}
+        <div className="relative flex-shrink-0">
+          <div className={cn("flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-extrabold",
+            conversation.is_group ? "bg-[hsl(var(--cph-emerald)/0.14)] text-[hsl(var(--cph-emerald))]" : isSelected ? "bg-card text-foreground" : "bg-[hsl(var(--cph-light-blue))] text-foreground")}>
+            {conversation.is_group ? <Users className="h-5 w-5" aria-hidden="true" /> : initialer(displayName)}
+          </div>
+          {!conversation.is_group && (
+            <OnlineIndicator isOnline={isOtherOnline} className="absolute -bottom-0.5 -right-0.5 h-3 w-3 ring-2 ring-card" />
           )}
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className={cn(
-              "font-medium truncate max-md:text-[16px]",
-              unreadCount > 0 && !isSelected && "font-bold"
-            )}>
+            <span className={cn("truncate text-[15px] leading-tight text-foreground", unreadCount > 0 && !isSelected ? "font-extrabold" : "font-semibold")}>
               {displayName}
             </span>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {unreadCount > 0 && !isSelected && (
-                <Badge 
-                  variant="default" 
-                  className="h-5 min-w-5 flex items-center justify-center text-xs max-md:text-[14px] max-md:h-6 px-1.5 animate-in zoom-in-50"
-                >
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Badge>
-              )}
-            </div>
+            <span className={cn("shrink-0 text-[12px] tabular-nums", unreadCount > 0 && !isSelected ? "font-extrabold text-foreground" : "text-muted-foreground")}>
+              {kortTid(conversation.updated_at)}
+            </span>
           </div>
-          
-          <div className={cn(
-            "flex items-center gap-2 text-sm mt-0.5 max-md:text-[14px]",
-            isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
-          )}>
+
+          <div className="mt-0.5 flex items-center gap-2 text-[13px] text-muted-foreground">
             <span className="truncate">
-              {formatDistanceToNow(new Date(conversation.updated_at), {
-                addSuffix: true,
-                locale: da,
-              })}
+              {conversation.is_group ? `${conversation.members?.length ?? 0} deltagere` : isOtherOnline ? "Online" : "Direkte samtale"}
             </span>
             {conversation.is_group && onlineMemberCount > 0 && (
-              <span className={cn(
-                "flex items-center gap-1 shrink-0",
-                isSelected ? "text-primary-foreground/70" : "text-green-600"
-              )}>
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                {onlineMemberCount}
+              <span className="flex shrink-0 items-center gap-1 text-[hsl(var(--cph-emerald))]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--cph-emerald))]" />
+                {onlineMemberCount} online
               </span>
+            )}
+            {unreadCount > 0 && !isSelected && (
+              <Badge variant="default" className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full border-0 bg-[hsl(var(--cph-emerald))] px-1.5 text-[12px] font-extrabold text-[hsl(var(--cph-onyx))] animate-in zoom-in-50">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Badge>
             )}
           </div>
         </div>
@@ -222,10 +201,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
             <Button
               variant="ghost"
               size="icon"
-              className={cn(
-                "h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 max-md:h-11 max-md:w-11 max-md:opacity-100",
-                isSelected ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent"
-              )}
+              className="h-11 w-11 flex-shrink-0 rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-card group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
               onClick={(e) => e.stopPropagation()}
               aria-label="Flere handlinger"
             >

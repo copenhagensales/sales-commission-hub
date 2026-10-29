@@ -64,7 +64,7 @@ export function BeskederInfoSheet({ open, onOpenChange, status, returFokus, rese
             </AccordionItem>
           ))}
         </Accordion>
-        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} className="mt-5 min-h-[44px] w-full rounded-full text-[14px] font-extrabold">Luk</Button>
+        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} className="mt-5 min-h-[44px] w-full rounded-full bg-card text-[14px] font-extrabold text-foreground hover:bg-muted">Luk</Button>
         <p className="mt-3 text-xs text-muted-foreground">Version {BESKEDER_INFO_VERSION}</p>
       </SheetContent>
     </Sheet>

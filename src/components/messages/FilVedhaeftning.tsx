@@ -95,7 +95,7 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, c
     }
   };
 
-  const flise = cn("flex min-h-11 w-full min-w-0 items-center gap-2 rounded p-2 text-left", isOwn ? "bg-primary-foreground/10" : "bg-background");
+  const flise = cn("flex min-h-11 w-full min-w-0 items-center gap-2 rounded-2xl p-2 text-left", isOwn ? "bg-[hsl(var(--cph-light-blue)/0.12)]" : "bg-card");
 
   if (fejl) {
     const permanent = erPermanentFilFejl(fejl);
@@ -105,7 +105,7 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, c
         <FileIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="text-[14px]">{filFejlTekst(fejl)}</span>
         {!permanent && (
-          <Button size="sm" variant="outline" className="min-h-11 text-foreground" onClick={() => void hent()}>
+          <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-foreground" onClick={() => void hent()}>
             {ventSek ? `Prøv igen (${ventSek} s)` : "Prøv igen"}
           </Button>
         )}
@@ -114,7 +114,7 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, c
   }
   if (url) {
     return (
-      <div className="w-full max-w-full overflow-hidden rounded">
+      <div className="w-full max-w-full overflow-hidden rounded-2xl">
         <img src={url} alt={navn || "Billede"} className="block h-auto max-h-60 w-full max-w-full object-contain" />
       </div>
     );
@@ -122,8 +122,8 @@ export function FilVedhaeftning({ messageId, sti, navn, type, isOwn, brugerId, c
   if (tekst !== null) {
     return (
       <div className="w-full min-w-0 space-y-1">
-        <pre className={cn("max-h-60 overflow-auto whitespace-pre-wrap break-words rounded p-2 text-[14px]", isOwn ? "bg-primary-foreground/10" : "bg-background text-foreground")}>{tekst}</pre>
-        <Button size="sm" variant="ghost" className="min-h-11" onClick={ryd}>Luk</Button>
+        <pre className={cn("max-h-60 overflow-auto whitespace-pre-wrap break-words rounded-2xl p-2 text-[14px]", isOwn ? "bg-[hsl(var(--cph-light-blue)/0.12)]" : "bg-card text-foreground")}>{tekst}</pre>
+        <Button size="sm" variant="ghost" className="min-h-11 rounded-full" onClick={ryd}>Luk</Button>
       </div>
     );
   }

@@ -247,16 +247,17 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // B2bc-5c-1 §1: samme fristgrundlag som tråden – kendt udløbet svaroriginal genopstår ikke ved urhop.
   const svarVaek = !!message.reply_to && (svarUtilgaengeligt(message.reply_to, fristNu)
     || erKendtUdloebet(currentEmployeeId, conversationId, message.reply_to.id, message.reply_to.slettes_efter, fristNu));
-  const btn = "h-7 w-7 md:h-6 md:w-6 max-md:h-11 max-md:w-11";
-  const ico = "h-3.5 w-3.5 md:h-3 md:w-3 max-md:h-4 max-md:w-4";
+  // D2a: handlingsknapper er runde og aldrig under 36 px på pc / 44 px på telefon
+  const btn = "h-9 w-9 rounded-full max-md:h-11 max-md:w-11";
+  const ico = "h-4 w-4";
 
   return (
     <div className={cn("flex group", isOwn ? "justify-end" : "justify-start")}>
       <div className={cn("flex min-w-0 flex-col max-w-[85%] md:max-w-[70%]", isOwn ? "items-end" : "items-start")}>
         {message.reply_to && !trukket && !udloebet && (
           <div className={cn(
-            "text-xs max-md:text-[14px] px-2 md:px-3 py-1 rounded-t-lg border-l-2 mb-1 max-w-full min-w-0",
-            isOwn ? "bg-primary/10 border-primary ml-auto" : "bg-muted border-muted-foreground"
+            "mb-1 min-w-0 max-w-full rounded-2xl border-l-4 px-3 py-1.5 text-[13px]",
+            isOwn ? "ml-auto border-[hsl(var(--cph-emerald))] bg-[hsl(var(--cph-light-blue))]" : "border-muted-foreground/40 bg-[hsl(var(--cph-light-blue))]"
           )}>
             <span className="font-medium">{message.reply_to.sender?.full_name}</span>
             <p className="truncate text-muted-foreground">{svarVaek ? "Beskeden er ikke længere tilgængelig" : svarUgyldig ? "Svaret kan ikke vises lige nu" : message.reply_to.content}</p>
@@ -264,11 +265,12 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
         )}
 
         <div className={cn(
-          "rounded-lg px-3 md:px-4 py-2 relative max-w-full min-w-0",
-          trukket ? "bg-muted text-muted-foreground" : isOwn ? (leveret ? "bg-primary text-primary-foreground" : "bg-primary/60 text-primary-foreground") : "bg-muted"
+          // D2a: egen = onyx med lys blå tekst (hale nederst til højre), andres = lys blå flade (hale nederst til venstre); ikke leveret = dæmpet
+          "relative min-w-0 max-w-full rounded-2xl px-3.5 py-2 text-[15px] leading-[1.4]",
+          trukket ? "bg-[hsl(var(--cph-light-blue))] text-muted-foreground" : isOwn ? (leveret ? "rounded-br-md bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "rounded-br-md bg-[hsl(var(--cph-onyx)/0.7)] text-[hsl(var(--cph-light-blue))]") : "rounded-bl-md bg-[hsl(var(--cph-light-blue))] text-foreground"
         )}>
           {!isOwn && message.sender && (
-            <div className="text-xs max-md:text-[14px] font-medium mb-1 opacity-70">{message.sender.full_name}</div>
+            <div className="mb-0.5 text-[12px] font-extrabold text-muted-foreground">{message.sender.full_name}</div>
           )}
 
           {trukket ? (
@@ -280,7 +282,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               <Textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="min-h-[60px] bg-background text-foreground text-[16px]"
+                className="min-h-[60px] rounded-2xl border-0 bg-card text-[16px] text-foreground"
                 maxLength={4000}
                 disabled={laas.art === "gem"}
                 autoFocus
@@ -295,17 +297,17 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               {!kanGemme && <p className="text-[14px]" role="status">Beskeden kan ikke rettes lige nu</p>}
               <div className="flex flex-wrap gap-1">
                 {kanGemme && (
-                  <Button size="sm" className="max-md:min-h-11 max-md:min-w-11" onClick={handleSaveEdit} disabled={laas.art === "gem"} aria-label="Gem ændring">
-                    <Check className="h-3 w-3" />
+                  <Button size="sm" className="min-h-11 min-w-11 rounded-full bg-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-onyx))] hover:bg-[hsl(var(--cph-emerald)/0.85)]" onClick={handleSaveEdit} disabled={laas.art === "gem"} aria-label="Gem ændring">
+                    <Check className="h-4 w-4" />
                   </Button>
                 )}
                 {kanGemme && nyereServer && (
-                  <Button size="sm" variant="outline" className="max-md:min-h-11 text-foreground" onClick={brugNyeste} disabled={laas.art === "gem"}>
+                  <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card text-foreground" onClick={brugNyeste} disabled={laas.art === "gem"}>
                     Brug nyeste tekst
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="max-md:min-h-11 max-md:min-w-11" onClick={() => afslutRet()} disabled={laas.art === "gem"} aria-label="Annullér">
-                  <X className="h-3 w-3" />
+                <Button size="sm" variant="ghost" className="min-h-11 min-w-11 rounded-full" onClick={() => afslutRet()} disabled={laas.art === "gem"} aria-label="Annullér">
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -321,11 +323,11 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
                 <div className="mb-2">
                   {isImage ? (
                     <a href={message.attachment_url} target="_blank" rel="noopener noreferrer">
-                      <img src={message.attachment_url} alt={message.attachment_name || "Billede"} className="max-w-full rounded max-h-60 object-cover" />
+                      <img src={message.attachment_url} alt={message.attachment_name || "Billede"} className="max-h-60 max-w-full rounded-2xl object-cover" />
                     </a>
                   ) : (
                     <a href={message.attachment_url} target="_blank" rel="noopener noreferrer"
-                      className={cn("flex items-center gap-2 p-2 rounded min-h-11", isOwn ? "bg-primary-foreground/10" : "bg-background")}>
+                      className={cn("flex min-h-11 items-center gap-2 rounded-2xl p-2", isOwn ? "bg-[hsl(var(--cph-light-blue)/0.12)]" : "bg-card")}>
                       <FileIcon className="h-4 w-4" />
                       <span className="text-sm underline">{message.attachment_name || "Fil"}</span>
                     </a>
@@ -339,7 +341,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
                 <div className="whitespace-pre-wrap break-words">{renderMentions(message.content)}</div>
               )}
 
-              <div className={cn("text-xs max-md:text-[14px] mt-1 flex flex-wrap items-center gap-1", isOwn ? "text-primary-foreground/70" : "text-muted-foreground")}>
+              <div className={cn("mt-1 flex flex-wrap items-center gap-1 text-[12px] tabular-nums max-md:text-[13px]", isOwn ? "justify-end text-[hsl(var(--cph-light-blue)/0.72)]" : "text-muted-foreground")}>
                 {format(new Date(message.created_at), "HH:mm", { locale: da })}
                 {message.edited_at && <span>(redigeret)</span>}
                 {message.slettes_efter && <span>· {slettesTekst(message.slettes_efter, nu)}</span>}
@@ -356,7 +358,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               "max-md:mt-1 max-md:flex",
               isOwn ? "md:left-0 md:-translate-x-full md:pr-1 max-md:justify-end" : "md:right-0 md:translate-x-full md:pl-1"
             )}>
-              <div className="flex items-center gap-0.5 md:gap-1 max-md:gap-2 bg-background/80 backdrop-blur-sm rounded-lg p-0.5 shadow-sm border text-foreground">
+              <div className="flex items-center gap-0.5 rounded-full bg-card/90 p-0.5 text-foreground shadow-sm backdrop-blur-sm md:gap-1 max-md:gap-1">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className={btn} aria-label="Reagér"><SmilePlus className={ico} /></Button>
@@ -365,7 +367,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
                     <div className="flex gap-1 flex-wrap max-w-[200px]">
                       {EMOJI_OPTIONS.map((emoji) => (
                         <button key={emoji} onClick={() => handleReaction(emoji)}
-                          className="text-xl md:text-lg hover:scale-125 active:scale-110 transition-transform p-1.5 md:p-1 max-md:min-h-11 max-md:min-w-11">
+                          className="min-h-11 min-w-11 rounded-full p-1.5 text-xl transition-colors hover:bg-[hsl(var(--cph-light-blue))] md:text-lg">
                           {emoji}
                         </button>
                       ))}
@@ -412,8 +414,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
           <div className={cn("flex flex-wrap gap-1 mt-1", isOwn ? "justify-end" : "justify-start")}>
             {Object.entries(groupedReactions).map(([emoji, data]) => (
               <button key={emoji} onClick={() => handleReaction(emoji)}
-                className={cn("text-xs max-md:text-[14px] px-1.5 py-0.5 rounded-full flex items-center gap-1 border max-md:min-h-11 max-md:px-3",
-                  data.hasOwn ? "bg-primary/20 border-primary" : "bg-muted border-transparent")}
+                className={cn("flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold max-md:min-h-11 max-md:px-3 max-md:text-[13px]",
+                  data.hasOwn ? "bg-[hsl(var(--cph-emerald)/0.18)] text-foreground ring-1 ring-[hsl(var(--cph-emerald))]" : "bg-card text-foreground ring-1 ring-border")}
                 title={data.users.join(", ")}>
                 <span>{emoji}</span>
                 <span>{data.count}</span>

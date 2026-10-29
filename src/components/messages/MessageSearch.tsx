@@ -96,27 +96,27 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
   });
 
   return (
-    <div className="border-b p-4 bg-muted/30">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="border-b border-border px-2 py-2 md:px-4">
+      <div className="mb-2 flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             value={query}
             onChange={(e) => { setQuery(e.target.value); if (!e.target.value.trim()) ryd(); }}
             onKeyDown={handleKeyDown}
             placeholder="Søg i beskeder..."
-            className="pl-9"
+            className="min-h-[44px] rounded-2xl border-0 bg-[hsl(var(--cph-light-blue))] pl-12 text-[16px] focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))] focus-visible:ring-offset-0"
           />
         </div>
-        <Button onClick={handleSearch} disabled={aktuel.art === "henter"}>
+        <Button onClick={handleSearch} disabled={aktuel.art === "henter"} className="min-h-11 rounded-full bg-[hsl(var(--cph-onyx))] px-4 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))]">
           {aktuel.art === "henter" ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             "Søg"
           )}
         </Button>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-11 w-11 rounded-full" aria-label="Luk søgning">
+          <X className="h-5 w-5" />
         </Button>
       </div>
 
@@ -127,7 +127,7 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
               <button
                 key={msg.id}
                 onClick={() => onSelectMessage(msg)}
-                className="w-full text-left p-2 rounded hover:bg-muted transition-colors"
+                className="w-full rounded-2xl px-3 py-2 text-left transition-colors hover:bg-[hsl(var(--cph-light-blue))]"
               >
                 <div className="flex items-center justify-between text-xs max-md:text-[14px] text-muted-foreground mb-1">
                   <span className="font-medium">{msg.sender?.full_name}</span>
@@ -154,7 +154,7 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
       {aktuel.art === "fejl" && (
         <div className="flex flex-wrap items-center justify-center gap-2 py-2" role="alert">
           <p className="text-[14px] text-destructive">Søgningen kunne ikke gennemføres</p>
-          <Button size="sm" variant="outline" className="min-h-11" onClick={() => koer(aktuel.q)}>Prøv igen</Button>
+          <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-[hsl(var(--cph-light-blue))] text-foreground" onClick={() => koer(aktuel.q)}>Prøv igen</Button>
         </div>
       )}
     </div>

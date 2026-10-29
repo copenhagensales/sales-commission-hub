@@ -143,45 +143,46 @@ export function NewConversationDialog({
         <div className="space-y-4">
           {isGroup && (
             <div>
-              <Label htmlFor="groupName">Gruppenavn</Label>
+              <Label htmlFor="groupName" className="mb-1.5 block text-[13px] font-extrabold">Gruppenavn</Label>
               <Input
                 id="groupName"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Angiv gruppenavn..."
                 maxLength={80}
+                className="min-h-[44px] rounded-2xl border-0 bg-card px-4 text-[16px] focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))] focus-visible:ring-offset-0"
               />
             </div>
           )}
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "employees" | "teams")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="employees" className="flex items-center gap-2">
+            <TabsList className="grid h-auto w-full grid-cols-2 rounded-full bg-card p-1">
+              <TabsTrigger value="employees" className="flex min-h-[40px] items-center gap-2 rounded-full text-[14px] font-extrabold data-[state=active]:bg-[hsl(var(--cph-onyx))] data-[state=active]:text-[hsl(var(--cph-light-blue))]">
                 <User className="h-4 w-4" />
                 Medarbejdere
               </TabsTrigger>
-              <TabsTrigger value="teams" className="flex items-center gap-2">
+              <TabsTrigger value="teams" className="flex min-h-[40px] items-center gap-2 rounded-full text-[14px] font-extrabold data-[state=active]:bg-[hsl(var(--cph-onyx))] data-[state=active]:text-[hsl(var(--cph-light-blue))]">
                 <Users className="h-4 w-4" />
                 Teams
               </TabsTrigger>
             </TabsList>
 
             <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={activeTab === "employees" ? "Søg efter medarbejdere..." : "Søg efter teams..."}
-                className="pl-9 max-md:min-h-11"
+                className="min-h-[44px] rounded-2xl border-0 bg-card pl-12 text-[16px] focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))] focus-visible:ring-offset-0"
               />
             </div>
 
             <TabsContent value="employees" className="mt-2">
-              <ScrollArea className="h-[300px] max-md:h-[40dvh] border rounded-md">
+              <ScrollArea className="h-[300px] rounded-2xl bg-card max-md:h-[40dvh]">
                 {employeesError ? (
                   <div className="flex flex-col items-center justify-center gap-2 h-full p-4 text-center">
                     <p className="text-sm text-muted-foreground">Kunne ikke hente kolleger</p>
-                    <Button size="sm" variant="outline" className="min-h-11" onClick={() => void refetchEmployees()}>Prøv igen</Button>
+                    <Button size="sm" variant="outline" className="min-h-11 rounded-full border-0 bg-card" onClick={() => void refetchEmployees()}>Prøv igen</Button>
                   </div>
                 ) : employeesLoading ? (
                   <div className="flex items-center justify-center h-full">
@@ -192,7 +193,7 @@ export function NewConversationDialog({
                     {filteredEmployees?.map((employee) => (
                       <label
                         key={employee.id}
-                        className="flex items-center gap-3 p-2 rounded-md hover:bg-accent cursor-pointer max-md:min-h-11 max-md:text-[16px] active:bg-accent"
+                        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 text-[15px] font-semibold hover:bg-[hsl(var(--cph-light-blue))] active:bg-[hsl(var(--cph-light-blue))]"
                       >
                         <Checkbox
                           checked={selectedIds.includes(employee.id)}
@@ -212,7 +213,7 @@ export function NewConversationDialog({
             </TabsContent>
 
             <TabsContent value="teams" className="mt-2">
-              <ScrollArea className="h-[300px] max-md:h-[40dvh] border rounded-md">
+              <ScrollArea className="h-[300px] rounded-2xl bg-card max-md:h-[40dvh]">
                 {teamsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="h-6 w-6 animate-spin" />
@@ -223,10 +224,10 @@ export function NewConversationDialog({
                       <button
                         key={team.id}
                         onClick={() => selectTeam(team.id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors ${
-                          selectedTeamId === team.id 
-                            ? "bg-primary text-primary-foreground" 
-                            : "hover:bg-accent"
+                        className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-[15px] font-semibold transition-colors ${
+                          selectedTeamId === team.id
+                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                            : "hover:bg-[hsl(var(--cph-light-blue))] active:bg-[hsl(var(--cph-light-blue))]"
                         }`}
                       >
                         <Users className="h-5 w-5" />
@@ -252,7 +253,7 @@ export function NewConversationDialog({
               {selectedTeamId ? `Team valgt (${deltagere.length} medlemmer)` : `${deltagere.length} valgt`}
             </span>
             <Button
-              className="max-md:min-h-11"
+              className="min-h-11 rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))]"
               onClick={handleCreate}
               disabled={(deltagere.length === 0 && !createConversation.kendtId) || createConversation.isPending}
             >
@@ -275,7 +276,7 @@ export function NewConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md rounded-3xl">
         <DialogHeader>
           <DialogTitle>Ny samtale</DialogTitle>
         </DialogHeader>

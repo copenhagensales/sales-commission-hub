@@ -5,7 +5,7 @@ import {
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
+import { Send, Loader2, Paperclip, X, Search, ArrowLeft } from "lucide-react";
 import { useSbDrift } from "@/hooks/useSbDrift";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -260,6 +260,10 @@ if (typeof window !== "undefined") {
 
 interface ChatViewProps {
   conversationId: string;
+  /** Samtalens navn til sidehovedet. */
+  titel?: string;
+  /** Telefon: tilbage-pil i sidehovedet (Messages lukker tråden). */
+  onTilbage?: () => void;
 }
 
 async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string; authId: string } | null> {
@@ -271,7 +275,7 @@ async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string; 
 
 const metaFra = (f: LokalFil): FilMeta => ({ name: f.name, type: f.type, size: f.size, sti: f.sti ?? null, trin: f.trin });
 
-export function ChatView({ conversationId }: ChatViewProps) {
+export function ChatView({ conversationId, titel, onTilbage }: ChatViewProps) {
   const [message, setMessage] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [svarId, setSvarId] = useState<string | null>(null);
@@ -818,27 +822,33 @@ export function ChatView({ conversationId }: ChatViewProps) {
   return (
     <div className="h-full flex flex-col min-w-0">
       {pause && (
-        <div role="status" className="px-2 md:px-4 py-2 border-b bg-muted text-[14px] md:text-sm text-foreground">
+        <div role="status" className="mx-2 mt-2 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-4 py-2.5 text-[14px] text-foreground md:mx-4">
           Beskeder er under vedligeholdelse – du kan læse, men ikke sende. Din kladde bevares.{" "}
           <button type="button" className="-my-3 ml-1 inline-flex min-h-11 items-center px-1 align-middle font-medium underline underline-offset-2" onClick={aabnInfo}>Læs mere</button>
         </div>
       )}
       <BeskederInfoSheet open={infoAaben} onOpenChange={setInfoAaben} status={{ kendt: drift.status === "kendt", pause, filTilladt: drift.filTilladt }} returFokus={infoAabner} reserveFokus={infoIkon} />
-      <div className="border-b p-2 flex justify-end gap-1">
-        <BeskederInfoIkon knapRef={infoIkon} onClick={aabnInfo} />
-        <Button variant="ghost" size="sm" onClick={() => setShowSearch(!showSearch)} className="h-8 px-2 md:px-3 max-md:h-11 max-md:w-11" aria-label="Søg i beskeder">
-          <Search className="h-4 w-4 md:mr-1" />
-          <span className="hidden md:inline">Søg</span>
+      {/* D2a: ét sidehoved: tilbage (telefon) · samtalens navn · info · søg – runde 44 px-knapper */}
+      <div className="sticky top-0 z-10 flex items-center gap-1 border-b border-border bg-card/95 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/80 md:px-3 md:py-2">
+        {onTilbage && (
+          <Button variant="ghost" size="sm" onClick={onTilbage} aria-label="Tilbage" className="h-11 w-11 shrink-0 rounded-full p-0 md:hidden">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        )}
+        <h2 className="min-w-0 flex-1 truncate px-1 text-[16px] font-extrabold text-foreground">{titel ?? "Samtale"}</h2>
+        <BeskederInfoIkon knapRef={infoIkon} onClick={aabnInfo} className="h-11 w-11 rounded-full" />
+        <Button variant="ghost" size="sm" onClick={() => setShowSearch(!showSearch)} className="h-11 w-11 rounded-full p-0" aria-label="Søg i beskeder" aria-pressed={showSearch}>
+          <Search className="h-5 w-5" />
         </Button>
       </div>
 
       {showSearch && <MessageSearch onClose={() => setShowSearch(false)} onSelectMessage={() => setShowSearch(false)} />}
 
       <ScrollArea className="flex-1 p-2 md:p-4">
-        <div className="space-y-3 md:space-y-4">
+        <div className="space-y-2 md:space-y-3">
           {hasOlder && (
             <div className="flex justify-center">
-              <Button variant="ghost" size="sm" className="min-h-11" onClick={loadOlder} disabled={isLoadingOlder}>
+              <Button variant="ghost" size="sm" className="min-h-11 rounded-full px-4 text-[14px] font-extrabold" onClick={loadOlder} disabled={isLoadingOlder}>
                 {isLoadingOlder ? "Henter …" : "Indlæs ældre"}
               </Button>
             </div>
@@ -851,7 +861,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             <div key={p.id} className="flex justify-end" aria-live="polite">
               <div className="max-w-[80%] min-w-0">
                 {p.tilstand === "gemt_vaek" ? (
-                  <div className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-[14px] text-muted-foreground">
+                  <div className="flex items-center gap-2 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-3 py-2 text-[14px] text-muted-foreground">
                     <span className="min-w-0">{GEMT_VAEK_TEKST}</span>
                     <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Luk"
                       onClick={() => meId && fjernAfsendelse(meId, conversationId, p.id)}>
@@ -860,7 +870,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
                   </div>
                 ) : (
                   <>
-                    <div className={cn("rounded-2xl px-3 py-2 text-[15px] break-words", ["afvist", "genudsted", "vaelg_fil"].includes(p.tilstand) ? "bg-destructive/10 text-foreground border border-destructive/40" : "bg-primary/70 text-primary-foreground")}>
+                    <div className={cn("rounded-2xl rounded-br-md px-3.5 py-2 text-[15px] break-words", ["afvist", "genudsted", "vaelg_fil"].includes(p.tilstand) ? "bg-destructive/10 text-foreground ring-1 ring-destructive/40" : "bg-[hsl(var(--cph-onyx)/0.7)] text-[hsl(var(--cph-light-blue))]")}>
                       {p.tekst || p.fil?.name}
                     </div>
                     {p.tilstand === "sender" ? (
@@ -907,7 +917,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
             </div>
           ))}
           {visBeskeder.length === 0 && !afsendelser.some((p) => !messages?.some((m) => m.id === p.id) && !harKendtUdloebet(meId, conversationId, p.id)) && (
-            <div className="text-center text-muted-foreground py-8">Ingen beskeder endnu. Start samtalen!</div>
+            <div className="mx-auto mt-6 max-w-sm rounded-3xl bg-[hsl(var(--cph-light-blue))] px-5 py-6 text-center">
+              <p className="text-[15px] font-extrabold text-foreground">Ingen beskeder endnu. Start samtalen!</p>
+            </div>
           )}
         </div>
         <TypingIndicator users={otherTypingUsers} />
@@ -917,8 +929,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
       </ScrollArea>
 
       {svarRef && (visSvar || svarOpslag.isError || svarSkjult) && (
-        <div className="px-2 md:px-4 py-2 bg-muted/50 border-t flex items-center justify-between gap-2">
-          <div className="text-sm min-w-0 flex-1">
+        <div className="mx-2 mb-1 flex items-center justify-between gap-2 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-3 py-2 md:mx-4">
+          <div className="min-w-0 flex-1 text-[14px]">
             <span className="text-muted-foreground">Svarer på: </span>
             {visSvar ? (
               <>
@@ -929,7 +941,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               <span className="text-muted-foreground">Svaret kan ikke vises lige nu</span>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={() => { setReplyTo(null); setSvarId(null); }} className="flex-shrink-0 h-8 w-8 p-0 max-md:h-11 max-md:w-11" aria-label="Fjern svar">
+          <Button variant="ghost" size="sm" onClick={() => { setReplyTo(null); setSvarId(null); }} className="h-11 w-11 flex-shrink-0 rounded-full p-0" aria-label="Fjern svar">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -938,7 +950,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       {lagerFejl && <p className="px-2 md:px-4 py-1 border-t text-[14px] text-muted-foreground" role="status">{LAGER_FEJL}</p>}
 
       {/* B2-6A §A: på telefon står composeren fast over bundbjælken (BOTTOM_NAV_HEIGHT = 64) og safe area. */}
-      <div ref={composerRef} className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
+      <div ref={composerRef} className="sticky bottom-0 z-10 bg-card p-2 md:p-3 max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
         {/* r2 §2(b): fil og filfejl ligger i den faste composer, så de aldrig skjules bag den på telefon. */}
         {(fil || filFejl) && (
           <div className="-mx-2 md:-mx-4 -mt-2 md:-mt-4 mb-2">
@@ -947,9 +959,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
               onRetry={fil.fejl && fil.file && filAaben ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
           )}
           {filFejl && (
-            <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
+            <div className="flex items-center justify-between gap-2 px-2 py-2 text-[14px] text-destructive md:px-4" role="alert">
               <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk">
+              <Button variant="ghost" size="sm" className="h-11 w-11 shrink-0 rounded-full p-0" onClick={() => setFilFejl(null)} aria-label="Luk">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -958,24 +970,25 @@ export function ChatView({ conversationId }: ChatViewProps) {
         )}
         {!drift.filTilladt && (
           <div className="flex items-center gap-2 pb-1">
-            <p className="text-[14px] md:text-xs text-muted-foreground">Filer kan ikke sendes lige nu</p>
-            <button type="button" className="min-h-11 md:min-h-0 text-[14px] md:text-xs text-muted-foreground underline underline-offset-2" onClick={aabnInfo}>Hvorfor?</button>
+            <p className="text-[13px] text-muted-foreground">Filer kan ikke sendes lige nu</p>
+            <button type="button" className="min-h-11 text-[13px] font-extrabold text-foreground underline underline-offset-2 md:min-h-0" onClick={aabnInfo}>Hvorfor?</button>
           </div>
         )}
         <div className="flex gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
           {drift.filTilladt && (
             <Button variant="ghost" size="icon" onClick={() => vaelgFil(null)} disabled={!!fil?.uploader || pause}
-              className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11" aria-label="Vedhæft fil" title={FIL_GRAENSER_TEKST}>
-              {fil?.uploader ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              className="h-11 w-11 flex-shrink-0 rounded-full bg-[hsl(var(--cph-light-blue))] text-foreground hover:bg-muted" aria-label="Vedhæft fil" title={FIL_GRAENSER_TEKST}>
+              {fil?.uploader ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
             </Button>
           )}
           <div className="flex-1 min-w-0">
-            <MentionInput value={message} onChange={setMessage} onKeyDown={handleKeyDown} placeholder="Skriv en besked..." onTyping={handleTyping} />
+            <MentionInput value={message} onChange={setMessage} onKeyDown={handleKeyDown} placeholder="Skriv en besked …" onTyping={handleTyping}
+              className="min-h-[44px] max-h-40 rounded-[22px] border-0 bg-[hsl(var(--cph-light-blue))] px-4 py-2.5 text-[16px] leading-[1.4] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[hsl(var(--cph-emerald))] focus-visible:ring-offset-0" />
           </div>
           <Button onClick={handleSend} disabled={!kanSende}
-            size="icon" className="h-10 w-10 flex-shrink-0 max-md:h-11 max-md:w-11" aria-label="Send">
-            <Send className="h-4 w-4" />
+            size="icon" className="h-11 w-11 flex-shrink-0 rounded-full bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:bg-[hsl(var(--cph-light-blue))] disabled:text-muted-foreground disabled:opacity-100" aria-label="Send">
+            <Send className="h-5 w-5" />
           </Button>
         </div>
       </div>

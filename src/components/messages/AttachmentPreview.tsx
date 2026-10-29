@@ -40,12 +40,12 @@ interface AttachmentPreviewProps {
 export function AttachmentPreview({ fil, onRemove, onRetry, onGenvalg }: AttachmentPreviewProps) {
   const genvalg = kraeverGenvalg(fil);
   return (
-    <div className="px-2 md:px-4 py-2 border-t bg-muted/30">
+    <div className="px-2 py-2 md:px-4">
       <div className="flex items-center gap-2 min-w-0">
         {fil.previewUrl && kanMiniature(fil) ? (
-          <img src={fil.previewUrl} alt={fil.name} width={64} height={64} className="h-16 w-16 shrink-0 object-cover rounded" />
+          <img src={fil.previewUrl} alt={fil.name} width={64} height={64} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
         ) : (
-          <div className="h-16 w-16 shrink-0 bg-muted rounded flex items-center justify-center">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[hsl(var(--cph-light-blue))]">
             <FileIcon className="h-6 w-6 text-muted-foreground" />
           </div>
         )}
@@ -62,11 +62,11 @@ export function AttachmentPreview({ fil, onRemove, onRetry, onGenvalg }: Attachm
           )}
         </div>
         {genvalg && onGenvalg ? (
-          <Button variant="outline" size="sm" className="min-h-11 shrink-0" onClick={onGenvalg}>Vælg filen igen</Button>
+          <Button variant="outline" size="sm" className="min-h-11 shrink-0 rounded-full border-0 bg-[hsl(var(--cph-light-blue))] text-foreground" onClick={onGenvalg}>Vælg filen igen</Button>
         ) : onRetry && (
-          <Button variant="outline" size="sm" className="min-h-11 shrink-0" onClick={onRetry}>Prøv igen</Button>
+          <Button variant="outline" size="sm" className="min-h-11 shrink-0 rounded-full border-0 bg-[hsl(var(--cph-light-blue))] text-foreground" onClick={onRetry}>Prøv igen</Button>
         )}
-        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={onRemove} aria-label="Fjern fil">
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 rounded-full" onClick={onRemove} aria-label="Fjern fil">
           <X className="h-4 w-4" />
         </Button>
       </div>
