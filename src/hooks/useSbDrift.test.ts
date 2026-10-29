@@ -86,12 +86,16 @@ describe("24d2 §1 useSbDrift", () => {
     const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(kald()).toBe(1));
     // Pausebevis (fx P0001/SB24D2_PAUSE) mens læsningen er i gang; invalidering må ikke afbryde den gamle
-    graense.rpc.mockImplementationOnce(async () => ({ data: null, error: { code: "PGRST202" } }));
     act(() => registrerPause(qc, "u", sessionsGeneration()));
     expect(result.current.beskederPause).toBe(true);
     act(() => slipGammel(raekke(false, true, true)));
     await waitFor(() => expect(qc.isFetching()).toBe(0));
-    expect(result.current.beskederPause).toBe(true); // ældre/fejlet svar ophæver ikke
+    expect(result.current.beskederPause).toBe(true); // ældre svar (startet før beviset) ophæver ikke
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "x" } });
+    act(() => result.current.refetch());
+    await waitFor(() => expect(kald()).toBe(2));
+    await waitFor(() => expect(qc.isFetching()).toBe(0));
+    expect(result.current.beskederPause).toBe(true); // fejlet svar ophæver ikke
     // Remount i samme QueryClient: pausen overlever
     const r2 = renderHook(() => useSbDrift(false, "u"), { wrapper: wrap });
     expect(r2.result.current.beskederPause).toBe(true);
@@ -99,7 +103,6 @@ describe("24d2 §1 useSbDrift", () => {
     const foer = kald();
     act(() => result.current.refetch());
     await waitFor(() => expect(kald()).toBe(foer + 1));
-    console.log("K", foer, qc.isFetching());
     await waitFor(() => expect(result.current.beskederPause).toBe(false));
   });
 
