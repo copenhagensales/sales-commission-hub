@@ -125,8 +125,14 @@ describe("T11 §11 signaler, deduplikering og levetid", () => {
     await act(async () => { vi.advanceTimersByTime(1000); });
     expect(toast).not.toHaveBeenCalled();
     expect(inval).not.toHaveBeenCalled();
-    // Gammel kanal-callback under ny session gør intet.
+    // Gammel kanal er fjernet, gammel callback gør intet; en ny kanal er bundet til den nye session.
+    expect(a.fjernet).toBe(true);
     await act(async () => { send(a, signal({ id: 11 })); });
     expect(g.opslag).toHaveBeenCalledTimes(1);
+    g.opslag.mockResolvedValue({ data: { conversation_id: "c1" }, error: null });
+    const [ny] = aktive();
+    expect(ny).not.toBe(a);
+    await act(async () => { send(ny, signal({ id: 11 })); });
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 });

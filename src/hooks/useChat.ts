@@ -1231,11 +1231,13 @@ function kunAktivitet(old: Record<string, unknown> | null | undefined, ny: Recor
 export function useChatUnreadTotal(employeeId: string | null | undefined, enabled = true) {
   const queryClient = useQueryClient();
   const on = enabled && !!employeeId;
+  // B2d-1 §11: ny session (logud/brugerskift) genopretter abonnementet bundet til den nye generation.
+  const sessionGen = useSyncExternalStore(abonnerAfsendelser, sessionsGeneration);
 
   useEffect(() => {
     if (!on || !employeeId) return;
-    // B2d-1 §11: callbacks bindes til abonnementets session; gamle callbacks virker ikke under en anden bruger.
-    const gen = sessionsGeneration();
+    // Callbacks bindes til abonnementets session; gamle callbacks virker ikke under en anden bruger.
+    const gen = sessionGen;
     const invalidate = () => {
       if (gen !== sessionsGeneration()) return;
       planlaeg(queryClient, CHAT_UNREAD_KEY);
@@ -1260,7 +1262,7 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
     };
     document.addEventListener("visibilitychange", forgrund);
     return () => { document.removeEventListener("visibilitychange", forgrund); supabase.removeChannel(channel); };
-  }, [on, employeeId, queryClient]);
+  }, [on, employeeId, queryClient, sessionGen]);
 
   return useQuery({
     queryKey: [...CHAT_UNREAD_KEY, employeeId],
