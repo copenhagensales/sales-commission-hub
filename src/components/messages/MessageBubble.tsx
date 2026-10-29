@@ -304,7 +304,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               {message.attachment_path ? (
                 <div className="mb-2">
                   <FilVedhaeftning messageId={message.id} sti={message.attachment_path} navn={message.attachment_name ?? null}
-                    type={message.attachment_type ?? null} isOwn={isOwn} brugerId={currentEmployeeId} />
+                    type={message.attachment_type ?? null} isOwn={isOwn} brugerId={currentEmployeeId} conversationId={conversationId} />
                 </div>
               ) : message.attachment_url ? (
                 // Kompatibilitetsundtagelse: historiske URL-rækker vises som hidtil indtil 24d2-konverteringen.
