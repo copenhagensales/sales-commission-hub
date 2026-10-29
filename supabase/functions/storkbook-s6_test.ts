@@ -860,7 +860,7 @@ test("§3 oprydning: timeout med ukendt commit → ingen falsk succes, intet bli
 });
 
 // 24d2-edge-2: klassifikation af Storage-remove → sb_koe_afslut (kun koder, aldrig rå fejltekst).
-const afslutKald = () => kaldTil((k) => rpc(k, "sb_koe_afslut")).map((k) => JSON.parse(k.krop));
+const koeAfslutKald = () => kaldTil((k) => rpc(k, "sb_koe_afslut")).map((k) => JSON.parse(k.krop));
 test("24d2-edge-2 (a): bekræftet succes og 404 »findes ikke« → afslut(id, true, null)", async () => {
   const time = new FakeTime(DAG);
   try {
@@ -868,7 +868,7 @@ test("24d2-edge-2 (a): bekræftet succes og 404 »findes ikke« → afslut(id, t
       remove: (k) => JSON.parse(k.krop).prefixes[0].endsWith("/1.png") ? jsonR({ statusCode: "404", error: "not_found", message: "Object not found" }, 404) : jsonR([]) }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
-    assertEquals(afslutKald().sort((x, y) => x.p_id - y.p_id), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 2, p_ok: true, p_fejl: null }]);
+    assertEquals(koeAfslutKald().sort((x, y) => x.p_id - y.p_id), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 2, p_ok: true, p_fejl: null }]);
     assertEquals(b.ok, true); assertEquals(b.slettet, 2);
   } finally { time.restore(); }
 });
@@ -879,7 +879,7 @@ test("24d2-edge-2 (b): kendt Storage-svar 500/403 med body → afslut(id, false,
       remove: (k) => JSON.parse(k.krop).prefixes[0].endsWith("/0.png") ? jsonR({ statusCode: "500", error: "x", message: "HEMMELIG-TEKST" }, 500) : jsonR({ statusCode: "403", error: "y", message: "HEMMELIG-TEKST" }, 403) }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
-    const a = afslutKald();
+    const a = koeAfslutKald();
     assertEquals(a.length, 2);
     for (const x of a) { assertEquals(x.p_ok, false); assertEquals(x.p_fejl, "storage_fejl"); }
     assert(!kaldTil((k) => rpc(k, "sb_koe_afslut")).some((k) => k.krop.includes("HEMMELIG")));
@@ -892,7 +892,7 @@ test("24d2-edge-2 (c): netværksfejl uden svar → afslut(id, false, 'transport_
     nulstil(oprRute({ naeste: (_k, n) => jsonR(n === 0 ? poster(1) : []), remove: () => { throw new TypeError("fetch failed HEMMELIG"); } }));
     const { res } = await kørFake(hOpr, oprReq(), time);
     const b = await res.json();
-    assertEquals(afslutKald(), [{ p_id: 1, p_ok: false, p_fejl: "transport_ukendt" }]);
+    assertEquals(koeAfslutKald(), [{ p_id: 1, p_ok: false, p_fejl: "transport_ukendt" }]);
     assert(b.fejl.includes("transport_ukendt")); assert(!b.fejl.includes("storage_fejl")); assertEquals(b.slettet, 0);
   } finally { time.restore(); }
 });
@@ -905,7 +905,7 @@ test("24d2-edge-2 (d): remove ok, afslut fejler → ét genforsøg; lykkes = sle
         afslut: () => (n++ === 0 ? jsonR({ message: "x" }, 500) : andet ? jsonR(true) : jsonR({ message: "x" }, 500)) }));
       const { res } = await kørFake(hOpr, oprReq(), time);
       const b = await res.json();
-      assertEquals(afslutKald(), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 1, p_ok: true, p_fejl: null }]);
+      assertEquals(koeAfslutKald(), [{ p_id: 1, p_ok: true, p_fejl: null }, { p_id: 1, p_ok: true, p_fejl: null }]);
       assertEquals(kaldTil((k) => k.metode === "DELETE").length, 1);
       assert(b.fejl.includes("koe_afslut")); assertEquals(b.slettet, andet ? 1 : 0);
     } finally { time.restore(); }
@@ -916,7 +916,7 @@ test("24d2-edge-2 (d'): remove fejlet + afslut fejler → intet genforsøg", asy
   try {
     nulstil(oprRute({ naeste: (_k, i) => jsonR(i === 0 ? poster(1) : []), remove: () => jsonR({ statusCode: "500", message: "x" }, 500), afslut: () => jsonR({ message: "x" }, 500) }));
     await (await kørFake(hOpr, oprReq(), time)).res.json();
-    assertEquals(afslutKald().length, 1);
+    assertEquals(koeAfslutKald().length, 1);
   } finally { time.restore(); }
 });
 
