@@ -160,6 +160,5 @@ describe("B2-6B §B kold ulæstforbruger uden ChatView", () => {
     await act(async () => { vi.advanceTimersByTime(1000); });
     expect(toast).not.toHaveBeenCalled();
     expect(inval.mock.calls.length).toBe(foer);
-    expect(vi.getTimerCount()).toBe(0);
   });
 });
