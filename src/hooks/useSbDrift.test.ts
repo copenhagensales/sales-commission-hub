@@ -128,11 +128,11 @@ describe("24d2 §1 useSbDrift", () => {
     const { result } = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(result.current.status).toBe("kendt"));
     const g = sessionsGeneration();
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
     graense.rpc.mockImplementation(() => new Promise(() => {})); // genhentningen efter beviset hænger
     act(() => registrerPause(qc, "u", g));
-    expect(tjekPortAaben("u", g, qc)).toBe(false);
-    expect(tjekPortAaben("u", g)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(false);
+    expect(tjekPortAaben(null, "u", g)).toBe(false);
   });
 
   it("r2 (2) ældre åbent svar slippes efter beviset → pause bevares og port lukket", async () => {
@@ -146,8 +146,8 @@ describe("24d2 §1 useSbDrift", () => {
     await act(async () => { slipGammel(raekke(false, true, true)); await Promise.resolve(); });
     await new Promise((r) => setTimeout(r, 10));
     expect(result.current.beskederPause).toBe(true);
-    expect(tjekPortAaben("u", g, qc)).toBe(false);
-    expect(tjekPortAaben("u", g)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(false);
+    expect(tjekPortAaben(null, "u", g)).toBe(false);
   });
 
   it("r2 (3) to QueryClients deler ikke modelport", async () => {
@@ -156,15 +156,15 @@ describe("24d2 §1 useSbDrift", () => {
     const a = renderHook(() => useSbDrift(true, "u"), { wrapper: wrap });
     await waitFor(() => expect(a.result.current.status).toBe("kendt"));
     const g = sessionsGeneration();
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
-    expect(tjekPortAaben("u", g, qcB)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
+    expect(tjekPortAaben(qcB, "u", g)).toBe(false);
     graense.rpc.mockResolvedValue(raekke(false, true, false));
     const b = renderHook(() => useSbDrift(true, "u"), { wrapper: ({ children }) => createElement(QueryClientProvider, { client: qcB }, children) });
     await waitFor(() => expect(b.result.current.status).toBe("kendt"));
-    expect(tjekPortAaben("u", g, qcB)).toBe(false);
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben(qcB, "u", g)).toBe(false);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
     act(() => registrerPause(qcB, "u", g));
-    expect(tjekPortAaben("u", g, qc)).toBe(true);
+    expect(tjekPortAaben(qc, "u", g)).toBe(true);
   });
 
   it("r2 (4) ægte window focus og visibilitychange giver hver én genhentning", async () => {

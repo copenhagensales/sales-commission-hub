@@ -1948,7 +1948,7 @@ async function tjekHeaders(f: TjekForloeb, vagt: () => boolean): Promise<Record<
  * Starter tjek for den aktuelle revision, hvis rækken står i 'tjekkes'. Ét transportgenforsøg efter 2 s, kun hvis
  * genlæsningen viser samme revision og stadig 'tjekkes'. Edge-resultatet ændrer aldrig klientstatus direkte.
  */
-export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean, ejer: OperationsEjer | undefined, qc: QueryClient | null): Promise<void> {
+export async function startTjekHvisNoedvendigt(messageId: string, vagt: () => boolean = () => true, ejer?: OperationsEjer, qc: QueryClient | null = null): Promise<void> {
   if (!vagt()) return;
   const r = await laesStatus(messageId);
   if (!vagt() || !r || r.status !== "tjekkes") return;

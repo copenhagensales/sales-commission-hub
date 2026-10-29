@@ -83,8 +83,11 @@ const egen = (besked_id: string | null, status = "bundet") => række({ besked_id
 const msg = (data: unknown, error: unknown = null) => ({ data, error });
 const fejl = (p: Promise<unknown>) => p.then(() => null, (x) => x as SendFejl);
 
+/** r3: produktionssignaturen kræver QueryClient – prøverne bruger én fast klient (ingen global fallback). */
+const tqc = new QueryClient();
+
 beforeEach(() => {
-  for (let g = 0; g <= sessionsGeneration() + 5; g++) saetModelPort("u", g, true); // 24d2: kendt tjek_tilladt=true
+  for (let g = 0; g <= sessionsGeneration() + 5; g++) saetModelPort("u", g, true, tqc); // 24d2: kendt tjek_tilladt=true
 
   insert.mockReset();
   kald.length = 0;
@@ -770,7 +773,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
     try {
       svar.chat_messages = [tjekkes(2), tjekkes(2), tjekkes(2)];
       graense.invoke.mockResolvedValue(transport);
-      const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+      const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
       await vi.advanceTimersByTimeAsync(10000); await p;
       expect(invokes()).toBe(2);
       expect(graense.invoke.mock.calls[1][1]).toMatchObject({ body: { type: "besked", id: "m", revision: 2 } });
@@ -783,7 +786,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       try {
         svar.chat_messages = [tjekkes(2), r2];
         graense.invoke.mockResolvedValue(transport);
-        const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+        const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
         await vi.advanceTimersByTimeAsync(3000); await p;
         expect(invokes()).toBe(1);
       } finally { slut(); }
@@ -794,7 +797,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       svar.chat_messages = [tjekkes(2), tjekkes(2)];
       graense.invoke.mockResolvedValue(transport);
       const ejer = fastholdEjer("e", "c", "u")!;
-      const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+      const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(1);
       auth("SIGNED_IN", "anden");
@@ -810,11 +813,11 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
       const slip: Array<() => void> = [];
       graense.invoke.mockImplementation((() => new Promise((r) => { slip.push(() => r({ error: null })); })));
       const ejer = fastholdEjer("e", "c", "u")!;
-      const a = startTjekHvisNoedvendigt("m", () => true, ejer);
-      const b = startTjekHvisNoedvendigt("m", () => true, ejer);
+      const a = startTjekHvisNoedvendigt("m", () => true, ejer, tqc);
+      const b = startTjekHvisNoedvendigt("m", () => true, ejer, tqc);
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(1);
-      const c = startTjekHvisNoedvendigt("m", () => true, ejer);
+      const c = startTjekHvisNoedvendigt("m", () => true, ejer, tqc);
       await vi.advanceTimersByTimeAsync(0);
       expect(invokes()).toBe(2);
       expect(graense.invoke.mock.calls.map((x) => arg(x[1], "body", "revision"))).toEqual([2, 3]);
@@ -830,7 +833,7 @@ describe("T9 (B2b-2 §9) – tjek for den rigtige revision", () => {
     try {
       svar.chat_messages = [tjekkes(2)];
       graense.invoke.mockResolvedValue({ data: { status }, error: null });
-      await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+      await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
       expect(kald.filter((k) => !k.startsWith("select:"))).toEqual([]);
     } finally { slut(); }
   });
@@ -1199,7 +1202,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
   it("JWT bindes eksplicit til operationens session (Authorization-header)", async () => {
     svar.chat_messages = [tjekkes(2)];
     graense.invoke.mockResolvedValue({ error: null });
-    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     expect(graense.invoke.mock.calls[0][1]).toMatchObject({ headers: { Authorization: "Bearer jwt-u" }, body: { id: "m", revision: 2 } });
   });
 
@@ -1207,7 +1210,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     let slip: (v: unknown) => void = () => undefined;
     graense.invoke.mockImplementationOnce(() => new Promise((r) => { slip = r; }));
-    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     await vi.waitFor(() => expect(invokes()).toBe(1));
     stopEfterbehandling("e", "c", "m");
     slip(transport);
@@ -1221,7 +1224,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
   it("stop under genforsøgsventetiden afslutter timeren straks; ingen genlæsning/genforsøg", async () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     graense.invoke.mockResolvedValue(transport);
-    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1)); // bevist aktiv timer
     const laes = kald.filter((k) => k === "select:chat_messages").length;
     stopEfterbehandling("e", "c", "m");
@@ -1237,7 +1240,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     graense.invoke.mockResolvedValue(transport);
     const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
     auth("SIGNED_OUT", null);
     expect(aktiveTjekTimere()).toBe(0);
@@ -1250,7 +1253,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     let slip: (v: unknown) => void = () => undefined;
     graense.session.mockImplementationOnce(() => new Promise((r) => { slip = r; }));
     const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
     await vi.waitFor(() => expect(supabase.auth.getSession).toHaveBeenCalled());
     auth("SIGNED_IN", "anden");
     slip({ data: { session: { access_token: "jwt-anden", user: { id: "anden" } } }, error: null });
@@ -1261,7 +1264,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
   it("session med anden bruger end operationens (uden generationsskift) → intet kald", async () => {
     svar.chat_messages = [tjekkes(2)];
     graense.session.mockResolvedValueOnce({ data: { session: { access_token: "jwt-x", user: { id: "x" } } }, error: null });
-    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     expect(invokes()).toBe(0);
   });
 
@@ -1269,7 +1272,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     graense.invoke.mockResolvedValue(transport);
     const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
     expect(tagHandling(ejer, "m", "send")).toBe(true); // manuel handling får låsen og afslutter det gamle tjeks timer
     expect(aktiveTjekTimere()).toBe(0);
@@ -1440,7 +1443,7 @@ describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek",
       if (signal instanceof AbortSignal && signal.aborted) return { error: { name: "FunctionsFetchError" } };
       http++; return { error: null };
     });
-    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     await vi.waitFor(() => expect(graense.invoke).toHaveBeenCalledTimes(1));
     const sig0 = arg(graense.invoke.mock.calls[0][1], "signal"); const sig = sig0 instanceof AbortSignal ? sig0 : null;
     expect(sig).toBeInstanceOf(AbortSignal);
@@ -1461,7 +1464,7 @@ describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek",
     let slip!: () => void;
     graense.invoke.mockImplementationOnce(async () => { await new Promise<void>((x) => { slip = x; }); return { error: null }; });
     const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
     await vi.waitFor(() => expect(graense.invoke).toHaveBeenCalledTimes(1));
     const sig0 = arg(graense.invoke.mock.calls[0][1], "signal"); const sig = sig0 instanceof AbortSignal ? sig0 : null;
     auth("SIGNED_OUT", null);
@@ -1473,7 +1476,7 @@ describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek",
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     graense.invoke.mockResolvedValue(transport);
     const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
     await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
     expect(tagHandling(ejer, "m", "ret")).toBe(true);
     expect(overtagTilGem(ejer, "m")).toBe(true);
@@ -1522,7 +1525,7 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
 
   it("positiv kontrol: uden stop sendes præcis ét HTTP-kald med den eksplicitte JWT", async () => {
     svar.chat_messages = [tjekkes(2)];
-    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     await vi.waitFor(() => expect(iSdkTokenopslag()).toBe(true));
     slipToken();
     await p;
@@ -1533,7 +1536,7 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
 
   it("stop under SDK'ets tokenopslag → ingen efterfølgende HTTP-transport, intet genforsøg", async () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
-    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     await vi.waitFor(() => expect(iSdkTokenopslag()).toBe(true)); // inde i SDK'et, efter vores sidste kontrol før invoke
     stopEfterbehandling("e", "c", "m");
     slipToken();
@@ -1547,7 +1550,7 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
   it("sessionsophør under SDK'ets tokenopslag → ingen efterfølgende HTTP-transport", async () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     const ejer = fastholdEjer("e", "c", "u")!;
-    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer, tqc);
     await vi.waitFor(() => expect(iSdkTokenopslag()).toBe(true));
     auth("SIGNED_OUT", null);
     slipToken();
@@ -2384,28 +2387,29 @@ describe("24d2 §1 (g) – modelport i startTjekHvisNoedvendigt", () => {
   afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset().mockImplementation(async () => ({ error: null })); });
 
   it("lukket/ukendt port → intet modelkald, serverstatus læses kun", async () => {
-    saetModelPort("u", sessionsGeneration(), false);
+    saetModelPort("u", sessionsGeneration(), false, tqc);
     svar.chat_messages = [tjekkes(2)];
-    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     expect(graense.invoke).not.toHaveBeenCalled();
-    expect(tjekPortAaben("u", sessionsGeneration())).toBe(false);
+    expect(tjekPortAaben(tqc, "u", sessionsGeneration())).toBe(false);
+    expect(tjekPortAaben(null, "u", sessionsGeneration())).toBe(false); // ingen global fallback
   });
 
   it("port lukkes under ventetiden → intet transportgenforsøg", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
-    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     await vi.advanceTimersByTimeAsync(0);
     expect(graense.invoke).toHaveBeenCalledTimes(1);
-    saetModelPort("u", sessionsGeneration(), false);
+    saetModelPort("u", sessionsGeneration(), false, tqc);
     await vi.advanceTimersByTimeAsync(3000); await p;
     expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 
   it("kontrol: åben port → modelkald", async () => {
     svar.chat_messages = [tjekkes(2)];
-    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!, tqc);
     expect(graense.invoke).toHaveBeenCalledTimes(1);
   });
 });
