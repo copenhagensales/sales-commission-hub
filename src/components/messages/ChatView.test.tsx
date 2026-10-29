@@ -129,8 +129,10 @@ afterEach(async () => {
   cleanup();
   for (const x of aabne.splice(0)) x();
   await new Promise((x) => setTimeout(x, 0));
-  const { stopAfstemninger } = await import("./ChatView");
+  const { stopAfstemninger, afstemningsKapacitet } = await import("./ChatView");
   for (const conv of ["A", "B", "c"]) stopAfstemninger("e", conv);
+  // Kontrol: ingen aktive pladser, ventere eller køposter lækker til næste prøve.
+  expect(afstemningsKapacitet()).toMatchObject({ aktive: 0, ventende: 0, iKoe: 0 });
   qc.clear();
 });
 
