@@ -46,7 +46,7 @@ const graense = vi.hoisted(() => ({
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (t: string) => builder(t),
+    from: (t: string) => (graense.from.getMockImplementation() ? graense.from(t) : builder(t)),
     rpc: graense.rpc,
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u" } } })), onAuthStateChange: vi.fn(),
       getSession: vi.fn(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })) },
@@ -877,10 +877,10 @@ describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
       return b;
     };
     let foerste = true;
-    const spy = vi.spyOn(supabase, "from").mockImplementation(((t: string) => {
+    graense.from.mockImplementation((t: string) => {
       if (t === "chat_messages" && foerste) { foerste = false; return thenable(raekker); }
       return thenable([]);
-    }) as never);
+    });
     try {
       const qcP = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } } });
       const w = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qcP }, children);
@@ -894,7 +894,7 @@ describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
       expect(cache?.pageParams).toEqual([0]);
       expect(typeof result.current.opdateret).toBe("number");
       qcP.clear();
-    } finally { spy.mockRestore(); }
+    } finally { graense.from.mockReset(); }
   });
 });
 
