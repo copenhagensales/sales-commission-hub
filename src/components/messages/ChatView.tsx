@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, useChatAktiv,
-  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, afslutFristForsoeg, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
+  erSynligMedFokus, onChatSignal, SendFejl, Message, useFristUr, erUdloebet, svarUtilgaengeligt, useSvarOriginal, planlaeg, erKendtUdloebet, kontrollerUdloeb, harKendtUdloebet, synkFristForloeb, fyrFristForloeb, afslutFristForsoeg, fristOprydning, afstemKun, registrerAfsendelsesKoordinering, stopEfterbehandling, registrerSamtaleStop, AFSTEM_BACKOFF_MS, GEMT_VAEK_TEKST, IKKE_REGISTRERET_TEKST, traadHentSekvens,
 } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -240,6 +240,8 @@ export function stopAfstemninger(emp: string, conv: string, id?: string): void {
   for (const f of [...forloeb.values()]) if (f.session === s && ramt(f.noegle)) stopForloeb(f.noegle);
   meldKoe();
 }
+// B2d-2 §12: bekræftet sletning/forladelse stopper samtalens afstemninger via den eksisterende stopvej.
+registrerSamtaleStop((emp, conv) => stopAfstemninger(emp, conv));
 /** B2b-2 §4: serverhandlinger på et id samordnes med manuel afsendelse, netværkslås, aktiv afstemning og pending post. */
 registrerAfsendelsesKoordinering((gen, emp, conv, id) => {
   const k = laasNoegle(gen, emp, conv, id);

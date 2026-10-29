@@ -165,6 +165,7 @@ export function rydSamtale(emp: string, conv: string, gen: number = generation):
 }
 
 export function gemRetKladde(emp: string, conv: string, k: RetKladde): boolean {
+  if (erLukket(emp, conv)) return true;
   retVersioner.set(retNoegle(emp, conv, k.beskedId), ++retVersionNr);
   return skriv(retNoegle(emp, conv, k.beskedId), { beskedId: k.beskedId, tekst: k.tekst.slice(0, 4000), revision: k.revision });
 }
