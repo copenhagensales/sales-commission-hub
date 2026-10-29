@@ -590,20 +590,27 @@ export function ChatView({ conversationId }: ChatViewProps) {
     // c2 §6: manuel afsendelse deler køens tre pladser; anmodningen ejes af operationen (d1 §2).
     if (ks.gen !== gen || !(await tagPlads(ks, fk, op))) { slipEje(); return; }
     if (!vagt()) { slipEje(); frigivPlads(ks); return; }
+    // r2 §2(a): driftsstatus genkontrolleres efter hvert ventepunkt; stop bevarer posten urørt (banner viser pausen).
+    if (driftRef.current.pause || (a.fil && !driftRef.current.filAaben)) { slipEje(); frigivPlads(ks); return; }
     opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "sender", fejl: null }, gen);
     let filMeta = a.fil;
+    const driftStop = () => driftRef.current.pause || (!!filMeta && !driftRef.current.filAaben);
+    const bevar = () => opdaterAfsendelse(emp, conv, id, { tilstand: a.tilstand, fil: filMeta ?? null, fejl: null }, gen);
     try {
       if (genudsted && filMeta) {
         // §10: genudstedelse fra den bevarede File (kun dokumenteret ubundet overtaget sti, kun brugerudløst, én gang).
         const file = afsendelsesFil(emp, conv, id);
         if (!file) { opdaterAfsendelse(emp, conv, id, { tilstand: "vaelg_fil" }, gen); return; }
+        if (driftStop()) { bevar(); return; }
         const u = await udstedUpload(conv, file, filMeta.type, kon);
         if (!vagt()) return;
+        if (driftStop()) { bevar(); return; }
         filMeta = { ...filMeta, sti: u.sti, trin: "uploader" };
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
         await uploadTilSti(u, file, filMeta.type, kon);
         if (!vagt()) return;
         filMeta = { ...filMeta, trin: "uploadet" };
+        if (driftStop()) { opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen); bevar(); return; }
         opdaterAfsendelse(emp, conv, id, { fil: filMeta }, gen);
       }
       // §3: en filsending kræver bekræftet upload (trin=uploadet) og ikke-tom sti på alle veje.
@@ -611,6 +618,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         opdaterAfsendelse(emp, conv, id, { tilstand: afsendelsesFil(emp, conv, id) ? "genudsted" : "vaelg_fil", fejl: null }, gen);
         return;
       }
+      if (driftStop()) { bevar(); return; } // sidste kontrol umiddelbart før INSERT
       await sendMessage.mutateAsync({
         id, conversationId: conv, content: a.tekst, replyToId: a.svarId ?? undefined,
         attachmentPath: filMeta?.sti ?? undefined, attachmentType: filMeta?.type, attachmentName: filMeta?.name,
@@ -739,9 +747,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (!forsoeg) return;
     const kon = { vagt: () => erAktuelKladdeUpload(ejer, forsoeg), bruger: ejer.bruger };
     try {
+      // r2 §2(a): lukket filport efter et ventepunkt → filen bevares i kladden som valgt, intet videre upload.
+      const lukket = () => !driftRef.current.filAaben && (opdaterKladdeUpload(ejer, forsoeg, { aktiv: false, sti: null, trin: "valgt", fejl: null }), true);
       const u = await udstedUpload(ejer.conv, file, type, kon);
+      if (lukket()) return;
       if (!opdaterKladdeUpload(ejer, forsoeg, { sti: u.sti, trin: "uploader" })) return;
       await uploadTilSti(u, file, type, kon);
+      if (lukket()) return;
       opdaterKladdeUpload(ejer, forsoeg, { trin: "uploadet", aktiv: false });
     } catch (e) {
       // Forældet operation er et særskilt udfald: ingen fejltekst, intet genforsøg, ingen skrivning.
@@ -901,22 +913,27 @@ export function ChatView({ conversationId }: ChatViewProps) {
         </div>
       )}
 
-      {fil && (
-        <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
-          onRetry={fil.fejl && fil.file && filAaben ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
-      )}
-      {filFejl && (
-        <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
-          <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
       {lagerFejl && <p className="px-2 md:px-4 py-1 border-t text-[14px] text-muted-foreground" role="status">{LAGER_FEJL}</p>}
 
       {/* B2-6A §A: på telefon står composeren fast over bundbjælken (BOTTOM_NAV_HEIGHT = 64) og safe area. */}
       <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
+        {/* r2 §2(b): fil og filfejl ligger i den faste composer, så de aldrig skjules bag den på telefon. */}
+        {(fil || filFejl) && (
+          <div className="-mx-2 md:-mx-4 -mt-2 md:-mt-4 mb-2">
+          {fil && (
+            <AttachmentPreview fil={fil} onRemove={fjernFil} onGenvalg={() => vaelgFil(null)}
+              onRetry={fil.fejl && fil.file && filAaben ? () => { const f = fil.file; if (f) void upload(f, fil.type); } : undefined} />
+          )}
+          {filFejl && (
+            <div className="px-2 md:px-4 py-2 border-t text-[14px] text-destructive flex items-center justify-between gap-2" role="alert">
+              <span className="min-w-0">{filFejl}. {FIL_GRAENSER_TEKST}</span>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 max-md:h-11 max-md:w-11 shrink-0" onClick={() => setFilFejl(null)} aria-label="Luk">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          </div>
+        )}
         {!drift.filTilladt && <p className="pb-1 text-[14px] md:text-xs text-muted-foreground">Filer kan ikke sendes lige nu</p>}
         <div className="flex gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
