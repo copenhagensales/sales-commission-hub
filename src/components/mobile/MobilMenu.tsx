@@ -1,6 +1,8 @@
 // D1: telefonens Menu-ark. Fliser pr. område (som Spil-hubben), søgefelt øverst, Min profil + Log ud nederst.
 // Samme sider og samme synlighed som sidebaren (useSynligStruktur: rettigheder + menu-editor); alle områder vises (også Mit arbejde, som ligger i bundbjælken – Mathias 29/10: »der mangler sider«).
 // Faner (fx Rapporter › Dagsrapporter) kommer fra STRUKTUR_NOEGLER, filtreret med canView på samme nøgler, som samlesiderne bruger; de vises som hint på flisen og kan søges frem.
+// Kendt afgrænsning (Codex D1b, accepteret): enkelte samlesider har ekstra betingelser ud over nøglen (fx kun superadmin) – så lander brugeren på siden, som selv skjuler fanen.
+// Faner uden egen rute (faneRute = sideRute, fx Storkbook › Begivenheder) åbner siden; fanen vælges der.
 import { useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { LogOut, Search, User, X } from "lucide-react";
@@ -38,8 +40,10 @@ export function MobilMenu({ badges = {}, onLogout, ekstra }: { badges?: Record<s
       const set = new Set<string>();
       const faner: Fane[] = [];
       for (const n of STRUKTUR_NOEGLER) {
-        if (n.sideRute !== sideRute || set.has(n.fane) || !canView(n.noegle)) continue;
-        set.add(n.fane);
+        // Dublet = samme navn OG samme mål; TM/FM-varianter med forskellige ruter bevares begge [Codex D1b].
+        const noegle = `${n.fane}|${n.faneRute ?? sideRute}`;
+        if (n.sideRute !== sideRute || set.has(noegle) || !canView(n.noegle)) continue;
+        set.add(noegle);
         faner.push({ id: `${sd.id}:${n.noegle}`, label: n.fane, rute: n.faneRute ?? sd.rute, side: sd });
       }
       if (faner.length > 0) m.set(sd.id, faner);
@@ -96,7 +100,7 @@ export function MobilMenu({ badges = {}, onLogout, ekstra }: { badges?: Record<s
     <div className="flex flex-col gap-5 px-2 pb-2" data-mobil-menu>
       <div className="relative">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Indtast type="search" value={soeg} onChange={(e) => setSoeg(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") ryd(); }}
+        <Indtast type="search" value={soeg} onChange={(e) => setSoeg(e.target.value)}
           placeholder="Søg i menuen …" aria-label="Søg i menuen" autoComplete="off" enterKeyHint="search" className="bg-card pl-12 pr-12 [&::-webkit-search-cancel-button]:hidden" />
         {soeg && (
           <button type="button" onClick={ryd} aria-label="Ryd søgning" className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground active:bg-muted">

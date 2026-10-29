@@ -10,7 +10,7 @@ vi.mock("@/components/layout/StrukturMenu", () => ({
     { id: "omraade_mit_arbejde", label: "Mit arbejde", ikon: Home, sider: [
       { id: "side_hjem", label: "Hjem", rute: "/home", ikon: Home, synlig: () => true },
       { id: "side_mine_tal", label: "Mine tal", rute: "/my-goals", ikon: Target, synlig: () => true },
-      { id: "side_vagter", label: "Vagter", rute: "/vagter", ikon: Calendar, synlig: () => true },
+      { id: "side_vagter", label: "Vagter", rute: "/vagter", ikon: Calendar, synlig: () => true },  // STRUKTUR_NOEGLER har to »Min vagtplan« (TM/FM) under /vagter
       { id: "side_min_profil", label: "Min profil", rute: "/my-profile", ikon: User, synlig: () => true },
     ] },
     { id: "omraade_mit_team", label: "Mit team", ikon: Users, sider: [
@@ -46,7 +46,7 @@ describe("MobilMenu", () => {
     expect(logud).toHaveBeenCalledTimes(1);
   });
 
-  it("søgning finder sider og faner (Dagsrapporter → fanens rute), kan ryddes med kryds/Escape; intet fund giver besked", () => {
+  it("søgning finder sider og faner (Dagsrapporter → fanens rute), kan ryddes med kryds; intet fund giver besked", () => {
     render(<MemoryRouter><MobilMenu onLogout={() => {}} /></MemoryRouter>);
     const felt = screen.getByRole("searchbox", { name: "Søg i menuen" });
     fireEvent.change(felt, { target: { value: "vagt" } });
@@ -63,7 +63,11 @@ describe("MobilMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ryd søgning" }));
     expect((felt as HTMLInputElement).value).toBe("");
     expect(screen.getByRole("heading", { name: "Mit team" })).toBeTruthy();
-    fireEvent.change(felt, { target: { value: "x" } }); fireEvent.keyDown(felt, { key: "Escape" });
-    expect((felt as HTMLInputElement).value).toBe("");
+  });
+
+  it("faner med samme navn men forskellige mål bevares begge (TM/FM »Min vagtplan«)", () => {
+    render(<MemoryRouter><MobilMenu onLogout={() => {}} /></MemoryRouter>);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Søg i menuen" }), { target: { value: "min vagtplan" } });
+    expect(screen.getAllByRole("button", { name: /^Min vagtplan/ }).length).toBe(2);
   });
 });
