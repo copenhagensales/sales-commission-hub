@@ -1615,16 +1615,24 @@ describe("B2c-2a §1 – pending, fristidentitet og budget", () => {
 
   it("udløb uden genoplivet pending-tekst; heller ikke når den kendte udløbne række forsvinder fra RLS", async () => {
     vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0);
+    // Fysisk igangværende afstemning holder pending-posten (B2b-3a), så den overlever, mens serverrækken er synlig.
+    const hold = kontrol<string>();
+    afstemKun.mockImplementation(() => hold.p);
     beskeder.liste = [fremmed("p1", "server-tekst", { sender_id: "e", slettes_efter: iso(-1) })];
-    tilfoejAfsendelse("e", "A", pend("p1", "pending-tekst"));
+    tilfoejAfsendelse("e", "A", pend("p1", "pending-tekst", "afstemmer"));
     const r = await klar();
+    await waitFor(() => expect(afstemKun).toHaveBeenCalled());
+    expect(hentAfsendelser("e", "A").some((a) => a.id === "p1")).toBe(true);
     expect(screen.queryByText("server-tekst")).toBeNull();
     expect(screen.queryByText("pending-tekst")).toBeNull();
     beskeder.liste = []; beskeder.opdateret++; // rækken er væk fra RLS
     r.rerender(wrap(<ChatView conversationId="A" />));
     await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    expect(hentAfsendelser("e", "A").some((a) => a.id === "p1")).toBe(true); // posten findes stadig – kun visningen er værnet
     expect(screen.queryByText("pending-tekst")).toBeNull();
     r.unmount();
+    hold.res("ukendt"); await act(async () => { await hold.p; });
+    afstemKun.mockImplementation(async () => "ikke_fundet");
   });
 
   it("pending uden kendt udløbet serverrække vises fortsat (ingen opfundet frist)", async () => {
