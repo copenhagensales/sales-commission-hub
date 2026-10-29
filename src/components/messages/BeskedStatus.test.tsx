@@ -305,6 +305,8 @@ describe("T4 (B2b-2 §4) – fælles handlingslås og ærlig resultatvisning", (
 });
 
 describe("B2b-4a §1 – alle ukendte handlinger forbliver synlige og afstembare gennem Ret og remount", () => {
+  const flush = async () => { await act(async () => { await new Promise((x) => setTimeout(x, 5)); }); };
+  const knap = (n: string) => screen.getByRole("button", { name: n });
   it.each([["Send alligevel"], ["Træk tilbage"], ["Fjern fil"]])("ukendt %s → Ret viser advarsel og »Tjek igen« i editoren; remount bevarer; Tjek igen skriver ikke", async (navn) => {
     raekke = { data: { status: "afventer_afsender", revision: 4, content: "vist tekst", attachment_path: "e/c/f" }, error: null };
     const r = render(ui(afventer(4, true)));

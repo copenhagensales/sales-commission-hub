@@ -534,6 +534,7 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
     graense.rpc.mockResolvedValueOnce({ data: 2, error: null });
     render(ui(besked("m1", "gammel"), "e"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    console.info("DBG", graense.rpc.mock.calls.map((c) => c[0]), !!felt());
     expect(aktiveTjekTimere()).toBe(0);
     await p;
     await new Promise((x) => setTimeout(x, 50));
