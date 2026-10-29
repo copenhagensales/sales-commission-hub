@@ -1265,13 +1265,82 @@ klientTest("24d2 sb-fil: port åben → uændret forløb (registrering + token f
   ingenUkendte();
 });
 
-klientTest("24d2 sb-fil: laes kalder ikke driftsporten (lukket port påvirker ikke læsning)", async () => {
+klientTest("24d2 sb-fil: port åben → token udstedes efter registrering (INSERT i sb_stier), 200 {sti, token}", async () => {
+  const b64u = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const jwt = `${b64u({ alg: "HS256" })}.${b64u({ exp: Math.floor(Date.now() / 1000) + 7200 })}.sig`;
+  const basis = udstedRute(() => tom(204), () => jsonR([{ sti: "x" }]));
+  nulstil((k) => k.sti.startsWith("/storage/v1/object/upload/sign/") ? jsonR({ url: `${k.sti.replace("/storage/v1", "")}?token=${jwt}` }) : basis(k));
+  const r = await hFil(udstedReq());
+  assertEquals(r.status, 200);
+  const b = await r.json(); assertEquals(b.token, jwt); assertEquals(typeof b.sti, "string");
+  assertEquals(registerKald().length, 1); assertEquals(tokenKald().length, 1);
+  const iD = kald.findIndex((k) => rpc(k, "sb_24d2_drift")), iR = kald.findIndex((k) => tabel(k, "sb_stier") && k.metode === "POST"), iT = kald.findIndex((k) => k.sti.startsWith("/storage/v1/object/upload/sign/"));
+  assert(iD >= 0 && iD < iR && iR < iT);
+  ingenUkendte();
+});
+
+klientTest("24d2 sb-fil: laes kalder ikke driftsporten (lukket port påvirker ikke læsning) → 200 med korrekte bytes", async () => {
   drift = () => jsonR([{ beskeder_pause: true, fil_tilladt: false, tjek_tilladt: false }]);
   try {
-    nulstil(udstedRute(() => tom(204)));
-    await (await hFil(laesReq())).body?.cancel();
+    const bytes = png(16);
+    nulstil(laesRute({ info: info(16), download: () => new Response(bytes.slice()) }));
+    const r = await hFil(laesReq());
+    assertEquals(r.status, 200); assertEquals(new Uint8Array(await r.arrayBuffer()), bytes);
     assertEquals(kaldTil((k) => rpc(k, "sb_24d2_drift")).length, 0);
-  } finally { drift = ÅBEN; ukendt = []; }
+    ingenUkendte();
+  } finally { drift = ÅBEN; }
+});
+
+// 24d2-edge-1b: modelopslag først efter reservation og åben port.
+const modelOpslag = () => kaldTil((k) => tabel(k, "pulsen_config"));
+const LUKKET = () => jsonR([{ beskeder_pause: false, fil_tilladt: true, tjek_tilladt: false }]);
+for (const [navn, cfg] of [["manglende model", () => jsonR([])], ["fejlende modelopslag", () => fejlR()]] as const) {
+  test(`24d2-1b tjek: lukket port + ${navn} → afslutning 'ukendt', intet modelopslag, intet fetch mod gateway`, async () => {
+    drift = LUKKET;
+    try {
+      const basis = tjekRute({ sti: null });
+      nulstil((k) => tabel(k, "pulsen_config") ? cfg() : basis(k));
+      const r = await hTjek(tjekReq());
+      assertEquals(r.status, 200); assertEquals(await r.json(), { status: "tjekket" });
+      assertEquals(modelOpslag().length, 0); assertEquals(gwKald().length, 0);
+      forventAfslutParam({ ...tjek.UKENDT });
+      ingenUkendte();
+    } finally { drift = ÅBEN; }
+  });
+}
+
+test("24d2-1b tjek: åben port + manglende model → reservation afsluttes 'ukendt', svar 'ikke_konfigureret', ingen gateway", async () => {
+  const basis = tjekRute({ sti: null });
+  nulstil((k) => tabel(k, "pulsen_config") ? jsonR([]) : basis(k));
+  const r = await hTjek(tjekReq());
+  assertEquals(await r.json(), { status: "ikke_konfigureret" });
+  assertEquals(gwKald().length, 0); forventAfslutParam({ ...tjek.UKENDT });
+  const iRes = kald.findIndex((k) => rpc(k, "sb_tjek_reserver")), iD = kald.findIndex((k) => rpc(k, "sb_24d2_drift")), iM = kald.findIndex((k) => tabel(k, "pulsen_config"));
+  assert(iRes >= 0 && iRes < iD && iD < iM);
+  ingenUkendte();
+});
+
+test("24d2-1b tjek: åben port + fejlende modelopslag → reservation afsluttes 'ukendt', 500 'konfig_fejl', ingen gateway", async () => {
+  const basis = tjekRute({ sti: null });
+  nulstil((k) => tabel(k, "pulsen_config") ? fejlR() : basis(k));
+  const r = await hTjek(tjekReq());
+  assertEquals(r.status, 500); assertEquals(await r.json(), { kode: "konfig_fejl" });
+  assertEquals(gwKald().length, 0); forventAfslutParam({ ...tjek.UKENDT });
+  ingenUkendte();
+});
+
+test("24d2-1b tjek: drift-RPC hænger efter reservation → afslutning 'ukendt' inden for tidsbudgettet, intet modelopslag", async () => {
+  const time = new FakeTime(Date.parse("2026-10-29T10:00:00Z"));
+  try {
+    const basis = tjekRute({ sti: null });
+    nulstil((k) => rpc(k, "sb_24d2_drift") ? hænger(k.signal) : basis(k));
+    const { res, ms } = await kørFake(hTjek, tjekReq(), time);
+    assertEquals(await res.json(), { status: "tjekket" });
+    assert(ms <= 55_000, `svar efter ${ms} ms`);
+    assertEquals(modelOpslag().length, 0); assertEquals(gwKald().length, 0);
+    forventAfslutParam({ ...tjek.UKENDT });
+    ingenUkendte();
+  } finally { time.restore(); }
 });
 
 test("24d2 tjek: port åben → uændret (gateway kaldes én gang, udfald ok)", async () => {
