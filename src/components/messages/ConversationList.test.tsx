@@ -3,10 +3,10 @@ import { render, screen, fireEvent, act, cleanup } from "@testing-library/react"
 import type { Conversation } from "@/hooks/useChat";
 
 const h = vi.hoisted(() => ({ afvis: null as null | ((e: unknown) => void), løs: null as null | (() => void) }));
-const samtale = {
-  id: "g1", is_group: true, name: "Holdet", created_by: "andre", direct_key: null,
-  updated_at: "2026-10-01T10:00:00Z", unread_count: 3, members: [],
-} as unknown as Conversation; // prøvefixture: kun felter listen læser
+const samtale: Conversation = {
+  id: "g1", is_group: true, name: "Holdet", created_by: "andre", direct_key: null, vaern_niveau: 0,
+  created_at: "2026-10-01T10:00:00Z", updated_at: "2026-10-01T10:00:00Z", unread_count: 3, members: [],
+};
 vi.mock("@/hooks/useChat", async () => {
   const ægte = await vi.importActual<typeof import("@/hooks/useChat")>("@/hooks/useChat");
   return {
@@ -30,7 +30,9 @@ afterEach(() => cleanup());
 async function startForlad() {
   const onSelect = vi.fn();
   render(<ConversationList selectedId="g1" onSelect={onSelect} />);
-  fireEvent.pointerDown(screen.getByRole("button", { name: "Flere handlinger" }), { button: 0, ctrlKey: false });
+  const knap = screen.getByRole("button", { name: "Flere handlinger" });
+  knap.focus();
+  fireEvent.keyDown(knap, { key: "Enter" });
   fireEvent.click(await screen.findByText("Forlad gruppe"));
   fireEvent.click(await screen.findByRole("button", { name: "Forlad" }));
   await vi.waitFor(() => expect(h.afvis).toBeTypeOf("function"));
