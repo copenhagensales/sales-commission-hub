@@ -899,7 +899,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
       )}
       {lagerFejl && <p className="px-2 md:px-4 py-1 border-t text-[14px] text-muted-foreground" role="status">{LAGER_FEJL}</p>}
 
-      <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      {/* B2-6A §A: på telefon står composeren fast over bundbjælken (BOTTOM_NAV_HEIGHT = 64) og safe area. */}
+      <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:bottom-[calc(64px+env(safe-area-inset-bottom,0px))]">
         <div className="flex gap-1 md:gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
           <Button variant="ghost" size="icon" onClick={() => vaelgFil(null)} disabled={!!fil?.uploader}
