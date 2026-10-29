@@ -2334,18 +2334,18 @@ describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessi
   beforeEach(() => { qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } }); auth("SIGNED_OUT", null); auth("SIGNED_IN", "u"); });
   afterEach(() => { vi.mocked(supabase.auth.getUser).mockReset().mockImplementation(async () => ({ data: { user: { id: "u" } } }) as never); qc.clear(); });
   const holdtIdentitet = () => {
-    let afvis!: (e: Error) => void;
-    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise((_, r) => { afvis = r; }));
-    return () => afvis(new Error("Not authenticated"));
+    const h: { afvis: ((e: Error) => void) | null } = { afvis: null };
+    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise((_, r) => { h.afvis = r; }));
+    return h;
   };
   it("oprettelse: identitetsopslag afvises efter logud → ForaeldetSession, ingen RPC", async () => {
     const afvis = holdtIdentitet();
     const { result, unmount } = renderHook(() => useOpret7(), { wrapper: wrap });
     graense.rpc.mockClear();
     const p = result.current.opret({ name: "", memberIds: ["x"], isGroup: false })!.then(() => null, (x: unknown) => x);
-    await vi.waitFor(() => expect(supabase.auth.getUser).toHaveBeenCalled());
+    await vi.waitFor(() => expect(afvis.afvis).toBeTypeOf("function"));
     auth("SIGNED_OUT", null);
-    afvis();
+    afvis.afvis?.(new Error("Not authenticated"));
     expect(await p).toBeInstanceOf(Foraeldet7);
     expect(graense.rpc.mock.calls.filter((c) => String(c[0]).startsWith("sb_chat_start"))).toHaveLength(0);
     unmount();
@@ -2355,9 +2355,9 @@ describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessi
     kald.length = 0;
     const { result, unmount } = renderHook(() => useSlet7(), { wrapper: wrap });
     const p = result.current.slet("c").then(() => null, (x: unknown) => x);
-    await vi.waitFor(() => expect(supabase.auth.getUser).toHaveBeenCalled());
+    await vi.waitFor(() => expect(afvis.afvis).toBeTypeOf("function"));
     auth("SIGNED_IN", "u2");
-    afvis();
+    afvis.afvis?.(new Error("Not authenticated"));
     expect(await p).toBeInstanceOf(Foraeldet7);
     expect(kald.filter((k) => k.startsWith("delete:"))).toHaveLength(0);
     unmount();
@@ -2366,8 +2366,8 @@ describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessi
     const afvis = holdtIdentitet();
     const { result, unmount } = renderHook(() => useSlet7(), { wrapper: wrap });
     const p = result.current.slet("c").then(() => null, (x: unknown) => x);
-    await vi.waitFor(() => expect(supabase.auth.getUser).toHaveBeenCalled());
-    afvis();
+    await vi.waitFor(() => expect(afvis.afvis).toBeTypeOf("function"));
+    afvis.afvis?.(new Error("Not authenticated"));
     const e = await p;
     expect(e).not.toBeInstanceOf(Foraeldet7);
     expect(e instanceof Error ? e.message : null).toBe("Not authenticated");
