@@ -375,3 +375,59 @@ describe("B2a-d1 §2 – annullerOperation", () => {
     expect(m.ejerGyldig(b)).toBe(true);
   });
 });
+
+describe("T12 – rydning efter bekræftet sletning/forladelse (§12)", () => {
+  it("rydder kun (bruger, samtale): kladde, ret-kladder, pending, File, uploadforløb; andre poster bevares", async () => {
+    const m = await ny();
+    const f = new File(["x"], "x.png", { type: "image/png" });
+    m.gemKladde("e", "A", { tekst: "kladde A", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "b1", tekst: "ret", revision: 1 });
+    m.tilfoejAfsendelse("e", "A", afs("1", "a"), f);
+    m.saetKladdeFil("e", "A", f);
+    m.gemKladde("e", "AB", { tekst: "nabo med fælles præfiks", svarId: null });
+    m.gemKladde("e", "B", { tekst: "kladde B", svarId: null });
+    m.gemKladde("x", "A", { tekst: "anden bruger", svarId: null });
+    m.rydSamtale("e", "A");
+    expect(m.laesKladde("e", "A")).toBeNull();
+    expect(m.laesRetKladde("e", "A", "b1")).toBeNull();
+    expect(m.hentAfsendelser("e", "A")).toEqual([]);
+    expect(m.afsendelsesFil("e", "A", "1")).toBeNull();
+    expect(m.kladdeFil("e", "A")).toBeNull();
+    expect(Object.keys(sessionStorage).filter((k) => k.startsWith("sb-kladde:e:A:") || k === "sb-kladde:e:A")).toEqual([]);
+    expect(m.laesKladde("e", "AB")?.tekst).toBe("nabo med fælles præfiks");
+    expect(m.laesKladde("e", "B")?.tekst).toBe("kladde B");
+    expect(m.laesKladde("x", "A")?.tekst).toBe("anden bruger");
+  });
+
+  it("sene callbacks genskaber intet: gemKladde/gemRetKladde/tilfoejAfsendelse/opdaterAfsendelse/upload efter rydning", async () => {
+    const m = await ny();
+    m.registrerKladdeOprydning();
+    const ejer = m.fastholdEjer("e", "A", "u")!;
+    const f = new File(["x"], "x.png", { type: "image/png" });
+    const forsoeg = m.startKladdeUpload(ejer, f, { name: "x.png", type: "image/png", size: 1 })!;
+    m.tilfoejAfsendelse("e", "A", afs("1", "a"));
+    m.rydSamtale("e", "A");
+    m.gemKladde("e", "A", { tekst: "sen autogem", svarId: null });
+    m.gemRetKladde("e", "A", { beskedId: "b1", tekst: "sen", revision: 2 });
+    m.tilfoejAfsendelse("e", "A", afs("2", "sen"));
+    m.opdaterAfsendelse("e", "A", "1", { tilstand: "afvist" });
+    expect(m.opdaterKladdeUpload(ejer, forsoeg, { trin: "uploadet", sti: "s" })).toBe(false);
+    expect(m.laesKladde("e", "A")).toBeNull();
+    expect(m.laesRetKladde("e", "A", "b1")).toBeNull();
+    expect(m.hentAfsendelser("e", "A")).toEqual([]);
+    expect(Object.keys(sessionStorage).filter((k) => k.startsWith("sb-kladde:e:A"))).toEqual([]);
+  });
+
+  it("forkert generation (logud siden handlingens start) rydder intet; logud rydder alt og ophæver lukning", async () => {
+    const m = await ny();
+    const gen = m.sessionsGeneration();
+    m.rydAlleKladder();
+    m.gemKladde("e", "A", { tekst: "ny session", svarId: null });
+    m.rydSamtale("e", "A", gen);
+    expect(m.laesKladde("e", "A")?.tekst).toBe("ny session");
+    m.rydSamtale("e", "A");
+    m.rydAlleKladder();
+    m.gemKladde("e", "A", { tekst: "efter logud", svarId: null });
+    expect(m.laesKladde("e", "A")?.tekst).toBe("efter logud");
+  });
+});
