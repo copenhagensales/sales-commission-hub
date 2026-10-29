@@ -1241,7 +1241,7 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     expect(invokes()).toBe(0);
   });
 
-  it("manuel handling mod bevist aktiv timer: Ret stopper tjekforløbet (timer væk), ingen genforsøg bagefter", async () => {
+  it("manuel handling (Send) mod bevist aktiv timer: afslutter tjekforløbet (timer væk), ingen genforsøg bagefter", async () => {
     svar.chat_messages = [tjekkes(2), tjekkes(2)];
     graense.invoke.mockResolvedValue(transport);
     const ejer = fastholdEjer("e", "c", "u")!;
