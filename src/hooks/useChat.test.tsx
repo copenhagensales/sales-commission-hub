@@ -1992,7 +1992,7 @@ describe("B2bc-5b §2 – fristlager: render læser, effekt registrerer; oprydni
 });
 
 // ---------- B2d-2 T12 (§12): sletning/forladelse gennem rigtig useDeleteConversation ----------
-import { useDeleteConversation, rydSlettetSamtale, registrerSamtaleStop } from "./useChat";
+import { useDeleteConversation, rydSlettetSamtale, registrerSamtaleStop, handlingFor } from "./useChat";
 import { gemKladde, laesKladde, tilfoejAfsendelse, hentAfsendelser, gemRetKladde, laesRetKladde, sessionsGeneration as genNu } from "@/lib/sbKladder";
 describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
   let qc12: QueryClient;
