@@ -12,7 +12,7 @@ import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { MessageSearch } from "./MessageSearch";
-import { AttachmentPreview, kraeverGenvalg, type LokalFil } from "./AttachmentPreview";
+import { kanMiniature, AttachmentPreview, kraeverGenvalg, type LokalFil } from "./AttachmentPreview";
 import { TypingIndicator } from "./TypingIndicator";
 import { MentionInput } from "./MentionInput";
 import { toast } from "sonner";
@@ -325,6 +325,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (!visFil) { frigivPreview(); return; }
     if (previewRef.current?.file === visFil) return;
     frigivPreview();
+    // B2-6A §A: automatisk miniature kun for billeder ≤ 200 KB; originalen (og upload) røres ikke.
+    if (!kanMiniature(visFil)) return;
     const p = { file: visFil, url: URL.createObjectURL(visFil) };
     previewRef.current = p;
     setPreview(p);
@@ -684,8 +686,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
     };
     // B2-6B §B: composeren tømmes først, når afsendelsen faktisk er accepteret i det lokale lager.
     const ejer = fastholdEjer(emp, conv, brugerRef.current);
-    // Uden auth-bruger (lytteren endnu ikke klar) kontrolleres kun lukning; med ejer også generation/epoke.
-    if (!tilfoejAfsendelse(emp, conv, a, fil?.file ?? null, ejer ?? undefined)) {
+    // B2-6A §D: uden fastholdt ejer (auth-bruger + session) sendes intet; composeren bevares.
+    if (!ejer || !tilfoejAfsendelse(emp, conv, a, fil?.file ?? null, ejer)) {
       sendLaas.current = false;
       toast.error("Kunne ikke sende beskeden");
       return;
@@ -897,7 +899,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       )}
       {lagerFejl && <p className="px-2 md:px-4 py-1 border-t text-[14px] text-muted-foreground" role="status">{LAGER_FEJL}</p>}
 
-      <div className="p-2 md:p-4 border-t safe-area-bottom">
+      <div className="sticky bottom-0 z-10 bg-background p-2 md:p-4 border-t max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="flex gap-1 md:gap-2 items-end">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={FIL_ACCEPT} />
           <Button variant="ghost" size="icon" onClick={() => vaelgFil(null)} disabled={!!fil?.uploader}
