@@ -42,7 +42,7 @@ function builder(tabel: string) {
 // B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
 
 const graense = vi.hoisted(() => ({
-  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  rpc: vi.fn<(...a: unknown[]) => PromiseLike<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
   session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })),
