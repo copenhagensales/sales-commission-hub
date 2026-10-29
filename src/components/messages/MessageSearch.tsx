@@ -81,14 +81,15 @@ export function MessageSearch({ onClose, onSelectMessage }: MessageSearchProps) 
   const resultater = aktuel.art === "resultat" ? aktuel.data : [];
   const nu = useFristUr(resultater.map((m) => m.slettes_efter));
   // B2bc-5b §2: samme fristgrundlag som tråden – kendt udløbet overlever urhop; render læser kun.
-  const viste = resultater.filter((m) => !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu));
+  const soegStart = aktuel.art === "resultat" ? aktuel.start : 0;
+  const viste = resultater.filter((m) => !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu, soegStart));
   const [, setFristSlag] = useState(0);
   useLayoutEffect(() => {
     const t = Date.now();
     let ny = false;
     for (const m of resultater) {
-      const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu);
-      const r = kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t, aktuel.art === "resultat" ? aktuel.start : 0);
+      const vist = !erKendtUdloebet(null, m.conversation_id, m.id, m.slettes_efter, nu, soegStart);
+      const r = kontrollerUdloeb(null, m.conversation_id, m.id, m.slettes_efter, t, soegStart);
       if ((r.ny && vist) || r.ophaevet) ny = true;
     }
     if (ny) setFristSlag((x) => x + 1); // render før frist → effekt efter frist: ny kontrol, ingen 0-ms-løkke

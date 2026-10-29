@@ -134,9 +134,15 @@ function rydAndreGenerationer(m: Map<string, unknown>): void {
  * effekter/callbacks via `kontrollerUdloeb`, så en suspenderet eller kasseret render aldrig ændrer andre visningers
  * udløbsbevis. Rent læsende: kendt udløbet id (uanset projektionens frist) ELLER frist passeret ved `nu`.
  */
-export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number): boolean {
-  if (kendteUdloebne.has(kuNoegle(emp, conv, id))) return true;
+export function erKendtUdloebet(emp: string | null | undefined, conv: string, id: string, frist: string | null | undefined, nu: number, start = 0, revision: number | null = null): boolean {
+  const e = kendteUdloebne.get(kuNoegle(emp, conv, id));
+  if (e && (frist === e.frist || !erNyereEnd(e, start, revision))) return true;
   return !!frist && erUdloebet(frist, nu);
+}
+/** Dokumenteret nyere end registreringen: læsning startet efter den ELLER højere revision for samme id. */
+function erNyereEnd(e: { reg: number; rev: number | null }, start: number, revision: number | null): boolean {
+  const rev = typeof revision === "number" ? revision : null;
+  return start > e.reg || (rev !== null && e.rev !== null && rev > e.rev);
 }
 /**
  * Skrivende fristkontrol – kun i effekt/callback (aldrig under render). `start` er læsningens startbevis
@@ -148,9 +154,7 @@ export function kontrollerUdloeb(emp: string | null | undefined, conv: string, i
   const e = kendteUdloebne.get(k);
   const rev = typeof revision === "number" ? revision : null;
   if (e) {
-    // Dokumenteret nyere: læsning startet efter registreringen ELLER højere revision for samme id.
-    const nyere = start > e.reg || (rev !== null && e.rev !== null && rev > e.rev);
-    if (frist === e.frist || !nyere) return { udloebet: true, ny: false, ophaevet: false };
+    if (frist === e.frist || !erNyereEnd(e, start, rev)) return { udloebet: true, ny: false, ophaevet: false };
     if (frist && erUdloebet(frist, nu)) { kendteUdloebne.set(k, { frist, reg: laesStart(), rev }); return { udloebet: true, ny: false, ophaevet: false }; }
     kendteUdloebne.delete(k);
     return { udloebet: false, ny: false, ophaevet: true };

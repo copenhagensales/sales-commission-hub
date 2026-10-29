@@ -1965,11 +1965,13 @@ describe("B2bc-5b §2 – fristlager: render læser, effekt registrerer; oprydni
     expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toMatchObject({ udloebet: true, ny: true });
     expect(kontrollerUdloeb("e", "c5b", "m1", frist, 10_001)).toMatchObject({ udloebet: true, ny: false }); // ingen løkke
     expect(erKendtUdloebet("e", "c5b", "m1", frist, 10_001 - 690)).toBe(true);
-    // Ny gyldig frist og SQL-pladsholder (null) afslutter forløbet – ingen permanent blokliste.
-    expect(kontrollerUdloeb("e", "c5b", "m1", new Date(99_000).toISOString(), 10_500).udloebet).toBe(false);
+    // B2-6C: ny frist/null uden startbevis er ikke bevis; dokumenteret nyere data (læsning startet efter) afslutter.
+    expect(kontrollerUdloeb("e", "c5b", "m1", new Date(99_000).toISOString(), 10_500).udloebet).toBe(true);
+    const { laesStart } = await import("@/lib/sbKladder");
+    expect(kontrollerUdloeb("e", "c5b", "m1", new Date(99_000).toISOString(), 10_500, laesStart()).udloebet).toBe(false);
     expect(harKendtUdloebet("e", "c5b", "m1")).toBe(false);
     kontrollerUdloeb("e", "c5b", "m2", frist, 10_001);
-    expect(kontrollerUdloeb("e", "c5b", "m2", null, 10_001).udloebet).toBe(false);
+    expect(kontrollerUdloeb("e", "c5b", "m2", null, 10_001, laesStart()).udloebet).toBe(false);
     expect(harKendtUdloebet("e", "c5b", "m2")).toBe(false);
   });
   it("fristOprydning rydder gemt redigeringskladde og Ret-lås for id'et; andre id'ers kladder og en fysisk Gem-lås røres ikke", async () => {

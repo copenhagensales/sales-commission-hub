@@ -51,7 +51,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // B2c-1 §5: lokalt udløbet indhold (klientens ur) – visningsværn, intet skrives.
   const fristNu = useFristUr([message.slettes_efter, message.reply_to?.slettes_efter]);
   // B2c-2a §1: kendt udløbet (konkret frist, generation) – et urhop tilbage genopliver hverken tekst eller editor.
-  const udloebet = erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, fristNu);
+  const udloebet = erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, fristNu, 0, message.revision);
   const slettet = !!message.deleted_at;
   // Kendt udløbet, tilbagetrukket eller slettet originaltekst: ingen editor, ingen Gem, ingen »Brug nyeste tekst«.
   const indholdVaek = trukket || udloebet || slettet;
@@ -59,7 +59,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
   // B2b-1 §3: kladde gendannes med sin egen startrevision; tilbagetrukket indhold genskabes aldrig i editoren.
   const gendan = () => {
     const g = currentEmployeeId ? laesRetKladde(currentEmployeeId, conversationId, message.id) : null;
-    return { ejer: noegle, aaben: !!g && !trukket && !message.deleted_at && !erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now()), tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
+    return { ejer: noegle, aaben: !!g && !trukket && !message.deleted_at && !erKendtUdloebet(currentEmployeeId, conversationId, message.id, message.slettes_efter, Date.now(), 0, message.revision), tekst: g?.tekst ?? message.content, revision: g?.revision ?? message.revision,
       lagerFejl: currentEmployeeId ? harRetLagerFejl(currentEmployeeId, conversationId, message.id) : false, konflikt: false, ukendt: false };
   };
   const [ret, setRet] = useState(gendan);

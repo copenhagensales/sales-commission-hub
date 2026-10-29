@@ -381,7 +381,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   ]);
   // B2c-2a §1: kendt udløbet pr. (generation, bruger, samtale, id, frist) – et urhop tilbage genopliver intet.
   // B2bc-5b §2: render læser kun lageret; registreringen sker i layout-effekten nedenfor.
-  const visBeskeder = useMemo(() => (messages ?? []).filter((m) => !erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu)), [messages, fristNu, meId, conversationId]);
+  const visBeskeder = useMemo(() => (messages ?? []).filter((m) => !erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu, hentStart, m.revision)), [messages, fristNu, meId, conversationId, hentStart]);
   const [, setUdloebSlag] = useState(0);
   useLayoutEffect(() => {
     // Fælles fristgrundlag: tråd, svaruddrag og valgt svar registreres mod det aktuelle ur efter commit.
@@ -392,7 +392,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     // ophæve et kendt udløb (ophævelse udløser én ny render, så legitim nyere servertilstand vises).
     const reg = (id: string | undefined, frist: string | null | undefined, start: number, revision: number | null = null) => {
       if (!id) return;
-      const vist = !erKendtUdloebet(meId, conversationId, id, frist, fristNu);
+      const vist = !erKendtUdloebet(meId, conversationId, id, frist, fristNu, start, revision);
       const r = kontrollerUdloeb(meId, conversationId, id, frist, t, start, revision);
       if ((r.ny && vist) || r.ophaevet) ny = true;
     };
@@ -502,7 +502,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   // B2c-1 §5 / B2c-2a §1: lokalt udløbne rækker genhentes (frist + 500 ms, derefter 2/4/8/16/32 s). Budgettet ejes
   // af det konkrete fristforløb (id + slettes_efter) i useChat og overlever remount og andre rækkers udløb/bortfald.
-  const udloebneListe = (messages ?? []).filter((m) => m.slettes_efter && erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu));
+  const udloebneListe = (messages ?? []).filter((m) => m.slettes_efter && erKendtUdloebet(meId, conversationId, m.id, m.slettes_efter, fristNu, hentStart, m.revision));
   const udloebne = udloebneListe.map((m) => `${m.id}@${m.slettes_efter}`).join(",");
   // B2c-2b-2: fristoprydning via stopvejen for netop de kendt udløbne id'er (én gang pr. frist og generation).
   // Låsen for fysisk igangværende arbejde og andre afsendelser/kladder røres ikke.
