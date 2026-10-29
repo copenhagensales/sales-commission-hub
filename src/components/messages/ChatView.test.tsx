@@ -1853,7 +1853,7 @@ describe("B2bc-5a §3 – ugyldiggørelse straks ved hændelsen; 300 ms forsinke
     const r = await klar();
     await waitFor(() => expect(screen.getByText("første")).toBeTruthy());
     // Et gammelt request startes (genforbindelse), og en ny hændelse kommer, mens det er i gang.
-    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await act(async () => { meldChatSignal({ conversationId: "A", kildeId: "andet0", haendelse: "trukket" }); });
     await vent(350);
     expect(n).toBe(2);
     await act(async () => { meldChatSignal({ conversationId: "A", kildeId: "andet", haendelse: "trukket" }); });
