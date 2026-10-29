@@ -1990,3 +1990,104 @@ describe("B2bc-5b §2 – fristlager: render læser, effekt registrerer; oprydni
     expect(handlingFor("e", "c5o", "g").art).toBe("gem"); // fysisk arbejde beholder pladsen til egen afslutning
   });
 });
+
+// ---------- B2d-2 T12 (§12): sletning/forladelse gennem rigtig useDeleteConversation ----------
+import { useDeleteConversation, rydSlettetSamtale, registrerSamtaleStop, handlingFor } from "./useChat";
+import { gemKladde, laesKladde, tilfoejAfsendelse, hentAfsendelser, gemRetKladde, laesRetKladde, sessionsGeneration as genNu } from "@/lib/sbKladder";
+describe("T12 §12 sletning, forladelse og kladdeoprydning", () => {
+  let qc12: QueryClient;
+  // Antagelse (ikke SQL-bevis): RLS lader DELETE returnere rækken ved tilladt sletning og 0 rækker ved afvisning.
+  const tabeller = (o: { conv: Record<string, unknown>; slettet: boolean }) => (t: string) => {
+    const b: Record<string, unknown> = {};
+    const res = () => ({ data: t === "chat_conversations" || t === "chat_conversation_members" ? (o.slettet ? [{ id: "x" }] : []) : null, error: null });
+    Object.assign(b, {
+      select: () => b, eq: () => b, delete: () => b,
+      single: () => Promise.resolve({ data: o.conv, error: null }),
+      then: (ok: (v: unknown) => unknown, f?: (e: unknown) => unknown) => Promise.resolve(res()).then(ok, f),
+    });
+    return b;
+  };
+  const afsPost = { id: "p1", tekst: "t", svarId: null, fil: null, tilstand: "afstemmer" as const, fejl: null, tidligereUkendt: false, oprettet: 1 };
+  const stop = vi.fn();
+  beforeEach(() => {
+    rydAlleKladder();
+    qc12 = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } } });
+    graense.rpc.mockImplementation(async () => ({ data: "e", error: null }));
+    registrerSamtaleStop(stop); stop.mockReset();
+    gemKladde("e", "S", { tekst: "kladde", svarId: null });
+    gemRetKladde("e", "S", { beskedId: "m", tekst: "ret", revision: 1 });
+    tilfoejAfsendelse("e", "S", afsPost);
+    gemKladde("e", "T", { tekst: "anden samtale", svarId: null });
+  });
+  afterEach(() => { graense.from.mockReset(); graense.rpc.mockReset(); qc12.clear(); registrerSamtaleStop(() => {}); });
+  const w = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc12 }, children);
+
+  it("bekræftet sletning: stopvej først, derefter kun samtalens kladde/ret-kladde/pending ryddet", async () => {
+    graense.from.mockImplementation(tabeller({ conv: { created_by: "e", is_group: true, direct_key: null }, slettet: true }));
+    let ryddetVedStop: boolean | null = null;
+    stop.mockImplementation(() => { ryddetVedStop = laesKladde("e", "S") === null; });
+    const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
+    await act(async () => { await result.current.mutateAsync("S"); });
+    expect(stop).toHaveBeenCalledWith("e", "S");
+    expect(ryddetVedStop).toBe(false); // invalidering før rydning
+    expect(laesKladde("e", "S")).toBeNull();
+    expect(laesRetKladde("e", "S", "m")).toBeNull();
+    expect(hentAfsendelser("e", "S")).toEqual([]);
+    expect(laesKladde("e", "T")?.tekst).toBe("anden samtale");
+    // Sent callback (fx ChatViews autogem) genskaber intet.
+    gemKladde("e", "S", { tekst: "sen", svarId: null });
+    expect(laesKladde("e", "S")).toBeNull();
+  });
+
+  it("bekræftet forladelse af gruppe (ikke opretter) rydder; afvist forladelse og afvist sletning bevarer; retry:0", async () => {
+    graense.from.mockImplementation(tabeller({ conv: { created_by: "anden", is_group: true, direct_key: null }, slettet: false }));
+    const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
+    await act(async () => { await expect(result.current.mutateAsync("S")).rejects.toThrow("Kunne ikke forlade gruppen"); });
+    expect(graense.from.mock.calls.filter(([t]) => t === "chat_conversations").length).toBe(1); // ingen automatisk gentagelse
+    expect(laesKladde("e", "S")?.tekst).toBe("kladde");
+    expect(stop).not.toHaveBeenCalled();
+    graense.from.mockImplementation(tabeller({ conv: { created_by: "anden", is_group: true, direct_key: null }, slettet: true }));
+    await act(async () => { await result.current.mutateAsync("S"); });
+    expect(laesKladde("e", "S")).toBeNull();
+  });
+
+  it("nøglebundet direkte samtale afvises før DELETE og bevarer kladden", async () => {
+    const kaldte: string[] = [];
+    graense.from.mockImplementation((t: string) => { kaldte.push(t); return tabeller({ conv: { created_by: "e", is_group: false, direct_key: "k" }, slettet: true })(t); });
+    const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
+    await act(async () => { await expect(result.current.mutateAsync("S")).rejects.toThrow("Direkte samtaler kan ikke slettes"); });
+    expect(kaldte).toEqual(["chat_conversations"]);
+    expect(laesKladde("e", "S")?.tekst).toBe("kladde");
+  });
+
+  it("logud under sletningen: handlingens gamle generation rydder intet i den nye session", async () => {
+    let løs!: (v: unknown) => void;
+    graense.from.mockImplementation((t: string) => {
+      const b = tabeller({ conv: { created_by: "e", is_group: true, direct_key: null }, slettet: true })(t) as Record<string, unknown>;
+      if (t === "chat_conversations") b.single = () => new Promise((r) => { løs = r; });
+      return b;
+    });
+    const { result } = renderHook(() => useDeleteConversation(), { wrapper: w });
+    let p!: Promise<unknown>;
+    act(() => { p = result.current.mutateAsync("S"); });
+    await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
+    rydAlleKladder(); // logud/brugerskift
+    expect(laesKladde("e", "S")).toBeNull(); // logud rydder brugerens tilstand
+    gemKladde("e", "S", { tekst: "ny brugers kladde", svarId: null });
+    await act(async () => { løs({ data: { created_by: "e", is_group: true, direct_key: null }, error: null }); await p; });
+    expect(stop).not.toHaveBeenCalled();
+    expect(laesKladde("e", "S")?.tekst).toBe("ny brugers kladde");
+    rydSlettetSamtale("e", "S", genNu() - 1);
+    expect(laesKladde("e", "S")?.tekst).toBe("ny brugers kladde");
+  });
+
+  it("lokale editorlåse ryddes; fysisk Gem beholder sin lås til egen afslutning", async () => {
+    auth("SIGNED_IN", "u");
+    const ejer = fastholdEjer("e", "S", "u")!;
+    expect(tagHandling(ejer, "r", "ret")).toBe(true);
+    expect(tagHandling(fastholdEjer("e", "S", "u"), "g", "gem")).toBe(true);
+    rydSlettetSamtale("e", "S", genNu());
+    expect(handlingFor("e", "S", "r").art).toBeNull();
+    expect(handlingFor("e", "S", "g").art).toBe("gem");
+  });
+});

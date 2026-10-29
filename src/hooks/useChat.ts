@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, type OperationsEjer } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, type OperationsEjer } from "@/lib/sbKladder";
 
 export interface Conversation {
   id: string;
@@ -874,11 +874,37 @@ export function useMarkAsRead() {
 /** Nøglebundne direkte samtaler (direct_key) kan ikke slettes eller forlades. */
 export const kanSletteSamtale = (c: Pick<Conversation, "direct_key">) => !c.direct_key;
 
+/** B2d-2 §12: kobling til ChatViews afstemningsstop (stopAfstemninger) uden cirkulær import. */
+type SamtaleStop = (emp: string, conv: string) => void;
+let samtaleStop: SamtaleStop = () => {};
+export function registrerSamtaleStop(fn: SamtaleStop): void { samtaleStop = fn; }
+
+/**
+ * B2d-2 §12: efter BEKRÆFTET tilladt sletning/forladelse. 1) Stopvejen invaliderer operationer (send/afstemning/
+ * efterbehandling/tjek) – fysisk arbejde beholder plads/lås til egen afslutning. 2) Derefter ryddes snapshots,
+ * lokale editorlåse og lageret for netop (medarbejder, samtale) i handlingens generation.
+ */
+export function rydSlettetSamtale(emp: string, conv: string, gen: number): void {
+  if (gen !== sessionsGeneration()) return;
+  samtaleStop(emp, conv);
+  stopEfterbehandling(emp, conv);
+  const pre = `${gen}:${emp}:${conv}:`;
+  let aendret = false;
+  for (const k of [...ukendte.keys()]) if (k.startsWith(pre)) { ukendte.delete(k); aendret = true; }
+  for (const [k, h] of [...handlinger]) if (k.startsWith(pre) && h.art === "ret") { handlinger.delete(k); aendret = true; }
+  rydSamtale(emp, conv, gen);
+  if (aendret) hMeld();
+}
+
 export function useDeleteConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // B2d-2 §12: sletning/forladelse gentages aldrig automatisk (appens mutations.retry=1).
+    retry: 0,
     mutationFn: async (conversationId: string) => {
+      // Generationen fastholdes ved handlingens start; medarbejderen ved første opslag.
+      const gen = sessionsGeneration();
       const employeeId = await getCurrentEmployeeId();
       const { data: conversation, error: cErr } = await supabase
         .from("chat_conversations")
@@ -903,6 +929,8 @@ export function useDeleteConversation() {
         if (d.error) throw d.error;
         if (!d.data?.length) throw new Error("Kunne ikke forlade gruppen");
       }
+      // Kun efter bekræftelse; afvisning (kast ovenfor) bevarer kladden.
+      rydSlettetSamtale(employeeId, conversationId, gen);
       return conversationId;
     },
     onSettled: () => {
