@@ -891,12 +891,9 @@ describe("T5 (B2c-1 §5) – useMessages bevarer rå sider", () => {
 });
 
 // ---------- B2b-3a: resultatkontrakt, holdbart ukendt udfald, lås/kø/stop (netværk mocket; SQL/RLS = antagelser) ----------
-import {
-  vurderUdfald, useEditMessage, useAfgoer, useFjernFil, tagHandling, aktiveHandlinger, udfaldSnapshot, tjekUdfaldIgen,
-  stopEfterbehandling, HandlingsFejl,
-} from "./useChat";
+import { vurderUdfald, useAfgoer, useFjernFil, aktiveHandlinger, udfaldSnapshot, tjekUdfaldIgen, HandlingsFejl } from "./useChat";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { act, waitFor } from "@testing-library/react";
+import { act } from "@testing-library/react";
 import { toast } from "sonner";
 
 describe("B2b-3a §1 – resultatvurdering mod snapshot", () => {
