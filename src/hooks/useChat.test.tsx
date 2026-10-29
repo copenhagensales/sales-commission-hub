@@ -1495,7 +1495,7 @@ describe("B2b-4b §3 – SDK'ets senere tokenventepunkt gennem rigtig SDK og moc
     const sdk = lavSdk();
     graense.invoke.mockReset().mockImplementation((navn: unknown, o: unknown) => sdk.functions.invoke(String(navn), {
       headers: { Authorization: String(arg(o, "headers", "Authorization")) },
-      body: arg(o, "body") as Record<string, unknown>,
+      body: (() => { const b = arg(o, "body"); return typeof b === "object" && b !== null ? { ...b } : undefined; })(),
       signal: (() => { const s = arg(o, "signal"); return s instanceof AbortSignal ? s : undefined; })(),
     }));
     auth("SIGNED_IN", "u");
