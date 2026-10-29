@@ -186,12 +186,13 @@ export const FRIST_GENHENT_MS = [500, 2000, 4000, 8000, 16000, 32000] as const;
  * B2c-1 §5: svaroriginal uden for de indlæste sider valideres ved et afgrænset RLS-opslag (én række).
  * null = ingen synlig række (utilgængelig). Nøglen indeholder sessionsgenerationen, så et gammelt svar aldrig rammer en ny session.
  */
-export function useSvarOriginal(id: string | null, forespGen = 0) {
+export function useSvarOriginal(id: string | null, forespGen = 0, aktiv = true) {
   const gen = sessionsGeneration();
   return useQuery({
     // B2c-1b §2: forespørgselsgenerationen gør, at et svar startet før genvalideringen aldrig rammer den nye nøgle.
+    // B2bc-5a §3: generationen skiftes straks ved hændelsen; `aktiv` holder kun den nye hentning tilbage i debounce.
     queryKey: ["chat-svar-original", gen, forespGen, id],
-    enabled: !!id,
+    enabled: !!id && aktiv,
     retry: false,
     queryFn: async (): Promise<ReplyPreview | null> => {
       if (!id) return null;
@@ -341,12 +342,53 @@ async function iBlokke<T = Record<string, unknown>>(
 /** Beskeder hentes nyeste først i blokke à 100; ældre historik hentes ved »Indlæs ældre«. */
 export const CHAT_PAGE_SIZE = 100;
 
+/**
+ * B2bc-5a §1: ét deduplikeret rækkegrundlag for visning og resultatbevis. Ældste blok først; første forekomst
+ * (i den ældste blok) vinder – samme regel som beskedlisten altid har brugt.
+ */
+export function dedupSider(pages: readonly (readonly Message[])[]): Message[] {
+  const set = new Set<string>();
+  const ud: Message[] = [];
+  for (const page of [...pages].reverse()) {
+    if (!Array.isArray(page)) continue;
+    for (const m of page) if (!set.has(m.id)) { set.add(m.id); ud.push(m); }
+  }
+  return ud;
+}
+
+/**
+ * B2bc-5a §3: hentesekvens pr. samtale. Hver blokhentning får et startnummer; blokken (array-referencen) husker det.
+ * Et resultat fra et request startet før en genvalideringshændelse er aldrig bevis – uanset dataUpdatedAt.
+ */
+const traadSekvens = new Map<string, number>();
+const sideStart = new WeakMap<object, number>();
+export function traadHentSekvens(conv: string | null | undefined): number { return conv ? traadSekvens.get(conv) ?? 0 : 0; }
+/** Laveste startnummer blandt blokkene (0 = ukendt, fx lokalt omskrevet cache). */
+export function traadSiderStart(pages: readonly object[] | undefined): number {
+  if (!pages || !pages.length) return 0;
+  let min = Infinity;
+  for (const p of pages) min = Math.min(min, sideStart.get(p) ?? 0);
+  return min === Infinity ? 0 : min;
+}
+
 export function useMessages(conversationId: string | null) {
   const query = useInfiniteQuery({
     queryKey: ["chat-messages", conversationId],
     initialPageParam: 0,
+    // B2bc-5a §3: friske blokreferencer, så startnummeret aldrig arves fra en ældre, indholdslig blok.
+    structuralSharing: false,
     queryFn: async ({ pageParam }): Promise<Message[]> => {
       if (!conversationId) return [];
+      const start = traadHentSekvens(conversationId) + 1;
+      traadSekvens.set(conversationId, start);
+      const ud = await hentSide(conversationId, pageParam);
+      sideStart.set(ud, start);
+      return ud;
+    },
+    getNextPageParam: (last, all) => (last.length === CHAT_PAGE_SIZE ? all.length : undefined),
+    enabled: !!conversationId,
+  });
+  async function hentSide(conversationId: string, pageParam: number): Promise<Message[]> {
       const fra = pageParam * CHAT_PAGE_SIZE;
       // Use secure view for sender data
       const { data: nyesteFoerst, error } = await supabase
@@ -442,20 +484,9 @@ export function useMessages(conversationId: string | null) {
           read_receipts: readReceiptsMap.get(msg.id) || []
         };
       }) as Message[];
-    },
-    getNextPageParam: (last, all) => (last.length === CHAT_PAGE_SIZE ? all.length : undefined),
-    enabled: !!conversationId,
-  });
+  }
   // Ældste blok først; dubletter (forskudte blokke efter nye beskeder) fjernes.
-  const data = useMemo(() => {
-    if (!query.data) return undefined;
-    const set = new Set<string>();
-    const ud: Message[] = [];
-    for (const page of [...query.data.pages].reverse()) {
-      for (const m of page) if (!set.has(m.id)) { set.add(m.id); ud.push(m); }
-    }
-    return ud;
-  }, [query.data]);
+  const data = useMemo(() => (query.data ? dedupSider(query.data.pages) : undefined), [query.data]);
   return {
     data,
     isLoading: query.isLoading,
@@ -464,6 +495,8 @@ export function useMessages(conversationId: string | null) {
     loadOlder: () => { if (!query.isFetching) void query.fetchNextPage(); },
     /** B2c-1: tidspunkt for seneste hentning (til fristgenhentning). */
     opdateret: query.dataUpdatedAt,
+    /** B2bc-5a §3: laveste startnummer for de viste blokke. */
+    hentStart: traadSiderStart(query.data?.pages),
   };
 }
 
@@ -1422,14 +1455,11 @@ function gemSnapshot(s: Omit<UdfaldSnapshot, "bekraeftet">, bekraeftet: boolean)
 export function visningIndarbejdet(qc: QueryClient, s: Pick<UdfaldSnapshot, "id" | "forventet"> & { ejer: Pick<OperationsEjer, "conv"> }): boolean {
   const d = qc.getQueryData<InfiniteData<Message[]>>(["chat-messages", s.ejer.conv]);
   if (!d || !Array.isArray(d.pages)) return false;
-  for (const side of d.pages) {
-    if (!Array.isArray(side)) continue;
-    const m = side.find((x) => x.id === s.id);
-    if (!m) continue;
-    if (m.revision > s.forventet.revision) return true;
-    return m.revision === s.forventet.revision && (!s.forventet.status || m.status === s.forventet.status);
-  }
-  return false;
+  // B2bc-5a §1: samme deduplikerede grundlag som beskedvisningen – en anden kopi af id'et tæller ikke.
+  const m = dedupSider(d.pages).find((x) => x.id === s.id);
+  if (!m) return false;
+  if (m.revision > s.forventet.revision) return true;
+  return m.revision === s.forventet.revision && (!s.forventet.status || m.status === s.forventet.status);
 }
 /** Genhenter beskedvisningen, før låsen slippes. Fejl eller ingen faktisk opdatering → bekræftet snapshot, så det gamle grundlag ikke kan handle igen. */
 async function opdaterVisning(qc: QueryClient, s: Omit<UdfaldSnapshot, "bekraeftet">, vagt: () => boolean): Promise<boolean> {
