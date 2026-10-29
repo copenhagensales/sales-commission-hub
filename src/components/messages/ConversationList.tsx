@@ -73,7 +73,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   }
 
   return (
-    <ScrollArea className="h-full" ref={rootRef}>
+    <ScrollArea className="h-full w-full [&_[data-radix-scroll-area-viewport]>div]:!block" ref={rootRef}>
       <div className="p-2 space-y-1 max-md:space-y-2">
         {conversations.map((conversation) => (
           <ConversationItem
@@ -148,7 +148,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
         aria-label={`${displayName}${unreadCount > 0 ? `, ${unreadCount} ulæste` : ""}`}
         className={cn(
-          "group relative flex min-h-[64px] items-center gap-3 p-3 md:min-h-0 md:p-3 rounded-xl max-md:border max-md:border-border max-md:bg-card cursor-pointer transition-all duration-200 active:scale-[0.98] touch-manipulation",
+          "group relative flex w-full min-w-0 max-w-full overflow-hidden min-h-[64px] items-center gap-3 p-3 md:min-h-0 md:p-3 rounded-xl max-md:border max-md:border-border max-md:bg-card cursor-pointer transition-all duration-200 active:scale-[0.98] touch-manipulation",
           isSelected 
             ? "bg-primary text-primary-foreground shadow-md" 
             : "hover:bg-accent/60 active:bg-accent/80"
@@ -185,7 +185,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
               {unreadCount > 0 && !isSelected && (
                 <Badge 
                   variant="default" 
-                  className="h-5 min-w-5 flex items-center justify-center text-xs px-1.5 animate-in zoom-in-50"
+                  className="h-5 min-w-5 flex items-center justify-center text-xs max-md:text-[14px] max-md:h-6 px-1.5 animate-in zoom-in-50"
                 >
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </Badge>
@@ -205,7 +205,7 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
             </span>
             {conversation.is_group && onlineMemberCount > 0 && (
               <span className={cn(
-                "flex items-center gap-1",
+                "flex items-center gap-1 shrink-0",
                 isSelected ? "text-primary-foreground/70" : "text-green-600"
               )}>
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />

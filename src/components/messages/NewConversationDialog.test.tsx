@@ -175,7 +175,7 @@ describe("B2-6B §B oprettelse: session og reel lukning", () => {
     fireEvent.click(screen.getByRole("button", { name: "Opret samtale" }));
     await vi.waitFor(() => expect(løs).toBeTypeOf("function"));
     rydAlleKladder(); // logud/brugerskift
-    await act(async () => { løs({ data: { user: { id: "u" } } } as Bruger); await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => { const svar: Bruger = { data: { user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" } }, error: null }; løs(svar); await new Promise((r) => setTimeout(r, 0)); });
     expect(opretKald()).toBe(0);
     expect(onCreated).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
