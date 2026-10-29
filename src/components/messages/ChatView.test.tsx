@@ -1466,14 +1466,21 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
   });
 
   it("successive frister: hver frist planlægges efter den forrige", async () => {
+    // B2bc-5c-2 §3: kontrolleret ur (ingen vægurfrister); fristtimerne afvikles med falske timere.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     beskeder.liste = [fremmed("a", "første", { slettes_efter: om(150) }), fremmed("b", "anden", { slettes_efter: om(450) }), fremmed("c", "varig")];
-    await klar();
-    await vent(250);
+    const r = render(wrap(<ChatView conversationId="A" />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(149); });
+    expect(screen.getByText("første")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(screen.queryByText("første")).toBeNull();
     expect(screen.getByText("anden")).toBeTruthy();
-    await vent(300);
+    await act(async () => { await vi.advanceTimersByTimeAsync(299); });
+    expect(screen.getByText("anden")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(screen.queryByText("anden")).toBeNull();
     expect(screen.getByText("varig")).toBeTruthy();
+    r.unmount();
   });
 
   it("SQL-pladsholder efter oprydning: samme id vises igen med serverens pladsholder (ingen blokliste)", async () => {
@@ -2141,5 +2148,152 @@ describe("B2bc-5c-1 §2 – genhentningsbudget bundet til det konkrete hentefors
     expect(n()).toBe(2); // 2 s målt fra det konkrete forsøgs afslutning
     r.unmount();
     for (const v of venter.splice(0)) v();
+  });
+});
+
+// ---------- B2bc-5c-2 §1 – udløb under »Tjek igen« og sent svar (rigtig ChatView + MessageBubble) ----------
+describe("B2bc-5c-2 §1 – udløb under »Tjek igen«", () => {
+  const T0 = new Date("2026-10-29T09:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0);
+    const { supabase } = await import("@/integrations/supabase/client");
+    const session: Session = { access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
+      user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" } };
+    graense.session.mockResolvedValue({ data: { session }, error: null });
+    const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { cb("SIGNED_IN", { user: { id: "u" } }); });
+  });
+  afterEach(() => { graense.rpc.mockReset(); graense.rpc.mockImplementation(async () => ({ data: "e", error: null })); vi.useRealTimers(); });
+  const egen = (frist: string | null, extra: Record<string, unknown> = {}) => fremmed("m1", "original-hemmelig", { sender_id: "e", revision: 3, slettes_efter: frist, ...extra });
+  const editor = () => screen.queryAllByRole("textbox").find((x) => x.getAttribute("aria-label") !== "besked") as HTMLTextAreaElement | undefined;
+  const genrender = async (r: ReturnType<typeof render>) => { r.rerender(wrap(<ChatView conversationId="A" />)); await tick(); };
+  const bekraeftetRaekke = { data: { status: "leveret", revision: 4, content: "min rettelse", attachment_path: null }, error: null };
+
+  /** Gem med transportfejl + ulæselig efterlæsning → holdbart ukendt udfald med »Tjek igen« (før fristen). */
+  async function ukendtGem() {
+    const { gemRetKladde } = await import("@/lib/sbKladder");
+    beskeder.liste = [egen(iso(1000))];
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "min rettelse", revision: 3 });
+    graense.rpc.mockImplementation(async (navn: unknown) => { if (navn === "sb_ret") throw new TypeError("Failed to fetch"); return { data: "e", error: null }; });
+    net.svar.chat_messages = [{ data: null, error: { message: "netværk" } }];
+    const r = await klar();
+    await waitFor(() => expect(editor()?.value).toBe("min rettelse"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
+    await tick(); await tick();
+    expect(await screen.findByRole("button", { name: "Tjek igen" })).toBeTruthy();
+    return r;
+  }
+
+  it("udløb under rækkeopslaget: sent bekræftende svar genskaber intet snapshot, rydder ikke nyere kladde og starter ingen efterbehandling", async () => {
+    const { udfaldSnapshot, handlingFor } = await import("@/hooks/useChat");
+    const { gemRetKladde, laesRetKladde } = await import("@/lib/sbKladder");
+    const r = await ukendtGem();
+    const hold = kontrol<Svar>();
+    net.vent = () => hold.p;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(true);
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    expect(udfaldSnapshot("e", "A", "m1")).toBeNull();          // fristoprydning via stopvejen
+    // Nyere gyldigt grundlag for samme id med ny kladde.
+    beskeder.liste = [egen(iso(60_000), { content: "ny tekst", revision: 7 })]; beskeder.opdateret++;
+    gemRetKladde("e", "A", { beskedId: "m1", tekst: "ny kladde", revision: 7 });
+    await genrender(r);
+    const refetch = vi.spyOn(qc, "refetchQueries"); const inval = vi.spyOn(qc, "invalidateQueries");
+    const rpcFoer = graense.rpc.mock.calls.length;
+    await act(async () => { hold.res(bekraeftetRaekke); await hold.p; });
+    await tick(); await tick();
+    expect(udfaldSnapshot("e", "A", "m1")).toBeNull();
+    expect(laesRetKladde("e", "A", "m1")?.tekst).toBe("ny kladde");
+    expect(refetch).not.toHaveBeenCalled();
+    expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
+    expect(graense.rpc.mock.calls.length).toBe(rpcFoer);
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
+    expect(screen.queryByText("Udfaldet kunne ikke bekræftes")).toBeNull();
+    r.unmount();
+  });
+
+  it("udløb under listegenhentningen: sent refetch-svar genskaber intet snapshot og starter ingen tjek-/cacheefterbehandling", async () => {
+    const { udfaldSnapshot, handlingFor } = await import("@/hooks/useChat");
+    const r = await ukendtGem();
+    net.svar.chat_messages = [bekraeftetRaekke];
+    const hold = kontrol<void>();
+    const refetch = vi.spyOn(qc, "refetchQueries").mockImplementation(() => hold.p);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    await waitFor(() => expect(refetch).toHaveBeenCalled()); // rækkeopslaget bekræftede; listen genhentes
+    vi.setSystemTime(T0 + 1001);
+    await genrender(r);
+    const inval = vi.spyOn(qc, "invalidateQueries");
+    const kaldFoer = net.kald.length, rpcFoer = graense.rpc.mock.calls.length;
+    await act(async () => { hold.res(); await hold.p; });
+    await tick(); await tick();
+    expect(udfaldSnapshot("e", "A", "m1")).toBeNull();
+    expect(inval.mock.calls.some((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["sb-begrundelse"]))).toBe(false);
+    expect(net.kald.length).toBe(kaldFoer);
+    expect(graense.rpc.mock.calls.length).toBe(rpcFoer);
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
+    expect(editor()).toBeUndefined();
+    r.unmount();
+  });
+
+  it("stop uden fristbevis under »Tjek igen« bevarer den almindelige kontrakt for ukendt udfald", async () => {
+    const { udfaldSnapshot, stopEfterbehandling, handlingFor } = await import("@/hooks/useChat");
+    const r = await ukendtGem();
+    const hold = kontrol<Svar>();
+    net.vent = () => hold.p;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tjek igen" })); });
+    act(() => { stopEfterbehandling("e", "A", "m1"); });   // stop – fristen er ikke passeret
+    await act(async () => { hold.res(bekraeftetRaekke); await hold.p; });
+    await tick(); await tick();
+    expect(udfaldSnapshot("e", "A", "m1")).not.toBeNull(); // ukendt udfald bevaret
+    expect(handlingFor("e", "A", "m1").tjekker).toBe(false);
+    expect(screen.getByText("Udfaldet kunne ikke bekræftes")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tjek igen" })).toBeTruthy();
+    r.unmount();
+  });
+});
+
+// ---------- B2bc-5c-2 §3 – to klienter med tegnet visning gennem ChatView/MessageBubble (fælles netværksmodel = antagelse) ----------
+describe("B2bc-5c-2 §3 – to klienter, samme id, tegnet visning", () => {
+  it("klient 1's sene INSERT taber på primærnøglen mod den anden klients række → begge visninger tegner præcis én besked, intet »Ikke sendt«", async () => {
+    beskeder.ægteSend = true;
+    const { supabase } = await import("@/integrations/supabase/client");
+    const cb = vi.mocked(supabase.auth.onAuthStateChange).mock.calls[0][0] as (e: string, s: unknown) => void;
+    act(() => { cb("SIGNED_IN", { user: { id: "u" } }); });
+    // Fælles model: INSERT er atomisk; primærnøglekonflikt = 23505 (antagelse, ikke SQL).
+    const rækker = new Map<string, Record<string, unknown>>();
+    const holdte: Array<() => void> = [];
+    net.insert.mockImplementation((row: unknown) => {
+      const r = row as { id: string };
+      const udfoer = () => (rækker.has(r.id) ? { error: { code: "23505", message: "duplicate key" } } : (rækker.set(r.id, { ...r }), { error: null }));
+      return new Promise((res) => holdte.push(() => res(udfoer())));
+    });
+    net.vent = async (id) => ({ data: rækker.has(id) ? { id, status: "leveret", revision: 1, content: "fælles tekst", attachment_path: null } : null, error: null });
+    const qc1 = qc, qc2 = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    const k1 = render(<QueryClientProvider client={qc1}><ChatView conversationId="A" /></QueryClientProvider>);
+    await waitFor(() => expect(hentAfsendelser("e", "A")).toBeDefined());
+    await tick();
+    fireEvent.change(within(k1.container).getByLabelText("besked"), { target: { value: "fælles tekst" } });
+    await act(async () => { fireEvent.click(within(k1.container).getByRole("button", { name: "Send" })); });
+    await waitFor(() => expect(holdte).toHaveLength(1));
+    const id = hentAfsendelser("e", "A")[0].id;
+    // Klient 2 (anden enhed) har allerede gemt rækken med samme id.
+    rækker.set(id, { id, content: "fælles tekst" });
+    const raekke = fremmed(id, "fælles tekst", { sender_id: "e" });
+    beskeder.liste = [raekke]; beskeder.opdateret++;
+    const k2 = render(<QueryClientProvider client={qc2}><ChatView conversationId="A" /></QueryClientProvider>);
+    await tick();
+    await act(async () => { holdte.splice(0).forEach((h) => h()); });
+    await tick(); await tick();
+    k1.rerender(<QueryClientProvider client={qc1}><ChatView conversationId="A" /></QueryClientProvider>);
+    await tick();
+    expect(rækker.size).toBe(1);
+    for (const k of [k1, k2]) {
+      expect(within(k.container).getAllByText("fælles tekst")).toHaveLength(1); // tegnet præcis én gang (ingen pending-dublet)
+      expect(within(k.container).queryByText(/Ikke sendt/)).toBeNull();
+    }
+    expect(hentAfsendelser("e", "A")).toHaveLength(0);
+    k1.unmount(); k2.unmount(); qc2.clear();
   });
 });
