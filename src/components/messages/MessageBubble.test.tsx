@@ -537,3 +537,53 @@ describe("B2c-1 §5 – editorspærring ved udløbet indhold (klientens ur)", ()
     expect(screen.getByText("Beskeden er ikke længere tilgængelig")).toBeTruthy();
   });
 });
+
+describe("B2c-1b §1 – aktuel frist i editor, Gem og kvittering", () => {
+  const T0 = new Date("2026-10-29T00:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  const sbRet = () => graense.rpc.mock.calls.filter((c) => c[0] === "sb_ret").length;
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0); aegte.brug = true; graense.rpc.mockClear(); });
+  const slut = () => { vi.useRealTimers(); aegte.brug = false; };
+
+  it("åben editor modtager allerede udløbet frist → tekst skjult, ingen Gem, nul sb_ret", async () => {
+    try {
+      gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
+      const m = { ...besked("m1", "server"), slettes_efter: iso(60_000) };
+      const r = render(ui(m, "e"));
+      expect(felt()?.value).toBe("min rettelse");
+      r.rerender(ui({ ...m, slettes_efter: iso(-1) }));
+      expect(felt()).toBeNull();
+      expect(screen.queryByText("min rettelse")).toBeNull();
+      expect(screen.queryByText("server")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Gem ændring" })).toBeNull();
+      expect(sbRet()).toBe(0);
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  it("Gem-callback fra før udløbet (ingen ny render) sender ikke sb_ret", async () => {
+    try {
+      gemRetKladde("e", "c", { beskedId: "m1", tekst: "min rettelse", revision: 1 });
+      const r = render(ui({ ...besked("m1", "server"), slettes_efter: iso(1000) }, "e"));
+      const knap = screen.getByRole("button", { name: "Gem ændring" });
+      vi.setSystemTime(T0 + 1500); // fristen passerer uden render/timerbehandling
+      await act(async () => { fireEvent.click(knap); });
+      expect(sbRet()).toBe(0);
+      r.unmount();
+    } finally { slut(); }
+  });
+
+  it("fokus før fristtimerbehandling kvitterer ikke en udløbet fremmed række", async () => {
+    try {
+      const fokus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      const m = { ...besked("f1", "fremmed"), sender_id: "anden", slettes_efter: iso(1000) };
+      const r = render(wrap(<MessageBubble message={m} isOwn={false} currentEmployeeId="e" authBrugerId="u" conversationId="c" onReply={() => undefined} />));
+      vi.setSystemTime(T0 + 1500);
+      fokus.mockReturnValue(true);
+      await act(async () => { window.dispatchEvent(new Event("focus")); });
+      expect(qc.getMutationCache().getAll()).toHaveLength(0); // ingen kvitteringsmutation startet
+      fokus.mockRestore();
+      r.unmount();
+    } finally { slut(); }
+  });
+});

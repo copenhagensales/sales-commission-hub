@@ -1533,3 +1533,73 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     expect(vi.getTimerCount()).toBeLessThan(5); // ingen ophobede/løbske timere
   });
 });
+
+describe("B2c-1b §1/§2 – aktuel frist og genvalidering af valgt svar", () => {
+  const T0 = new Date("2026-10-29T00:00:00Z").getTime();
+  const iso = (ms: number) => new Date(T0 + ms).toISOString();
+  const raekke = (content: string, slettes_efter: string | null = null) => ({ data: { id: "x", content, sender_id: "s", status: "leveret", slettes_efter, deleted_at: null, sender: null }, error: null });
+  const vent = (ms: number) => act(async () => { await new Promise((x) => setTimeout(x, ms)); });
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(T0); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("frist passerer under svaropslag → udløbet svar vises aldrig", async () => {
+    const k = kontrol<unknown>();
+    net.vent = () => k.p;
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    vi.setSystemTime(T0 + 1000);
+    await act(async () => { k.res(raekke("udløbet svar", iso(500))); await k.p; });
+    await vent(0);
+    expect(screen.queryByText("udløbet svar")).toBeNull();
+    r.unmount();
+  });
+
+  it("gammel svartekst skjules straks ved genforbindelse; læsefejl → fejltilstand uden tekst, reference bevaret", async () => {
+    net.svar.chat_messages = [raekke("svartekst")];
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    await waitFor(() => expect(screen.getByText("svartekst")).toBeTruthy());
+    net.svar.chat_messages = [{ data: null, error: { message: "Failed to fetch" } }];
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    expect(screen.queryByText("svartekst")).toBeNull(); // straks, før debounce/netværk
+    await vent(400);
+    await waitFor(() => expect(screen.getByText("Svaret kan ikke vises lige nu")).toBeTruthy());
+    expect(screen.queryByText("svartekst")).toBeNull();
+    expect(laesKladde("e", "A")?.svarId).toBe("x"); // fejl er ikke sletning
+    r.unmount();
+  });
+
+  it("sent oprindeligt svar efter invalidation genindsætter ikke indhold (query havde endnu ingen data)", async () => {
+    const gammel = kontrol<unknown>();
+    let n = 0;
+    net.vent = () => (++n === 1 ? gammel.p : Promise.resolve(raekke("ny tekst")));
+    beskeder.liste = [fremmed("m", "tråd")];
+    gemKladde("e", "A", { tekst: "", svarId: "x", fil: null, retId: null });
+    const r = await klar();
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await vent(400);
+    await waitFor(() => expect(screen.getByText("ny tekst")).toBeTruthy());
+    await act(async () => { gammel.res(raekke("gammel tekst")); await gammel.p; });
+    await vent(0);
+    expect(screen.queryByText("gammel tekst")).toBeNull();
+    expect(screen.getByText("ny tekst")).toBeTruthy();
+    r.unmount();
+  });
+
+  it("fokus før fristtimerbehandling: ingen kvittering af udløbne id'er", async () => {
+    const kvit = vi.fn();
+    kvitMutate.fn = kvit;
+    const fokus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    beskeder.liste = [fremmed("u1", "udløber", { slettes_efter: iso(1000) }), fremmed("v1", "varig")];
+    const r = await klar();
+    vi.setSystemTime(T0 + 1500);
+    fokus.mockReturnValue(true);
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    const ids = kvit.mock.calls.flatMap((c) => (c[0] as { messageIds?: string[] }).messageIds ?? []);
+    expect(ids).not.toContain("u1");
+    fokus.mockRestore();
+    r.unmount();
+  });
+});
