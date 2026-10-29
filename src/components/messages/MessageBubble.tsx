@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import {
   Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead, useAfgoer,
   erSynligMedFokus, handlingsTekst, HandlingsFejl, tagHandling, overtagTilGem, frigivRet, useHandling, udfaldSnapshot,
-  useFristUr, erUdloebet, svarUtilgaengeligt,
+  useFristUr, erUdloebet, erKendtUdloebet, svarUtilgaengeligt,
 } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -19,7 +19,7 @@ import { MessageWithLinks } from "./LinkPreview";
 import { renderMentions } from "./MentionInput";
 import { BeskedStatus, UkendtUdfald } from "./BeskedStatus";
 import { FilVedhaeftning } from "./FilVedhaeftning";
-import { laesRetKladde, gemRetKladde, sletRetKladde, sletRetKladdeHvis, retKladdeVersion, harRetLagerFejl, fastholdEjer, ejerGyldig } from "@/lib/sbKladder";
+import { laesRetKladde, gemRetKladde, sletRetKladde, sletRetKladdeHvis, retKladdeVersion, harRetLagerFejl, fastholdEjer, ejerGyldig, sessionsGeneration } from "@/lib/sbKladder";
 
 interface MessageBubbleProps {
   message: Message;
