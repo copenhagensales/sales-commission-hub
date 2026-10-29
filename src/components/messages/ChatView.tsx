@@ -383,8 +383,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // Ryd valgt svar, når originalen er tilbagetrukket, slettet, udløbet eller bevist utilgængelig (tomt RLS-opslag).
   useEffect(() => {
     if (!svarRef || !messages) return;
-    // B2bc-5a §3: under genvalidering er intet resultat bevis – et gammelt tomt svar rydder ikke referencen.
-    if (svarSkjult) return;
+    // B2bc-5a §3: under genvalidering er intet læseresultat bevis – et gammelt tomt svar rydder ikke referencen.
+    // Kun den lokale frist (klientens ur, ingen læsning) må rydde imens.
+    if (svarSkjult) {
+      if (erUdloebet(svarITraad?.slettes_efter ?? replyTo?.slettes_efter, fristNu)) { setReplyTo(null); setSvarId(null); }
+      return;
+    }
     const vaek = svarITraad
       ? svarUtilgaengeligt(svarITraad, fristNu)
       : svarOpslag.isSuccess && (!svarOpslag.data || svarUtilgaengeligt(svarOpslag.data, fristNu));
