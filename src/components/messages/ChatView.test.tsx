@@ -709,6 +709,41 @@ describe("§4 – fælles afstemningskø (B2a-b4)", () => {
     expect(net.insert).not.toHaveBeenCalled();
   });
 
+  it("B2b-3a §2a: udtømt pending-post, som en synlig egen serverrække skjuler, ryddes og spærrer ikke serverhandlinger tavst", async () => {
+    const { tilfoejAfsendelse, fastholdEjer } = await import("@/lib/sbKladder");
+    const { tagHandling, frigivHandling } = await import("@/hooks/useChat");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    const r = await klarFake();
+    for (let n = 0; n < 7; n++) { if (ventende.some((x) => x.id === "A1")) await svarFor("A1", null); await fremad(30000); }
+    expect(screen.getByRole("button", { name: "Prøv igen" })).toBeTruthy();
+    // Udtømt: koordineringen blokerer ikke længere tavst (før B2b-3a: blokeret, så alle klik blev ignoreret).
+    const e1 = fastholdEjer("e", "A", "u");
+    expect(tagHandling(e1, "A1", "send")).toBe(true);
+    frigivHandling(e1!, "A1");
+    beskeder.liste = [{ ...fremmed("A1", "A1"), sender_id: "e", status: "afventer_afsender", read_receipts: [] }];
+    beskeder.opdateret++;
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await fremad(0);
+    expect(hentAfsendelser("e", "A")).toEqual([]); // serverrækken beviser gemningen; posten skjuler ikke længere sit genforsøg
+    expect(screen.queryByRole("button", { name: "Prøv igen" })).toBeNull();
+    expect(net.insert).not.toHaveBeenCalled();
+  });
+
+  it("B2b-3a §2a: synlig serverrække under aktivt afstemningsopslag rydder ikke posten før forløbets egen afslutning", async () => {
+    const { tilfoejAfsendelse, fastholdEjer } = await import("@/lib/sbKladder");
+    const { tagHandling } = await import("@/hooks/useChat");
+    tilfoejAfsendelse("e", "A", afs("A1"));
+    const r = await klarFake();
+    expect(opslag("A1")).toBe(1);
+    beskeder.liste = [{ ...fremmed("A1", "A1"), sender_id: "e", status: "afventer_afsender", read_receipts: [] }];
+    r.rerender(wrap(<ChatView conversationId="A" />));
+    await fremad(0);
+    expect(hentAfsendelser("e", "A")).toHaveLength(1); // fysisk igangværende arbejde beskyttes
+    expect(tagHandling(fastholdEjer("e", "A", "u"), "A1", "send")).toBe(false);
+    await svarFor("A1", { id: "A1" });
+    expect(hentAfsendelser("e", "A")).toEqual([]);
+  });
+
   it("mange pending id'er: målt maksimal samtidighed er 3", async () => {
     const { tilfoejAfsendelse } = await import("@/lib/sbKladder");
     for (let i = 0; i < 8; i++) tilfoejAfsendelse("e", "A", afs(`P${i}`));
