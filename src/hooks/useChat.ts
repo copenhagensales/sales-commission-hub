@@ -139,8 +139,12 @@ export const harKendtUdloebet = (emp: string | null | undefined, conv: string, i
  * Budgettet (FRIST_GENHENT_MS: 500 ms + 2/4/8/16/32 s) overlever remount og andre rækkers udløb/bortfald;
  * gentagne svar med samme frist nulstiller det ikke. Række væk/ændret frist afslutter forløbet.
  */
-const fristForloeb = new Map<string, { n: number; due: number }>();
-export function synkFristForloeb(emp: string | null | undefined, conv: string, udloebne: ReadonlyArray<{ id: string; frist: string }>, nu: number): number | null {
+const fristForloeb = new Map<string, { n: number; due: number; opd: number | null; fyret: number }>();
+/**
+ * Ventetiden måles fra svaret på den foregående genhentning (opdateret ændret). Udebliver svaret (fejlet
+ * genhentning, afmontering), bruges en sikkerhedsgrænse på dobbelt ventetid fra genhentningen.
+ */
+export function synkFristForloeb(emp: string | null | undefined, conv: string, udloebne: ReadonlyArray<{ id: string; frist: string }>, nu: number, opdateret: number): number | null {
   rydAndreGenerationer(fristForloeb);
   const pre = `${kuNoegle(emp, conv, "")}`;
   const aktuelle = new Set(udloebne.map((u) => `${pre}${u.id}@${u.frist}`));
@@ -150,20 +154,21 @@ export function synkFristForloeb(emp: string | null | undefined, conv: string, u
     const k = `${pre}${u.id}@${u.frist}`;
     let f = fristForloeb.get(k);
     // Ur-skævhed: første genhentning ved frist + 500 ms (aldrig før nu).
-    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]) }; fristForloeb.set(k, f); }
+    if (!f) { f = { n: 0, due: Math.max(nu, new Date(u.frist).getTime() + FRIST_GENHENT_MS[0]), opd: null, fyret: 0 }; fristForloeb.set(k, f); }
     if (f.n >= FRIST_GENHENT_MS.length) continue;
+    if (f.opd !== null && opdateret !== f.opd) { f.due = nu + FRIST_GENHENT_MS[f.n]; f.opd = null; }
     if (min === null || f.due < min) min = f.due;
   }
   return min;
 }
 /** Forbruger ét genforsøg for hvert forfaldent forløb; returnerer om der skal genhentes. */
-export function fyrFristForloeb(emp: string | null | undefined, conv: string, nu: number): boolean {
+export function fyrFristForloeb(emp: string | null | undefined, conv: string, nu: number, opdateret: number): boolean {
   const pre = `${kuNoegle(emp, conv, "")}`;
   let fyr = false;
   for (const [k, f] of fristForloeb) {
     if (!k.startsWith(pre) || f.n >= FRIST_GENHENT_MS.length || f.due > nu) continue;
-    f.n++; fyr = true;
-    if (f.n < FRIST_GENHENT_MS.length) f.due = nu + FRIST_GENHENT_MS[f.n];
+    f.n++; fyr = true; f.fyret = nu; f.opd = opdateret;
+    if (f.n < FRIST_GENHENT_MS.length) f.due = nu + 2 * FRIST_GENHENT_MS[f.n];
   }
   return fyr;
 }
