@@ -131,11 +131,32 @@ export function sletRetKladdeHvis(emp: string, conv: string, msg: string, versio
   return true;
 }
 // ---------- B2d-2 §12: rydning efter bekræftet sletning/forladelse ----------
-/** Samtaler, der er ryddet i denne generation; skrivninger herefter ignoreres (sene callbacks). */
-const lukkede = new Set<string>();
+/**
+ * B2-6B §B: lukningslivscyklus pr. (generation, bruger, samtale). Værdien er lukningens sekvensnummer.
+ * En lukket samtale genåbnes kun af en samtaleliste-/samtalelæsning, der er STARTET efter lukningen og viser
+ * medlemskab (genoptagSamtale); en vilkårlig ældre cacheindlæsning kan ikke ophæve spærringen.
+ * Epoken øges ved hver lukning, så ejere/callbacks fra samtalens tidligere forløb aldrig bliver gyldige igen.
+ */
+const lukkede = new Map<string, number>();
+const epoker = new Map<string, number>();
+let sekvens = 0;
 const erLukket = (emp: string, conv: string) => lukkede.has(`${generation}:${nk(emp, conv)}`);
-/** Kun til prøver/visning: er samtalen ryddet i denne generation? */
+/** Kun til prøver/visning: er samtalen ryddet (og ikke genoptaget) i denne generation? */
 export const samtaleRyddet = erLukket;
+/** Samtalens forløbsepoke i aktuel generation (0 = aldrig lukket). */
+export const samtaleEpoke = (emp: string, conv: string) => epoker.get(`${generation}:${nk(emp, conv)}`) ?? 0;
+/** Startbevis for en læsning: tages synkront FØR læsningen sendes. */
+export const laesStart = () => ++sekvens;
+/** Dokumenteret medlemskab fra en læsning startet efter lukningen genåbner samtalen (ny epoke er allerede givet). */
+export function genoptagSamtale(emp: string, conv: string, start: number, gen: number): boolean {
+  if (!emp || !conv || gen !== generation) return false;
+  const k = `${generation}:${nk(emp, conv)}`;
+  const luk = lukkede.get(k);
+  if (luk === undefined || luk >= start) return false;
+  lukkede.delete(k);
+  meld();
+  return true;
+}
 /**
  * Rydder netop (bruger, samtale) i den aktuelle generation: skrivekladde, redigeringskladder, pending poster,
  * File-referencer, uploadforløb og snapshots. Andre samtaler/brugere røres ikke. Kaldes først efter stopvejen.
@@ -143,7 +164,9 @@ export const samtaleRyddet = erLukket;
  */
 export function rydSamtale(emp: string, conv: string, gen: number = generation): void {
   if (!emp || !conv || gen !== generation) return;
-  lukkede.add(`${generation}:${nk(emp, conv)}`);
+  const lk = `${generation}:${nk(emp, conv)}`;
+  lukkede.set(lk, ++sekvens);
+  epoker.set(lk, (epoker.get(lk) ?? 0) + 1); // gamle ejere/callbacks for samtalen bliver permanent ugyldige
   const base = noegle(emp, conv);
   const ramt = (k: string) => k === base || k.startsWith(`${base}:`);
   const noegler = new Set<string>([...hukommelse.keys()].filter(ramt));
@@ -201,6 +224,8 @@ export interface OperationsEjer {
   bruger: string;
   /** Særskilt operations-id for netop dette arbejde (aldrig beskedens UUID eller uploadforsøgets id). */
   op: string;
+  /** B2-6B: samtalens forløbsepoke ved handlingens start; en senere lukning ugyldiggør ejeren. */
+  ep?: number;
 }
 let opNr = 0;
 export const nytOperationsId = () => `op${++opNr}`;
@@ -209,7 +234,7 @@ export function fastholdEjer(emp: string | null | undefined, conv: string | null
   const b = bruger ?? aktivBruger;
   if (!emp || !conv || !b) return null;
   if (lytterAktiv && aktivBruger !== null && aktivBruger !== b) return null;
-  return { emp, conv, gen: generation, bruger: b, op: nytOperationsId() };
+  return { emp, conv, gen: generation, bruger: b, op: nytOperationsId(), ep: samtaleEpoke(emp, conv) };
 }
 /** d1 §2: eksplicit annullerede operationer (stopvej). Operations-id'er er unikke, så sættet kan kun ugyldiggøre netop dem. */
 const annulleredeOps = new Set<string>();
@@ -217,7 +242,8 @@ const annulleredeOps = new Set<string>();
 export function annullerOperation(op: string): void { annulleredeOps.add(op); }
 /** Ejerskab gælder: samme sessionsgeneration, ikke annulleret og – når auth-lytteren kører – samme auth-bruger. Navigation ændrer ikke ejeren. */
 export const ejerGyldig = (e: OperationsEjer | null | undefined) =>
-  !!e && !!e.bruger && !!e.op && e.gen === generation && !annulleredeOps.has(e.op) && (!lytterAktiv || aktivBruger === e.bruger);
+  !!e && !!e.bruger && !!e.op && e.gen === generation && !annulleredeOps.has(e.op) && (!lytterAktiv || aktivBruger === e.bruger)
+  && (e.ep === undefined || e.ep === samtaleEpoke(e.emp, e.conv));
 /** Konteksten passer til input (samtale) og er stadig gyldig. */
 export const ejerPasser = (e: OperationsEjer | null | undefined, conv: string) => !!e && e.conv === conv && ejerGyldig(e);
 
@@ -256,11 +282,16 @@ function saet(emp: string, conv: string, l: Afsendelse[]): void {
   meld();
 }
 
-/** Synkron registrering før første sideeffekt. */
-export function tilfoejAfsendelse(emp: string, conv: string, a: Afsendelse, fil?: File | null): void {
-  if (erLukket(emp, conv)) return;
+/**
+ * Synkron registrering før første sideeffekt. B2-6B: kontrollerbart resultat – false betyder, at posten IKKE er
+ * accepteret (lukket samtale, forældet ejer); kalderen må så ikke tømme composeren eller starte afsendelse.
+ */
+export function tilfoejAfsendelse(emp: string, conv: string, a: Afsendelse, fil?: File | null, ejer?: OperationsEjer | null): boolean {
+  if (!emp || !conv || erLukket(emp, conv)) return false;
+  if (ejer !== undefined && !ejerPasser(ejer, conv)) return false;
   if (fil) filer.set(fk(emp, conv, a.id), fil);
   saet(emp, conv, [...hentAfsendelser(emp, conv).filter((x) => x.id !== a.id), a]);
+  return hentAfsendelser(emp, conv).some((x) => x.id === a.id);
 }
 
 /** Opdaterer kun posten med dette id; ingen effekt, hvis den er væk eller generationen er skiftet. */
@@ -283,6 +314,8 @@ export function fjernAfsendelse(emp: string, conv: string, id: string, gen = gen
 export const afsendelsesFil = (emp: string, conv: string, id: string) => filer.get(fk(emp, conv, id)) ?? null;
 export function saetAfsendelsesFil(emp: string, conv: string, id: string, f: File | null): void {
   if (f && erLukket(emp, conv)) return;
+  // B2-6B: et gammelt callback kan ikke genskabe en File for en post, der ikke længere findes.
+  if (f && !hentAfsendelser(emp, conv).some((x) => x.id === id)) return;
   if (f) filer.set(fk(emp, conv, id), f); else filer.delete(fk(emp, conv, id));
   meld();
 }
@@ -389,7 +422,11 @@ export function abonnerAfsendelser(l: Lytter): () => void { lyttere.add(l); retu
 
 export function rydAlleKladder(): void {
   generation++;
+  // B2-6B §B: sessionsophør afbryder straks den gamle sessions SDK-arbejde (også et senere tokenventepunkt).
+  sessionStyring.abort();
+  sessionStyring = new AbortController();
   lukkede.clear();
+  epoker.clear();
   retVersioner.clear();
   afsendelser.clear();
   filer.clear();
@@ -414,6 +451,18 @@ export function rydAlleKladder(): void {
   }
   meld();
 }
+
+// ---------- B2-6B §B: sessionskontekst for handlinger uden samtaleejer (oprettelse/sletning/forladelse) ----------
+let sessionStyring = new AbortController();
+export interface SessionsKontekst { gen: number; bruger: string | null; signal: AbortSignal }
+/** Fastholdes synkront ved brugerhandlingen, før første asynkrone trin. */
+export const fastholdSession = (): SessionsKontekst => ({ gen: generation, bruger: aktivBruger, signal: sessionStyring.signal });
+/** Samme generation og – når auth-lytteren kører – samme auth-bruger. Tokenrefresh for samme bruger ændrer intet. */
+export const sessionGyldig = (s: SessionsKontekst | null | undefined): boolean =>
+  !!s && s.gen === generation && !s.signal.aborted && (!lytterAktiv || s.bruger === null || aktivBruger === s.bruger);
+/** Fejl for en handling, hvis session er ophørt; kalderen viser intet. */
+export class ForaeldetSession extends Error { constructor() { super("forældet session"); this.name = "ForaeldetSession"; } }
+export function kraevSession(s: SessionsKontekst): void { if (!sessionGyldig(s)) throw new ForaeldetSession(); }
 
 let registreret = false;
 let sidsteBruger: string | null | undefined;
