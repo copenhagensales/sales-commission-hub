@@ -1458,3 +1458,20 @@ test("24d2 tjek: port åben → uændret (gateway kaldes én gang, udfald ok)", 
   assertEquals(await r.json(), { status: "tjekket" }); assertEquals(gwKald().length, 1); assertEquals(udfaldSendt().udfald, "ok");
   assertEquals(kaldTil((k) => rpc(k, "sb_24d2_drift")).length, 1); ingenUkendte();
 });
+
+// ---------------------------------------------------------------- 24d2-edge-1d: .jfif som JPEG
+klientTest("1d (a) sb-fil: bundet .jfif-sti med JPEG-bytes → 200, image/jpeg, identiske bytes", async () => {
+  const jpg = new Uint8Array(64); jpg.set([0xff, 0xd8, 0xff, 0xe0]); jpg[63] = 0xd9;
+  nulstil(laesRute({ sti: "c/e1/1767442872222-donners.jfif", navn: "donners.jfif", info: info(64), download: () => new Response(jpg) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 200);
+  assertEquals(r.headers.get("Content-Type"), "image/jpeg");
+  assertEquals(new Uint8Array(await r.arrayBuffer()), jpg);
+  ingenUkendte();
+});
+klientTest("1d (b) sb-fil: .jfif-sti med PNG-bytes → 410 (type_afvist)", async () => {
+  nulstil(laesRute({ sti: "c/e1/x.jfif", navn: "x.jfif", info: info(16), download: () => new Response(png(16)) }));
+  const r = await hFil(laesReq());
+  assertEquals(r.status, 410); assertEquals(await r.json(), { kode: "vaek" });
+});
+test("1d sb-fil: EXT_FOR uændret – TYPER.jfif er image/jpeg", () => { assertEquals(fil.TYPER.jfif, "image/jpeg"); });
