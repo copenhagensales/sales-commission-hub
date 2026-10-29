@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef } from "react";
 import { toast } from "sonner";
 import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, type OperationsEjer } from "@/lib/sbKladder";
 
