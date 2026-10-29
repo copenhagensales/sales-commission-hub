@@ -39,7 +39,7 @@ describe("BeskederInfo", () => {
   it("lukning kaldes via onOpenChange", () => {
     const luk = vi.fn();
     render(<BeskederInfoSheet open onOpenChange={luk} />);
-    fireEvent.click(screen.getByRole("button", { name: /close|luk/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Luk" }).at(-1)!);  // den tydelige Luk-knap nederst (Mathias 29/10); X øverst findes stadig
     expect(luk).toHaveBeenCalledWith(false);
   });
 
