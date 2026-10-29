@@ -2037,7 +2037,7 @@ describe("B2bc-5c-1 – fristlivscyklus gennem tråden", () => {
     beskeder.liste = [egen(iso(60_000), { content: "ny gyldig tekst", revision: 5 })]; beskeder.opdateret++;
     gemRetKladde("e", "A", { beskedId: "m1", tekst: "ny kladde", revision: 5 });
     await genrender(r);
-    expect(screen.getByText("ny gyldig tekst")).toBeTruthy();
+    expect(editor()?.value).toBe("ny kladde"); // ny gyldig række med ny kladde: editoren gendannes
     expect(laesRetKladde("e", "A", "m1")?.tekst).toBe("ny kladde");
     r.unmount();
   });

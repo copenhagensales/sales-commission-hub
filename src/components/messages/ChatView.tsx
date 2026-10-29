@@ -463,9 +463,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
     for (const [id, seq] of traadSvarSkjult) if (hentStart <= seq) (rest ??= new Map()).set(id, seq);
     if ((rest?.size ?? 0) !== traadSvarSkjult.size) setTraadSvarSkjult(rest ?? new Map());
   }, [hentStart, traadSvarSkjult]);
+  // B2bc-5c-1 §1: valgt svar bruger samme kendt-udløbet-grundlag (urhop genopliver ikke).
+  const svarVaekKendt = (s: { id: string; slettes_efter?: string | null }) => erKendtUdloebet(meId, conversationId, s.id, s.slettes_efter, fristNu);
   const visSvar = svarSkjult ? null
-    : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) ? svarITraad
-    : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) ? svarOpslag.data : null;
+    : svarITraad && !svarUtilgaengeligt(svarITraad, fristNu) && !svarVaekKendt(svarITraad) ? svarITraad
+    : !svarITraad && svarOpslag.data && !svarUtilgaengeligt(svarOpslag.data, fristNu) && !svarVaekKendt(svarOpslag.data) ? svarOpslag.data : null;
 
   // Kvitterer kun hentede/viste LEVEREDE beskeder fra andre uden egen kvittering – kun ved synligt vindue med fokus.
   // B2c-1: skjulte (lokalt udløbne) rækker kvitteres aldrig.
