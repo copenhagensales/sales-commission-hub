@@ -1365,14 +1365,14 @@ describe("T5 (B2c-1 §5) – lokal fristkontrol i tråd, svaruddrag og valgt sva
     const frist = om(300);
     const signaler: AbortSignal[] = [];
     let n = 0;
-    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: string, init?: RequestInit) => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((_u: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       if (init?.signal) signaler.push(init.signal);
       n++;
       if (n === 1) return Promise.resolve(new Response("filindhold", { status: 200, headers: { "Content-Type": "text/plain" } }));
       if (n === 2) return Promise.resolve(new Response(new Uint8Array([1, 2]), { status: 200, headers: { "Content-Type": "image/png" } }));
       // Pågående hentning, der skal aborteres (afvises ved abort, så sbFil's plads frigives).
-      return new Promise((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
-    }) as typeof fetch);
+      return new Promise<Response>((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
+    });
     // jsdom mangler Blob.text(); læses via FileReader (kun prøvemiljø).
     if (!Blob.prototype.text) {
       Blob.prototype.text = function (this: Blob) {
