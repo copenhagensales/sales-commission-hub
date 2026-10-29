@@ -592,9 +592,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (!vagt()) { slipEje(); frigivPlads(ks); return; }
     let filMeta = a.fil;
     const driftStop = () => driftRef.current.pause || (!!filMeta && !driftRef.current.filAaben);
-    // r3 §2(a): et driftsstop ender som »afvist, kan sendes igen« (tidligere ukendt udfald: fortsat afstemning) –
+    // r3 §2(a): et driftsstop ender som »afvist, kan sendes igen« (genudstedelse bevarer genudsted; tidligere ukendt: afstemning) –
     // aldrig stående »Sender …«. Tekst, svar og fil bevares; afslutningen går gennem samme finally som andre stop.
-    const bevar = () => opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : "afvist", fil: filMeta ?? null, fejl: null }, gen);
+    const bevar = () => opdaterAfsendelse(emp, conv, id, { tilstand: a.tidligereUkendt ? "afstemmer" : a.tilstand === "genudsted" ? "genudsted" : "afvist", fil: filMeta ?? null, fejl: null }, gen);
     try {
       // r2 §2(a): driftsstatus genkontrolleres efter hvert ventepunkt – her efter køventen.
       if (driftStop()) { bevar(); return; }
