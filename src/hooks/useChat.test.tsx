@@ -1001,6 +1001,11 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     expect(tagHandling(ejer(), ID, "ret")).toBe(true);
     expect(udfaldSnapshot("e", "c", ID)).not.toBeNull();
     svar.chat_messages = [r(4, { status: "leveret" })];
+    // B2b-4a: uden indarbejdet visning (ingen aktiv observer) er resultatet bekræftet, men det gamle grundlag beskyttes.
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    qc.setQueryData(["chat-messages", "c"], { pages: [[{ id: ID, status: "leveret", revision: 4 }]], pageParams: [0] });
     expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("bekraeftet");
     expect(udfaldSnapshot("e", "c", ID)).toBeNull();
     expect(rpc()).toHaveBeenCalledTimes(1);
@@ -1252,6 +1257,211 @@ describe("B2b-3b §2b – tjekforløbets ejer, ventetimer og JWT", () => {
     expect(aktiveTjekTimere()).toBe(0);
     await p; await vi.advanceTimersByTimeAsync(5000);
     expect(invokes()).toBe(1);
+    frigivHandling(ejer, "m");
+  });
+});
+
+// ---------- B2b-4a: sammenhængende resultat, visningsgrundlag og stop gennem afstemning/transport ----------
+import { overtagTilGem, visningIndarbejdet } from "./useChat";
+import { onlineManager } from "@tanstack/react-query";
+
+describe("B2b-4a §1 – resultat frigiver ikke det gamle grundlag før faktisk indarbejdet visning", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const ID = "m1";
+  const r = (revision: number, o: Record<string, unknown> = {}) => msg({ status: "afventer_afsender", revision, content: "x", attachment_path: null, ...o });
+  const liste = (status: string, revision: number) => ({ id: ID, status, revision });
+  const ejer = () => fastholdEjer("e", "c", "u")!;
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    graense.rpc.mockReset();
+    vi.mocked(toast.error).mockReset();
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+  });
+  afterEach(() => { onlineManager.setOnline(true); graense.rpc.mockReset(); vi.mocked(toast.error).mockReset(); for (const k of Object.keys(svar)) delete svar[k]; qc.clear(); });
+
+  it("visningIndarbejdet: kun forventet (eller senere) revision i målstatus i InfiniteData tæller", () => {
+    const s = { id: ID, forventet: { revision: 4, status: "leveret" }, ejer: { conv: "c" } };
+    expect(visningIndarbejdet(qc, s)).toBe(false); // ingen liste
+    qc.setQueryData(["chat-messages", "c"], { pages: [[liste("afventer_afsender", 4)]], pageParams: [0] });
+    expect(visningIndarbejdet(qc, s)).toBe(false);
+    qc.setQueryData(["chat-messages", "c"], { pages: [[], [liste("leveret", 4)]], pageParams: [0, 1] });
+    expect(visningIndarbejdet(qc, s)).toBe(true);
+  });
+
+  it("direkte succes med paused/offline genhentning (aktiv observer) → bekræftet snapshot, ikke frigivet grundlag; låsen frigives", async () => {
+    let n = 0;
+    renderHook(() => useInfiniteQuery({ queryKey: ["chat-messages", "c"], initialPageParam: 0, getNextPageParam: () => undefined,
+      queryFn: async () => (++n === 1 ? [liste("afventer_afsender", 4)] : [liste("leveret", 4)]) }), { wrapper: wrap });
+    await vi.waitFor(() => expect(n).toBe(1));
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); expect(tagHandling(e, ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(true);
+    // Nettet falder bort, mens sb_afgoer svarer: genhentningen pauses (refetchQueries afslutter uden opdatering).
+    graense.rpc.mockImplementationOnce(async () => { onlineManager.setOnline(false); return { data: true, error: null }; });
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(aktiveHandlinger()).toBe(0); // ingen permanent lås – beskyttelsen er den synlige bekræftet-tilstand
+    expect(tagHandling(ejer(), ID, "send", { revision: 4, status: "afventer_afsender" })).toBe(false); // gammelt grundlag
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+    onlineManager.setOnline(true);
+    await vi.waitFor(() => expect(visningIndarbejdet(qc, { id: ID, forventet: { revision: 4, status: "leveret" }, ejer: { conv: "c" } })).toBe(true));
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("bekraeftet");
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("direkte succes uden aktiv observer (afmonteret liste) → bekræftet snapshot; nyt klik på gammelt grundlag starter ingen skrivning", async () => {
+    qc.setQueryData(["chat-messages", "c"], { pages: [[liste("afventer_afsender", 4)]], pageParams: [0] });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "traek");
+    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "traek", conversationId: "c", ejer: e });
+    expect(udfaldSnapshot("e", "c", ID)).toMatchObject({ art: "traek", bekraeftet: true });
+    expect(tagHandling(ejer(), ID, "traek", { revision: 4, status: "afventer_afsender" })).toBe(false);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("»Tjek igen« mod fejlet listegenhentning: bekræftet snapshot bevares, ingen skrivning", async () => {
+    let n = 0;
+    renderHook(() => useInfiniteQuery({ queryKey: ["chat-messages", "c"], initialPageParam: 0, getNextPageParam: () => undefined,
+      queryFn: async () => { if (++n === 1) return [liste("afventer_afsender", 4)]; throw new Error("net"); } }), { wrapper: wrap });
+    await vi.waitFor(() => expect(n).toBe(1));
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    graense.rpc.mockResolvedValueOnce({ data: true, error: null });
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e });
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("»Tjek igen« bekræfter ukendt udfald, men visningen er ikke opdateret → bekræftet snapshot (ikke frigivet)", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+    svar.chat_messages = [r(4)];
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).catch(() => null);
+    svar.chat_messages = [r(4, { status: "leveret" })];
+    expect(await tjekUdfaldIgen(qc, "e", "c", ID)).toBe("ukendt");
+    expect(udfaldSnapshot("e", "c", ID)?.bekraeftet).toBe(true);
+  });
+
+  it("»Tjek igen« deltager i handlingskoordineringen: optaget lås → intet tjek; under tjek afvises skrivning og Gem-overgang", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+    svar.chat_messages = [r(4)];
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).catch(() => null);
+    const holder = ejer(); expect(tagHandling(holder, ID, "ret")).toBe(true);
+    // Editorens 'ret'-lås må ikke skjule/blokere tjekket; en skrivende handling gør.
+    let slip!: (x: unknown) => void;
+    svar.chat_messages = [new Promise((x) => { slip = x; })];
+    const p = tjekUdfaldIgen(qc, "e", "c", ID);
+    expect(tagHandling(ejer(), ID, "traek")).toBe(false);
+    expect(overtagTilGem(holder, ID)).toBe(false);
+    slip(msg({ status: "afventer_afsender", revision: 4, content: "x", attachment_path: null }));
+    expect(await p).toBe("ukendt");
+    expect(graense.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("stop under »Tjek igen«: sent svar ændrer ikke snapshot, giver ingen toast/cacheinvalidering og ingen efterbehandling", async () => {
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+    svar.chat_messages = [r(4)];
+    await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e }).catch(() => null);
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    const inv = vi.spyOn(qc, "invalidateQueries");
+    const ref = vi.spyOn(qc, "refetchQueries");
+    let slip!: (x: unknown) => void;
+    svar.chat_messages = [new Promise((x) => { slip = x; })];
+    const foer = udfaldSnapshot("e", "c", ID);
+    const p = tjekUdfaldIgen(qc, "e", "c", ID);
+    stopEfterbehandling("e", "c", ID);
+    slip(msg({ status: "leveret", revision: 4, content: "x", attachment_path: null }));
+    expect(await p).toBe("stoppet");
+    expect(udfaldSnapshot("e", "c", ID)).toBe(foer);
+    expect(inv).not.toHaveBeenCalled();
+    expect(ref).not.toHaveBeenCalled();
+    expect(aktiveEfterbehandlinger()).toBe(0);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(graense.invoke).not.toHaveBeenCalled();
+  });
+
+  it("P0001 fra sb_afgoer + samme revision i målstatus → ingen fejl; anden revision → ordret afvisning", async () => {
+    qc.setQueryData(["chat-messages", "c"], { pages: [[liste("leveret", 4)]], pageParams: [0] });
+    const { result } = renderHook(() => useAfgoer(), { wrapper: wrap });
+    const e = ejer(); tagHandling(e, ID, "send");
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
+    svar.chat_messages = [r(4, { status: "leveret" })];
+    await expect(result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e, fejltekst: "x" })).resolves.toBeTruthy();
+    expect(toast.error).not.toHaveBeenCalled();
+    const e2 = ejer(); tagHandling(e2, ID, "send");
+    graense.rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "Kun afventende indhold kan sendes" } });
+    svar.chat_messages = [r(5, { status: "leveret" })];
+    const f = await result.current.mutateAsync({ messageId: ID, revision: 4, handling: "send", conversationId: "c", ejer: e2, fejltekst: "x" }).then(() => null, (x) => x);
+    expect((f as HandlingsFejl).art).toBe("afvist");
+    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith("Kun afventende indhold kan sendes"));
+    expect(graense.rpc).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("B2b-4a §2 – stop gennem transporten og manuel Gem mod aktivt tjek", () => {
+  const transport = { error: { name: "FunctionsFetchError" } };
+  const tjekkes = (revision: number) => msg({ status: "tjekkes", revision });
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); graense.invoke.mockReset(); auth("SIGNED_IN", "u"); });
+  afterEach(() => { vi.useRealTimers(); graense.invoke.mockReset(); });
+
+  it("én AbortController pr. tjek: stop under SDK'ets senere tokenventepunkt forhindrer HTTP-transport", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    // Mock af SDK-grænsen (rigtig SDK-prøve er B2b-4b): token afventes inde i invoke, derefter fetch med signal.
+    let slipToken!: () => void; let http = 0;
+    graense.invoke.mockImplementationOnce(async (...a: unknown[]) => {
+      const o = a[1] as { signal?: AbortSignal };
+      await new Promise<void>((x) => { slipToken = x; });
+      if (o.signal?.aborted) return { error: { name: "FunctionsFetchError" } };
+      http++; return { error: null };
+    });
+    const p = startTjekHvisNoedvendigt("m", () => true, fastholdEjer("e", "c", "u")!);
+    await vi.waitFor(() => expect(graense.invoke).toHaveBeenCalledTimes(1));
+    const sig = (graense.invoke.mock.calls[0][1] as { signal?: AbortSignal }).signal;
+    expect(sig).toBeInstanceOf(AbortSignal);
+    expect(sig?.aborted).toBe(false);
+    stopEfterbehandling("e", "c", "m");
+    expect(sig?.aborted).toBe(true);
+    slipToken();
+    await p;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(http).toBe(0);
+    expect(graense.invoke).toHaveBeenCalledTimes(1); // intet transportgenforsøg efter afbrydelse
+    expect(aktiveTjekTimere()).toBe(0);
+    expect(aktiveTjek()).toBe(0);
+  });
+
+  it("sessionsophør afbryder også transportsignalet", async () => {
+    svar.chat_messages = [tjekkes(2)];
+    let slip!: () => void;
+    graense.invoke.mockImplementationOnce(async () => { await new Promise<void>((x) => { slip = x; }); return { error: null }; });
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(graense.invoke).toHaveBeenCalledTimes(1));
+    const sig = (graense.invoke.mock.calls[0][1] as { signal?: AbortSignal }).signal;
+    auth("SIGNED_OUT", null);
+    expect(sig?.aborted).toBe(true);
+    slip(); await p;
+  });
+
+  it("manuel Gem via editorovergangen (overtagTilGem) mod bevist aktiv tjektimer afslutter det gamle tjek", async () => {
+    svar.chat_messages = [tjekkes(2), tjekkes(2)];
+    graense.invoke.mockResolvedValue(transport);
+    const ejer = fastholdEjer("e", "c", "u")!;
+    const p = startTjekHvisNoedvendigt("m", () => ejerGyldig(ejer), ejer);
+    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
+    expect(tagHandling(ejer, "m", "ret")).toBe(true);
+    expect(overtagTilGem(ejer, "m")).toBe(true);
+    expect(aktiveTjekTimere()).toBe(0);
+    await p; await vi.advanceTimersByTimeAsync(5000);
+    expect(graense.invoke).toHaveBeenCalledTimes(1);
     frigivHandling(ejer, "m");
   });
 });

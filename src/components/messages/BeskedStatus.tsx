@@ -18,7 +18,8 @@ export function UkendtUdfald({ emp, conversationId, messageId, onAfklaret }: {
   const qc = useQueryClient();
   const laas = useHandling(emp, conversationId, messageId);
   const [ulaest, setUlaest] = useState(false);
-  if (!laas.ukendt || (laas.art && laas.art !== "ret")) return null; // åben editor ('ret') rydder/skjuler ikke tilstanden
+  // Åben editor ('ret') rydder/skjuler ikke tilstanden; under en anden skrivende handling er snapshottet erstattet.
+  if (!laas.ukendt || (laas.art && laas.art !== "ret")) return null;
   const tjek = async () => {
     const v = await tjekUdfaldIgen(qc, emp, conversationId, messageId);
     setUlaest(v === "ukendt");
@@ -55,7 +56,8 @@ export function BeskedStatus({ message, conversationId, currentEmployeeId, authB
   const fjern = useFjernFil();
   // B2b-2 §4: fælles lås pr. bruger/besked (også for boblen); overlever kortets afmontering.
   const laas = useHandling(currentEmployeeId, conversationId, message.id);
-  const optaget = !!laas.art;
+  // B2b-4a §1: et igangværende »Tjek igen« spærrer også for nye skrivekald.
+  const optaget = !!laas.art || laas.tjekker;
 
   if (message.status === "tjekkes") {
     return (

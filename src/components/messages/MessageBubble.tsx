@@ -182,6 +182,8 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
       if (!ejerGyldig(ejer)) return;
       const art = e instanceof HandlingsFejl ? e.art : null;
       if (art === "stoppet") return;
+      // B2b-4a §1: sen fejl mod en nyere kladde (genåbnet/ændret efter Gem) ændrer hverken editor-state eller viser toast.
+      if (retKladdeVersion(emp, conv, msg) !== version) return;
       const egen = noegleRef.current === ejerNoegle;
       // Ukendt udfald: lokal tilstand ved editoren, ingen toast og ingen automatisk ny skrivning.
       // B2b-3a §1: ukendt udfald ligger i det delte snapshot (overlever remount); kun konflikt er lokal editorstate.
@@ -276,8 +278,9 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, authBrugerId 
               <p className="text-[14px] opacity-80">{editContent.length}/4.000</p>
               {retLagerFejl && <p className="text-[14px]" role="status">Kladden kunne ikke gemmes på enheden – den findes kun, mens siden er åben</p>}
               {konflikt && <p className="text-[14px]" role="alert">Beskeden er ændret – prøv igen</p>}
-              {egenState && !konflikt && currentEmployeeId && laas.ukendt === "gem" && (
-                <UkendtUdfald emp={currentEmployeeId} conversationId={conversationId} messageId={message.id} onAfklaret={afklaretGem} />
+              {/* B2b-4a §1: alle ukendte udfald (Send, Træk tilbage, Fjern fil, Gem) forbliver synlige og afstembare i editoren. */}
+              {egenState && !konflikt && currentEmployeeId && laas.ukendt && (
+                <UkendtUdfald emp={currentEmployeeId} conversationId={conversationId} messageId={message.id} onAfklaret={laas.ukendt === "gem" ? afklaretGem : undefined} />
               )}
               {!kanGemme && <p className="text-[14px]" role="status">Beskeden kan ikke rettes lige nu</p>}
               <div className="flex flex-wrap gap-1">
