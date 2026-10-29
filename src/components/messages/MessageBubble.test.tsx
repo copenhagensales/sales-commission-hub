@@ -521,24 +521,26 @@ describe("T4 (B2b-2 §4) – Gem og boblens Træk tilbage under fælles lås (ri
   });
 
   // B2b-4a §2
-  it("bevist aktiv tjektimer → klik på Gem i editoren afslutter timeren; intet transportgenforsøg", async () => {
+  it("B2b-4a: bevist aktiv tjektimer → klik på Gem i editoren afslutter timeren; intet transportgenforsøg", async () => {
     const { startTjekHvisNoedvendigt, aktiveTjekTimere } = await import("@/hooks/useChat");
     const { fastholdEjer, ejerGyldig } = await import("@/lib/sbKladder");
     raekke = { data: { status: "tjekkes", revision: 1 }, error: null };
-    graense.invoke.mockResolvedValue({ error: { name: "FunctionsFetchError" } });
+    graense.invoke.mockReset().mockResolvedValueOnce({ error: { name: "FunctionsFetchError" } }).mockResolvedValue({ error: null });
     vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null });
     const ejer = fastholdEjer("e", "c", "u")!;
     const p = startTjekHvisNoedvendigt("m1", () => ejerGyldig(ejer), ejer);
-    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1));
+    await vi.waitFor(() => expect(aktiveTjekTimere()).toBe(1)); // bevist aktiv ventetimer for revision 1
     gemRetKladde("e", "c", { beskedId: "m1", tekst: "min", revision: 1 });
     graense.rpc.mockResolvedValueOnce({ data: 2, error: null });
     render(ui(besked("m1", "gammel"), "e"));
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Gem ændring" })); });
-    console.info("DBG", graense.rpc.mock.calls.map((c) => c[0]), !!felt());
-    expect(aktiveTjekTimere()).toBe(0);
+    raekke = { data: { status: "tjekkes", revision: 2, content: "min", attachment_path: null }, error: null };
+    fireEvent.click(screen.getByRole("button", { name: "Gem ændring" }));
+    expect(aktiveTjekTimere()).toBe(0); // synkront ved editorovergangen, før sb_ret svarer
     await p;
-    await new Promise((x) => setTimeout(x, 50));
-    expect(graense.invoke).toHaveBeenCalledTimes(1);
+    await flush();
+    await new Promise((x) => setTimeout(x, 2100));
+    const rev = (n: number) => graense.invoke.mock.calls.filter((c) => (c[1] as { body: { revision: number } }).body.revision === n).length;
+    expect(rev(1)).toBe(1); // intet genforsøg for det gamle tjek
   });
 });
 
