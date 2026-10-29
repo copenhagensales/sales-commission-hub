@@ -2360,7 +2360,6 @@ describe("B2-6C §C fristidentitet på tværs af original og svaruddrag", () => 
   }
 });
 
-import type { Session } from "@supabase/supabase-js";
 // ---------- B2-6A §D: handleSend kræver fastholdt ejer (auth-bruger + session) ----------
 describe("B2-6A §D handleSend uden gyldig auth-ejer", () => {
   it("auth-lytteren melder anden bruger: intet accepteres, composeren bevares, ingen RPC", async () => {
@@ -2372,18 +2371,19 @@ describe("B2-6A §D handleSend uden gyldig auth-ejer", () => {
     const lyt = kald[0][0];
     await klar();
     skriv("hej");
+    const sess = (id: string): Session => ({
+      access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
+      user: { id, app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" },
+    });
     try {
-      await act(async () => { lyt("SIGNED_IN", null); }); // ingen leveret auth-bruger
+      // Lytteren melder en anden auth-bruger end komponentens leverede: fastholdEjer giver ingen ejer.
+      await act(async () => { lyt("SIGNED_IN", sess("anden")); });
       await act(async () => { fireEvent.click(send()); });
       expect(hentAfsendelser("e", "A") ?? []).toHaveLength(0);
       expect((screen.getByLabelText("besked") as HTMLTextAreaElement).value).toBe("hej");
       expect(mutateAsync).not.toHaveBeenCalled();
     } finally {
-      const session: Session = {
-        access_token: "t", refresh_token: "r", expires_in: 3600, token_type: "bearer",
-        user: { id: "u", app_metadata: {}, user_metadata: {}, aud: "authenticated", created_at: "2026-01-01T00:00:00Z" },
-      };
-      await act(async () => { lyt("SIGNED_IN", session); });
+      await act(async () => { lyt("SIGNED_IN", sess("u")); });
     }
   });
 });
