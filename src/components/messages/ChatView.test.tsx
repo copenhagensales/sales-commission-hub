@@ -2110,3 +2110,30 @@ describe("B2bc-5c-1 – fristlivscyklus gennem tråden", () => {
     r.unmount();
   });
 });
+
+describe("B2bc-5c-1 §2 – genhentningsbudget bundet til det konkrete henteforsøg", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  it("anden cacheopdatering (opdateret fra anden kilde) afslutter ikke forsøget; ventetiden måles fra forsøgets eget svar", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const venter: Array<() => void> = [];
+    const inval = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => new Promise<void>((res) => { venter.push(res); }));
+    const n = () => inval.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === JSON.stringify(["chat-messages", "A"])).length;
+    const a = fremmed("bf1", "BF-tekst", { slettes_efter: new Date(Date.now() - 1).toISOString() });
+    beskeder.liste = [a];
+    const r = render(wrap(<ChatView conversationId="A" />));
+    const genrender = async () => { r.rerender(wrap(<ChatView conversationId="A" />)); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(n()).toBe(1); // forsøg 1 startet (svar holdes ved grænsen)
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    beskeder.opdateret++; await genrender(); // realtime/anden kilde opdaterer cachen – ikke forsøgets svar
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); }); // gammel kode: næste forsøg 2 s efter opdateringen
+    expect(n()).toBe(1);
+    await act(async () => { for (const v of venter.splice(0)) v(); await vi.advanceTimersByTimeAsync(0); }); // forsøgets eget svar
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(n()).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(n()).toBe(2); // 2 s målt fra det konkrete forsøgs afslutning
+    r.unmount();
+    for (const v of venter.splice(0)) v();
+  });
+});
