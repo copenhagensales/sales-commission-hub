@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClie
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useRef } from "react";
 import { toast } from "sonner";
-import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, registrerKladdeOprydning, fastholdSession, sessionGyldig, kraevSession, ForaeldetSession, laesStart, genoptagSamtale, type OperationsEjer, type SessionsKontekst } from "@/lib/sbKladder";
+import { ejerGyldig, ejerPasser, fastholdEjer, annullerOperation, sessionsGeneration, abonnerAfsendelser, sletRetKladde, rydSamtale, registrerKladdeOprydning, fastholdSession, sessionGyldig, kraevSession, ForaeldetSession, ejerSignal, laesStart, genoptagSamtale, type OperationsEjer, type SessionsKontekst } from "@/lib/sbKladder";
 export { ForaeldetSession } from "@/lib/sbKladder";
 
 export interface Conversation {
@@ -679,6 +679,23 @@ export interface SendInput {
   ejer: OperationsEjer;
 }
 
+/**
+ * B2-7 §1: binder et afbrydelsessignal til et SDK-kald (insert/rpc), så et afbrudt signal også stopper det senere
+ * tokenventepunkt inde i SDK'et. Kald uden abortSignal (fx grænsemocks) returneres uændret.
+ */
+export function medSignal<T>(b: T, signal: AbortSignal | null): T {
+  return signal && harAfbrydelse(b) ? b.abortSignal(signal) : b;
+}
+function harAfbrydelse<T>(b: T): b is T & { abortSignal(s: AbortSignal): T } {
+  return typeof b === "object" && b !== null && typeof Reflect.get(b, "abortSignal") === "function";
+}
+
+/** B2-7 §1: en afvisning efter sessionsophør (fx identitetsopslag eller afbrudt SDK-kald) bliver ForaeldetSession. */
+function foraeldetVed(s: SessionsKontekst): (e: unknown) => never {
+  return (e) => { throw sessionGyldig(s) ? e : new ForaeldetSession(); };
+}
+
+
 /** Forældet operation (logud/brugerskift): intet efterfølgende kald startes. */
 const foraeldet = () => new SendFejl("ukendt", "Ikke sendt – prøv igen", false);
 
@@ -688,7 +705,8 @@ const ukendt = () => new SendFejl("ukendt", "Ikke sendt – prøv igen");
  * Indsætter én besked med stabilt id. INSERT sker kun efter et fejlfrit forhåndsopslag;
  * ukendt udfald afstemmes, og en bekræftet række genindsættes aldrig.
  */
-export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string, vagt: () => boolean = () => true): Promise<void> {
+export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string, vagt: () => boolean = () => true,
+  sessionSignal: () => AbortSignal | null = () => null): Promise<void> {
   if (!vagt()) throw foraeldet();
   const foer = await afstemAfsendelse(v, employeeId, vagt);
   if (!vagt()) throw foraeldet();
@@ -698,8 +716,10 @@ export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string,
   if (foer === "genudsted") throw new SendFejl("genudsted", IKKE_REGISTRERET_TEKST, false);
   if (foer === "ukendt") throw new SendFejl("ukendt", "Ikke sendt – prøv igen", false);
   let error: { code?: string; message?: string } | null = null;
+  // B2-7 §1: signalet følger operationens session, så logud/brugerskift under SDK'ets tokenventen hindrer transport.
+  const signal = sessionSignal();
   try {
-    const r = await supabase.from("chat_messages").insert({
+    const r = await medSignal(supabase.from("chat_messages").insert({
       id: v.id,
       conversation_id: v.conversationId,
       sender_id: employeeId,
@@ -708,7 +728,7 @@ export async function sendBesked(v: Omit<SendInput, "ejer">, employeeId: string,
       attachment_path: v.attachmentPath || null,
       attachment_type: v.attachmentType || null,
       attachment_name: v.attachmentName || null,
-    });
+    }), signal);
     error = r.error;
   } catch { error = { message: "transport" }; }
   if (!error) return;
@@ -748,7 +768,7 @@ export function useSendMessage() {
       const ejer = v.ejer;
       const vagt = () => ejerPasser(ejer, v.conversationId);
       if (!vagt()) throw foraeldet();
-      await sendBesked(v, ejer.emp, vagt);
+      await sendBesked(v, ejer.emp, vagt, () => ejerSignal(ejer));
       return v;
     },
     // Afstemningsforløbet ejer genforsøgene (App.tsx' mutations.retry=1 overstyres lokalt).
@@ -798,7 +818,7 @@ export function useEditMessage() {
         const ny = revision + 1;
         await udfoerHandling(queryClient, { ejer, id: messageId, art: "gem", startRevision: revision,
           forventet: { revision: ny, content }, filRef: null, kladdeVersion }, vagt,
-          () => supabase.rpc("sb_ret", { p_kilde: "besked", p_id: messageId, p_revision: revision, p_tekst: content }),
+          () => medSignal(supabase.rpc("sb_ret", { p_kilde: "besked", p_id: messageId, p_revision: revision, p_tekst: content }), ejerSignal(ejer)),
           (d) => d === ny);
         return { revision: ny, conversationId, messageId, ejer };
       } finally { frigivHandling(ejer, messageId); }
@@ -937,7 +957,12 @@ export function useDeleteConversation() {
   const mutation = useMutation({
     // B2d-2 §12: sletning/forladelse gentages aldrig automatisk (appens mutations.retry=1).
     retry: 0,
-    mutationFn: async ({ conversationId, session: s }: { conversationId: string; session: SessionsKontekst }) => {
+    mutationFn: ({ conversationId, session: s }: { conversationId: string; session: SessionsKontekst }) => sletForloeb(conversationId, s).catch(foraeldetVed(s)),
+    onSettled: (_d, _e, v) => {
+      if (v && sessionGyldig(v.session)) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+  });
+  async function sletForloeb(conversationId: string, s: SessionsKontekst): Promise<string> {
       // B2-6B §B: sessionen er fastholdt ved brugerhandlingen; den kontrolleres efter hvert ventepunkt og før hvert
       // efterfølgende netværks-/cachetrin, og SDK-kaldene afbrydes ved sessionsophør (også under tokenventen).
       kraevSession(s);
@@ -975,16 +1000,12 @@ export function useDeleteConversation() {
       // Kun efter bekræftelse; afvisning (kast ovenfor) bevarer kladden.
       rydSlettetSamtale(employeeId, conversationId, s.gen);
       return conversationId;
-    },
-    onSettled: (_d, _e, v) => {
-      if (v && sessionGyldig(v.session)) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
-    },
-  });
+  }
 
   /** Fastholder sessionen synkront ved klik. Sen afslutning efter sessionsophør afvises med ForaeldetSession. */
   const slet = useCallback((conversationId: string): Promise<string> => {
     const session = fastholdSession();
-    return mutation.mutateAsync({ conversationId, session }).then((id) => { kraevSession(session); return id; });
+    return mutation.mutateAsync({ conversationId, session }).then((id) => { kraevSession(session); return id; }, foraeldetVed(session));
   }, [mutation]);
 
   return { ...mutation, slet };
@@ -1073,7 +1094,14 @@ export function useCreateConversation() {
 
   const mutation = useMutation({
     retry: 0,
-    mutationFn: async ({ input: { name, memberIds, isGroup }, session: s }: { input: OpretInput; session: SessionsKontekst }): Promise<Conversation> => {
+    mutationFn: (v: { input: OpretInput; session: SessionsKontekst }) => opretForloeb(v).catch(foraeldetVed(v.session)),
+    onSettled: (_d, e, v) => {
+      if (!v || !sessionGyldig(v.session)) return;
+      // Ved kendt id men fejlet hentning må listen ikke overskrive valget; ellers genvalideres den.
+      if (!(e instanceof OpretFejl && e.art === "hent")) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+  });
+  async function opretForloeb({ input: { name, memberIds, isGroup }, session: s }: { input: OpretInput; session: SessionsKontekst }): Promise<Conversation> {
       // B2-6B §B: sessionen er fastholdt ved klik; kontrol efter hvert ventepunkt og før hvert netværks-/cachetrin.
       kraevSession(s);
       const t = opretTilstand(queryClient);
@@ -1122,13 +1150,7 @@ export function useCreateConversation() {
       queryClient.setQueryData<Conversation[]>(["chat-conversations"], (old) => [conversation, ...(old ?? []).filter((c) => c.id !== conversation.id)]);
       if (t.kendtId === id) { t.kendtId = null; t.kendtInput = null; opretMeld(); }
       return conversation;
-    },
-    onSettled: (_d, e, v) => {
-      if (!v || !sessionGyldig(v.session)) return;
-      // Ved kendt id men fejlet hentning må listen ikke overskrive valget; ellers genvalideres den.
-      if (!(e instanceof OpretFejl && e.art === "hent")) void queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
-    },
-  });
+  }
 
   /**
    * Synkron lås på selve handlingen: dobbeltklik i samme tick giver ét kald. null = låst.
@@ -1141,7 +1163,7 @@ export function useCreateConversation() {
     t.laast = true;
     const gen = t.gen;
     return mutation.mutateAsync({ input, session })
-      .then((c) => { kraevSession(session); return c; })
+      .then((c) => { kraevSession(session); return c; }, foraeldetVed(session))
       .finally(() => { if (t.gen === gen) t.laast = false; });
   }, [queryClient, mutation]);
 
@@ -2009,7 +2031,7 @@ export function useAfgoer() {
         const status = v.handling === "send" ? "leveret" : "trukket_tilbage";
         await udfoerHandling(qc, { ejer: v.ejer, id: v.messageId, art: v.handling, startRevision: v.revision,
           forventet: { revision: v.revision, status }, startStatus: v.startStatus, filRef: null, kladdeVersion: null }, vagt,
-          () => supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling }),
+          () => medSignal(supabase.rpc("sb_afgoer", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision, p_handling: v.handling }), ejerSignal(v.ejer)),
           (d) => d === true);
         return v;
       } finally { frigivHandling(v.ejer, v.messageId); }
@@ -2034,7 +2056,7 @@ export function useFjernFil() {
         const ny = v.revision + 1;
         await udfoerHandling(qc, { ejer: v.ejer, id: v.messageId, art: "fjern", startRevision: v.revision,
           forventet: { revision: ny, utenFil: true }, filRef: v.filRef, kladdeVersion: null }, vagt,
-          () => supabase.rpc("sb_fjern_fil", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision }),
+          () => medSignal(supabase.rpc("sb_fjern_fil", { p_kilde: "besked", p_id: v.messageId, p_revision: v.revision }), ejerSignal(v.ejer)),
           (d) => d === ny);
         return v;
       } finally { frigivHandling(v.ejer, v.messageId); }

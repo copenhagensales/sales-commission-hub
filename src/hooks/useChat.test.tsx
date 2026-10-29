@@ -42,7 +42,7 @@ function builder(tabel: string) {
 // B2b-3b §3: typede grænsemocks (ingen typeomgåelse ved rpc/invoke/from).
 
 const graense = vi.hoisted(() => ({
-  rpc: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ data: "e", error: null })),
+  rpc: vi.fn<(...a: unknown[]) => PromiseLike<unknown>>(async () => ({ data: "e", error: null })),
   invoke: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ error: null })),
   from: vi.fn<(t: string) => unknown>(),
   session: vi.fn<() => Promise<unknown>>(async () => ({ data: { session: { access_token: "jwt-u", user: { id: "u" } } }, error: null })),
@@ -2216,5 +2216,161 @@ describe("B2-6B §B rigtig SDK med mocket HTTP: stop under tokenventepunkt", () 
   it("positiv kontrol uden stop: præcis én transport", async () => {
     const { transport } = await kør(false);
     expect(transport.length).toBe(1);
+  });
+});
+
+// ---------- B2-7 §2: transportstop ved sessionsophør gennem rigtig SDK og mocket HTTP ----------
+import { ejerSignal, ejerPasser as ejerPasser7 } from "@/lib/sbKladder";
+import { useEditMessage as useRet7, useAfgoer as useAfgoer7, useFjernFil as useFjern7, tagHandling as tag7, aktiveHandlinger as aktive7, sendBesked as send7, SendFejl as SendFejl7, useCreateConversation as useOpret7, useDeleteConversation as useSlet7, ForaeldetSession as Foraeldet7 } from "./useChat";
+
+describe("B2-7 §2 – fire skriveveje: logud/brugerskift under skrivekaldets tokenvent giver nul transport", () => {
+  // Rigtig supabase-js; HTTP mockes ved fetch som platformen: et afbrudt signal afvises uden transport.
+  let transport: string[] = [];
+  let tokenOpslag = 0;
+  let holdFra = Number.POSITIVE_INFINITY;
+  const holdte: Array<() => void> = [];
+  const slip = () => { for (const x of holdte.splice(0)) x(); };
+  const svarHttp: { krop: string } = { krop: "true" };
+  let sentSvar: (() => void) | null = null;
+  let holdSvar = false;
+  const hentFn = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.signal?.aborted) throw new DOMException("afbrudt", "AbortError");
+    transport.push(String(url));
+    // Allerede afsendt: serveren kan have gennemført; et senere afbrudt signal afviser svaret som fetch gør.
+    if (holdSvar) await new Promise<void>((x, afvis) => { sentSvar = x; init?.signal?.addEventListener("abort", () => afvis(new DOMException("afbrudt", "AbortError"))); });
+    return new Response(svarHttp.krop, { status: 201, headers: { "content-type": "application/json" } });
+  });
+  const klient = createClient("http://lokal.test", "anon", {
+    // Tokenopslag før holdFra (fx SDK'ets initiale opslag ved oprettelse) besvares straks; skrivekaldets eget holdes.
+    accessToken: () => { const n = ++tokenOpslag; return n > holdFra ? new Promise<string>((x) => { holdte.push(() => x("jwt")); }) : Promise.resolve("jwt"); },
+    global: { fetch: hentFn },
+  });
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  const ID = "m7";
+  beforeEach(async () => {
+    qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 }, queries: { retry: false } } });
+    transport = []; holdte.length = 0; sentSvar = null; holdSvar = false; svarHttp.krop = "true";
+    await Promise.resolve();
+    holdFra = tokenOpslag; // alt derefter er skrivekaldets eget ventepunkt
+    auth("SIGNED_OUT", null); auth("SIGNED_IN", "u");
+    graense.rpc.mockReset().mockImplementation((n: unknown, a: unknown) => klient.rpc(String(n), typeof a === "object" && a !== null ? { ...a } : {}));
+    graense.from.mockImplementation((t: string) => ({ ...builder(t), insert: (r: unknown) => { kald.push(`insert:${t}`); return klient.from(t).insert(typeof r === "object" && r !== null ? { ...r } : {}); } }));
+  });
+  afterEach(async () => {
+    slip(); sentSvar?.();
+    graense.rpc.mockReset(); graense.from.mockReset();
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    expect(aktive7()).toBe(0);
+    qc.clear();
+  });
+  const ventPaaToken = () => vi.waitFor(() => expect(holdte.length).toBe(1));
+
+  type Vej = "insert" | "sb_ret" | "sb_afgoer" | "sb_fjern_fil";
+  async function start(vej: Vej) {
+    const e = fastholdEjer("e", "c", "u")!;
+    if (vej === "insert") {
+      svar.chat_messages = [msg(null), msg(null), msg(null)];
+      return { p: send7(v, "e", () => ejerPasser7(e, "c"), () => ejerSignal(e)).then(() => "ok", (x: unknown) => x), unmount: () => undefined };
+    }
+    svar.chat_messages = [msg({ status: "afventer_afsender", revision: 1, content: "x", attachment_path: null })];
+    svarHttp.krop = vej === "sb_afgoer" ? "true" : "2";
+    if (vej === "sb_ret") {
+      const h = renderHook(() => useRet7(), { wrapper: wrap }); tag7(e, ID, "gem");
+      return { p: h.result.current.mutateAsync({ messageId: ID, content: "x", conversationId: "c", revision: 1, ejer: e }).then(() => "ok", (x: unknown) => x), unmount: h.unmount };
+    }
+    if (vej === "sb_afgoer") {
+      const h = renderHook(() => useAfgoer7(), { wrapper: wrap }); tag7(e, ID, "send");
+      return { p: h.result.current.mutateAsync({ messageId: ID, revision: 1, handling: "send", conversationId: "c", ejer: e }).then(() => "ok", (x: unknown) => x), unmount: h.unmount };
+    }
+    const h = renderHook(() => useFjern7(), { wrapper: wrap }); tag7(e, ID, "fjern");
+    return { p: h.result.current.mutateAsync({ messageId: ID, revision: 1, conversationId: "c", ejer: e, filRef: null }).then(() => "ok", (x: unknown) => x), unmount: h.unmount };
+  }
+  const veje: Vej[] = ["insert", "sb_ret", "sb_afgoer", "sb_fjern_fil"];
+
+  for (const vej of veje) {
+    for (const [navn, skift] of [["logud", () => auth("SIGNED_OUT", null)], ["brugerskift", () => auth("SIGNED_IN", "u2")]] as const) {
+      it(`${vej}: ${navn} under skrivekaldets tokenventen → nul HTTP-transport, ingen falsk succes`, async () => {
+        const { p, unmount } = await start(vej);
+        await ventPaaToken();
+        skift();
+        slip();
+        const r = await p;
+        expect(transport).toEqual([]);
+        expect(r).not.toBe("ok");
+        if (vej === "insert") expect(r instanceof SendFejl7 ? r.art : null).toBe("ukendt");
+        unmount();
+      });
+    }
+    it(`${vej}: positiv kontrol uden stop → præcis ét HTTP-kald`, async () => {
+      const { p, unmount } = await start(vej);
+      await ventPaaToken();
+      slip();
+      await p;
+      expect(transport).toHaveLength(1);
+      expect(transport[0]).toContain(vej === "insert" ? "/rest/v1/chat_messages" : `/rest/v1/rpc/${vej}`);
+      unmount();
+    });
+    it(`${vej}: allerede sendt kald med sent svar efter logud → ukendt/stoppet, ingen ny skrivning`, async () => {
+      holdSvar = true;
+      const { p, unmount } = await start(vej);
+      await ventPaaToken();
+      slip();
+      await vi.waitFor(() => expect(transport).toHaveLength(1));
+      auth("SIGNED_OUT", null);
+      sentSvar?.();
+      const r = await p;
+      expect(r).not.toBe("ok");
+      expect(transport).toHaveLength(1);
+      expect(kald.filter((k) => k === "insert:chat_messages").length).toBeLessThanOrEqual(1);
+      unmount();
+    });
+  }
+});
+
+describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessionsskift → ForaeldetSession", () => {
+  let qc: QueryClient;
+  const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+  beforeEach(() => { qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } }); auth("SIGNED_OUT", null); auth("SIGNED_IN", "u"); });
+  afterEach(() => { vi.mocked(supabase.auth.getUser).mockReset().mockImplementation(async () => ({ data: { user: { id: "u" } } }) as never); qc.clear(); });
+  const holdtIdentitet = () => {
+    const h: { afvis: ((e: Error) => void) | null } = { afvis: null };
+    vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise((_, r) => { h.afvis = r; }));
+    return h;
+  };
+  it("oprettelse: identitetsopslag afvises efter logud → ForaeldetSession, ingen RPC", async () => {
+    const afvis = holdtIdentitet();
+    const { result, unmount } = renderHook(() => useOpret7(), { wrapper: wrap });
+    graense.rpc.mockClear();
+    const p = result.current.opret({ name: "", memberIds: ["x"], isGroup: false })!.then(() => null, (x: unknown) => x);
+    await vi.waitFor(() => expect(afvis.afvis).toBeTypeOf("function"));
+    auth("SIGNED_OUT", null);
+    afvis.afvis?.(new Error("Not authenticated"));
+    expect(await p).toBeInstanceOf(Foraeldet7);
+    expect(graense.rpc.mock.calls.filter((c) => String(c[0]).startsWith("sb_chat_start"))).toHaveLength(0);
+    unmount();
+  });
+  it("sletning: identitetsopslag afvises efter brugerskift → ForaeldetSession, ingen DELETE", async () => {
+    const afvis = holdtIdentitet();
+    kald.length = 0;
+    const { result, unmount } = renderHook(() => useSlet7(), { wrapper: wrap });
+    const p = result.current.slet("c").then(() => null, (x: unknown) => x);
+    await vi.waitFor(() => expect(afvis.afvis).toBeTypeOf("function"));
+    auth("SIGNED_IN", "u2");
+    afvis.afvis?.(new Error("Not authenticated"));
+    expect(await p).toBeInstanceOf(Foraeldet7);
+    expect(kald.filter((k) => k.startsWith("delete:"))).toHaveLength(0);
+    unmount();
+  });
+  it("kontrol: samme afvisning uden sessionsskift bevarer den oprindelige fejl", async () => {
+    const afvis = holdtIdentitet();
+    const { result, unmount } = renderHook(() => useSlet7(), { wrapper: wrap });
+    const p = result.current.slet("c").then(() => null, (x: unknown) => x);
+    await vi.waitFor(() => expect(afvis.afvis).toBeTypeOf("function"));
+    afvis.afvis?.(new Error("Not authenticated"));
+    const e = await p;
+    expect(e).not.toBeInstanceOf(Foraeldet7);
+    expect(e instanceof Error ? e.message : null).toBe("Not authenticated");
+    unmount();
   });
 });
