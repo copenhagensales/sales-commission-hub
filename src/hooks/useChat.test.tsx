@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
@@ -936,6 +936,8 @@ describe("B2b-3a §1/§2a – rigtige hooks med stabil QueryClient (mutations.re
     vi.mocked(toast.error).mockReset();
     auth("SIGNED_OUT", null); auth("SIGNED_IN", "u"); // ny generation: ingen låse/snapshots fra andre prøver
   });
+  // Isolation: ingen rpc-kald/toasts lækker til andre prøver i blandet rækkefølge.
+  afterEach(() => { rpc().mockReset(); vi.mocked(toast.error).mockReset(); for (const k of Object.keys(svar)) delete svar[k]; });
   const ejer = () => fastholdEjer("e", "c", "u")!;
   const afslut = async () => { await act(async () => { await new Promise((x) => setTimeout(x, 0)); }); qc.clear(); };
 
