@@ -73,7 +73,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   }
 
   return (
-    <ScrollArea className="h-full" ref={rootRef}>
+    <ScrollArea className="h-full w-full [&_[data-radix-scroll-area-viewport]>div]:!block" ref={rootRef}>
       <div className="p-2 space-y-1 max-md:space-y-2">
         {conversations.map((conversation) => (
           <ConversationItem
