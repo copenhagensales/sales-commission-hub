@@ -2332,7 +2332,7 @@ describe("B2-7 §1 – afviste ventepunkter i oprettelse og sletning efter sessi
   let qc: QueryClient;
   const wrap = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
   beforeEach(() => { qc = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } }); auth("SIGNED_OUT", null); auth("SIGNED_IN", "u"); });
-  afterEach(() => { vi.mocked(supabase.auth.getUser).mockReset().mockImplementation(async () => ({ data: { user: { id: "u" } } }) as never); qc.clear(); });
+  afterEach(() => { vi.mocked(supabase.auth.getUser).mockReset(); /* vitest 3: mockReset gendanner den typede grænsemock */ qc.clear(); });
   const holdtIdentitet = () => {
     const h: { afvis: ((e: Error) => void) | null } = { afvis: null };
     vi.mocked(supabase.auth.getUser).mockImplementationOnce(() => new Promise((_, r) => { h.afvis = r; }));
