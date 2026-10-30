@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Eye, EyeOff, Flag, Link2, Lock, MoreHorizontal, Pencil, Star, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Link2, Lock, MoreHorizontal, Pencil, Reply, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -19,7 +19,9 @@ import { PulsenAvatar } from "./PulsenAvatar";
 import { PULSEN_MAX_CHARS, pulsenRelativeTime, shortName, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
 import { OmtaleFelt } from "./OmtaleFelt";
-import { erOmtaleFejl, renderOmtaler, type Omtale } from "./omtaler";
+import { erOmtaleFejl, type Omtale } from "./omtaler";
+import { renderTekstMedLinks, FoersteLink } from "./tekstMedLinks";
+import { grupperKommentarer } from "./kommentarTraad";
 import { ANMELD_KODER, anmeldTekst, begrundelseTekst, useSbBegrundelse, type AnmeldKode } from "@/hooks/useSbOpslag";
 
 const TYPE_PILL: Partial<Record<PulsenPost["post_type"], { label: string; cls: string }>> = {
@@ -34,7 +36,7 @@ export interface PostInteractions {
   comments: FeedCommentView[];
   canInteract: boolean;
   onReact: (r: ReactionKey) => void;
-  onComment: (body: string, mentions: Omtale[]) => Promise<unknown>;
+  onComment: (body: string, mentions: Omtale[], parentId?: string | null) => Promise<unknown>;
   onDeleteComment: (id: string) => Promise<unknown>;
   /** S7: moderation, anmeldelse og forfatterens afgørelse for kommentarer. */
   onModerateComment?: (id: string, hide: boolean, kode?: AnmeldKode | null) => Promise<unknown>;
@@ -47,7 +49,8 @@ interface Props {
   isMine: boolean;
   canModerate: boolean;
   contextLabel?: string | null;
-  imageUrl?: string | null;
+  /** S8: alle billeder (signerede URL'er) i rækkefølge. */
+  imageUrls?: string[];
   /** Reaktioner og kommentarer i både Huset og team. */
   interactions?: PostInteractions;
   onEdit: (body: string, mentions: Omtale[]) => Promise<unknown>;
@@ -64,7 +67,7 @@ function joinDanish(names: string[]) {
   return names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} og ${names[names.length - 1]}`;
 }
 
-export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageUrl, interactions, onEdit, onDelete, onHide, onBestAnswer, onCommentsClosed, onDecide, onReport }: Props) {
+export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageUrls, interactions, onEdit, onDelete, onHide, onBestAnswer, onCommentsClosed, onDecide, onReport }: Props) {
   const [editing, setEditing] = useState(false);
   // S7: begrundelsesdialog (anmeld/skjul) for opslag og kommentarer
   const [reasonFor, setReasonFor] = useState<{ art: "anmeld" | "skjul" | "anmeld_kommentar" | "skjul_kommentar"; id?: string } | null>(null);
@@ -81,13 +84,14 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
   const [imgRatio, setImgRatio] = useState<string | null>(null);
   const [draft, setDraft] = useState(post.body);
   const [draftMentions, setDraftMentions] = useState<Omtale[]>(post.mentions ?? []);
-  const [zoom, setZoom] = useState(false);
+  const [zoom, setZoom] = useState<number | null>(null);  // S8: indeks på det åbne billede
   const authorName = shortName(post.author?.first_name, post.author?.last_name);
   const praisedList = post.praisedAll?.length ? post.praisedAll : post.praised ? [post.praised] : [];
   const praisedName = praisedList.length ? joinDanish(praisedList.map((p) => `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim())) : null;
   const pill = TYPE_PILL[post.post_type];
   const meta = [contextLabel ?? post.author?.job_title, pulsenRelativeTime(post.created_at)].filter(Boolean).join(" · ");
-  const img = post.localImageUrl ?? imageUrl;
+  const imgs = post.localImageUrl ? [post.localImageUrl] : (imageUrls ?? []);
+  const img = imgs[0];
   // Menuen findes på alle gemte opslag (»Kopiér link«); øvrige punkter kræver forfatter/moderator.
   const showMenu = !post.pending;
   const canManagePost = isMine || canModerate;
@@ -203,7 +207,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
           </div>
         </div>
       ) : (
-        post.body && <p className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-[1.5] text-foreground">{renderOmtaler(post.body, post.mentions)}</p>
+        post.body && <><p className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-[1.5] text-foreground">{renderTekstMedLinks(post.body, post.mentions)}</p><FoersteLink body={post.body} /></>
       )}
 
       {isPoll && !post.pending && <PulsenPollCard postId={post.id} />}
@@ -232,15 +236,30 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
 
       {img && (
         <>
-          <button type="button" onClick={() => setZoom(true)} aria-label="Vis billedet i fuld størrelse" className="-mx-5 mt-3 block w-[calc(100%+2.5rem)] overflow-hidden bg-muted">
-            <img src={img} alt="" loading="lazy" className="max-h-[520px] w-full object-cover"
-              style={{ aspectRatio: imgRatio ?? "4 / 3" }}
-              onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setImgRatio(`${t.naturalWidth} / ${t.naturalHeight}`); }} />
-          </button>
-          <Dialog open={zoom} onOpenChange={setZoom}>
-            <DialogContent className="max-w-[min(96vw,1400px)] border-0 bg-transparent p-0 shadow-none">
-              <DialogTitle className="sr-only">Billede fra {authorName}</DialogTitle>
-              <img src={img} alt="" className="max-h-[90vh] w-full rounded-[18px] object-contain" />
+          {/* S8: 1 billede = fuld bredde; 2 = to kolonner; 3+ = gitter m. »+N« på det fjerde */}
+          <div className={cn("-mx-5 mt-3 grid gap-0.5 overflow-hidden bg-muted", imgs.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
+            {imgs.slice(0, 4).map((u, i) => (
+              <button key={u} type="button" onClick={() => setZoom(i)} aria-label={imgs.length > 1 ? `Vis billede ${i + 1} af ${imgs.length} i fuld størrelse` : "Vis billedet i fuld størrelse"}
+                className={cn("relative block w-full overflow-hidden bg-muted", imgs.length === 3 && i === 0 && "col-span-2")}>
+                <img src={u} alt="" loading="lazy" className={cn("w-full object-cover", imgs.length === 1 ? "max-h-[520px]" : (imgs.length === 3 && i === 0) ? "aspect-[16/9]" : "aspect-square")}
+                  style={imgs.length === 1 ? { aspectRatio: imgRatio ?? "4 / 3" } : undefined}
+                  onLoad={(e) => { if (imgs.length !== 1) return; const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setImgRatio(`${t.naturalWidth} / ${t.naturalHeight}`); }} />
+                {i === 3 && imgs.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-[hsl(var(--cph-onyx)/0.55)] text-[24px] font-extrabold text-[hsl(var(--cph-light-blue))]">+{imgs.length - 4}</span>}
+              </button>
+            ))}
+          </div>
+          <Dialog open={zoom !== null} onOpenChange={(o) => { if (!o) setZoom(null); }}>
+            <DialogContent className="max-w-[min(96vw,1400px)] border-0 bg-transparent p-0 shadow-none"
+              onKeyDown={(e) => { if (zoom === null) return; if (e.key === "ArrowRight") setZoom((zoom + 1) % imgs.length); if (e.key === "ArrowLeft") setZoom((zoom - 1 + imgs.length) % imgs.length); }}>
+              <DialogTitle className="sr-only">Billede {zoom !== null ? zoom + 1 : 1} af {imgs.length} fra {authorName}</DialogTitle>
+              {zoom !== null && <img src={imgs[zoom]} alt="" className="max-h-[90vh] w-full rounded-[18px] object-contain" />}
+              {imgs.length > 1 && zoom !== null && (
+                <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-between px-2">
+                  <button type="button" aria-label="Forrige billede" onClick={() => setZoom((zoom - 1 + imgs.length) % imgs.length)} className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-card/90 text-foreground"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
+                  <button type="button" aria-label="Næste billede" onClick={() => setZoom((zoom + 1) % imgs.length)} className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-card/90 text-foreground"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
+                </div>
+              )}
+              {imgs.length > 1 && zoom !== null && <p className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1 text-[12px] font-extrabold tabular-nums">{zoom + 1} / {imgs.length}</p>}
             </DialogContent>
           </Dialog>
         </>
@@ -265,8 +284,12 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
   // Ældste først i tråden
   const comments = [...interactions.comments].reverse();
   const best = comments.find((c) => c.id === post.best_answer_comment_id) ?? null;
-  const rest = comments.filter((c) => c.id !== best?.id);
-  const visible = showAll ? rest : rest.slice(0, 1);
+  // S8: tråde (ét niveau): topkommentarer m. deres svar, ældste først; »Se alle« tæller tråde
+  const traade = grupperKommentarer(comments.filter((c) => c.id !== best?.id && c.parentId !== best?.id));
+  const bestSvar = best ? comments.filter((c) => c.parentId === best.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : [];
+  const rest = traade;
+  const visible = showAll ? traade : traade.slice(0, 1);
+  const [svarTil, setSvarTil] = useState<{ id: string; navn: string } | null>(null);
   const canPickBest = isMine && post.post_type === "question";
   /** Lille ordknap under en kommentar (ikon + ord). aria-label bevares til prøver/skærmlæser. */
   const tekstKnap = (props: { label: string; aria: string; ikon: typeof Flag; onClick: () => void; tone?: "normal" | "fare" }) => (
@@ -286,6 +309,29 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
     </>
   );
 
+  /** Én kommentarrække (top eller svar). */
+  const kommentarRaekke = (c: PostInteractions["comments"][number], erSvar: boolean) => (
+            <li key={c.id} className={cn("flex items-start gap-2", erSvar && "ml-10")}>
+              <PulsenAvatar name={c.authorName} size={erSvar ? 28 : 32} className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                {/* D2a: boble m. navn · tid; egne kommentarer i svag emerald, andres i lys blå; handlinger som små ordknapper under boblen */}
+                <div className={cn("rounded-[18px] px-3.5 py-2", c.hiddenAt ? "bg-muted" : c.isMine ? "bg-[hsl(var(--cph-emerald)/0.14)]" : "bg-[hsl(var(--cph-light-blue))]")}>
+                  <p className="text-[13px] font-extrabold text-foreground">{c.authorName}<span className="font-normal text-muted-foreground"> · {pulsenRelativeTime(c.createdAt)}</span></p>
+                  <p className="break-words whitespace-pre-wrap text-[15px] leading-[1.45] text-foreground">{renderTekstMedLinks(c.body, c.mentions)}</p>
+                  {c.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{c.hiddenKode ? ` · ${anmeldTekst(c.hiddenKode)}` : ""}</p>}
+                  {c.isMine && c.status === "tjekkes" && <p className="mt-1 text-[12px] text-muted-foreground">✓ Tjekkes …</p>}
+                  {c.isMine && c.status === "afventer_afsender" && <KommentarAfventer id={c.id} revision={c.revision ?? 1} onDecide={interactions.onDecideComment} onDelete={() => interactions.onDeleteComment(c.id)} />}
+                </div>
+                <div className="-mt-0.5 flex flex-wrap items-center gap-0.5 px-1">
+                  {!c.parentId && !post.comments_closed_at && interactions.canInteract && tekstKnap({ label: "Svar", aria: `Svar på ${c.authorName}`, ikon: Reply, onClick: () => { setSvarTil({ id: c.id, navn: c.authorName }); setComposing(true); } })}
+                  {handlinger(c)}
+                  {!erSvar && canPickBest && tekstKnap({ label: "Bedste svar", aria: "Markér som bedste svar", ikon: Star, onClick: () => onBestAnswer(c.id) })}
+                  {c.isMine && tekstKnap({ label: "Slet", aria: "Slet din kommentar", ikon: X, onClick: () => void interactions.onDeleteComment(c.id), tone: "fare" })}
+                </div>
+              </div>
+            </li>
+  );
+
   const savingRef = useRef(false);
   const latestValue = useRef(value);
   latestValue.current = value;
@@ -295,12 +341,13 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
     const sent = value;
     setSaving(true);
     try {
-      await interactions.onComment(sent, valueMentions);
+      await interactions.onComment(sent, valueMentions, svarTil?.id ?? null);
       // Nulstil kun, hvis feltet stadig rummer den sendte version.
       if (latestValue.current === sent) {
         setValue("");
         setValueMentions([]);
         setComposing(false);
+        setSvarTil(null);
       }
     } catch (e) {
       if (erLukketFejl(e)) {
@@ -341,39 +388,22 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
           <div className="min-w-0 flex-1">
             <div className="rounded-[18px] bg-[hsl(var(--cph-praise))] px-3.5 py-2">
               <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--cph-praise-foreground))]">★ Bedste svar · {best.authorName}</p>
-              <p className="mt-1 break-words text-[15px] leading-[1.45] text-foreground">{renderOmtaler(best.body, best.mentions)}</p>
+              <p className="mt-1 break-words text-[15px] leading-[1.45] text-foreground">{renderTekstMedLinks(best.body, best.mentions)}</p>
               {best.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{best.hiddenKode ? ` · ${anmeldTekst(best.hiddenKode)}` : ""}</p>}
             </div>
             <div className="-mt-0.5 flex flex-wrap items-center gap-0.5 px-1">
+              {!best.parentId && !post.comments_closed_at && interactions.canInteract && tekstKnap({ label: "Svar", aria: `Svar på ${best.authorName}`, ikon: Reply, onClick: () => { setSvarTil({ id: best.id, navn: best.authorName }); setComposing(true); } })}
               {handlinger(best)}
               {canPickBest && tekstKnap({ label: "Fjern som bedste svar", aria: "Fjern som bedste svar", ikon: Star, onClick: () => onBestAnswer(null) })}
             </div>
           </div>
         </div>
       )}
+      {bestSvar.length > 0 && <ul className="mt-2 space-y-3">{bestSvar.map((r) => kommentarRaekke(r, true))}</ul>}
 
       {visible.length > 0 && (
         <ul className="mt-3 space-y-3">
-          {visible.map((c) => (
-            <li key={c.id} className="flex items-start gap-2">
-              <PulsenAvatar name={c.authorName} size={32} className="mt-0.5" />
-              <div className="min-w-0 flex-1">
-                {/* D2a: boble m. navn · tid; egne kommentarer i svag emerald, andres i lys blå; handlinger som små ordknapper under boblen */}
-                <div className={cn("rounded-[18px] px-3.5 py-2", c.hiddenAt ? "bg-muted" : c.isMine ? "bg-[hsl(var(--cph-emerald)/0.14)]" : "bg-[hsl(var(--cph-light-blue))]")}>
-                  <p className="text-[13px] font-extrabold text-foreground">{c.authorName}<span className="font-normal text-muted-foreground"> · {pulsenRelativeTime(c.createdAt)}</span></p>
-                  <p className="break-words whitespace-pre-wrap text-[15px] leading-[1.45] text-foreground">{renderOmtaler(c.body, c.mentions)}</p>
-                  {c.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{c.hiddenKode ? ` · ${anmeldTekst(c.hiddenKode)}` : ""}</p>}
-                  {c.isMine && c.status === "tjekkes" && <p className="mt-1 text-[12px] text-muted-foreground">✓ Tjekkes …</p>}
-                  {c.isMine && c.status === "afventer_afsender" && <KommentarAfventer id={c.id} revision={c.revision ?? 1} onDecide={interactions.onDecideComment} onDelete={() => interactions.onDeleteComment(c.id)} />}
-                </div>
-                <div className="-mt-0.5 flex flex-wrap items-center gap-0.5 px-1">
-                  {handlinger(c)}
-                  {canPickBest && tekstKnap({ label: "Bedste svar", aria: "Markér som bedste svar", ikon: Star, onClick: () => onBestAnswer(c.id) })}
-                  {c.isMine && tekstKnap({ label: "Slet", aria: "Slet din kommentar", ikon: X, onClick: () => void interactions.onDeleteComment(c.id), tone: "fare" })}
-                </div>
-              </div>
-            </li>
-          ))}
+          {visible.flatMap((t) => [kommentarRaekke(t.top, false), ...t.svar.map((r) => kommentarRaekke(r, true))])}
         </ul>
       )}
       {rest.length > 1 && (
@@ -382,6 +412,12 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
         </button>
       )}
 
+      {composing && !post.comments_closed_at && svarTil && (
+        <div className="mt-2 flex items-center gap-2 px-1 text-[13px] text-muted-foreground">
+          <span>Svarer <b className="font-extrabold text-foreground">{svarTil.navn}</b></span>
+          <button type="button" aria-label="Fjern svar" onClick={() => setSvarTil(null)} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[hsl(var(--cph-light-blue))]"><X className="h-4 w-4" aria-hidden="true" /></button>
+        </div>
+      )}
       {composing && !post.comments_closed_at && (
         <div className="mt-2 flex items-start gap-2">
           <div className="min-w-0 flex-1">
@@ -395,9 +431,9 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
               onChange={(t, m) => { setValue(t); setValueMentions(m); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); }
-                if (e.key === "Escape") setComposing(false);
+                if (e.key === "Escape") { setComposing(false); setSvarTil(null); }
               }}
-              placeholder={post.post_type === "question" ? "Skriv et svar …" : "Skriv en kommentar …"}
+              placeholder={svarTil ? `Skriv et svar til ${svarTil.navn.split(" ")[0]} …` : post.post_type === "question" ? "Skriv et svar …" : "Skriv en kommentar …"}
               aria-label="Din kommentar, højst 200 tegn"
               className="min-h-[44px] resize-none rounded-[16px] py-2.5 text-[16px]"
             />

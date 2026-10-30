@@ -44,6 +44,8 @@ export interface FeedCommentView {
   revision?: number | null;
   hiddenAt?: string | null;
   hiddenKode?: string | null;
+  /** S8: svar på en anden kommentar (ét niveau). */
+  parentId?: string | null;
 }
 
 export function buildTargetKey(
@@ -144,7 +146,7 @@ export function useFeedReactions(targetKeys: string[]) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("feed_comments")
-        .select("id, target_key, user_id, body, created_at, mentions, status, revision, hidden_at, hidden_kode")
+        .select("id, target_key, user_id, body, created_at, mentions, status, revision, hidden_at, hidden_kode, parent_id")
         .in("target_key", keys)
         .order("created_at", { ascending: false });
 
@@ -254,12 +256,14 @@ export function useFeedReactions(targetKeys: string[]) {
       targetType,
       targetKey,
       body,
-      mentions,
+      mentions, parentId,
     }: {
       targetType: FeedTargetType;
       targetKey: string;
       body: string;
       mentions?: Omtale[];
+      /** S8: svar på kommentar. */
+      parentId?: string | null;
     }) => {
       if (!myUserId) throw new Error("Du skal være logget ind");
       const trimmed = body.trim().slice(0, 200);
@@ -271,6 +275,7 @@ export function useFeedReactions(targetKeys: string[]) {
         user_id: myUserId,
         body: trimmed,
         mentions: rensOmtaler(trimmed, mentions ?? []),
+        parent_id: parentId ?? null,
       }).select("id, status, revision").single();
       if (error) throw error;
       const r = data as { id: string; status?: string | null; revision?: number | null };
@@ -340,6 +345,7 @@ export function useFeedReactions(targetKeys: string[]) {
           revision: (c as { revision?: number | null }).revision ?? null,
           hiddenAt: (c as { hidden_at?: string | null }).hidden_at ?? null,
           hiddenKode: (c as { hidden_kode?: string | null }).hidden_kode ?? null,
+          parentId: (c as { parent_id?: string | null }).parent_id ?? null,
           createdAt: c.created_at,
           mentions: tilOmtaler(c.mentions),
         })),

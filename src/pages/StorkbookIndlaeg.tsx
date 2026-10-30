@@ -7,7 +7,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { PulsenPostCard } from "@/components/pulsen/PulsenPostCard";
 import { PulsenEmpty, PulsenError, PulsenPostSkeleton } from "@/components/pulsen/PulsenStates";
 import { useFeedReactions } from "@/hooks/useFeedReactions";
-import { postTargetKey, usePulsenImageUrls, usePulsenMe, usePulsenMutations, usePulsenPost } from "@/hooks/usePulsen";
+import { postTargetKey, usePulsenImageUrls, opslagBilledStier, usePulsenMe, usePulsenMutations, usePulsenPost } from "@/hooks/usePulsen";
 
 /** Ét Storkbook-opslag på egen adresse: /storkbook/indlaeg/:id. Adgang afgøres af RLS. */
 export default function StorkbookIndlaeg() {
@@ -16,7 +16,7 @@ export default function StorkbookIndlaeg() {
   const me = usePulsenMe();
   const postQ = usePulsenPost(id);
   const post = postQ.data ?? null;
-  const images = usePulsenImageUrls(post?.image_path ? [post.image_path] : []);
+  const images = usePulsenImageUrls(post ? opslagBilledStier(post) : []);
   const mut = usePulsenMutations(me.self);
   const key = id ? postTargetKey(id) : "";
   const fr = useFeedReactions(post ? [key] : []);
@@ -50,13 +50,13 @@ export default function StorkbookIndlaeg() {
         isMine={post.author_employee_id === me.employeeId}
         canModerate={me.canModerate(post)}
         contextLabel={contextLabel}
-        imageUrl={post.image_path ? images.data?.get(post.image_path) : null}
+        imageUrls={opslagBilledStier(post).map((sti) => images.data?.get(sti)).filter((u): u is string => !!u)}
         interactions={{
           summary: fr.getReactions(key),
           comments: fr.getComments(key),
           canInteract: fr.canInteract,
           onReact: (reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: key, reaction }),
-          onComment: (b, m) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body: b, mentions: m }),
+          onComment: (b, m, parentId) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body: b, mentions: m, parentId }),
           onDeleteComment: (cid) => fr.deleteComment.mutateAsync(cid),
           onModerateComment: (cid, hide, kode) => fr.moderateComment.mutateAsync({ id: cid, hide, kode }),
           onReportComment: (cid, kode) => fr.reportComment.mutateAsync({ id: cid, kode }),

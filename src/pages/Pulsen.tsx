@@ -30,7 +30,7 @@ import {
 } from "@/hooks/useCompanyEvents";
 import { useFeedReactions } from "@/hooks/useFeedReactions";
 import {
-  formatUnread, milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, usePulsenMe,
+  formatUnread, milestoneTargetKey, postTargetKey, useMarkPulsenSeen, usePulsenFeed, usePulsenImageUrls, opslagBilledStier, usePulsenMe,
   usePulsenMilestonesToday, usePulsenMutations,
   type PulsenPost, type PulsenScope,
 } from "@/hooks/usePulsen";
@@ -94,7 +94,7 @@ function PulsenFeed() {
     setTeamId(teamParam);
     setTab("team");
   }, [teamParam, me.teams]);
-  const images = usePulsenImageUrls(posts.filter((p) => p.image_path && !p.localImageUrl).map((p) => p.image_path as string));
+  const images = usePulsenImageUrls(posts.filter((p) => !p.localImageUrl).flatMap((p) => opslagBilledStier(p)));
 
   const mut = usePulsenMutations(me.self);
 
@@ -198,13 +198,13 @@ function PulsenFeed() {
                 isMine={p.author_employee_id === me.employeeId}
                 canModerate={me.canModerate(p)}
                 contextLabel={contextFor(p)}
-                imageUrl={p.image_path ? images.data?.get(p.image_path) : null}
+                imageUrls={opslagBilledStier(p).map((sti) => images.data?.get(sti)).filter((u): u is string => !!u)}
                 interactions={!p.pending ? {
                   summary: fr.getReactions(key),
                   comments: fr.getComments(key),
                   canInteract: fr.canInteract,
                   onReact: (reaction) => fr.setReaction.mutate({ targetType: "pulsen_post", targetKey: key, reaction }),
-                  onComment: (body, mentions) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body, mentions }),
+                  onComment: (body, mentions, parentId) => fr.addComment.mutateAsync({ targetType: "pulsen_post", targetKey: key, body, mentions, parentId }),
                   onDeleteComment: (id) => fr.deleteComment.mutateAsync(id),
                   onModerateComment: (id, hide, kode) => fr.moderateComment.mutateAsync({ id, hide, kode }),
                   onReportComment: (id, kode) => fr.reportComment.mutateAsync({ id, kode }),

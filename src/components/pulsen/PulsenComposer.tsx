@@ -64,8 +64,8 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   const [audience, setAudience] = useState<"house" | "team">(defaultAudience);
   const [praised, setPraised] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
@@ -92,30 +92,38 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
   }, [defaultAudience, canPostHouse, team?.id]);
 
   const reset = () => {
-    setBody(""); setMentions([]); setPraised([]); setFile(null); setPreview(null); setMode("post"); setOpen(false);
+    setBody(""); setMentions([]); setPraised([]); setFiles([]); setPreviews([]); setMode("post"); setOpen(false);
     setPollOptions(["", ""]); setPollDage(7); setPollAnonymous(false); setGenforsoeg(null);
   };
 
   const pickMode = (m: Mode) => {
     setOpen(true);
     setMode(m);
-    if (m === "poll") { setFile(null); setPreview(null); }
+    if (m === "poll") { setFiles([]); setPreviews([]); }
   };
 
-  const onFile = (f: File | undefined) => {
-    if (!f) return;
-    if (!f.type.startsWith("image/")) return toast.error("Vælg en billedfil");
-    if (f.size > PULSEN_IMAGE_MAX_BYTES) return toast.error("Billedet må højst fylde 10 MB");
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+  const MAKS_BILLEDER = 6;
+  // S8: op til 6 billeder pr. opslag
+  const onFiles = (liste: FileList | File[] | null | undefined) => {
+    const nye = Array.from(liste ?? []);
+    if (nye.length === 0) return;
+    if (nye.some((f) => !f.type.startsWith("image/"))) return toast.error("Vælg kun billedfiler");
+    if (nye.some((f) => f.size > PULSEN_IMAGE_MAX_BYTES)) return toast.error("Hvert billede må højst fylde 10 MB");
+    const plads = MAKS_BILLEDER - files.length;
+    if (plads <= 0) return toast.error(`Højst ${MAKS_BILLEDER} billeder pr. opslag`);
+    const tag = nye.slice(0, plads);
+    if (tag.length < nye.length) toast.error(`Højst ${MAKS_BILLEDER} billeder pr. opslag – de første ${tag.length} er valgt`);
+    setFiles((l) => [...l, ...tag]);
+    setPreviews((l) => [...l, ...tag.map((f) => URL.createObjectURL(f))]);
     setOpen(true);
   };
+  const fjernBillede = (i: number) => { setFiles((l) => l.filter((_, j) => j !== i)); setPreviews((l) => l.filter((_, j) => j !== i)); };
 
   const canSend =
     audiences.length > 0 &&
     !busy &&
     body.length <= PULSEN_MAX_CHARS &&
-    (mode === "question" || mode === "poll" ? body.trim().length > 0 : body.trim().length > 0 || !!file) &&
+    (mode === "question" || mode === "poll" ? body.trim().length > 0 : body.trim().length > 0 || files.length > 0) &&
     (mode !== "praise" || praised.length > 0);
 
   const sendPoll = async () => {
@@ -178,10 +186,11 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
       postType: mode as Exclude<Mode, "poll">,
       body,
       praised: mode === "praise" ? praised : null,
-      imageFile: file,
+      imageFile: files[0] ?? null,
+      imageFiles: files,
       mentions,
     };
-    const localUrl = preview;
+    const localUrl = previews[0];
     try {
       await onSubmit(input, localUrl);
       // Kladden nulstilles først efter vellykket gem.
@@ -328,17 +337,21 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
               </div>
             </div>
           )}
-          {preview && (
-            <div className="relative mt-3">
-              <img src={preview} alt="Valgt billede" className="max-h-[320px] w-full rounded-[18px] object-cover" />
-              <button type="button" aria-label="Fjern billede" onClick={() => { setFile(null); setPreview(null); }} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground">
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
+          {previews.length > 0 && (
+            <div className={cn("mt-3 grid gap-2", previews.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
+              {previews.map((src, i) => (
+                <div key={src} className="relative">
+                  <img src={src} alt={`Valgt billede ${i + 1}`} className={cn("w-full rounded-[18px] object-cover", previews.length === 1 ? "max-h-[320px]" : "aspect-square")} />
+                  <button type="button" aria-label={`Fjern billede ${i + 1}`} onClick={() => fjernBillede(i)} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground">
+                    <X className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-muted-foreground">
             <span>Del aldrig kundeoplysninger</span>
-            {!preview && mode !== "poll" && (
+            {files.length < MAKS_BILLEDER && mode !== "poll" && (
               <button type="button" aria-label="Vedhæft billede" onClick={() => fileRef.current?.click()} className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-full text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
                 <ImagePlus className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -370,7 +383,7 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
 
   return (
     <section aria-label="Skriv i Storkbook" className="rounded-[24px] bg-card p-5">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
 
       {!(open && telefon) && genforsoegAlert}
 

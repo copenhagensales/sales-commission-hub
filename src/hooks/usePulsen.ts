@@ -29,6 +29,8 @@ export interface PulsenPost {
   body: string;
   praised_employee_id: string | null;
   image_path: string | null;
+  /** S8: alle billeder (image_path = det første). */
+  image_paths?: string[] | null;
   best_answer_comment_id: string | null;
   hidden_at: string | null;
   /** S7: moderationskode, lukkede kommentarer, tjekstatus og revision (fra 24d/S7-a). */
@@ -51,7 +53,7 @@ export interface PulsenPost {
 }
 
 const POST_SELECT =
-  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, best_answer_comment_id, hidden_at, hidden_kode, comments_closed_at, status, revision, created_at, edited_at, mentions, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
+  "id, author_employee_id, audience, team_id, post_type, body, praised_employee_id, praised_employee_ids, image_path, image_paths, best_answer_comment_id, hidden_at, hidden_kode, comments_closed_at, status, revision, created_at, edited_at, mentions, author:employee_master_data!pulsen_posts_author_employee_id_fkey(id, first_name, last_name, job_title), praised:employee_master_data!pulsen_posts_praised_employee_id_fkey(id, first_name, last_name)";
 
 /** Henter navne på alle roste kolleger, så ros til flere vises korrekt. */
 async function attachPraised(posts: PulsenPost[]): Promise<PulsenPost[]> {
@@ -180,6 +182,9 @@ export function usePulsenPost(id: string | undefined) {
 }
 
 /** Signerede adresser (1 time) til billeder, som brugeren må se. */
+/** Alle billedstier for et opslag (S8: image_paths, ellers image_path). */
+export const opslagBilledStier = (p: { image_path: string | null; image_paths?: string[] | null }): string[] => (p.image_paths?.length ? p.image_paths : p.image_path ? [p.image_path] : []);
+
 export function usePulsenImageUrls(paths: string[]) {
   const sorted = useMemo(() => Array.from(new Set(paths)).sort(), [paths]);
   return useQuery({
@@ -220,6 +225,8 @@ export interface NewPulsenPost {
   body: string;
   praised?: { id: string; first_name: string | null; last_name: string | null }[] | null;
   imageFile?: File | null;
+  /** S8: op til 6 billeder (imageFile bevares for ældre kaldere). */
+  imageFiles?: File[] | null;
   mentions?: Omtale[];
 }
 
@@ -257,15 +264,23 @@ export function usePulsenMutations(author: PersonRef | null) {
     mutationFn: async ({ input, id }: { input: NewPulsenPost; id: string; localUrl?: string }) => {
       if (!author) throw new Error("Din bruger er ikke koblet til et medarbejderkort");
       const body = input.body.trim().slice(0, PULSEN_MAX_CHARS);
-      let imagePath: string | null = null;
-      if (input.imageFile) {
-        const blob = await compressPulsenImage(input.imageFile);
-        imagePath = `${author.id}/${id}.webp`;
-        const { error: upErr } = await supabase.storage
-          .from(PULSEN_BUCKET)
-          .upload(imagePath, blob, { contentType: "image/webp", upsert: false });
-        if (upErr) throw upErr;
+      // S8: op til 6 billeder: <forfatter>/<id>.webp (første) og <forfatter>/<id>-N.webp; værnet i databasen kræver netop det format.
+      const filer = (input.imageFiles ?? (input.imageFile ? [input.imageFile] : [])).slice(0, 6);
+      const stier: string[] = [];
+      try {
+        for (let i = 0; i < filer.length; i++) {
+          const blob = await compressPulsenImage(filer[i]);
+          const sti = i === 0 ? `${author.id}/${id}.webp` : `${author.id}/${id}-${i}.webp`;
+          const { error: upErr } = await supabase.storage.from(PULSEN_BUCKET).upload(sti, blob, { contentType: "image/webp", upsert: false });
+          if (upErr) throw upErr;
+          stier.push(sti);
+        }
+      } catch (e) {
+        // Fejl i komprimering eller upload midtvejs: allerede uploadede billeder fjernes igen [Codex S8]
+        if (stier.length) await supabase.storage.from(PULSEN_BUCKET).remove(stier).catch(() => undefined);
+        throw e;
       }
+      const imagePath: string | null = stier[0] ?? null;
       const { data, error } = await supabase
         .from("pulsen_posts")
         .insert({
@@ -278,12 +293,13 @@ export function usePulsenMutations(author: PersonRef | null) {
           praised_employee_id: input.postType === "praise" ? input.praised?.[0]?.id ?? null : null,
           praised_employee_ids: input.postType === "praise" ? (input.praised ?? []).map((p) => p.id) : [],
           image_path: imagePath,
+          image_paths: stier,
           mentions: rensOmtaler(body, input.mentions ?? []),
         })
         .select(POST_SELECT)
         .single();
       if (error) {
-        if (imagePath) await supabase.storage.from(PULSEN_BUCKET).remove([imagePath]);
+        if (stier.length) await supabase.storage.from(PULSEN_BUCKET).remove(stier);
         throw error;
       }
       const row = data as unknown as PulsenPost;
@@ -305,6 +321,7 @@ export function usePulsenMutations(author: PersonRef | null) {
         praised_employee_ids: (input.praised ?? []).map((p) => p.id),
         praisedAll: input.praised ?? [],
         image_path: null,
+        image_paths: [],
         best_answer_comment_id: null,
         hidden_at: null,
         created_at: new Date().toISOString(),
@@ -324,7 +341,8 @@ export function usePulsenMutations(author: PersonRef | null) {
       if (ctx) qc.setQueryData(ctx.key, ctx.prev);
     },
     onSuccess: (row, { id, localUrl }) => {
-      patchEverywhere((p) => (p.id === id ? { ...row, localImageUrl: localUrl } : p));
+      // Ét billede: den lokale URL kan blive stående; flere: alle signeres fra lageret [Codex S8]
+      patchEverywhere((p) => (p.id === id ? { ...row, localImageUrl: (row.image_paths?.length ?? 0) > 1 ? undefined : localUrl } : p));
       qc.invalidateQueries({ queryKey: ["pulsen-unanswered"] });
     },
   });
@@ -352,8 +370,9 @@ export function usePulsenMutations(author: PersonRef | null) {
     mutationFn: async (post: PulsenPost) => {
       const { error } = await supabase.from("pulsen_posts").update({ deleted_at: new Date().toISOString() }).eq("id", post.id);
       if (error) throw error;
-      // Billedet slettes sammen med indlægget (forfatterens egen mappe).
-      if (post.image_path) await supabase.storage.from(PULSEN_BUCKET).remove([post.image_path]);
+      // Billederne slettes sammen med indlægget (forfatterens egen mappe).
+      const stier = Array.from(new Set([...(post.image_paths ?? []), ...(post.image_path ? [post.image_path] : [])]));
+      if (stier.length) await supabase.storage.from(PULSEN_BUCKET).remove(stier);
     },
     onMutate: async (post) => {
       await cancelFor(post.id);

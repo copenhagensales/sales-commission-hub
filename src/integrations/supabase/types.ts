@@ -8819,6 +8819,7 @@ export type Database = {
           id: string
           leveret_at: string | null
           mentions: Json
+          parent_id: string | null
           personoplysning: boolean
           revision: number
           slettes_efter: string | null
@@ -8843,6 +8844,7 @@ export type Database = {
           id?: string
           leveret_at?: string | null
           mentions?: Json
+          parent_id?: string | null
           personoplysning?: boolean
           revision?: number
           slettes_efter?: string | null
@@ -8867,6 +8869,7 @@ export type Database = {
           id?: string
           leveret_at?: string | null
           mentions?: Json
+          parent_id?: string | null
           personoplysning?: boolean
           revision?: number
           slettes_efter?: string | null
@@ -14048,6 +14051,7 @@ export type Database = {
           hidden_kode: string | null
           id: string
           image_path: string | null
+          image_paths: string[]
           leveret_at: string | null
           mentions: Json
           personoplysning: boolean
@@ -14082,6 +14086,7 @@ export type Database = {
           hidden_kode?: string | null
           id?: string
           image_path?: string | null
+          image_paths?: string[]
           leveret_at?: string | null
           mentions?: Json
           personoplysning?: boolean
@@ -14116,6 +14121,7 @@ export type Database = {
           hidden_kode?: string | null
           id?: string
           image_path?: string | null
+          image_paths?: string[]
           leveret_at?: string | null
           mentions?: Json
           personoplysning?: boolean
