@@ -263,17 +263,35 @@ Deno.serve(async (req) => {
 
 
     // Fetch team memberships (inkl. fratraadtes sidste kendte team, saa historiske
-    // leaderboards bevarer teamattributionen)
-    const { data: teamMembers } = await supabase
-      .from("employee_team_attribution")
-      .select("employee_id, team_name, is_current")
-      .order("is_current", { ascending: false });
+    // leaderboards bevarer teamattributionen). Pagineret og med fejlkontrol: en afkortet
+    // eller fejlet liste maa ikke blive til "friske" team-leaderboards uden medlemmer.
+    type TeamAttribution = { employee_id: string; team_id: string | null; team_name: string | null; is_current: boolean };
+    const teamMembers: TeamAttribution[] = [];
+    for (let offset = 0; ; ) {
+      const { data: page, error: tmError } = await supabase
+        .from("employee_team_attribution")
+        .select("employee_id, team_id, team_name, is_current")
+        .order("employee_id", { ascending: true })
+        .order("team_id", { ascending: true })
+        .range(offset, offset + 999);
+      if (tmError) throw tmError;
+      if (!page || page.length === 0) break;
+      teamMembers.push(...(page as TeamAttribution[]));
+      offset += page.length;
+    }
+    // Aktuelt medlemskab foerst, saa employeeTeamMap peger paa det aktuelle team
+    teamMembers.sort((a, b) => Number(b.is_current) - Number(a.is_current));
     
     const employeeTeamMap = new Map<string, string>();
-    (teamMembers || []).forEach(tm => {
-      const teamName = (tm as any)?.team_name;
-      if (teamName && tm.employee_id && !employeeTeamMap.has(tm.employee_id)) {
-        employeeTeamMap.set(tm.employee_id, teamName);
+    // Medlemmer pr. team (team_members + fratraadtes sidste kendte team) til team-scope-leaderboards
+    const teamEmployeeIds = new Map<string, Set<string>>();
+    teamMembers.forEach(tm => {
+      if (tm.team_name && tm.employee_id && !employeeTeamMap.has(tm.employee_id)) {
+        employeeTeamMap.set(tm.employee_id, tm.team_name);
+      }
+      if (tm.team_id && tm.employee_id) {
+        if (!teamEmployeeIds.has(tm.team_id)) teamEmployeeIds.set(tm.team_id, new Set<string>());
+        teamEmployeeIds.get(tm.team_id)!.add(tm.employee_id);
       }
     });
 
@@ -357,6 +375,15 @@ Deno.serve(async (req) => {
     const clientList = clients as { id: string; name: string }[];
 
     const campaigns = await fetchAllPaginated("client_campaigns", "id, client_id");
+
+    // Teams til team-scope (fx Hiper-boardet laeser scope_type='team'). Denne funktion er nu ENESTE
+    // skriver af team-raekker (calculate-kpi-values skriver dem ikke laengere): foer laa de kun i den
+    // timelige fulde koersel, og naar dens kald udeblev (pg_net-timeouts), blev team-cachen > 2 t
+    // gammel, og boardet viste ingen saelgere (30/10-2026).
+    // Eksplicit fejlkontrol: et fejlet teamopslag maa ikke blive til en "vellykket" koersel uden team-raekker [Codex r2]
+    const { data: teamRows, error: teamsError } = await supabase.from("teams").select("id, name").order("name", { ascending: true });
+    if (teamsError) throw teamsError;
+    const teamList = (teamRows || []) as { id: string; name: string }[];
     
     const campaignToClientMap = new Map<string, string>();
     for (const campaign of campaigns) {
@@ -436,6 +463,45 @@ Deno.serve(async (req) => {
 
         if (clientLeaderboard.length > 0) {
           console.log(`[calculate-leaderboard-incremental] Client ${client.name} ${period.type}: ${clientLeaderboard.length} entries`);
+        }
+      }
+
+      // ============= TEAM-SCOPED LEADERBOARDS =============
+      // Samme salg og samme beregning som global/klient – kun afgraenset til teamets medlemmer
+      // (agent_email -> medarbejder via mapping/work_email, som i calculate-kpi-values' teamtrin).
+      for (const team of teamList) {
+        const members = teamEmployeeIds.get(team.id);
+        const teamSales = members && members.size > 0
+          ? periodSales.filter(s => {
+              const employeeId = s.agent_email ? emailToEmployeeId.get(s.agent_email.toLowerCase()) : undefined;
+              return !!employeeId && members.has(employeeId);
+            })
+          : [];
+
+        const teamLeaderboard = teamSales.length === 0
+          ? []
+          : await calculateLeaderboard(
+              supabase,
+              teamSales,
+              employeeMap,
+              employeeTeamMap,
+              new Map(emailToEmployeeId),
+              countingProductIds,
+              crossSaleProductIds,
+              productCommissionMap,
+              30
+            );
+
+        leaderboardCaches.push({
+          period_type: period.type,
+          scope_type: "team",
+          scope_id: team.id,
+          leaderboard_data: teamLeaderboard,
+          calculated_at: calculatedAt,
+        });
+
+        if (teamLeaderboard.length > 0) {
+          console.log(`[calculate-leaderboard-incremental] Team ${team.name} ${period.type}: ${teamLeaderboard.length} entries`);
         }
       }
     }
