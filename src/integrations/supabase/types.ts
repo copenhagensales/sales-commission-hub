@@ -15956,6 +15956,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sb_anmeldelser: {
+        Row: {
+          anmelder_employee_id: string
+          behandlet_af: string | null
+          behandlet_at: string | null
+          id: number
+          kilde: string
+          kilde_id: string
+          kode: string
+          oprettet: string
+          post_id: string
+        }
+        Insert: {
+          anmelder_employee_id: string
+          behandlet_af?: string | null
+          behandlet_at?: string | null
+          id?: never
+          kilde: string
+          kilde_id: string
+          kode: string
+          oprettet?: string
+          post_id: string
+        }
+        Update: {
+          anmelder_employee_id?: string
+          behandlet_af?: string | null
+          behandlet_at?: string | null
+          id?: never
+          kilde?: string
+          kilde_id?: string
+          kode?: string
+          oprettet?: string
+          post_id?: string
+        }
+        Relationships: []
+      }
       sb_dagstal: {
         Row: {
           dag: string
@@ -20819,11 +20855,7 @@ export type Database = {
         Returns: boolean
       }
       sb_anmeld: {
-        Args: {
-          p_id: string
-          p_kilde: string
-          p_kode: string
-        }
+        Args: { p_id: string; p_kilde: string; p_kode: string }
         Returns: string
       }
       sb_bind_sti: {
@@ -20864,6 +20896,7 @@ export type Database = {
       sb_flag: { Args: { p_noegle: string }; Returns: boolean }
       sb_flag_laes: { Args: { p_noegle: string }; Returns: boolean }
       sb_handling: { Args: never; Returns: string }
+      sb_kan_moderere_opslag: { Args: { p_post: string }; Returns: boolean }
       sb_kilde_for_tabel: { Args: { p_tabel: string }; Returns: string }
       sb_kildetid: {
         Args: { p_created: string; p_edited: string; p_leveret: string }
@@ -20889,6 +20922,10 @@ export type Database = {
           id: number
           sti: string
         }[]
+      }
+      sb_kommentar_opslag: {
+        Args: { p_target_key: string; p_target_type: string }
+        Returns: string
       }
       sb_laas_egen: {
         Args: { p_id: string; p_kilde: string; p_revision: number }
