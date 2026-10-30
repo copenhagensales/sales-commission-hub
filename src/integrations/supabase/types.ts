@@ -8882,7 +8882,15 @@ export type Database = {
           user_id?: string
           vaern_niveau?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "feed_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "feed_comments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       feed_reactions: {
         Row: {
