@@ -3,7 +3,6 @@ import { useRef, useState, type MouseEvent, type Ref, type RefObject } from "rea
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { BESKEDER_INFO, BESKEDER_INFO_VERSION, BESKEDER_INFO_KNAP_TEKST, BESKEDER_INFO_INDLEDNING, ligeNuTekster, type BeskederInfoStatus } from "./beskederInfoTekst";
 
@@ -43,27 +42,26 @@ export function BeskederInfoSheet({ open, onOpenChange, status, returFokus, rese
         className={cn("overflow-y-auto", telefon ? "max-h-[85dvh] rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))]" : "sm:max-w-md")}
         onCloseAutoFocus={fokusTilbage}>
         <SheetHeader className="text-left">
-          <SheetTitle>{BESKEDER_INFO_KNAP_TEKST}</SheetTitle>
-          <SheetDescription>{BESKEDER_INFO_INDLEDNING}</SheetDescription>
+          <SheetTitle className="pr-12 text-[22px] font-extrabold leading-tight tracking-[-0.02em]">{BESKEDER_INFO_KNAP_TEKST}</SheetTitle>
+          <SheetDescription className="text-[15px] leading-[1.5]">{BESKEDER_INFO_INDLEDNING}</SheetDescription>
         </SheetHeader>
         {ligeNu.length > 0 && (
-          <div role="status" className="mt-3 rounded-lg border border-border bg-card p-3 text-[14px] text-card-foreground">
-            <p className="font-medium">Lige nu</p>
+          <div role="status" className="mt-3 rounded-[24px] bg-[hsl(var(--cph-onyx))] p-4 text-[14px] text-[hsl(var(--cph-light-blue))]">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--cph-emerald))]">Lige nu</p>
             {ligeNu.map((t) => <p key={t} className="mt-1">{t}</p>)}
           </div>
         )}
-        <Accordion type="multiple" defaultValue={[BESKEDER_INFO[0].id]} className="mt-2">
+        {/* D2a: tre korte afsnit som hvide kort (teksten er kort nok til at stå åben – ingen harmonika) */}
+        <div className="mt-4 space-y-3">
           {BESKEDER_INFO.map((a) => (
-            <AccordionItem key={a.id} value={a.id}>
-              <AccordionTrigger className="min-h-11 py-3 text-left text-[15px] font-medium">{a.titel}</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc space-y-2 pl-5 text-[14px] text-foreground">
-                  {a.punkter.map((p) => <li key={p}>{p}</li>)}
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
+            <section key={a.id} aria-labelledby={`info-${a.id}`} className="rounded-[24px] bg-card p-4">
+              <h3 id={`info-${a.id}`} className="text-[15px] font-extrabold text-foreground">{a.titel}</h3>
+              <ul className="mt-2 space-y-2 text-[14px] leading-[1.5] text-foreground">
+                {a.punkter.map((p) => <li key={p} className="flex gap-2"><span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[hsl(var(--cph-emerald))]" />{p}</li>)}
+              </ul>
+            </section>
           ))}
-        </Accordion>
+        </div>
         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} className="mt-5 min-h-[44px] w-full rounded-full bg-card text-[14px] font-extrabold text-foreground hover:bg-muted">Luk</Button>
         <p className="mt-3 text-xs text-muted-foreground">Version {BESKEDER_INFO_VERSION}</p>
       </SheetContent>

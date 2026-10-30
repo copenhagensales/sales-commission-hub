@@ -100,10 +100,14 @@ export function Samleside({ titel, faner, ejerAfTab, parameter = "tab", layout: 
         </div>
       ) : (
         <Tabs value={aktivPlads} onValueChange={(v) => skift(pladser.find((p) => p.value === v)?.foerste ?? v)} className="w-full">
+          {/* D2a: faner som runde piller i et hvidt spor (som Huset/Team i Storkbook); valgt = onyx. På telefon ruller sporet vandret. */}
           {pladser.length > 1 && (
-            <TabsList aria-label={titel} className="mb-4 h-auto flex-wrap max-md:flex max-md:w-full max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:[scrollbar-width:none] max-md:[&>button]:min-h-11 max-md:[&>button]:flex-none">
+            <TabsList aria-label={titel} className="mb-4 h-auto w-fit max-w-full flex-wrap gap-1 rounded-full bg-card p-1 text-foreground max-md:flex max-md:w-full max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:[scrollbar-width:none] max-md:[&>button]:flex-none">
               {pladser.map((p) => (
-                <TabsTrigger key={p.value} value={p.value}>{p.label}</TabsTrigger>
+                <TabsTrigger key={p.value} value={p.value}
+                  className="min-h-[44px] rounded-full px-4 text-[14px] font-extrabold text-foreground transition-colors hover:bg-[hsl(var(--cph-light-blue))] data-[state=active]:bg-[hsl(var(--cph-onyx))] data-[state=active]:text-[hsl(var(--cph-light-blue))] data-[state=active]:shadow-none md:min-h-[40px]">
+                  {p.label}
+                </TabsTrigger>
               ))}
             </TabsList>
           )}

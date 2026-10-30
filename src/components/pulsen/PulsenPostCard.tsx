@@ -268,19 +268,21 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
   const rest = comments.filter((c) => c.id !== best?.id);
   const visible = showAll ? rest : rest.slice(0, 1);
   const canPickBest = isMine && post.post_type === "question";
-  /** Anmeld/skjul-knapper – samme for bedste svar og tråden [Codex S7-c P2-2]. */
+  /** Lille ordknap under en kommentar (ikon + ord). aria-label bevares til prøver/skærmlæser. */
+  const tekstKnap = (props: { label: string; aria: string; ikon: typeof Flag; onClick: () => void; tone?: "normal" | "fare" }) => (
+    <button key={props.aria} type="button" aria-label={props.aria} onClick={props.onClick}
+      className={cn("flex min-h-[36px] items-center gap-1 rounded-full px-2 text-[12px] font-extrabold transition-colors max-md:min-h-[44px]",
+        props.tone === "fare" ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive" : "text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] hover:text-foreground")}>
+      <props.ikon className="h-3.5 w-3.5" aria-hidden="true" />{props.label}
+    </button>
+  );
+  /** Anmeld/skjul – samme for bedste svar og tråden [Codex S7-c P2-2]. */
   const handlinger = (c: PostInteractions["comments"][number]) => (
     <>
-      {!c.isMine && interactions.onReportComment && (
-        <button type="button" aria-label="Anmeld kommentar" onClick={() => onReason({ art: "anmeld_kommentar", id: c.id })} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
-          <Flag className="h-4 w-4" aria-hidden="true" />
-        </button>
-      )}
-      {canModerate && !c.isMine && interactions.onModerateComment && (
-        <button type="button" aria-label={c.hiddenAt ? "Vis kommentaren igen" : "Skjul kommentaren"} onClick={() => (c.hiddenAt ? void interactions.onModerateComment?.(c.id, false) : onReason({ art: "skjul_kommentar", id: c.id }))} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))]">
-          {c.hiddenAt ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
-        </button>
-      )}
+      {!c.isMine && interactions.onReportComment && tekstKnap({ label: "Anmeld", aria: "Anmeld kommentar", ikon: Flag, onClick: () => onReason({ art: "anmeld_kommentar", id: c.id }) })}
+      {canModerate && !c.isMine && interactions.onModerateComment && (c.hiddenAt
+        ? tekstKnap({ label: "Vis igen", aria: "Vis kommentaren igen", ikon: Eye, onClick: () => void interactions.onModerateComment?.(c.id, false) })
+        : tekstKnap({ label: "Skjul", aria: "Skjul kommentaren", ikon: EyeOff, onClick: () => onReason({ art: "skjul_kommentar", id: c.id }) }))}
     </>
   );
 
@@ -334,39 +336,42 @@ function PostFooter({ post, isMine, canModerate, interactions, onBestAnswer, onR
       </div>
 
       {best && (
-        <div className="mt-2 rounded-2xl bg-[hsl(var(--cph-light-blue))] px-4 py-3">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--cph-praise-foreground))]">★ Bedste svar · {best.authorName}</p>
-          <p className="mt-1 break-words text-[15px] text-foreground">{renderOmtaler(best.body, best.mentions)}</p>
-          {best.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{best.hiddenKode ? ` · ${anmeldTekst(best.hiddenKode)}` : ""}</p>}
-          <div className="flex items-center gap-1">{handlinger(best)}</div>
-          {canPickBest && (
-            <button type="button" onClick={() => onBestAnswer(null)} className="mt-1 min-h-[44px] text-[13px] font-extrabold text-muted-foreground hover:underline">Fjern som bedste svar</button>
-          )}
+        <div className="mt-3 flex items-start gap-2">
+          <PulsenAvatar name={best.authorName} size={32} className="mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <div className="rounded-[18px] bg-[hsl(var(--cph-praise))] px-3.5 py-2">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--cph-praise-foreground))]">★ Bedste svar · {best.authorName}</p>
+              <p className="mt-1 break-words text-[15px] leading-[1.45] text-foreground">{renderOmtaler(best.body, best.mentions)}</p>
+              {best.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{best.hiddenKode ? ` · ${anmeldTekst(best.hiddenKode)}` : ""}</p>}
+            </div>
+            <div className="-mt-0.5 flex flex-wrap items-center gap-0.5 px-1">
+              {handlinger(best)}
+              {canPickBest && tekstKnap({ label: "Fjern som bedste svar", aria: "Fjern som bedste svar", ikon: Star, onClick: () => onBestAnswer(null) })}
+            </div>
+          </div>
         </div>
       )}
 
       {visible.length > 0 && (
-        <ul className="mt-2 space-y-2">
+        <ul className="mt-3 space-y-3">
           {visible.map((c) => (
             <li key={c.id} className="flex items-start gap-2">
-              <div className="min-w-0 flex-1 rounded-[16px] bg-[hsl(var(--cph-light-blue))] px-3 py-2">
-                <p className="text-[13px] font-extrabold text-foreground">{c.authorName}</p>
-                <p className="break-words whitespace-pre-wrap text-[15px] text-foreground">{renderOmtaler(c.body, c.mentions)}</p>
-                {c.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{c.hiddenKode ? ` · ${anmeldTekst(c.hiddenKode)}` : ""}</p>}
-                {c.isMine && c.status === "tjekkes" && <p className="mt-1 text-[12px] text-muted-foreground">✓ Tjekkes …</p>}
-                {c.isMine && c.status === "afventer_afsender" && <KommentarAfventer id={c.id} revision={c.revision ?? 1} onDecide={interactions.onDecideComment} onDelete={() => interactions.onDeleteComment(c.id)} />}
+              <PulsenAvatar name={c.authorName} size={32} className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                {/* D2a: boble m. navn · tid; egne kommentarer i svag emerald, andres i lys blå; handlinger som små ordknapper under boblen */}
+                <div className={cn("rounded-[18px] px-3.5 py-2", c.hiddenAt ? "bg-muted" : c.isMine ? "bg-[hsl(var(--cph-emerald)/0.14)]" : "bg-[hsl(var(--cph-light-blue))]")}>
+                  <p className="text-[13px] font-extrabold text-foreground">{c.authorName}<span className="font-normal text-muted-foreground"> · {pulsenRelativeTime(c.createdAt)}</span></p>
+                  <p className="break-words whitespace-pre-wrap text-[15px] leading-[1.45] text-foreground">{renderOmtaler(c.body, c.mentions)}</p>
+                  {c.hiddenAt && <p className="mt-1 text-[12px] font-semibold text-muted-foreground">Skjult{c.hiddenKode ? ` · ${anmeldTekst(c.hiddenKode)}` : ""}</p>}
+                  {c.isMine && c.status === "tjekkes" && <p className="mt-1 text-[12px] text-muted-foreground">✓ Tjekkes …</p>}
+                  {c.isMine && c.status === "afventer_afsender" && <KommentarAfventer id={c.id} revision={c.revision ?? 1} onDecide={interactions.onDecideComment} onDelete={() => interactions.onDeleteComment(c.id)} />}
+                </div>
+                <div className="-mt-0.5 flex flex-wrap items-center gap-0.5 px-1">
+                  {handlinger(c)}
+                  {canPickBest && tekstKnap({ label: "Bedste svar", aria: "Markér som bedste svar", ikon: Star, onClick: () => onBestAnswer(c.id) })}
+                  {c.isMine && tekstKnap({ label: "Slet", aria: "Slet din kommentar", ikon: X, onClick: () => void interactions.onDeleteComment(c.id), tone: "fare" })}
+                </div>
               </div>
-              {handlinger(c)}
-              {canPickBest && (
-                <button type="button" aria-label="Markér som bedste svar" onClick={() => onBestAnswer(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
-                  <Star className="h-4 w-4" aria-hidden="true" />
-                </button>
-              )}
-              {c.isMine && (
-                <button type="button" aria-label="Slet din kommentar" onClick={() => interactions.onDeleteComment(c.id)} className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-[hsl(var(--cph-light-blue))] active:opacity-70">
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </button>
-              )}
             </li>
           ))}
         </ul>
