@@ -232,7 +232,7 @@ export function PulsenPostCard({ post, isMine, canModerate, contextLabel, imageU
 
       {img && (
         <>
-          <button type="button" onClick={() => setZoom(true)} aria-label="Vis billedet i fuld størrelse" className="mt-3 block w-full overflow-hidden rounded-[18px] bg-muted active:opacity-90">
+          <button type="button" onClick={() => setZoom(true)} aria-label="Vis billedet i fuld størrelse" className="-mx-5 mt-3 block w-[calc(100%+2.5rem)] overflow-hidden bg-muted">
             <img src={img} alt="" loading="lazy" className="max-h-[520px] w-full object-cover"
               style={{ aspectRatio: imgRatio ?? "4 / 3" }}
               onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setImgRatio(`${t.naturalWidth} / ${t.naturalHeight}`); }} />

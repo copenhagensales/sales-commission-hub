@@ -21,6 +21,7 @@ vi.mock("@/hooks/useChat", async () => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/hooks/useCurrentEmployeeId", () => ({ useCurrentEmployeeId: () => ({ data: null }) }));
+vi.mock("@/hooks/useSidsteBeskeder", () => ({ useSidsteBeskeder: () => ({ data: {} }) }));
 import { toast } from "sonner";
 import { ConversationList } from "./ConversationList";
 import { ForaeldetSession } from "@/lib/sbKladder";

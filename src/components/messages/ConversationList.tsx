@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { samtaleNavn, initialer, kortTid } from "./samtaleTekst";
 import { useCurrentEmployeeId } from "@/hooks/useCurrentEmployeeId";
+import { useSidsteBeskeder, type SidsteBesked } from "@/hooks/useSidsteBeskeder";
 import { Users, MoreVertical, Trash2, LogOut, Loader2 } from "lucide-react";
 import { OnlineIndicator } from "./OnlineIndicator";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   const { data: conversations, isLoading } = useConversations();
   const onlineUsers = useOnlineStatus();
   const migId = useCurrentEmployeeId().data ?? null;
+  const sidste = useSidsteBeskeder((conversations ?? []).map((c) => c.id)).data ?? {};
   const rootRef = useRef<HTMLDivElement>(null);
   const viewport = () => rootRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]") ?? null;
 
@@ -89,6 +91,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
             }}
             onlineUsers={onlineUsers}
             migId={migId}
+            sidste={sidste[conversation.id]}
           />
         ))}
       </div>
@@ -103,9 +106,11 @@ interface ConversationItemProps {
   onDelete: () => void;
   onlineUsers: Set<string>;
   migId?: string | null;
+  /** Seneste besked i samtalen (uddrag i listen). */
+  sidste?: SidsteBesked;
 }
 
-function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineUsers, migId }: ConversationItemProps) {
+function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineUsers, migId, sidste }: ConversationItemProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const deleteConversation = useDeleteConversation();
 
@@ -123,6 +128,16 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
     : 0;
 
   const unreadCount = conversation.unread_count || 0;
+  // Uddrag af seneste besked: »Du: …« / »Fornavn: …« (gruppe) / bare teksten (direkte); fil uden tekst → filnavn.
+  const uddrag = (() => {
+    if (!sidste) return null;
+    const tekst = sidste.content?.trim() || (sidste.attachment_name ? `📎 ${sidste.attachment_name}` : sidste.attachment_path ? "📎 Fil" : "");
+    if (!tekst) return null;
+    if (migId && sidste.sender_id === migId) return `Du: ${tekst}`;
+    if (!conversation.is_group) return tekst;
+    const afs = conversation.members?.find((m) => m.employee_id === sidste.sender_id)?.employee?.full_name?.split(" ")[0];
+    return afs ? `${afs}: ${tekst}` : tekst;
+  })();
 
   const handleDelete = async () => {
     if (!kanSletteSamtale(conversation)) { setShowDeleteDialog(false); return; }
@@ -172,13 +187,13 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
               {displayName}
             </span>
             <span className={cn("shrink-0 text-[12px] tabular-nums", unreadCount > 0 && !isSelected ? "font-extrabold text-foreground" : "text-muted-foreground")}>
-              {kortTid(conversation.updated_at)}
+              {kortTid(sidste?.created_at ?? conversation.updated_at)}
             </span>
           </div>
 
           <div className="mt-0.5 flex items-center gap-2 text-[13px] text-muted-foreground">
-            <span className="truncate">
-              {conversation.is_group ? `${conversation.members?.length ?? 0} deltagere` : isOtherOnline ? "Online" : "Direkte samtale"}
+            <span className={cn("truncate", unreadCount > 0 && !isSelected ? "font-semibold text-foreground" : "")}>
+              {uddrag ?? (conversation.is_group ? `${conversation.members?.length ?? 0} deltagere` : isOtherOnline ? "Online" : "Ingen beskeder endnu")}
             </span>
             {conversation.is_group && onlineMemberCount > 0 && (
               <span className="flex shrink-0 items-center gap-1 text-[hsl(var(--cph-emerald))]">

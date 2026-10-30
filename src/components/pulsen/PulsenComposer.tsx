@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, CalendarPlus, Plus, HandHeart, HelpCircle, ImagePlus, PenLine, X } from "lucide-react";
+import { BarChart3, Plus, HandHeart, ImagePlus, PenLine, X } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AfstemningOmtaleFejl, useActiveColleagues, useOpretAfstemning, type NewPulsenPost } from "@/hooks/usePulsen";
 import { PULSEN_IMAGE_MAX_BYTES, PULSEN_MAX_CHARS, showCharCounter } from "@/lib/pulsen/format";
 import { cn } from "@/lib/utils";
+import { BottomSheet, useIsPhone } from "@/components/mobile";
 import { OmtaleFelt } from "./OmtaleFelt";
 import { erOmtaleFejl, type Omtale } from "./omtaler";
 
@@ -36,15 +37,25 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
 }
 
+// Mathias 30/10: Spørgsmål fjernet (= afstemning), Begivenhed fjernet (oprettes under fanen Begivenheder)
 const MODES: { key: Mode; label: string; icon: typeof PenLine }[] = [
   { key: "post", label: "Indlæg", icon: PenLine },
   { key: "praise", label: "Ros", icon: HandHeart },
-  { key: "question", label: "Spørgsmål", icon: HelpCircle },
   { key: "poll", label: "Afstemning", icon: BarChart3 },
 ];
 
+const SHEET_TITEL: Record<Mode, string> = { post: "Nyt indlæg", praise: "Giv ros", question: "Stil et spørgsmål", poll: "Ny afstemning" };
+
 export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, defaultAudience, team, onSubmit, onOpenEvent, initialMode, initialBody, onOpenChange }: Props) {
   const [open, setOpen] = useState(!!initialMode);
+  const telefon = useIsPhone();
+  const aabnerRef = useRef<HTMLButtonElement>(null);
+  const varAaben = useRef(false);
+  // Telefon: når arket lukker (Luk, Annullér eller Del), går fokus tilbage til åbneren [Codex D2a-4].
+  useEffect(() => {
+    if (varAaben.current && !open && telefon) setTimeout(() => aabnerRef.current?.focus({ preventScroll: true }), 0);
+    varAaben.current = open;
+  }, [open, telefon]);
   const [mode, setMode] = useState<Mode>(initialMode && initialMode !== "image" ? initialMode : "post");
   const [body, setBody] = useState(initialBody ?? "");
   const [mentions, setMentions] = useState<Omtale[]>([]);
@@ -185,10 +196,9 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
 
   if (audiences.length === 0) return null;
 
-  return (
-    <section aria-label="Skriv i Storkbook" className="rounded-[24px] bg-card p-5">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
-
+  // Fælles stykker til kortet (pc) og arket (telefon). Type-piller i én række med vandret rulle (ombrød før i to rækker på telefon – D2a).
+  const genforsoegAlert = (
+    <>
       {genforsoeg && (
         <div role="alert" className="mb-3 rounded-[18px] bg-[hsl(var(--cph-light-blue))] p-4">
           <p className="text-[16px] font-extrabold text-foreground">Afstemningen er delt – omtalerne mangler.</p>
@@ -200,15 +210,27 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
           </div>
         </div>
       )}
-
-      {/* Låst under gemning og i genforsøgstilstand, så kladden ikke ændres efter afsendelse. */}
-      <fieldset disabled={busy || !!genforsoeg} className="m-0 min-w-0 border-0 p-0">
-
-      {!open ? (
-        <button type="button" onClick={() => setOpen(true)} className="flex min-h-[52px] w-full items-center rounded-[18px] bg-[hsl(var(--cph-light-blue))] px-4 text-left text-[16px] text-muted-foreground">
-          Del noget med {defaultAudience === "team" && team ? team.name : "huset"} …
-        </button>
-      ) : (
+    </>
+  );
+  const typePiller = (
+      <div className="-mx-1 mt-3 flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {MODES.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => pickMode(key)}
+            aria-pressed={open && mode === key}
+            className={cn(
+              "flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 text-[14px] font-extrabold transition-colors",
+              open && mode === key ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground hover:bg-[hsl(var(--cph-light-blue))]"
+            )}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" /> {label}
+          </button>
+        ))}
+      </div>
+  );
+  const aabentIndhold = (
         <div>
           {mode === "praise" && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -324,32 +346,8 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
             {showCharCounter(body.length) && <span className="tabular-nums">{body.length}/{PULSEN_MAX_CHARS}</span>}
           </div>
         </div>
-      )}
-
-      {/* Type-piller i én række med vandret rulle (ombrød før i to rækker på telefon – D2a) */}
-      <div className="-mx-1 mt-3 flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {MODES.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => pickMode(key)}
-            aria-pressed={open && mode === key}
-            className={cn(
-              "flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 text-[14px] font-extrabold transition-colors",
-              open && mode === key ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]" : "text-foreground hover:bg-[hsl(var(--cph-light-blue))]"
-            )}
-          >
-            <Icon className="h-4 w-4" aria-hidden="true" /> {label}
-          </button>
-        ))}
-        {canManageEvents && (
-          <button type="button" onClick={onOpenEvent} className="flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 text-[14px] font-extrabold text-foreground hover:bg-[hsl(var(--cph-light-blue))]">
-            <CalendarPlus className="h-4 w-4" aria-hidden="true" /> Begivenhed
-          </button>
-        )}
-      </div>
-
-      {open && (
+  );
+  const bundraekke = (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           {audiences.length > 1 ? (
             <button
@@ -368,8 +366,37 @@ export function PulsenComposer({ myEmployeeId, canPostHouse, canManageEvents, de
             <button type="button" onClick={send} disabled={mode === "poll" ? busy || audiences.length === 0 : !canSend} className="min-h-[44px] rounded-full bg-[hsl(var(--cph-onyx))] px-5 text-[14px] font-extrabold text-[hsl(var(--cph-light-blue))] hover:bg-[hsl(var(--cph-onyx-pressed))] disabled:opacity-50">Del</button>
           </div>
         </div>
+  );
+
+  return (
+    <section aria-label="Skriv i Storkbook" className="rounded-[24px] bg-card p-5">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+
+      {!(open && telefon) && genforsoegAlert}
+
+      {/* Låst under gemning og i genforsøgstilstand, så kladden ikke ændres efter afsendelse. */}
+      <fieldset disabled={busy || !!genforsoeg} className="m-0 min-w-0 border-0 p-0">
+
+      {/* D2a (Facebook-niveau): på telefon åbner skrivefeltet som et ark fra bunden; på pc folder kortet ud som før. Kladden bevares, når arket lukkes. */}
+      {(!open || telefon) && (
+        <button ref={aabnerRef} type="button" onClick={() => setOpen(true)} className="flex min-h-[52px] w-full items-center rounded-[18px] bg-[hsl(var(--cph-light-blue))] px-4 text-left text-[16px] text-muted-foreground">
+          Del noget med {defaultAudience === "team" && team ? team.name : "huset"} …
+        </button>
       )}
+      {open && !telefon && aabentIndhold}
+      {(!open || !telefon) && typePiller}
+      {open && !telefon && bundraekke}
       </fieldset>
+      {open && telefon && (
+        <BottomSheet open onOpenChange={(o) => { if (!o) setOpen(false); }} title={SHEET_TITEL[mode]}>
+          <div className="px-2">{genforsoegAlert}</div>
+          <fieldset disabled={busy || !!genforsoeg} className="m-0 min-w-0 border-0 p-0 px-2">
+        {aabentIndhold}
+      {typePiller}
+        {bundraekke}
+          </fieldset>
+        </BottomSheet>
+      )}
     </section>
   );
 }

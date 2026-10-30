@@ -1376,7 +1376,7 @@ export function useChatUnreadTotal(employeeId: string | null | undefined, enable
     const invalidate = () => {
       if (gen !== sessionsGeneration()) return;
       planlaeg(queryClient, CHAT_UNREAD_KEY);
-      planlaeg(queryClient, ["chat-conversations"]);
+      planlaeg(queryClient, ["chat-conversations"]); planlaeg(queryClient, ["chat-sidste-beskeder"]);
     };
     const channel = supabase
       .channel(`chat-unread-${employeeId}`)
@@ -1486,7 +1486,7 @@ export function meldChatSignal(s: { conversationId: string | null; kildeId: stri
 
 /** Fallback ved fejlet/tomt opslag: alle relevante visninger genvalideres. */
 function genvaliderAlt(qc: QueryClient, employeeId: string): void {
-  planlaeg(qc, ["chat-conversations"]);
+  planlaeg(qc, ["chat-conversations"]); planlaeg(qc, ["chat-sidste-beskeder"]);
   planlaeg(qc, ["chat-messages"]);
   planlaeg(qc, CHAT_UNREAD_KEY);
   planlaeg(qc, ["sb-begrundelse", employeeId]);
@@ -1512,7 +1512,7 @@ export function behandlSignal(qc: QueryClient, s: SignalRaekke, employeeId: stri
     let lykkedes = true;
     if (!s.privat) {
       if (conv) planlaeg(qc, ["chat-messages", conv]);
-      planlaeg(qc, ["chat-conversations"]);
+      planlaeg(qc, ["chat-conversations"]); planlaeg(qc, ["chat-sidste-beskeder"]);
       planlaeg(qc, CHAT_UNREAD_KEY);
     } else {
       conv = null;
