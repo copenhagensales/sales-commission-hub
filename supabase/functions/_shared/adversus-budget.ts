@@ -55,3 +55,11 @@ export function lavAdversusBudget(svc: any, bruger: string, formaal: BudgetForma
 }
 
 export const erBudgetFejl = (e: unknown): boolean => e instanceof Error && e.message.startsWith("ADVERSUS_BUDGET_");
+
+/** Standardbudget ud fra miljøet (service-klient) og API-brugernavnet – så ALLE adapter-instanser budgetterer, også dem uden kalder-opsætning. */
+export async function lavStandardBudget(username: string, formaal: BudgetFormaal): Promise<AdversusBudget | null> {
+  const url = Deno.env.get("SUPABASE_URL"), key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return null;  // lokal prøve uden miljø: fail-open
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  return lavAdversusBudget(createClient(url, key), await budgetNoegle(username), formaal);
+}

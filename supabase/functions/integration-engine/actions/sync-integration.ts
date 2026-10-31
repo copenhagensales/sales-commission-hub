@@ -207,11 +207,8 @@ export async function syncIntegration(
       integration.calls_org_codes
     );
     // [F1a] Fælles kvotebegrænser pr. integration (Adversus); fail-open ved fejl i begrænseren
-    if ((source || integration.provider) === "adversus" && typeof (adapter as any).setBudget === "function") {
-      const { lavAdversusBudget, budgetNoegle } = await import("../../_shared/adversus-budget.ts");
-      const brugernavn = String((credentials as any)?.username ?? (credentials as any)?.user ?? integration.id);
-      (adapter as any).setBudget(lavAdversusBudget(supabase, await budgetNoegle(brugernavn), "andet"));  // formål sættes pr. handling nedenfor
-    }
+    // [F1a] Adversus-adapteren budgetterer sig selv (nøgle = hash af API-brugernavn); her sættes kun formål pr. handling
+    (adapter as any).setBudgetFormaal?.("andet");
 
     const runResults: Record<string, unknown> = {};
     const actionsExecuted: string[] = [];

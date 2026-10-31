@@ -24,6 +24,7 @@ export function udledTimestampSemantik(rows: KaldRaekke[], fra: string, til: str
 export function cphIso(dag: string, time: number, minut = 0): string {
   // Uafhængig af maskinens tidszone og korrekt på DST-skiftedage: gæt ud fra offset ved 00:00Z, kontrollér dansk klokketime ved gættet og justér
   const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", hour: "2-digit", hour12: false });
+  time += Math.floor(minut / 60); minut = minut % 60;  // fx (10, 60) = 11:00
   const midnatZ = new Date(`${dag}T00:00:00Z`);
   const offMidnat = Number(fmt.format(midnatZ)) % 24;
   let t = new Date(Date.UTC(+dag.slice(0, 4), +dag.slice(5, 7) - 1, +dag.slice(8, 10), time - offMidnat, minut));

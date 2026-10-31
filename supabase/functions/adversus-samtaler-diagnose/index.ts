@@ -7,9 +7,10 @@ import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 import { feltTrae, fordeling } from "../_shared/felttrae.ts";
 import { cphIso, senesteHverdag, udledTimestampSemantik } from "./analyse.ts";
 import { hentCallsV1, mapCallEntry } from "../integration-engine/adapters/adversus-calls.ts";
+import { budgetNoegle, lavAdversusBudget } from "../_shared/adversus-budget.ts";
 
 const BASE = "https://api.adversus.io/v1";
-const MAKS_KALD = 14;
+const MAKS_KALD = 30;  // prober ≤ 14 + sammenligning ≤ 12 + genforsøg
 const MAKS_KALD_SAMMENLIGN = 12; // sammenligning: op til 12 sider à 1000 kald
 const HENT_MAKS_BYTES = 65536; // hente-test: kun de første 64 KB læses og kasseres – ingen lagring, ingen afspilning
 const PAUSE_MS = 700;
@@ -36,6 +37,7 @@ Deno.serve(async (req) => {
   const user = s(c?.username ?? c?.user), pass = s(c?.password ?? c?.pass);
   if (!user || !pass) return json(500, { error: "Legitimation mangler" });
   const headers = { Authorization: `Basic ${btoa(`${user}:${pass}`)}`, Accept: "application/json" };
+  const budget = lavAdversusBudget(svc, await budgetNoegle(user), "diagnose");  // samme kvote som drift – også ét request kan være det tredje samtidige
 
   let apiKald = 0, rateLimit = 0;
   const get = async (path: string, redirect: RequestRedirect = "follow"): Promise<{ status: number; data: unknown; location: string | null }> => {
@@ -43,7 +45,10 @@ Deno.serve(async (req) => {
     for (let a = 0; a < 3; a++) {
       apiKald++;
       await new Promise((r) => setTimeout(r, PAUSE_MS));
-      const res = await fetch(`${BASE}${path}`, { headers, redirect });
+      const lease = await budget.reserver(1);
+      let res: Response;
+      try { res = await fetch(`${BASE}${path}`, { headers, redirect }); if (redirect !== "manual") { const t = await res.text(); res = new Response(t, { status: res.status, headers: res.headers }); } }
+      finally { await budget.frigiv(lease); }
       if (res.status === 429) { rateLimit++; await res.body?.cancel(); await new Promise((r) => setTimeout(r, 3000 * (a + 1))); continue; }
       const location = res.headers.get("location");
       if (redirect === "manual") { await res.body?.cancel(); return { status: res.status, data: null, location }; }

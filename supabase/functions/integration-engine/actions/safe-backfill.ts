@@ -234,7 +234,9 @@ export async function safeBackfill(
 
       // Fetch calls
       let callsCount = 0;
-      if (datasets.includes("calls") && (adapter as any).fetchCallsRange) {
+      if (datasets.includes("calls") && (integration as any)?.config?.calls_v1 === true) {
+        log("INFO", `Day ${dayStart}: calls skipped – calls_v1 (calls-incremental er eneste skriver af dialer_calls)`);  // [F1a]
+      } else if (datasets.includes("calls") && (adapter as any).fetchCallsRange) {
         const calls = await (adapter as any).fetchCallsRange({ from: dayStart, to: dayEnd });
         if (calls.length > 0) {
           const result = await engine.processCalls(calls, integrationId, 200);

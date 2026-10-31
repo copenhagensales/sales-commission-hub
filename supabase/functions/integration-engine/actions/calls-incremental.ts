@@ -11,12 +11,13 @@ import { getAdapter } from "../adapters/registry.ts";
 import { getSyncState, upsertSyncState, recordSyncError } from "../utils/sync-state.ts";
 import { TimeoutGuard } from "../utils/timeout-guard.ts";
 import { hentCallsV1, mapCallEntry } from "../adapters/adversus-calls.ts";
-import { budgetNoegle, erBudgetFejl, lavAdversusBudget } from "../../_shared/adversus-budget.ts";
+import { erBudgetFejl } from "../../_shared/adversus-budget.ts";
 
 export const OVERLAP_MS = 2 * 60 * 60 * 1000;      // sent afsluttede kald: start-filter + 2 t overlap
 export const BAGKANT_MS = 2 * 60 * 1000;            // kald, der stadig er i gang
 export const MAKS_VINDUE_MS = 24 * 60 * 60 * 1000;  // ved langt efterslæb: højst 24 t ad gangen, resten næste kørsel
-const LAAS_TTL_MS = 150 * 1000;
+const LAAS_TTL_MS = 360 * 1000;  // > tidsbudget 120 s + langsomme requests/genforsøg (målt op til ~290 s i mock)
+const MAKS_AFSTEMNINGSDAGE_PR_NAT = 7;
 
 type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void;
 
@@ -44,13 +45,25 @@ export function cphMidnat(dag: string): string {
 export function plusDage(dag: string, n: number): string { const d = new Date(`${dag}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 export function dagsvindue(dag: string): { fra: string; til: string } { return { fra: cphMidnat(dag), til: cphMidnat(plusDage(dag, 1)) }; }
 
-/** Historisk backfill: næste hele dag bagud fra cursor, indtil 'dage' før i dag. null = færdig. */
-export function backfillDag(cursor: string | null, dage: number, nu = new Date()): { dag: string; fra: string; til: string; naeste: string } | null {
+/** Backfill-cursor "dag|graense": grænsen fastlægges ved første kørsel og flytter sig ikke under pauser. */
+export function parseBackfillCursor(cursor: string | null, dage: number, nu = new Date()): { dag: string; graense: string } {
   const iDag = danskDato(nu);
-  const graense = plusDage(iDag, -dage);
-  const dag = cursor ?? plusDage(iDag, -1);
+  if (cursor && cursor.includes("|")) { const [dag, graense] = cursor.split("|"); return { dag, graense }; }
+  return { dag: cursor ?? plusDage(iDag, -1), graense: plusDage(iDag, -dage) };
+}
+/** Historisk backfill: næste hele dag bagud fra cursor, indtil den faste grænse. null = færdig. */
+export function backfillDag(cursor: string | null, dage: number, nu = new Date()): { dag: string; fra: string; til: string; naeste: string } | null {
+  const { dag, graense } = parseBackfillCursor(cursor, dage, nu);
   if (dag < graense) return null;
-  return { dag, ...dagsvindue(dag), naeste: plusDage(dag, -1) };
+  return { dag, ...dagsvindue(dag), naeste: `${plusDage(dag, -1)}|${graense}` };
+}
+/** Dagsafstemning: alle dage fra (sidst afstemt + 1) til og med i går, ældste først, højst maks pr. nat. */
+export function afstemningsDage(sidstAfstemt: string | null, iGaar: string, maks = MAKS_AFSTEMNINGSDAGE_PR_NAT): string[] {
+  const ud: string[] = [];
+  let d = sidstAfstemt ? plusDage(sidstAfstemt, 1) : iGaar;
+  if (d < plusDage(iGaar, -(maks - 1))) d = plusDage(iGaar, -(maks - 1));  // efter lang pause: højst maks dage bagud
+  while (d <= iGaar && ud.length < maks) { ud.push(d); d = plusDage(d, 1); }
+  return ud;
 }
 
 async function laas(supabase: any, noegle: string, runId: string): Promise<boolean> {
@@ -79,10 +92,9 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
     let budgetVentet = 0;
     try {
       const { data: credentials } = await supabase.rpc("get_dialer_credentials", { p_integration_id: integ.id, p_encryption_key: Deno.env.get("DB_ENCRYPTION_KEY") });
-      const brugernavn = String((credentials as any)?.username ?? (credentials as any)?.user ?? integ.id);
-      const budget = lavAdversusBudget(supabase, await budgetNoegle(brugernavn), "kald");
       const adapter: any = await getAdapter("adversus", credentials, integ.name, integ.api_url, integ.config, integ.calls_org_codes);
-      adapter.setBudget?.(budget);
+      adapter.setBudgetFormaal?.("kald");  // adapteren budgetterer sig selv (nøgle = hash af API-brugernavn)
+      const budget = { get ventet() { return Number(adapter.budgetVentet?.() ?? 0); } };
       const get = (sti: string) => adapter.getV1(sti) as Promise<unknown>;
       const hentOgGem = async (fra: string, til: string): Promise<{ komplet: boolean; processed: number; errors: number; sider: number; total: number | null }> => {
         const { entries, sider, total, komplet } = await hentCallsV1(get, fra, til, { stop });
@@ -99,29 +111,32 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
         else log("WARN", `calls-incremental ${integ.name}: vandmærke IKKE flyttet (komplet=${r.komplet}, fejl=${r.errors})`);
         resultat[integ.name] = { vindue: [v.fra.toISOString(), v.til.toISOString()], efterslaeb: v.efterslaeb, ...r, ventet: budget.ventet };
       } else {
-        // Nat 1: dagsafstemning af gårsdagen (tilbagevendende) – fanger kald uden for overlap/efterslæb
+        // Nat 1: dagsafstemning (tilbagevendende) – alle dage siden sidst afstemt t.o.m. i går, ældste først; fanger kald uden for overlap/efterslæb
         const iGaar = plusDage(danskDato(nu), -1);
         const afst = await getSyncState(supabase, integ.id, "calls_v1_afstemning");
-        let afstemning: unknown = "allerede";
-        if (afst?.cursor !== iGaar) {
-          const dv = dagsvindue(iGaar);
+        const dage = afstemningsDage(afst?.cursor ?? null, iGaar);
+        const afstemning: unknown[] = [];
+        for (const dag of dage) {
+          if (stop()) break;
+          const dv = dagsvindue(dag);
           const r = await hentOgGem(dv.fra, dv.til);
-          if (r.komplet && r.errors === 0) await upsertSyncState(supabase, integ.id, "calls_v1_afstemning", nu, iGaar);
-          afstemning = { dag: iGaar, ...r };
+          afstemning.push({ dag, ...r });
+          if (!(r.komplet && r.errors === 0)) break;  // cursor flyttes kun fremad over komplette dage
+          await upsertSyncState(supabase, integ.id, "calls_v1_afstemning", nu, dag);
         }
         // Nat 2: historisk backfill (engangs) dag for dag bagud
-        const dage = Number(integ?.config?.calls_v1_backfill_dage ?? 30);
+        const bfDage = Number(integ?.config?.calls_v1_backfill_dage ?? 30);
         const bf = await getSyncState(supabase, integ.id, "calls_v1_backfill");
         let cursor: string | null = bf?.cursor ?? null; let dageKoert = 0; let backfill: unknown = cursor === "faerdig" ? "færdig" : null;
         while (cursor !== "faerdig" && !stop()) {
-          const b = backfillDag(cursor, dage, nu);
+          const b = backfillDag(cursor, bfDage, nu);
           if (!b) { await upsertSyncState(supabase, integ.id, "calls_v1_backfill", nu, "faerdig"); cursor = "faerdig"; backfill = "færdig nu"; break; }
           const r = await hentOgGem(b.fra, b.til);
           if (!r.komplet || r.errors > 0) { await recordSyncError(supabase, integ.id, "calls_v1_backfill", `ufuldstændig/fejl på ${b.dag}`); backfill = { stoppet_ved: b.dag, komplet: r.komplet, fejl: r.errors }; break; }
           cursor = b.naeste; dageKoert++;
           await upsertSyncState(supabase, integ.id, "calls_v1_backfill", nu, cursor);
         }
-        resultat[integ.name] = { afstemning, backfill: backfill ?? { dage_koert: dageKoert, cursor }, ventet: budget.ventet };
+        resultat[integ.name] = { afstemning: afstemning.length ? afstemning : "allerede", backfill: backfill ?? { dage_koert: dageKoert, cursor }, ventet: budget.ventet };
       }
       budgetVentet = budget.ventet;
     } catch (e) {

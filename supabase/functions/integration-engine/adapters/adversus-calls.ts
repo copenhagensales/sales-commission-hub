@@ -76,18 +76,21 @@ export function mapCallEntry(e: CallEntry, dialerName: string): StandardCall {
 export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, opts: { maksSider?: number; stop?: () => boolean } = {}): Promise<{ entries: CallEntry[]; sider: number; total: number | null; komplet: boolean }> {
   const maksSider = opts.maksSider ?? 30;
   const filt = encodeURIComponent(JSON.stringify({ start: { $gt: fra, $lt: til } }));
-  const entries: CallEntry[] = []; const set = new Set<string>(); let total: number | null = null; let sider = 0; let komplet = false;
+  const entries: CallEntry[] = []; const set = new Set<string>(); let total: number | null = null; let sider = 0; let raa = 0; let komplet = false;
   for (let side = 1; side <= maksSider; side++) {
     if (opts.stop?.()) break;
-    const data = (await get(`/calls?filters=${filt}&pageSize=1000&page=${side}&includeMeta=true`)) as { calls?: CallEntry[]; meta?: { pagination?: { pageCount?: number; total?: number } } } | null;
-    if (!data || typeof data !== "object") throw new Error(`calls_v1: tomt svar på side ${side}`);
-    const calls = Array.isArray(data.calls) ? data.calls : [];
-    sider++;
+    const data = (await get(`/calls?filters=${filt}&pageSize=1000&page=${side}&includeMeta=true`)) as { calls?: unknown; meta?: { pagination?: { pageCount?: unknown; total?: unknown } } } | null;
+    // Gyldig struktur kræves (ellers kan et fejlsvar ligne en tom, komplet side): calls skal være array og meta.pagination.pageCount et tal ≥ 1
+    if (!data || typeof data !== "object" || !Array.isArray(data.calls)) throw new Error(`calls_v1: ugyldigt svar på side ${side}`);
+    const pageCount = Number(data.meta?.pagination?.pageCount);
+    if (!Number.isFinite(pageCount) || pageCount < 1) throw new Error(`calls_v1: meta.pagination.pageCount mangler på side ${side}`);
+    const calls = data.calls as CallEntry[];
+    sider++; raa += calls.length;
     for (const c of calls) { const id = str(c.id); if (id && !set.has(id)) { set.add(id); entries.push(c); } }
-    const pageCount = Number(data.meta?.pagination?.pageCount ?? 1);
-    total = data.meta?.pagination?.total != null ? Number(data.meta.pagination.total) : total;
-    if (calls.length === 0 || side >= pageCount) { komplet = true; break; }
+    const t = Number(data.meta?.pagination?.total); if (Number.isFinite(t)) total = t;
+    if (side >= pageCount) { komplet = true; break; }
+    if (calls.length === 0) break;  // tom side før pageCount: ikke komplet
   }
-  if (komplet && total != null && entries.length < total && entries.length < sider * 1000) komplet = false; // uoverensstemmelse mellem meta.total og hentede
+  if (komplet && total != null && raa < total) komplet = false;  // meta.total større end hentet (rå antal, før dedup)
   return { entries, sider, total, komplet };
 }

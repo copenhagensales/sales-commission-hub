@@ -29,7 +29,7 @@ Deno.test("hentCallsV1: følger pageCount, dedup på id, stopper ved tom side", 
   const kaldt: string[] = [];
   const get = (sti: string) => { kaldt.push(sti); const side = Number(/page=(\d+)/.exec(sti)?.[1]); return Promise.resolve(sider[side]); };
   const r = await hentCallsV1(get, "2026-10-30T09:00:00Z", "2026-10-30T10:00:00Z");
-  assertEquals(r.entries.map((e) => e.id), [1, 2, 3]); assertEquals(r.sider, 3); assertEquals(r.total, 5); assertEquals(r.komplet, false); // meta.total 5 > 3 hentede → ikke komplet
+  assertEquals(r.entries.map((e) => e.id), [1, 2, 3]); assertEquals(r.sider, 3); assertEquals(r.total, 5); assertEquals(r.komplet, false); // meta.total 5 > 4 rå hentede → ikke komplet
   assertEquals(kaldt[0].includes("pageSize=1000"), true); assertEquals(kaldt[0].includes("%22start%22"), true);
 });
 
@@ -39,4 +39,15 @@ Deno.test("hentCallsV1: sideloft → komplet=false; stop() → komplet=false; al
   const loft = await hentCallsV1(get, "a", "b", { maksSider: 1 }); assertEquals(loft.komplet, false);
   let n = 0; const stoppet = await hentCallsV1(get, "a", "b", { stop: () => n++ > 0 }); assertEquals(stoppet.komplet, false);
   const alle = await hentCallsV1(get, "a", "b"); assertEquals(alle.komplet, true); assertEquals(alle.entries.length, 2000);
+});
+
+Deno.test("hentCallsV1: ugyldig struktur kaster (tomt objekt, manglende pageCount, calls ikke array)", async () => {
+  const kast = async (svar: unknown) => { try { await hentCallsV1(() => Promise.resolve(svar), "a", "b"); return false; } catch { return true; } };
+  assertEquals(await kast({}), true);
+  assertEquals(await kast({ calls: [], meta: {} }), true);
+  assertEquals(await kast({ calls: "x", meta: { pagination: { pageCount: 1 } } }), true);
+  const ok = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 1, total: 0 } } }), "a", "b");
+  assertEquals(ok.komplet, true);
+  const forLidt = await hentCallsV1(() => Promise.resolve({ calls: [{ id: 1 }], meta: { pagination: { pageCount: 1, total: 2500 } } }), "a", "b");
+  assertEquals(forLidt.komplet, false);
 });

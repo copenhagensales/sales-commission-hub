@@ -187,7 +187,9 @@ export async function smartBackfill(
 
       // Fetch calls for this day
       let callsCount = 0;
-      if ((adapter as any).fetchCallsRange) {
+      if ((integration as any)?.config?.calls_v1 === true) {
+        log("INFO", `Backfill day ${dayStart}: calls skipped – calls_v1 (calls-incremental er eneste skriver)`);  // [F1a]
+      } else if ((adapter as any).fetchCallsRange) {
         const calls = await (adapter as any).fetchCallsRange({ from: dayStart, to: effectiveEnd });
         if (calls.length > 0) {
           const result = await engine.processCalls(calls, integrationId, 200);

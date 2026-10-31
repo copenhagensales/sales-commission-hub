@@ -1,4 +1,5 @@
 import { mapAdversusDispositionStatus, mapAdversusHangupCauseStatus } from "./adversus-calls.ts";
+import { erBudgetFejl, lavStandardBudget, type AdversusBudget, type BudgetFormaal } from "../../_shared/adversus-budget.ts";
 import { DialerAdapter, ApiMetrics } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 import { RateLimiter } from "../utils/rate-limiter.ts";
@@ -53,13 +54,23 @@ export class AdversusAdapter implements DialerAdapter {
   private lastRequestTime = 0;
   private throttleMs = 500;
   /** Fælles kvotebegrænser (F1a, _shared/adversus-budget.ts); sættes af kalderen. Fail-open hvis ikke sat. */
-  private budget: { reserver(antal?: number): Promise<string | null>; frigiv(lease: string | null): Promise<void>; saetFormaal?(f: "salg" | "kald" | "optagelse" | "diagnose" | "andet"): void } | null = null;
-  setBudget(b: typeof this.budget) { this.budget = b; }
-  setBudgetFormaal(f: "salg" | "kald" | "optagelse" | "diagnose" | "andet") { this.budget?.saetFormaal?.(f); }
+  private budget: AdversusBudget | null = null;
+  private budgetKlar: Promise<void> | null = null;
+  private username = "";
+  private budgetFormaal: BudgetFormaal = "andet";
+  setBudget(b: AdversusBudget | null) { this.budget = b; this.budgetKlar = Promise.resolve(); }
+  setBudgetFormaal(f: BudgetFormaal) { this.budgetFormaal = f; this.budget?.saetFormaal(f); }
+  budgetVentet(): number { return this.budget?.ventet ?? 0; }
+  /** Adapteren budgetterer sig selv (nøgle = hash af API-brugernavn), hvis ingen kalder har sat et budget – så ingen vej kan omgå kvoten. */
+  private async sikrBudget(): Promise<void> {
+    if (!this.budgetKlar) this.budgetKlar = lavStandardBudget(this.username, this.budgetFormaal).then((b) => { if (!this.budget) this.budget = b; }).catch(() => undefined);
+    await this.budgetKlar;
+  }
   /** Offentlig, budgetteret GET mod /v1 (bruges af calls-incremental). */
   getV1(endpoint: string): Promise<unknown> { return this.get(endpoint); }
   /** ALLE requests mod Adversus går her igennem [F1a]: reservation i budgettet, timeout 100 s (kortere end lease), body læses færdigt, mens lease holdes. */
   private async budgetFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    await this.sikrBudget();
     const lease = this.budget ? await this.budget.reserver(1) : null;
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 100_000);
     try {
@@ -101,6 +112,7 @@ export class AdversusAdapter implements DialerAdapter {
     }
 
     this.authHeader = btoa(`${user}:${pass}`);
+    this.username = user;
     this.dialerName = dialerName || "Adversus";
   }
 
@@ -741,6 +753,7 @@ export class AdversusAdapter implements DialerAdapter {
         }
         return data;
       } catch (e) {
+        if (erBudgetFejl(e)) throw e;  // [F1a] udtømt kvote må ikke blive til "lead ikke fundet"
         if (attempt > maxRetries) {
           console.error(`[Adversus] Lead ${leadId}: error after ${maxRetries} retries:`, e);
           return null;
@@ -820,6 +833,7 @@ export class AdversusAdapter implements DialerAdapter {
           }
           break; // Success, exit retry loop
         } catch (e) {
+          if (erBudgetFejl(e)) throw e;  // [F1a] udtømt kvote må ikke blive til en tom salgsside (vandmærke må ikke flyttes)
           retryAttempt++;
           if (retryAttempt >= maxRetries) {
             console.error(`[Adversus] Error fetching page ${page} after ${maxRetries} attempts:`, e);

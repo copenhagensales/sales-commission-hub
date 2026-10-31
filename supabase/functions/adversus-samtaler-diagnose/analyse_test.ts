@@ -20,3 +20,7 @@ Deno.test("cphIso: DST-skiftedag 25/10 – 02:00 (før skift) og 10:00 (efter sk
   assertEquals(cphIso("2026-10-25", 10), "2026-10-25T09:00:00.000Z");
   assertEquals(cphIso("2026-07-01", 10), "2026-07-01T08:00:00.000Z");
 });
+Deno.test("cphIso: minutter ≥ 60 normaliseres (10:00 + 60 min = 11:00)", () => {
+  assertEquals(cphIso("2026-10-30", 10, 60), "2026-10-30T10:00:00.000Z");
+  assertEquals(cphIso("2026-10-30", 10, 120), "2026-10-30T11:00:00.000Z");
+});
