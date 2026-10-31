@@ -6371,6 +6371,27 @@ export type Database = {
           },
         ]
       }
+      dialer_politik_cache: {
+        Row: {
+          art: string
+          noegle: string
+          opdateret: string
+          retention_days: number
+        }
+        Insert: {
+          art: string
+          noegle: string
+          opdateret?: string
+          retention_days: number
+        }
+        Update: {
+          art?: string
+          noegle?: string
+          opdateret?: string
+          retention_days?: number
+        }
+        Relationships: []
+      }
       dialer_sessions: {
         Row: {
           agent_external_id: string | null
@@ -11306,6 +11327,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "kald_felt_katalog_kilde_fkey"
+            columns: ["kilde"]
+            isOneToOne: false
+            referencedRelation: "api_register"
+            referencedColumns: ["noegle"]
+          },
           {
             foreignKeyName: "kald_felt_katalog_version_fkey"
             columns: ["version"]
@@ -20108,6 +20136,7 @@ export type Database = {
         Returns: number
       }
       data_import_retention_run: { Args: { _dry_run?: boolean }; Returns: Json }
+      dialer_politik_cache_opfrisk: { Args: never; Returns: undefined }
       eesy_mobile_subscriptions: { Args: never; Returns: string[] }
       effective_auth_user_id: { Args: never; Returns: string }
       effective_employee_id: { Args: never; Returns: string }
@@ -20888,7 +20917,12 @@ export type Database = {
       jsonb_object_keys_array: { Args: { p_json: Json }; Returns: Json }
       kald_felt_daekning: {
         Args: { p_dage?: number }
-        Returns: { maal_tabel: string; noegle: string; antal: number; total: number }[]
+        Returns: {
+          antal: number
+          maal_tabel: string
+          noegle: string
+          total: number
+        }[]
       }
       league_auto_advance_seasons: { Args: never; Returns: Json }
       league_current_open_season: {
