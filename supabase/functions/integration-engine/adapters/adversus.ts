@@ -51,6 +51,11 @@ export class AdversusAdapter implements DialerAdapter {
   // Burst-throttling: minimum 500ms between API calls
   private lastRequestTime = 0;
   private throttleMs = 500;
+  /** Fælles kvotebegrænser (F1a, _shared/adversus-budget.ts); sættes af kalderen. Fail-open hvis ikke sat. */
+  private budget: { reserver(antal?: number): Promise<string | null>; frigiv(lease: string | null): Promise<void> } | null = null;
+  setBudget(b: { reserver(antal?: number): Promise<string | null>; frigiv(lease: string | null): Promise<void> } | null) { this.budget = b; }
+  /** Offentlig, budgetteret GET mod /v1 (bruges af calls-incremental). */
+  getV1(endpoint: string): Promise<unknown> { return this.get(endpoint); }
 
   getMetrics(): ApiMetrics {
     return { ...this._metrics };
@@ -128,9 +133,13 @@ export class AdversusAdapter implements DialerAdapter {
     for (let attempt = 1; attempt <= retries; attempt++) {
       await this.throttle();
       this._metrics.apiCalls++;
-      const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
-        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
-      });
+      const lease = this.budget ? await this.budget.reserver(1) : null;
+      let res: Response;
+      try {
+        res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
+          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
+        });
+      } finally { if (this.budget) await this.budget.frigiv(lease); }
 
       if (res.status === 429) {
         this._metrics.rateLimitHits++;
@@ -942,12 +951,17 @@ export class AdversusAdapter implements DialerAdapter {
         while (!success && retries < maxRetries) {
           try {
             const url = `${this.baseUrl}${endpointBase}&pageSize=${pageSize}&page=${page}`;
-            const res = await fetch(url, {
-              headers: {
-                'Authorization': `Basic ${this.authHeader}`,
-                'Content-Type': 'application/json'
-              }
-            });
+            this._metrics.apiCalls++;  // [F1a] /cdr talte ikke med før; nu budgetteret som alle andre kald
+            const cdrLease = this.budget ? await this.budget.reserver(1) : null;
+            let res: Response;
+            try {
+              res = await fetch(url, {
+                headers: {
+                  'Authorization': `Basic ${this.authHeader}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+            } finally { if (this.budget) await this.budget.frigiv(cdrLease); }
 
             if (res.status === 429) {
               const waitTime = Math.min(5000 * Math.pow(2, retries), 20000);

@@ -206,6 +206,11 @@ export async function syncIntegration(
       integration.config,
       integration.calls_org_codes
     );
+    // [F1a] Fælles kvotebegrænser pr. integration (Adversus); fail-open ved fejl i begrænseren
+    if ((source || integration.provider) === "adversus" && typeof (adapter as any).setBudget === "function") {
+      const { lavAdversusBudget } = await import("../../_shared/adversus-budget.ts");
+      (adapter as any).setBudget(lavAdversusBudget(supabase, integration.id, actionList.includes("sales") ? "salg" : "andet"));
+    }
 
     const runResults: Record<string, unknown> = {};
     const actionsExecuted: string[] = [];

@@ -43,6 +43,15 @@ serve(async (req) => {
     const effectiveMaxRecords = maxRecords ?? 200;
     const supabase = getSupabase();
 
+    // calls-incremental (plan v2.4 F1a): kald fra /v1/calls hvert 2. min / natlig backfill – egen vej, eget vandmærke, budget pr. integration
+    if (action === "calls-incremental") {
+      const { callsIncremental } = await import("./actions/calls-incremental.ts");
+      const { IngestionEngine } = await import("./core.ts");
+      const engine = new IngestionEngine();
+      const resultat = await callsIncremental(supabase, engine, log, { integrationId: integration_id ?? integrationId, tilstand: body.tilstand });
+      return new Response(JSON.stringify({ success: true, resultat }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "check-rate-limits") {
       const effectiveIntegrationId = integrationId || integration_id;
       if (!effectiveIntegrationId) {

@@ -27,6 +27,16 @@ export const DIALER_CALL_METADATA_ALLOWLIST = [
   "result",
   "project",
   "orgCode",
+  // [F1a, /v1/calls] tekniske telefonifelter – ingen personoplysninger
+  "connectTime",
+  "queuedSeconds",
+  "dialingSeconds",
+  "billableSeconds",
+  "agentConversationSeconds",
+  "sip",
+  "anonymous",
+  "hasRecording",
+  "kilde",
 ] as const;
 
 /** Retention window for the dialer call identity keys, in days. */
