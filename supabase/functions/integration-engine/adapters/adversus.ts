@@ -168,7 +168,7 @@ export class AdversusAdapter implements DialerAdapter {
           throw new Error("Rate Limit Adversus Excedido (after retries)");
         }
         this._metrics.retries++;
-        const retryAfterMs = this.parseRetryAfterMs(res.headers.get("Retry-After"));
+        const retryAfterMs = (() => { const v = this.parseRetryAfterMs(res.headers.get("Retry-After")); return v == null ? null : Math.min(v, 60_000); })();  // [F1a] loft 60 s: ét request overlever aldrig låsen
         const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt - 1), 20000); // 5s, 10s, 20s (capped)
         const delay = this.addJitter(retryAfterMs ?? exponentialDelay);
 
@@ -801,7 +801,7 @@ export class AdversusAdapter implements DialerAdapter {
               break;
             }
             this._metrics.retries++;
-            const retryAfterMs = this.parseRetryAfterMs(res.headers.get("Retry-After"));
+            const retryAfterMs = (() => { const v = this.parseRetryAfterMs(res.headers.get("Retry-After")); return v == null ? null : Math.min(v, 60_000); })();  // [F1a] loft 60 s: ét request overlever aldrig låsen
             const exponentialDelay = Math.min(5000 * Math.pow(2, retryAttempt - 1), 20000); // 5s, 10s, 20s (capped)
             const delay = this.addJitter(retryAfterMs ?? exponentialDelay);
             console.log(`[Adversus] Rate limited on page ${page}, waiting ${delay}ms (retry ${retryAttempt}/${maxRetries})`);
