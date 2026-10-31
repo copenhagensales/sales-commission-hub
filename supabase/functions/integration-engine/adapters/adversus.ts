@@ -657,6 +657,7 @@ export class AdversusAdapter implements DialerAdapter {
 
       await rateLimiter.waitForSlot();
       const leadData = await this.fetchLeadById(leadId).catch(e => {
+        if (erBudgetFejl(e)) throw e;  // [F1a] udtømt kvote må ikke blive til "ingen leaddata" (salgsvandmærke må ikke flyttes)
         console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
         return null;
       });

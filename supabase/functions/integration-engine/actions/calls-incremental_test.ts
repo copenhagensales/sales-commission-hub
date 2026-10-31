@@ -27,6 +27,9 @@ Deno.test("backfillDag: starter i går, går bagud, stopper ved grænsen", () =>
   assertEquals(backfillDag("2026-10-27|2026-10-28", 3, nu), null);
   // grænsen er fast: selv om 'nu' rykker 5 dage frem under en pause, erklæres 28/10 ikke færdig
   assertEquals(backfillDag("2026-10-28|2026-10-28", 3, new Date("2026-11-05T13:00:00Z"))!.dag, "2026-10-28");
+  // gammelt cursorformat uden grænse: bevarer 'dage' dage fra cursoren, også efter pause
+  assertEquals(backfillDag("2026-10-28", 3, new Date("2026-11-05T13:00:00Z"))!.dag, "2026-10-28");
+  assertEquals(backfillDag("2026-10-28", 3, new Date("2026-11-05T13:00:00Z"))!.naeste, "2026-10-27|2026-10-26");
 });
 
 Deno.test("dagsvindue: DST-skiftedag 25/10-2026 er 25 timer, 29/3 er 23 timer", () => {
@@ -40,5 +43,6 @@ Deno.test("afstemningsDage: genoptager alle manglende dage, ældste først, høj
   assertEquals(afstemningsDage("2026-10-31", "2026-10-31"), []);
   assertEquals(afstemningsDage(null, "2026-10-31"), ["2026-10-31"]);
   assertEquals(afstemningsDage("2026-09-01", "2026-10-31").length, 7);
-  assertEquals(afstemningsDage("2026-09-01", "2026-10-31")[0], "2026-10-25");
+  assertEquals(afstemningsDage("2026-09-01", "2026-10-31")[0], "2026-09-02");  // ældste manglende først – intet springes over
+  assertEquals(afstemningsDage("2026-10-20", "2026-10-31")[0], "2026-10-21");
 });

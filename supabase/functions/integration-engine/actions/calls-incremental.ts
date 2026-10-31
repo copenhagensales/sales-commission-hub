@@ -16,7 +16,7 @@ import { erBudgetFejl } from "../../_shared/adversus-budget.ts";
 export const OVERLAP_MS = 2 * 60 * 60 * 1000;      // sent afsluttede kald: start-filter + 2 t overlap
 export const BAGKANT_MS = 2 * 60 * 1000;            // kald, der stadig er i gang
 export const MAKS_VINDUE_MS = 24 * 60 * 60 * 1000;  // ved langt efterslæb: højst 24 t ad gangen, resten næste kørsel
-const LAAS_TTL_MS = 360 * 1000;  // > tidsbudget 120 s + langsomme requests/genforsøg (målt op til ~290 s i mock)
+const LAAS_TTL_MS = 600 * 1000;  // > tidsbudget 120 s + én igangværende side (≤ 100 s request + 429-genforsøg ≤ 60 s) pr. dag/side (mock: op til ~370 s)
 const MAKS_AFSTEMNINGSDAGE_PR_NAT = 7;
 
 type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void;
@@ -49,7 +49,8 @@ export function dagsvindue(dag: string): { fra: string; til: string } { return {
 export function parseBackfillCursor(cursor: string | null, dage: number, nu = new Date()): { dag: string; graense: string } {
   const iDag = danskDato(nu);
   if (cursor && cursor.includes("|")) { const [dag, graense] = cursor.split("|"); return { dag, graense }; }
-  return { dag: cursor ?? plusDage(iDag, -1), graense: plusDage(iDag, -dage) };
+  if (cursor) return { dag: cursor, graense: plusDage(cursor, -(dage - 1)) };  // gammelt format uden grænse: bevar 'dage' dage fra cursoren (aldrig for tidlig 'færdig')
+  return { dag: plusDage(iDag, -1), graense: plusDage(iDag, -dage) };
 }
 /** Historisk backfill: næste hele dag bagud fra cursor, indtil den faste grænse. null = færdig. */
 export function backfillDag(cursor: string | null, dage: number, nu = new Date()): { dag: string; fra: string; til: string; naeste: string } | null {
@@ -60,8 +61,7 @@ export function backfillDag(cursor: string | null, dage: number, nu = new Date()
 /** Dagsafstemning: alle dage fra (sidst afstemt + 1) til og med i går, ældste først, højst maks pr. nat. */
 export function afstemningsDage(sidstAfstemt: string | null, iGaar: string, maks = MAKS_AFSTEMNINGSDAGE_PR_NAT): string[] {
   const ud: string[] = [];
-  let d = sidstAfstemt ? plusDage(sidstAfstemt, 1) : iGaar;
-  if (d < plusDage(iGaar, -(maks - 1))) d = plusDage(iGaar, -(maks - 1));  // efter lang pause: højst maks dage bagud
+  let d = sidstAfstemt ? plusDage(sidstAfstemt, 1) : iGaar;  // ingen datoklampning: ældste manglende dag først, antalsloftet fordeler over flere nætter
   while (d <= iGaar && ud.length < maks) { ud.push(d); d = plusDage(d, 1); }
   return ud;
 }

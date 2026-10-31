@@ -46,12 +46,16 @@ Deno.serve(async (req) => {
       apiKald++;
       await new Promise((r) => setTimeout(r, PAUSE_MS));
       const lease = await budget.reserver(1);
+      const ctl = new AbortController(); const tmo = setTimeout(() => ctl.abort(), 100_000);  // request kan ikke overleve leasen (120 s)
       let res: Response;
-      try { res = await fetch(`${BASE}${path}`, { headers, redirect }); if (redirect !== "manual") { const t = await res.text(); res = new Response(t, { status: res.status, headers: res.headers }); } }
-      finally { await budget.frigiv(lease); }
+      try {
+        const r0 = await fetch(`${BASE}${path}`, { headers, redirect, signal: ctl.signal });
+        if (redirect === "manual") { await r0.body?.cancel(); res = new Response(null, { status: r0.status, headers: r0.headers }); }
+        else { const t = await r0.text(); res = new Response(t, { status: r0.status, headers: r0.headers }); }
+      } finally { clearTimeout(tmo); await budget.frigiv(lease); }
       if (res.status === 429) { rateLimit++; await res.body?.cancel(); await new Promise((r) => setTimeout(r, 3000 * (a + 1))); continue; }
       const location = res.headers.get("location");
-      if (redirect === "manual") { await res.body?.cancel(); return { status: res.status, data: null, location }; }
+      if (redirect === "manual") return { status: res.status, data: null, location };
       const text = await res.text(); let data: unknown = null; try { data = JSON.parse(text); } catch { data = null; }
       return { status: res.status, data, location: null };
     }
@@ -112,8 +116,11 @@ Deno.serve(async (req) => {
     const r = await get(`/calls/${encodeURIComponent(cdrIds[0])}/recording`, "manual");
     if (r.location) {
       const t0 = Date.now();
-      const res = await fetch(r.location, { headers: { Range: `bytes=0-${HENT_MAKS_BYTES - 1}` } }); // ingen Authorization
-      const buf = new Uint8Array(await res.arrayBuffer());
+      const ctl2 = new AbortController(); const tmo2 = setTimeout(() => ctl2.abort(), 60_000);
+      const lease2 = await budget.reserver(1);
+      let res: Response; let buf: Uint8Array;
+      try { res = await fetch(r.location, { headers: { Range: `bytes=0-${HENT_MAKS_BYTES - 1}` }, signal: ctl2.signal }); buf = new Uint8Array(await res.arrayBuffer()); } // ingen Authorization
+      finally { clearTimeout(tmo2); await budget.frigiv(lease2); }
       const sig = buf.length >= 4 ? String.fromCharCode(buf[0], buf[1], buf[2], buf[3]) : "";
       const format = sig.startsWith("ID3") || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) ? "mp3" : sig === "RIFF" ? "wav" : sig === "OggS" ? "ogg" : sig === "fLaC" ? "flac" : "ukendt";
       const total = Number(res.headers.get("content-range")?.split("/")[1] ?? res.headers.get("content-length") ?? 0);

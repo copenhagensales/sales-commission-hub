@@ -82,7 +82,8 @@ export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: s
     const data = (await get(`/calls?filters=${filt}&pageSize=1000&page=${side}&includeMeta=true`)) as { calls?: unknown; meta?: { pagination?: { pageCount?: unknown; total?: unknown } } } | null;
     // Gyldig struktur kræves (ellers kan et fejlsvar ligne en tom, komplet side): calls skal være array og meta.pagination.pageCount et tal ≥ 1
     if (!data || typeof data !== "object" || !Array.isArray(data.calls)) throw new Error(`calls_v1: ugyldigt svar på side ${side}`);
-    const pageCount = Number(data.meta?.pagination?.pageCount);
+    const pageCountRaa = data.meta?.pagination?.pageCount;
+    const pageCount = typeof pageCountRaa === "number" ? pageCountRaa : Number.NaN;
     if (!Number.isFinite(pageCount) || pageCount < 1) throw new Error(`calls_v1: meta.pagination.pageCount mangler på side ${side}`);
     const calls = data.calls as CallEntry[];
     sider++; raa += calls.length;
