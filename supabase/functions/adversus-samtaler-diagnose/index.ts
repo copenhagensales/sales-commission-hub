@@ -9,6 +9,7 @@ import { cphIso, senesteHverdag, udledTimestampSemantik } from "./analyse.ts";
 
 const BASE = "https://api.adversus.io/v1";
 const MAKS_KALD = 14;
+const HENT_MAKS_BYTES = 65536; // hente-test: kun de første 64 KB læses og kasseres – ingen lagring, ingen afspilning
 const PAUSE_MS = 700;
 
 type Row = Record<string, unknown>;
@@ -98,6 +99,20 @@ Deno.serve(async (req) => {
   if (cdrIds[0]) ud.recording_link_fra_recordings = await linkProbe(cdrIds[0]);
   const medLink = calls.find((c) => s((c.links as Row)?.recording));
   if (medLink) ud.recording_link_fra_calls = { links_recording_sti_type: s((medLink.links as Row)?.recording).startsWith("http") ? "absolut" : "relativ", ...(await linkProbe(s(medLink.id))) };
+  // 5b) hente-test (?hent=1, Mathias 31/10 »kan vi hente tidligere kald som test«): følg 307 for den NYESTE optagelse og hent de første bytes
+  //     UDEN Adversus-login (beviser at linket er credential-frit), læs filsignatur/størrelse/varighedsestimat og kassér. Intet gemmes.
+  if (url.searchParams.get("hent") === "1" && cdrIds[0]) {
+    const r = await get(`/calls/${encodeURIComponent(cdrIds[0])}/recording`, "manual");
+    if (r.location) {
+      const t0 = Date.now();
+      const res = await fetch(r.location, { headers: { Range: `bytes=0-${HENT_MAKS_BYTES - 1}` } }); // ingen Authorization
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const sig = buf.length >= 4 ? String.fromCharCode(buf[0], buf[1], buf[2], buf[3]) : "";
+      const format = sig.startsWith("ID3") || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) ? "mp3" : sig === "RIFF" ? "wav" : sig === "OggS" ? "ogg" : sig === "fLaC" ? "flac" : "ukendt";
+      const total = Number(res.headers.get("content-range")?.split("/")[1] ?? res.headers.get("content-length") ?? 0);
+      ud.hente_test = { status: res.status, uden_login: true, range_accepteret: res.status === 206, content_type: res.headers.get("content-type"), bytes_laest: buf.length, filstoerrelse_bytes: total || null, format, ms: Date.now() - t0, gemt: false };
+    } else ud.hente_test = { status: r.status, location_findes: false };
+  }
   // 6) /sessions
   const r6 = await get(`/sessions?pageSize=1`);
   ud.sessions = { status: r6.status, felter: liste(r6.data, "sessions")[0] ? feltTrae(liste(r6.data, "sessions")[0], 2) : null };
