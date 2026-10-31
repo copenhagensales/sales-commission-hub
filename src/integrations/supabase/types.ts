@@ -163,6 +163,81 @@ export type Database = {
           },
         ]
       }
+      adversus_api_budget_graenser: {
+        Row: {
+          aktiv: boolean
+          api_bruger: string
+          opdateret: string
+          pr_minut: number
+          pr_time: number
+          pr_time_andet: number
+          samtidige: number
+        }
+        Insert: {
+          aktiv?: boolean
+          api_bruger: string
+          opdateret?: string
+          pr_minut?: number
+          pr_time?: number
+          pr_time_andet?: number
+          samtidige?: number
+        }
+        Update: {
+          aktiv?: boolean
+          api_bruger?: string
+          opdateret?: string
+          pr_minut?: number
+          pr_time?: number
+          pr_time_andet?: number
+          samtidige?: number
+        }
+        Relationships: []
+      }
+      adversus_api_kald_log: {
+        Row: {
+          api_bruger: string
+          formaal: string
+          id: number
+          tid: string
+        }
+        Insert: {
+          api_bruger: string
+          formaal: string
+          id?: never
+          tid?: string
+        }
+        Update: {
+          api_bruger?: string
+          formaal?: string
+          id?: never
+          tid?: string
+        }
+        Relationships: []
+      }
+      adversus_api_leases: {
+        Row: {
+          api_bruger: string
+          formaal: string
+          lease: string
+          taget: string
+          udloeb: string
+        }
+        Insert: {
+          api_bruger: string
+          formaal: string
+          lease?: string
+          taget?: string
+          udloeb?: string
+        }
+        Update: {
+          api_bruger?: string
+          formaal?: string
+          lease?: string
+          taget?: string
+          udloeb?: string
+        }
+        Relationships: []
+      }
       adversus_campaign_mappings: {
         Row: {
           adversus_campaign_id: string
@@ -19591,6 +19666,15 @@ export type Database = {
         Args: { p_review_id: string; p_role: string }
         Returns: Json
       }
+      adversus_api_budget_frigiv: {
+        Args: { p_lease: string }
+        Returns: undefined
+      }
+      adversus_api_budget_reserver: {
+        Args: { p_antal?: number; p_bruger: string; p_formaal?: string }
+        Returns: Json
+      }
+      adversus_api_budget_status: { Args: { p_bruger: string }; Returns: Json }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       assign_role_by_email: {
