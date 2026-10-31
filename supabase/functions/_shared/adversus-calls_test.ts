@@ -44,7 +44,9 @@ Deno.test("hentCallsV1: sideloft → komplet=false; stop() → komplet=false; al
 Deno.test("hentCallsV1: ugyldig struktur kaster (tomt objekt, manglende pageCount, calls ikke array)", async () => {
   const kast = async (svar: unknown) => { try { await hentCallsV1(() => Promise.resolve(svar), "a", "b"); return false; } catch { return true; } };
   assertEquals(await kast({}), true);
-  assertEquals(await kast({ calls: [], meta: {} }), true);
+  assertEquals(await kast({ calls: [{ id: 1 }], meta: {} }), true);  // kald uden meta: ugyldigt
+  const tom = await hentCallsV1(() => Promise.resolve({ calls: [] }), "a", "b");  // tomt vindue uden meta (prod 31/10): komplet
+  assertEquals(tom.komplet, true); assertEquals(tom.total, 0); assertEquals(tom.entries.length, 0);
   assertEquals(await kast({ calls: "x", meta: { pagination: { pageCount: 1 } } }), true);
   assertEquals(await kast({ calls: [], meta: { pagination: { pageCount: true } } }), true);  // boolean er ikke et tal
   const ok = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 1, total: 0 } } }), "a", "b");

@@ -82,10 +82,12 @@ export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: s
     const data = (await get(`/calls?filters=${filt}&pageSize=1000&page=${side}&includeMeta=true`)) as { calls?: unknown; meta?: { pagination?: { pageCount?: unknown; total?: unknown } } } | null;
     // Gyldig struktur kræves (ellers kan et fejlsvar ligne en tom, komplet side): calls skal være array og meta.pagination.pageCount et tal ≥ 1
     if (!data || typeof data !== "object" || !Array.isArray(data.calls)) throw new Error(`calls_v1: ugyldigt svar på side ${side}`);
+    const calls = data.calls as CallEntry[];
     const pageCountRaa = data.meta?.pagination?.pageCount;
+    // Tomt vindue: Adversus udelader meta, når der ingen kald er (målt i prod 31/10 15:0x) – det er en komplet, tom side 1
+    if (side === 1 && calls.length === 0 && pageCountRaa === undefined) { sider = 1; total = 0; komplet = true; break; }
     const pageCount = typeof pageCountRaa === "number" ? pageCountRaa : Number.NaN;
     if (!Number.isFinite(pageCount) || pageCount < 1) throw new Error(`calls_v1: meta.pagination.pageCount mangler på side ${side}`);
-    const calls = data.calls as CallEntry[];
     sider++; raa += calls.length;
     for (const c of calls) { const id = str(c.id); if (id && !set.has(id)) { set.add(id); entries.push(c); } }
     const t = Number(data.meta?.pagination?.total); if (Number.isFinite(t)) total = t;
