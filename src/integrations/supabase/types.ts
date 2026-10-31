@@ -193,6 +193,27 @@ export type Database = {
         }
         Relationships: []
       }
+      adversus_api_budget_timer: {
+        Row: {
+          antal: number
+          api_bruger: string
+          formaal: string
+          time_start: string
+        }
+        Insert: {
+          antal: number
+          api_bruger: string
+          formaal: string
+          time_start: string
+        }
+        Update: {
+          antal?: number
+          api_bruger?: string
+          formaal?: string
+          time_start?: string
+        }
+        Relationships: []
+      }
       adversus_api_kald_log: {
         Row: {
           api_bruger: string
@@ -6110,6 +6131,7 @@ export type Database = {
           id: string
           integration_id: string | null
           integration_type: string
+          katalog_version: number | null
           lead_external_id: string
           metadata: Json | null
           recording_url: string | null
@@ -6130,6 +6152,7 @@ export type Database = {
           id?: string
           integration_id?: string | null
           integration_type: string
+          katalog_version?: number | null
           lead_external_id: string
           metadata?: Json | null
           recording_url?: string | null
@@ -6150,6 +6173,7 @@ export type Database = {
           id?: string
           integration_id?: string | null
           integration_type?: string
+          katalog_version?: number | null
           lead_external_id?: string
           metadata?: Json | null
           recording_url?: string | null
@@ -6172,6 +6196,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "dialer_integrations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dialer_calls_katalog_version_fkey"
+            columns: ["katalog_version"]
+            isOneToOne: false
+            referencedRelation: "kald_felt_katalog_version"
+            referencedColumns: ["version"]
           },
         ]
       }
@@ -6222,6 +6253,78 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      dialer_leads: {
+        Row: {
+          aktiv: boolean | null
+          campaign_external_id: string | null
+          contact_attempts: number | null
+          created_at: string
+          ekstern_reference: string | null
+          external_id: string
+          felter: Json
+          id: string
+          imported: string | null
+          integration_id: string
+          katalog_version: number | null
+          last_contacted_by: string | null
+          last_modified: string | null
+          next_contact: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          aktiv?: boolean | null
+          campaign_external_id?: string | null
+          contact_attempts?: number | null
+          created_at?: string
+          ekstern_reference?: string | null
+          external_id: string
+          felter?: Json
+          id?: string
+          imported?: string | null
+          integration_id: string
+          katalog_version?: number | null
+          last_contacted_by?: string | null
+          last_modified?: string | null
+          next_contact?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aktiv?: boolean | null
+          campaign_external_id?: string | null
+          contact_attempts?: number | null
+          created_at?: string
+          ekstern_reference?: string | null
+          external_id?: string
+          felter?: Json
+          id?: string
+          imported?: string | null
+          integration_id?: string
+          katalog_version?: number | null
+          last_contacted_by?: string | null
+          last_modified?: string | null
+          next_contact?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialer_leads_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dialer_leads_katalog_version_fkey"
+            columns: ["katalog_version"]
+            isOneToOne: false
+            referencedRelation: "kald_felt_katalog_version"
+            referencedColumns: ["version"]
+          },
+        ]
       }
       dialer_sessions: {
         Row: {
@@ -11074,6 +11177,149 @@ export type Database = {
             referencedColumns: ["key"]
           },
         ]
+      }
+      kald_felt_katalog: {
+        Row: {
+          adversus_felt_id: number | null
+          aendret: string
+          aendret_af: string | null
+          afledt_af: string[]
+          begrundelse: string | null
+          beskrivelse: string | null
+          datatype: string
+          eksempel: string | null
+          endpoint: string
+          felt_navn: string
+          felt_sti: string
+          hentes: boolean
+          historik: boolean
+          id: string
+          kampagne_ekstern_id: string | null
+          kilde: string
+          klassifikation: string
+          maal_kolonne: string | null
+          maal_tabel: string | null
+          metadata_noegle: string | null
+          oprettet: string
+          retention_dage: number | null
+          status: string
+          version: number
+        }
+        Insert: {
+          adversus_felt_id?: number | null
+          aendret?: string
+          aendret_af?: string | null
+          afledt_af?: string[]
+          begrundelse?: string | null
+          beskrivelse?: string | null
+          datatype: string
+          eksempel?: string | null
+          endpoint: string
+          felt_navn: string
+          felt_sti: string
+          hentes?: boolean
+          historik?: boolean
+          id?: string
+          kampagne_ekstern_id?: string | null
+          kilde?: string
+          klassifikation?: string
+          maal_kolonne?: string | null
+          maal_tabel?: string | null
+          metadata_noegle?: string | null
+          oprettet?: string
+          retention_dage?: number | null
+          status?: string
+          version: number
+        }
+        Update: {
+          adversus_felt_id?: number | null
+          aendret?: string
+          aendret_af?: string | null
+          afledt_af?: string[]
+          begrundelse?: string | null
+          beskrivelse?: string | null
+          datatype?: string
+          eksempel?: string | null
+          endpoint?: string
+          felt_navn?: string
+          felt_sti?: string
+          hentes?: boolean
+          historik?: boolean
+          id?: string
+          kampagne_ekstern_id?: string | null
+          kilde?: string
+          klassifikation?: string
+          maal_kolonne?: string | null
+          maal_tabel?: string | null
+          metadata_noegle?: string | null
+          oprettet?: string
+          retention_dage?: number | null
+          status?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kald_felt_katalog_version_fkey"
+            columns: ["version"]
+            isOneToOne: false
+            referencedRelation: "kald_felt_katalog_version"
+            referencedColumns: ["version"]
+          },
+        ]
+      }
+      kald_felt_katalog_audit: {
+        Row: {
+          aendret: string
+          aendret_af: string | null
+          gammel: Json | null
+          handling: string
+          id: number
+          katalog_id: string
+          ny: Json | null
+        }
+        Insert: {
+          aendret?: string
+          aendret_af?: string | null
+          gammel?: Json | null
+          handling: string
+          id?: never
+          katalog_id: string
+          ny?: Json | null
+        }
+        Update: {
+          aendret?: string
+          aendret_af?: string | null
+          gammel?: Json | null
+          handling?: string
+          id?: never
+          katalog_id?: string
+          ny?: Json | null
+        }
+        Relationships: []
+      }
+      kald_felt_katalog_version: {
+        Row: {
+          beskrivelse: string
+          ikrafttraedelse: string
+          oprettet: string
+          oprettet_af: string | null
+          version: number
+        }
+        Insert: {
+          beskrivelse: string
+          ikrafttraedelse?: string
+          oprettet?: string
+          oprettet_af?: string | null
+          version: number
+        }
+        Update: {
+          beskrivelse?: string
+          ikrafttraedelse?: string
+          oprettet?: string
+          oprettet_af?: string | null
+          version?: number
+        }
+        Relationships: []
       }
       kpi_cached_values: {
         Row: {
@@ -19675,6 +19921,7 @@ export type Database = {
         Returns: Json
       }
       adversus_api_budget_status: { Args: { p_bruger: string }; Returns: Json }
+      adversus_api_budget_timestat: { Args: never; Returns: undefined }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       assign_role_by_email: {
