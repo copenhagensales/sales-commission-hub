@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X, ChevronDown, ChevronUp, History, Eye } from "lucide-react";
 import { IntegrationLogs } from "@/components/settings/IntegrationLogs";
 import { DialerIntegrations } from "@/components/settings/DialerIntegrations";
+import { KaldFeltKatalog } from "@/components/settings/KaldFeltKatalog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -1153,6 +1154,8 @@ export default function Settings() {
 
         {/* Dialer Integrations */}
         <DialerIntegrations />
+        {/* Kaldsdata – feltkatalog (plan v2.5 F1b) */}
+        <KaldFeltKatalog />
         {/* System Logs */}
         <IntegrationLogs />
 
