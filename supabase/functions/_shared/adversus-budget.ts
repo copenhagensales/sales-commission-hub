@@ -1,6 +1,8 @@
-// Fælles kvotebegrænser for Adversus' API (plan v2.4 §2 greb 1 / F1a): reservation i DB før hvert request,
+// Fælles kvotebegrænser for Adversus' API (plan v2.5 §2 greb 1 / F1a + F1a-2): reservation i DB før hvert request,
 // lease frigives efter at svaret er læst færdigt. Fejl i selve begrænseren (fx manglende migration) må ALDRIG stoppe
-// Tier 1-salgs-sync: derfor fail-open med advarsel – Adversus' egne 429-svar er fortsat bagstopper.
+// Tier 1-salgs-sync: derfor fail-open med advarsel KUN for formål 'salg' – alle andre formål fejler lukket (ADVERSUS_BUDGET_UTILGAENGELIG),
+// så kald/optagelser aldrig kører uden budget. Adversus' egne 429-svar er fortsat bagstopper.
+// F1a-2: ÉN organisationsnøgle for alle API-brugere og formål (kvoten antages at gælde hele organisationen, plan v2.5 A11).
 // Udtømt kvote kaster ADVERSUS_BUDGET_<aarsag>; kalderen afbryder sin kørsel uden at flytte vandmærker (genoptages næste kørsel).
 // deno-lint-ignore-file no-explicit-any -- service-klienten er 3rd party (supabase-js)
 
@@ -18,10 +20,11 @@ export interface AdversusBudget {
   readonly ventet: number;
 }
 
-/** Budgetnøgle = API-bruger (ikke integration): delte logins deler kvote. Hash, så brugernavnet ikke gemmes. */
-export async function budgetNoegle(username: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(username ?? "").trim().toLowerCase()));
-  return "u:" + Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join("");
+/** Organisationsnøglen: alle API-brugere og formål deler Adversus' kvote (F1a-2). Rækken i adversus_api_budget_graenser hedder det samme. */
+export const ORG_NOEGLE = "org:adversus";
+/** Budgetnøgle = hele organisationen (F1a-2). Brugernavnet bruges ikke længere (signaturen bevares for kalderne); intet brugernavn gemmes. */
+export async function budgetNoegle(_username: string): Promise<string> {
+  return ORG_NOEGLE;
 }
 
 const MAKS_VENT_MS: Record<BudgetFormaal, number> = { salg: 55_000, kald: 20_000, optagelse: 20_000, diagnose: 10_000, andet: 20_000 };
@@ -39,7 +42,11 @@ export function lavAdversusBudget(svc: any, bruger: string, formaal: BudgetForma
         let data: any = null, error: any = null;
         try { ({ data, error } = await svc.rpc("adversus_api_budget_reserver", { p_bruger: bruger, p_formaal: aktueltFormaal, p_antal: antal })); }
         catch (e) { error = e; }
-        if (error) { console.warn(`[adversus-budget] fail-open (${bruger}/${aktueltFormaal}): ${error?.code ?? error?.message ?? "fejl"}`); return null; }
+        if (error) {
+          if (aktueltFormaal === "salg") { console.warn(`[adversus-budget] fail-open (${bruger}/salg): ${error?.code ?? error?.message ?? "fejl"}`); return null; }
+          console.warn(`[adversus-budget] begrænser utilgængelig (${bruger}/${aktueltFormaal}): ${error?.code ?? error?.message ?? "fejl"} – fejler lukket`);
+          throw new Error("ADVERSUS_BUDGET_UTILGAENGELIG");
+        }
         if (data?.ok === true) return String(data.lease);
         const vent = Math.min(Number(data?.vent_ms ?? 1000), 10_000);
         if (Date.now() - start + vent > maksVent) { console.warn(`[adversus-budget] kvote brugt (${bruger}/${aktueltFormaal}: ${data?.aarsag}) – opgiver efter ${Date.now() - start} ms`); throw new Error(`ADVERSUS_BUDGET_${String(data?.aarsag ?? "ukendt").toUpperCase()}`); }
