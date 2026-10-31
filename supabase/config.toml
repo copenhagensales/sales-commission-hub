@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.adversus-create-webhook]
 verify_jwt = true
 
+[functions.kald-webhook]
+verify_jwt = false
+
 [functions.adversus-manage-webhooks]
 verify_jwt = true
 

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireCronOrOwner } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,8 @@ interface CreateWebhookRequest {
   integration_id: string;
   event: string;
   template?: Record<string, unknown>;
+  target?: 'dialer-webhook' | 'kald-webhook';
+  auth_key?: string;
 }
 
 interface AdversusWebhookResponse {
@@ -21,13 +24,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Ejerkontrol (samtaler F0.1 / Codex r3): registrering af webhooks hos Adversus er en ejerhandling – ikke blot gatewayens JWT-kontrol.
+  const auth = await requireCronOrOwner(req);
+  if (auth instanceof Response) return auth;
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const encryptionKey = Deno.env.get('DB_ENCRYPTION_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { integration_id, event, template }: CreateWebhookRequest = await req.json();
+    const { integration_id, event, template, target, auth_key }: CreateWebhookRequest = await req.json();
+    // target: hvilken modtagerfunktion Adversus skal kalde (standard = dialer-webhook som hidtil; kald-webhook til kaldsevents, plan v2.3 §2)
+    const maal = target === 'kald-webhook' ? 'kald-webhook' : 'dialer-webhook';
 
     if (!integration_id || !event) {
       return new Response(
@@ -69,7 +78,7 @@ serve(async (req) => {
     const { username, password } = credentials as { username: string; password: string };
 
     // Build webhook URL with dialer_id parameter
-    const webhookUrl = `${supabaseUrl}/functions/v1/dialer-webhook?dialer_id=${integration_id}`;
+    const webhookUrl = `${supabaseUrl}/functions/v1/${maal}?dialer_id=${integration_id}`;
 
     console.log(`Webhook URL: ${webhookUrl}`);
 
@@ -85,8 +94,12 @@ serve(async (req) => {
     if (template && Object.keys(template).length > 0) {
       webhookPayload.template = template;
     }
+    // authKey sendes som GET-parameter af Adversus (spec) – gives i payloaden og logges aldrig
+    if (typeof auth_key === 'string' && auth_key.length >= 16) {
+      webhookPayload.authKey = auth_key;
+    }
 
-    console.log('Creating webhook in Adversus:', JSON.stringify(webhookPayload, null, 2));
+    console.log('Creating webhook in Adversus:', JSON.stringify({ ...webhookPayload, authKey: webhookPayload.authKey ? '(sat)' : undefined }, null, 2));
 
     const response = await fetch(adversusApiUrl, {
       method: 'POST',
