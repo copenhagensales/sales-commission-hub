@@ -6,9 +6,11 @@
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 import { feltTrae, fordeling } from "../_shared/felttrae.ts";
 import { cphIso, senesteHverdag, udledTimestampSemantik } from "./analyse.ts";
+import { hentCallsV1, mapCallEntry } from "../integration-engine/adapters/adversus-calls.ts";
 
 const BASE = "https://api.adversus.io/v1";
 const MAKS_KALD = 14;
+const MAKS_KALD_SAMMENLIGN = 12; // sammenligning: op til 12 sider à 1000 kald
 const HENT_MAKS_BYTES = 65536; // hente-test: kun de første 64 KB læses og kasseres – ingen lagring, ingen afspilning
 const PAUSE_MS = 700;
 
@@ -112,6 +114,25 @@ Deno.serve(async (req) => {
       const total = Number(res.headers.get("content-range")?.split("/")[1] ?? res.headers.get("content-length") ?? 0);
       ud.hente_test = { status: res.status, uden_login: true, range_accepteret: res.status === 206, content_type: res.headers.get("content-type"), bytes_laest: buf.length, filstoerrelse_bytes: total || null, format, ms: Date.now() - t0, gemt: false };
     } else ud.hente_test = { status: r.status, location_findes: false };
+  }
+  // 5c) sammenligning /cdr (dialer_calls i dag) vs. /v1/calls for hele 'dag' (F1a-port: duration_seconds/status identiske). Kun antal – intet gemmes.
+  if (url.searchParams.get("sammenlign") === "1") {
+    const dagFra = cphIso(dag, 0), dagTil = cphIso(dag, 24);
+    let kald = 0;
+    const getSammenlign = async (sti: string) => { if (kald++ >= MAKS_KALD_SAMMENLIGN) throw new Error("sammenligning: sideloft nået"); const r = await get(sti); return r.data; };
+    const { entries, sider, total } = await hentCallsV1(getSammenlign, dagFra, dagTil);
+    const nye = new Map(entries.map((e) => [s(e.id), mapCallEntry(e, integrationNavn)]));
+    const { data: rows } = await svc.from("dialer_calls").select("external_id, duration_seconds, total_duration_seconds, status, start_time").eq("integration_id", di.id).gte("start_time", dagFra).lt("start_time", dagTil).limit(20000);
+    const gamle = new Map(((rows ?? []) as Row[]).map((r) => [s(r.external_id), r]));
+    let faelles = 0, varighedEns = 0, totalEns = 0, statusEns = 0, startEns = 0; const statusAfvig: Record<string, number> = {};
+    for (const [id, n] of nye) {
+      const g = gamle.get(id); if (!g) continue; faelles++;
+      if (Number(g.duration_seconds) === n.durationSeconds) varighedEns++;
+      if (Number(g.total_duration_seconds) === n.totalDurationSeconds) totalEns++;
+      if (s(g.status) === n.status) statusEns++; else { const k = `${s(g.status)}→${n.status}`; statusAfvig[k] = (statusAfvig[k] ?? 0) + 1; }
+      if (Math.abs(Date.parse(s(g.start_time)) - Date.parse(n.startTime)) < 1000) startEns++;
+    }
+    ud.sammenligning = { dag, calls_v1: nye.size, sider, total, dialer_calls_cdr: gamle.size, faelles, kun_i_calls_v1: nye.size - faelles, kun_i_dialer_calls: gamle.size - faelles, varighed_ens: varighedEns, total_ens: totalEns, status_ens: statusEns, start_ens: startEns, status_afvigelser: statusAfvig };
   }
   // 6) /sessions
   const r6 = await get(`/sessions?pageSize=1`);
