@@ -23,13 +23,14 @@ interface IntegrationLog {
   created_at: string;
 }
 
-export function IntegrationLogs() {
+/** `integrationId`: vis kun log for én konto (Integrationer-siden). */
+export function IntegrationLogs({ integrationId }: { integrationId?: string } = {}) {
   const [selectedLog, setSelectedLog] = useState<IntegrationLog | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: logs, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ["integration-logs", typeFilter, statusFilter],
+    queryKey: ["integration-logs", typeFilter, statusFilter, integrationId ?? "alle"],
     queryFn: async () => {
       let query = supabase
         .from("integration_logs")
@@ -37,6 +38,9 @@ export function IntegrationLogs() {
         .order("created_at", { ascending: false })
         .limit(50);
 
+      if (integrationId) {
+        query = query.eq("integration_id", integrationId);
+      }
       if (typeFilter !== "all") {
         query = query.eq("integration_type", typeFilter);
       }

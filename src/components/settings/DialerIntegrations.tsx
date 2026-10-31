@@ -131,7 +131,7 @@ const ADVERSUS_WEBHOOK_EVENTS = [
 // The webhook payload structure is different from Enreach Contact Center webhooks
 
 /** `provider`: vis kun konti for disse dialer_integrations.provider-værdier (Integrationer-siden, pr. API). */
-export function DialerIntegrations({ provider }: { provider?: string[] } = {}) {
+export function DialerIntegrations({ provider, integrationIds }: { provider?: string[]; integrationIds?: string[] } = {}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -234,7 +234,7 @@ export function DialerIntegrations({ provider }: { provider?: string[] } = {}) {
       return data as DialerIntegration[];
     },
   });
-  const integrations = provider ? alleIntegrationer?.filter((i) => provider.includes(i.provider)) : alleIntegrationer;
+  const integrations = alleIntegrationer?.filter((i) => (!provider || provider.includes(i.provider)) && (!integrationIds || integrationIds.includes(i.id)));
 
   // Fetch dialer calls grouped by agent
   const { data: callsByAgent, isLoading: isLoadingCalls, refetch: refetchCalls } = useQuery({

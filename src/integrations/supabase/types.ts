@@ -1307,6 +1307,60 @@ export type Database = {
         }
         Relationships: []
       }
+      api_konto: {
+        Row: {
+          aendret: string
+          aktiv: boolean
+          api_noegle: string
+          id: string
+          integration_id: string | null
+          navn: string
+          note: string | null
+          oprettet: string
+          sort: number
+        }
+        Insert: {
+          aendret?: string
+          aktiv?: boolean
+          api_noegle: string
+          id?: string
+          integration_id?: string | null
+          navn: string
+          note?: string | null
+          oprettet?: string
+          sort?: number
+        }
+        Update: {
+          aendret?: string
+          aktiv?: boolean
+          api_noegle?: string
+          id?: string
+          integration_id?: string | null
+          navn?: string
+          note?: string | null
+          oprettet?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      api_konto_klient: {
+        Row: {
+          client_id: string
+          konto_id: string
+          oprettet: string
+        }
+        Insert: {
+          client_id: string
+          konto_id: string
+          oprettet?: string
+        }
+        Update: {
+          client_id?: string
+          konto_id?: string
+          oprettet?: string
+        }
+        Relationships: []
+      }
       api_register: {
         Row: {
           aendret: string
@@ -20000,6 +20054,14 @@ export type Database = {
       adversus_api_budget_timestat: { Args: never; Returns: undefined }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
+      api_konto_kampagner: {
+        Args: { p_integration_id: string }
+        Returns: { campaign_external_id: string }[]
+      }
+      api_konto_saet_klienter: {
+        Args: { p_konto: string; p_clients: string[] }
+        Returns: number
+      }
       assign_role_by_email: {
         Args: {
           _email: string

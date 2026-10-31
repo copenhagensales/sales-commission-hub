@@ -146,10 +146,12 @@ export interface KaldFeltKatalogProps {
   laast?: boolean;
   /** Vises som fane på en API-underside (kortere titel/tekst). */
   indlejret?: boolean;
+  /** Kontoens kampagner: kampagnefelter for andre kampagner skjules (fælles felter vises altid). */
+  kampagner?: string[];
 }
 
 /** Feltkataloget (plan v2.5 F1b): hvad en API leverer, hvor det gemmes, om det hentes, klassifikation, frist og dækning. Kun ejer/superadmin kan gemme (RLS). */
-export function KaldFeltKatalog({ kilde, laast = false, indlejret = false }: KaldFeltKatalogProps) {
+export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampagner }: KaldFeltKatalogProps) {
   const { data, isLoading, error } = useKaldFeltKatalog(kilde);
   const { data: daekning } = useKaldFeltDaekning(DAEKNING_DAGE);
   const [soeg, setSoeg] = useState("");
@@ -158,14 +160,16 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false }: Kal
     const m = new Map<string, KatalogFelt[]>();
     const q = soeg.trim().toLowerCase();
     for (const f of data ?? []) {
+      if (kampagner && f.kampagne_ekstern_id && !kampagner.includes(f.kampagne_ekstern_id)) continue;
       if (q && !`${f.felt_navn} ${f.felt_sti} ${f.beskrivelse ?? ""} ${f.metadata_noegle ?? ""} ${f.maal_kolonne ?? ""} ${f.kampagne_ekstern_id ?? ""}`.toLowerCase().includes(q)) continue;
       const liste = m.get(f.endpoint) ?? [];
       liste.push(f);
       m.set(f.endpoint, liste);
     }
     return m;
-  }, [data, soeg]);
+  }, [data, soeg, kampagner]);
 
+  const synlige = useMemo(() => (data ?? []).filter((f) => !(kampagner && f.kampagne_ekstern_id && !kampagner.includes(f.kampagne_ekstern_id))), [data, kampagner]);
   const endpoints = useMemo(() => {
     const kendte = KATALOG_ENDPOINTS.filter((e) => (data ?? []).some((f) => f.endpoint === e.endpoint));
     const kendteNavne = kendte.map((e) => e.endpoint);
@@ -173,9 +177,9 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false }: Kal
     return [...kendte, ...ekstra];
   }, [data]);
 
-  const total = data?.length ?? 0;
-  const hentes = (data ?? []).filter((f) => f.hentes).length;
-  const uklassificeret = (data ?? []).filter((f) => f.klassifikation === "ukendt").length;
+  const total = synlige.length;
+  const hentes = synlige.filter((f) => f.hentes).length;
+  const uklassificeret = synlige.filter((f) => f.klassifikation === "ukendt").length;
 
   return (
     <Card>
