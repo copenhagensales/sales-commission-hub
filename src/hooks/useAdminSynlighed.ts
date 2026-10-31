@@ -48,7 +48,7 @@ export function useAdminSynlighed() {
     documents: amoSek && v("menu_amo_documents"), "audit-log": amoSek && v("menu_amo_audit_log"), settings: amoSek && v("menu_amo_settings"),
   };
   const admin = {
-    settings: v("tab_administration_indstillinger"), types: loen && v("menu_salary_types"),
+    integrationer: v("tab_administration_integrationer"), types: loen && v("menu_salary_types"),
     rettigheder: led && v("tab_administration_rettigheder"),
     menu: isOwner && v("tab_administration_menu"),
     "kpi-definitioner": adminSek && v("menu_kpi_definitions"),

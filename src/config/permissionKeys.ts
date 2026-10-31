@@ -385,7 +385,7 @@ export const PERMISSION_KEYS = {
   tab_compliance_processing_activities: { label: 'Fane: processing-activities', section: 'compliance', parent: 'menu_compliance_admin' },
   tab_compliance_retention_policies: { label: 'Fane: retention-policies', section: 'compliance', parent: 'menu_compliance_admin' },
   tab_compliance_security_incidents: { label: 'Fane: security-incidents', section: 'compliance', parent: 'menu_compliance_admin' },
-  tab_administration_indstillinger: { label: 'Fane: Indstillinger', section: 'sales_system', parent: 'menu_settings' },
+  tab_administration_integrationer: { label: 'Fane: Integrationer', section: 'sales_system', parent: 'menu_settings' },
   tab_administration_rettigheder: { label: 'Fane: Rettigheder', section: 'personale', parent: 'menu_permissions' },
   tab_administration_menu: { label: 'Fane: Menu', section: 'personale', parent: 'menu_permissions' },
   tab_administration_sikkerhed: { label: 'Fane: Sikkerhed', section: 'ledelse', parent: 'menu_security_dashboard' },

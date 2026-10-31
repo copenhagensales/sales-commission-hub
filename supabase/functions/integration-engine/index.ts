@@ -62,6 +62,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, resultat }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // leads-incremental (plan v2.5 F1b-2 / §2 greb 6): emner fra /v1/leads hver time / natlig backfill – eget vandmærke, kataloget styrer felter
+    if (action === "leads-incremental") {
+      const { requireCronOrOwner } = await import("../_shared/auth.ts");
+      const auth = await requireCronOrOwner(req);
+      if (auth instanceof Response) return auth;
+      const { leadsIncremental } = await import("./actions/leads-incremental.ts");
+      const koer = () => leadsIncremental(supabase, log, { integrationId: integration_id ?? integrationId, tilstand: body.tilstand });
+      if (background) {
+        EdgeRuntime.waitUntil(koer().then((r) => log("INFO", "leads-incremental færdig", r)).catch((e) => log("ERROR", `leads-incremental: ${e instanceof Error ? e.message : String(e)}`)));
+        return new Response(JSON.stringify({ success: true, action: "leads-incremental", background: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const resultat = await koer();
+      return new Response(JSON.stringify({ success: true, resultat }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "check-rate-limits") {
       const effectiveIntegrationId = integrationId || integration_id;
       if (!effectiveIntegrationId) {

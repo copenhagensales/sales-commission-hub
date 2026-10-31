@@ -6,7 +6,7 @@
 // Udtømt kvote kaster ADVERSUS_BUDGET_<aarsag>; kalderen afbryder sin kørsel uden at flytte vandmærker (genoptages næste kørsel).
 // deno-lint-ignore-file no-explicit-any -- service-klienten er 3rd party (supabase-js)
 
-export type BudgetFormaal = "salg" | "kald" | "optagelse" | "diagnose" | "andet";
+export type BudgetFormaal = "salg" | "kald" | "emner" | "optagelse" | "diagnose" | "andet";
 
 export interface AdversusBudget {
   /** Reserverer ét request; venter (højst maksVentMs for formålet) hvis kvoten er brugt. Returnerer lease eller null (fail-open). */
@@ -27,7 +27,7 @@ export async function budgetNoegle(_username: string): Promise<string> {
   return ORG_NOEGLE;
 }
 
-const MAKS_VENT_MS: Record<BudgetFormaal, number> = { salg: 55_000, kald: 20_000, optagelse: 20_000, diagnose: 10_000, andet: 20_000 };
+const MAKS_VENT_MS: Record<BudgetFormaal, number> = { salg: 55_000, kald: 20_000, emner: 20_000, optagelse: 20_000, diagnose: 10_000, andet: 20_000 };
 
 export function lavAdversusBudget(svc: any, bruger: string, formaal: BudgetFormaal): AdversusBudget {
   let ventet = 0; let aktueltFormaal: BudgetFormaal = formaal;

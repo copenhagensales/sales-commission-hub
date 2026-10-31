@@ -130,7 +130,8 @@ const ADVERSUS_WEBHOOK_EVENTS = [
 // HeroBase (Enreach Outbound) has a programmatic API for webhooks at /hooks
 // The webhook payload structure is different from Enreach Contact Center webhooks
 
-export function DialerIntegrations() {
+/** `provider`: vis kun konti for disse dialer_integrations.provider-værdier (Integrationer-siden, pr. API). */
+export function DialerIntegrations({ provider }: { provider?: string[] } = {}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -221,7 +222,7 @@ export function DialerIntegrations() {
   const [deletedSalesCount, setDeletedSalesCount] = useState<number | null>(null);
 
   // Fetch Dialer Integrations from new table
-  const { data: integrations, isLoading } = useQuery({
+  const { data: alleIntegrationer, isLoading } = useQuery({
     queryKey: ["dialer-integrations"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -233,6 +234,7 @@ export function DialerIntegrations() {
       return data as DialerIntegration[];
     },
   });
+  const integrations = provider ? alleIntegrationer?.filter((i) => provider.includes(i.provider)) : alleIntegrationer;
 
   // Fetch dialer calls grouped by agent
   const { data: callsByAgent, isLoading: isLoadingCalls, refetch: refetchCalls } = useQuery({

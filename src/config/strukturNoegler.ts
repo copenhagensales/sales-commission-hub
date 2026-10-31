@@ -108,7 +108,7 @@ export const STRUKTUR_NOEGLER: StrukturNoegle[] = [
   { omraade: "Compliance og AMO", side: "AMO", sideRute: "/amo", fane: "settings", noegle: "menu_amo_settings", faneRute: "/amo/settings" },
   { omraade: "Compliance og AMO", side: "AMO", sideRute: "/amo", fane: "tasks", noegle: "menu_amo_tasks", faneRute: "/amo/tasks" },
   { omraade: "Compliance og AMO", side: "AMO", sideRute: "/amo", fane: "training", noegle: "menu_amo_training", faneRute: "/amo/training" },
-  { omraade: "Administration", side: "Administration", sideRute: "/admin", fane: "Indstillinger", noegle: "tab_administration_indstillinger", faneRute: "/settings" },
+  { omraade: "Administration", side: "Administration", sideRute: "/admin", fane: "Integrationer", noegle: "tab_administration_integrationer", faneRute: "/integrationer" },
   { omraade: "Administration", side: "Administration", sideRute: "/admin", fane: "Lønarter", noegle: "menu_salary_types", faneRute: "/salary/types" },
   { omraade: "Administration", side: "Administration", sideRute: "/admin", fane: "Rettigheder", noegle: "tab_administration_rettigheder", faneRute: "/permissions" },
   { omraade: "Administration", side: "Administration", sideRute: "/admin", fane: "Menu", noegle: "tab_administration_menu", faneRute: "/admin/menu-editor" },

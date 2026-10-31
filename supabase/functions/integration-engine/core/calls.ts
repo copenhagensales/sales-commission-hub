@@ -2,6 +2,7 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardCall } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { sanitizeDialerCallMetadata } from "../../_shared/dialer-call-privacy.ts"
+import { anvendKatalog, harKilde, hentKatalog, kildeForIntegrationType, type Katalog } from "../../_shared/kald-felt-katalog.ts"
 
 
 /**
@@ -33,7 +34,8 @@ async function processCallsBatch(
   agentMapByEmail: Map<string, string>,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
   agentMapByDialerId: Map<string, string>,
-  integrationId: string
+  integrationId: string,
+  katalog: Katalog | null
 ) {
   let processed = 0
   let errors = 0
@@ -51,7 +53,7 @@ async function processCallsBatch(
         }
       }
       if (agentId) matched++
-      const callData = {
+      const raa = {
         external_id: call.externalId,
         integration_type: call.integrationType,
         dialer_name: call.dialerName,
@@ -64,14 +66,19 @@ async function processCallsBatch(
         campaign_external_id: call.campaignExternalId,
         lead_external_id: call.leadExternalId,
         agent_id: agentId,
-        // Privacy: recording links and non-technical metadata are never stored.
-        // See _shared/dialer-call-privacy.ts. The agent e-mail from the payload
+        // Privacy: recording links are never stored. The agent e-mail from the payload
         // is still used above to resolve agent_id, it is just not persisted.
         recording_url: null,
-        metadata: sanitizeDialerCallMetadata(call.metadata),
+        metadata: call.metadata ?? null,
         integration_id: integrationId,
         updated_at: new Date().toISOString(),
       }
+      // [F1b-2] Feltkataloget afgør, hvad der skrives (kolonner og metadata-nøgler); recording_url forbliver null uanset katalog.
+      // Fallback uden katalog (utilgængeligt eller uden rækker for kilden): kode-allowlisten som hidtil (dialer-call-privacy.ts).
+      const kilde = kildeForIntegrationType(call.integrationType)
+      const callData = katalog && harKilde(katalog, kilde)
+        ? { ...anvendKatalog(katalog, "dialer_calls", kilde, raa).raekke, recording_url: null }
+        : { ...raa, metadata: sanitizeDialerCallMetadata(call.metadata) }
       allCallsData.push(callData)
       processed++
     } catch (e) {
@@ -137,6 +144,9 @@ export async function processCalls(
   const agentMapByEmail = new Map<string, string>(
     agents.filter((a: any) => a.email && a.id).map((a: any) => [a.email.toLowerCase(), a.id])
   )
+  // [F1b-2] Kataloget hentes én gang pr. kørsel (cache 5 min). Fejl → fallback til kode-allowlisten med advarsel (Tier 1 må ikke stoppe).
+  let katalog: Katalog | null = null
+  try { katalog = await hentKatalog(supabase) } catch (e) { log("WARN", `feltkatalog utilgængeligt – kode-allowlist bruges: ${e instanceof Error ? e.message : String(e)}`) }
   let totalProcessed = 0
   let totalErrors = 0
   let totalMatched = 0
@@ -152,7 +162,8 @@ export async function processCalls(
       agentMapByEmail,
       log,
       agentMapByDialerId,
-      integrationId
+      integrationId,
+      katalog
     )
     totalProcessed += processed
     totalErrors += errors

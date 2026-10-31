@@ -1,13 +1,14 @@
 // /v1/calls-mapper (plan v2.4 F1a; ligger i _shared, fordi både integration-engine og adversus-samtaler-diagnose bruger den – Supabase bundler ikke søskende-funktioners filer): dokumenteret endpoint i stedet for det udokumenterede /cdr.
 // Læsekontrakt bevares: dialer_calls.duration_seconds = besvaret→slut (= /cdr's conversationSeconds) = conversation + queued;
-// total_duration_seconds = duration; status i de fem eksisterende værdier. Kundens nummer (number) og extension gemmes ikke.
+// total_duration_seconds = duration; status i de fem eksisterende værdier. Mapperen leverer ALLE felter (også number/extension, F1b-2);
+// feltkataloget (kald-felt-katalog.ts) afgør i core/calls.ts, hvad der skrives (Mathias 31/10: alt hentes; kataloget klassificerer/rydder).
 import type { StandardCall } from "../integration-engine/types.ts";  // kun typer – ingen runtime-afhængighed, så filen kan bundles fra _shared
 
 export interface CallEntry {
   id?: unknown; campaignId?: unknown; leadId?: unknown; contactId?: unknown; userId?: unknown;
   disposition?: unknown; byeCause?: unknown; start?: unknown; answer?: unknown; connect?: unknown; end?: unknown;
   duration?: unknown; queued?: unknown; billable?: unknown; dialing?: unknown; conversation?: unknown;
-  sip?: unknown; origin?: unknown; anonymous?: unknown; links?: { recording?: unknown } | null;
+  sip?: unknown; origin?: unknown; anonymous?: unknown; number?: unknown; extension?: unknown; links?: { recording?: unknown } | null;
 }
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -65,6 +66,8 @@ export function mapCallEntry(e: CallEntry, dialerName: string): StandardCall {
       agentConversationSeconds: conversation,
       sip: str(e.sip) || undefined,
       anonymous: str(e.anonymous) || undefined,
+      number: str(e.number) || undefined,
+      extension: str(e.extension) || undefined,
       hasRecording: !!str(e.links?.recording),
       kilde: "calls_v1",
     },

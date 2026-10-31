@@ -134,7 +134,8 @@ export const routes: RouteConfig[] = [
   { path: "/login-log", component: redirectTo("/admin?tab=sikkerhed&side=login-log"), access: "protected" },
   { path: "/upcoming-starts", component: redirectTo("/employees?tab=upcoming-starts"), access: "protected" },
 
-  { path: "/settings", component: redirectTo("/admin?tab=indstillinger&side=settings"), access: "protected" },
+  { path: "/settings", component: redirectTo("/admin?tab=indstillinger&side=integrationer"), access: "protected" },
+  { path: "/integrationer", component: redirectTo("/admin?tab=indstillinger&side=integrationer"), access: "protected" },
 
   { path: "/vagt-flow/my-schedule", component: redirectTo("/vagter?tab=vagtplan"), access: "protected" },
   { path: "/vagt-flow", component: FieldmarketingSamleside, access: "protected" },

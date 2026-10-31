@@ -1307,6 +1307,51 @@ export type Database = {
         }
         Relationships: []
       }
+      api_register: {
+        Row: {
+          aendret: string
+          beskrivelse: string | null
+          leverandoer: string | null
+          link: string | null
+          navn: string
+          noegle: string
+          oprettet: string
+          redigerbar: boolean
+          retning: string
+          sort: number
+          status: string
+          tabeller: string[]
+        }
+        Insert: {
+          aendret?: string
+          beskrivelse?: string | null
+          leverandoer?: string | null
+          link?: string | null
+          navn: string
+          noegle: string
+          oprettet?: string
+          redigerbar?: boolean
+          retning: string
+          sort?: number
+          status?: string
+          tabeller?: string[]
+        }
+        Update: {
+          aendret?: string
+          beskrivelse?: string | null
+          leverandoer?: string | null
+          link?: string | null
+          navn?: string
+          noegle?: string
+          oprettet?: string
+          redigerbar?: boolean
+          retning?: string
+          sort?: number
+          status?: string
+          tabeller?: string[]
+        }
+        Relationships: []
+      }
       apple_relay_eea_ranges: {
         Row: {
           country: string
@@ -11195,6 +11240,7 @@ export type Database = {
           historik: boolean
           id: string
           kampagne_ekstern_id: string | null
+          kanonisk_felt: string | null
           kilde: string
           klassifikation: string
           maal_kolonne: string | null
@@ -11221,6 +11267,7 @@ export type Database = {
           historik?: boolean
           id?: string
           kampagne_ekstern_id?: string | null
+          kanonisk_felt?: string | null
           kilde?: string
           klassifikation?: string
           maal_kolonne?: string | null
@@ -11247,6 +11294,7 @@ export type Database = {
           historik?: boolean
           id?: string
           kampagne_ekstern_id?: string | null
+          kanonisk_felt?: string | null
           kilde?: string
           klassifikation?: string
           maal_kolonne?: string | null
@@ -20838,6 +20886,10 @@ export type Database = {
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
       is_view_as_active: { Args: never; Returns: boolean }
       jsonb_object_keys_array: { Args: { p_json: Json }; Returns: Json }
+      kald_felt_daekning: {
+        Args: { p_dage?: number }
+        Returns: { maal_tabel: string; noegle: string; antal: number; total: number }[]
+      }
       league_auto_advance_seasons: { Args: never; Returns: Json }
       league_current_open_season: {
         Args: never

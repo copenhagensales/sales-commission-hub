@@ -12,7 +12,7 @@ export const Pulsen = lazyPage(() => import("@/pages/Pulsen"));
 export const StorkbookIndlaeg = lazyPage(() => import("@/pages/StorkbookIndlaeg"));
 export const StorkbookBegivenhed = lazyPage(() => import("@/pages/StorkbookBegivenhed"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
-export const Settings = lazyPage(() => import("@/pages/Settings"));
+export const Integrationer = lazyPage(() => import("@/pages/Integrationer"));
 
 export const MgTest = lazyPage(() => import("@/pages/MgTest"));
 

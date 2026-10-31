@@ -64,7 +64,7 @@ export function AdministrationSamleside() {
   const I = g("indstillinger", "Indstillinger"), S = g("sikkerhed", "Sikkerhed"), T = g("tv-tavler", "TV-tavler");
   return (
     <Samleside titel="Administration" faner={[
-      { id: "settings", label: "Indstillinger", element: <P.Settings />, synlig: s.settings, gruppe: I },
+      { id: "integrationer", label: "Integrationer", element: <P.Integrationer />, synlig: s.integrationer, gruppe: I },
       { id: "types", label: "Lønarter", element: <P.SalaryTypes />, synlig: s.types, gruppe: I },
       { id: "rettigheder", label: "Rettigheder", element: <P.Permissions />, synlig: s.rettigheder },
       { id: "menu", label: "Menu", element: <P.MenuEditor />, synlig: s.menu },

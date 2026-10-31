@@ -11,8 +11,11 @@ import { Database as DatabaseIcon, Loader2 } from "lucide-react";
 import {
   KATALOG_ENDPOINTS,
   KATALOG_KLASSIFIKATIONER,
+  daekningNoegle,
+  useKaldFeltDaekning,
   useKaldFeltKatalog,
   useOpdaterKatalogFelt,
+  type Daekning,
   type KatalogFelt,
   type KatalogKlassifikation,
 } from "@/hooks/useKaldFeltKatalog";
@@ -24,18 +27,34 @@ const STATUS_LABEL: Record<string, { label: string; variant: "default" | "second
   skabelon: { label: "Skabelon", variant: "outline" },
 };
 
+const DAEKNING_DAGE = 7;
+
 function maalTekst(f: KatalogFelt): string {
   if (f.maal_kolonne) return `${f.maal_tabel}.${f.maal_kolonne}`;
-  if (f.metadata_noegle) return `${f.maal_tabel}.metadata.${f.metadata_noegle}`;
+  if (f.metadata_noegle) return `${f.maal_tabel}.${f.maal_tabel === "dialer_leads" ? "felter" : "metadata"}.${f.metadata_noegle}`;
   return "gemmes ikke";
 }
 
-function FeltRaekke({ felt }: { felt: KatalogFelt }) {
+function DaekningCelle({ felt, daekning }: { felt: KatalogFelt; daekning?: Map<string, Daekning> }) {
+  const n = daekningNoegle(felt);
+  const d = n && daekning ? daekning.get(n) : undefined;
+  if (!n) return <span className="text-xs text-muted-foreground">–</span>;
+  if (!d || d.total === 0) return <span className="text-xs text-muted-foreground">0 rækker</span>;
+  const pct = Math.round((d.antal / d.total) * 100);
+  return (
+    <span className={`text-xs ${pct === 0 ? "text-muted-foreground" : ""}`}>
+      {d.antal.toLocaleString("da-DK")}/{d.total.toLocaleString("da-DK")} <span className="text-muted-foreground">({pct} %)</span>
+    </span>
+  );
+}
+
+function FeltRaekke({ felt, laast, daekning }: { felt: KatalogFelt; laast: boolean; daekning?: Map<string, Daekning> }) {
   const opdater = useOpdaterKatalogFelt();
   const [retention, setRetention] = useState<string>(felt.retention_dage == null ? "" : String(felt.retention_dage));
   const [begrundelse, setBegrundelse] = useState<string>(felt.begrundelse ?? "");
   const afledt = felt.felt_sti.startsWith("afledt:");
-  const laast = felt.status === "skabelon";
+  const skabelon = felt.status === "skabelon";
+  const spaerret = laast || skabelon || opdater.isPending;
 
   const gem = (aendring: Parameters<typeof opdater.mutate>[0]["aendring"]) => opdater.mutate({ id: felt.id, aendring });
 
@@ -43,7 +62,10 @@ function FeltRaekke({ felt }: { felt: KatalogFelt }) {
     <TableRow className={felt.hentes ? undefined : "opacity-60"}>
       <TableCell className="align-top">
         <div className="font-medium">{felt.felt_navn}</div>
-        <div className="text-xs text-muted-foreground font-mono">{felt.felt_sti}</div>
+        <div className="text-xs text-muted-foreground font-mono">
+          {felt.felt_sti}
+          {felt.kampagne_ekstern_id && <span className="ml-1">· kampagne {felt.kampagne_ekstern_id}</span>}
+        </div>
         {felt.beskrivelse && <div className="text-xs text-muted-foreground mt-1 max-w-md">{felt.beskrivelse}</div>}
         {afledt && felt.afledt_af.length > 0 && (
           <div className="text-xs text-muted-foreground mt-1">Afledt af: {felt.afledt_af.join(", ")}</div>
@@ -52,22 +74,19 @@ function FeltRaekke({ felt }: { felt: KatalogFelt }) {
       <TableCell className="align-top text-xs">{felt.datatype}</TableCell>
       <TableCell className="align-top text-xs font-mono">
         {maalTekst(felt)}
+        {felt.kanonisk_felt && <div className="text-muted-foreground mt-1">fælles: {felt.kanonisk_felt}</div>}
         {felt.eksempel && <div className="text-muted-foreground mt-1">fx {felt.eksempel}</div>}
       </TableCell>
       <TableCell className="align-top">
         <Switch
           checked={felt.hentes}
-          disabled={laast || opdater.isPending}
+          disabled={spaerret}
           onCheckedChange={(v) => gem({ hentes: v, status: v ? "aktiv" : "inaktiv" })}
           aria-label={`Hent ${felt.felt_navn}`}
         />
       </TableCell>
       <TableCell className="align-top">
-        <Select
-          value={felt.klassifikation}
-          disabled={opdater.isPending}
-          onValueChange={(v) => gem({ klassifikation: v as KatalogKlassifikation })}
-        >
+        <Select value={felt.klassifikation} disabled={spaerret} onValueChange={(v) => gem({ klassifikation: v as KatalogKlassifikation })}>
           <SelectTrigger className="w-[170px] h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -86,9 +105,10 @@ function FeltRaekke({ felt }: { felt: KatalogFelt }) {
           min={0}
           max={3650}
           className="w-24 h-8 text-xs"
-          placeholder="tabellens"
+          placeholder="politik"
           value={retention}
-          disabled={opdater.isPending}
+          disabled
+          title="Frister pr. felt afgøres samlet i F5 – indtil da gælder kampagne-/klientpolitikken"
           onChange={(e) => setRetention(e.target.value)}
           onBlur={() => {
             const ny = retention === "" ? null : Number(retention);
@@ -97,11 +117,14 @@ function FeltRaekke({ felt }: { felt: KatalogFelt }) {
         />
       </TableCell>
       <TableCell className="align-top">
+        <DaekningCelle felt={felt} daekning={daekning} />
+      </TableCell>
+      <TableCell className="align-top">
         <Input
           className="w-56 h-8 text-xs"
           placeholder="Begrundelse"
           value={begrundelse}
-          disabled={opdater.isPending}
+          disabled={spaerret}
           onChange={(e) => setBegrundelse(e.target.value)}
           onBlur={() => {
             const ny = begrundelse.trim() === "" ? null : begrundelse.trim();
@@ -116,16 +139,26 @@ function FeltRaekke({ felt }: { felt: KatalogFelt }) {
   );
 }
 
-/** Indstillinger → »Kaldsdata«: feltkataloget (plan v2.5 F1b). Kun ejer/superadmin kan gemme (RLS); andre ser kataloget. */
-export function KaldFeltKatalog() {
-  const { data, isLoading, error } = useKaldFeltKatalog();
+export interface KaldFeltKatalogProps {
+  /** API-nøgle (api_register.noegle). Uden: alle kilder. */
+  kilde?: string;
+  /** Låst API (Integrationer-siden): kataloget vises, men kan ikke ændres. */
+  laast?: boolean;
+  /** Vises som fane på en API-underside (kortere titel/tekst). */
+  indlejret?: boolean;
+}
+
+/** Feltkataloget (plan v2.5 F1b): hvad en API leverer, hvor det gemmes, om det hentes, klassifikation, frist og dækning. Kun ejer/superadmin kan gemme (RLS). */
+export function KaldFeltKatalog({ kilde, laast = false, indlejret = false }: KaldFeltKatalogProps) {
+  const { data, isLoading, error } = useKaldFeltKatalog(kilde);
+  const { data: daekning } = useKaldFeltDaekning(DAEKNING_DAGE);
   const [soeg, setSoeg] = useState("");
 
   const prEndpoint = useMemo(() => {
     const m = new Map<string, KatalogFelt[]>();
     const q = soeg.trim().toLowerCase();
     for (const f of data ?? []) {
-      if (q && !`${f.felt_navn} ${f.felt_sti} ${f.beskrivelse ?? ""} ${maalTekst(f)}`.toLowerCase().includes(q)) continue;
+      if (q && !`${f.felt_navn} ${f.felt_sti} ${f.beskrivelse ?? ""} ${f.metadata_noegle ?? ""} ${f.maal_kolonne ?? ""} ${f.kampagne_ekstern_id ?? ""}`.toLowerCase().includes(q)) continue;
       const liste = m.get(f.endpoint) ?? [];
       liste.push(f);
       m.set(f.endpoint, liste);
@@ -134,9 +167,10 @@ export function KaldFeltKatalog() {
   }, [data, soeg]);
 
   const endpoints = useMemo(() => {
-    const kendte = KATALOG_ENDPOINTS.map((e) => e.endpoint);
-    const ekstra = [...new Set((data ?? []).map((f) => f.endpoint))].filter((e) => !kendte.includes(e)).map((e) => ({ endpoint: e, label: e }));
-    return [...KATALOG_ENDPOINTS, ...ekstra];
+    const kendte = KATALOG_ENDPOINTS.filter((e) => (data ?? []).some((f) => f.endpoint === e.endpoint));
+    const kendteNavne = kendte.map((e) => e.endpoint);
+    const ekstra = [...new Set((data ?? []).map((f) => f.endpoint))].filter((e) => !kendteNavne.includes(e)).map((e) => ({ endpoint: e, label: e }));
+    return [...kendte, ...ekstra];
   }, [data]);
 
   const total = data?.length ?? 0;
@@ -148,11 +182,12 @@ export function KaldFeltKatalog() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <DatabaseIcon className="h-5 w-5" />
-          Kaldsdata – feltkatalog
+          {indlejret ? "Felter" : "Feltkatalog"}
         </CardTitle>
         <CardDescription>
-          Alle felter Adversus kan levere for kald, sessioner, emner og optagelser: hvor de gemmes, om de hentes, klassifikation og
-          opbevaringsfrist. Standard er »hent alt«; kataloget klassificerer og sætter frister. Ændringer logges.
+          {laast
+            ? "Låst: felterne vises, men kan først ændres, når denne API flyttes over på kataloget i en senere leverance."
+            : "Alle felter API'en kan levere: hvor de gemmes, om de hentes, klassifikation, frist og dækning. Standard er »hent alt«; kataloget klassificerer og sætter frister. Ændringer logges."}
         </CardDescription>
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <Badge variant="outline">{total} felter</Badge>
@@ -168,7 +203,12 @@ export function KaldFeltKatalog() {
           </div>
         )}
         {error && <div className="text-destructive text-sm py-4">Kataloget kunne ikke hentes: {(error as Error).message}</div>}
-        {!isLoading && !error && (
+        {!isLoading && !error && total === 0 && (
+          <div className="text-sm text-muted-foreground py-6 text-center">
+            Ingen felter registreret for denne API endnu. Felterne registreres, når API'en flyttes over på kataloget.
+          </div>
+        )}
+        {!isLoading && !error && total > 0 && (
           <TooltipProvider>
             <Tabs defaultValue={endpoints[0]?.endpoint}>
               <TabsList className="flex flex-wrap h-auto">
@@ -189,14 +229,20 @@ export function KaldFeltKatalog() {
                         <TableHead>
                           <Tooltip>
                             <TooltipTrigger>Hentes</TooltipTrigger>
-                            <TooltipContent>Slås fra: feltet kasseres ved næste hentning, og gemte værdier ryddes efter fristen (fra F1b-2).</TooltipContent>
+                            <TooltipContent>Slås fra: feltet kasseres ved næste hentning, og gemte værdier ryddes efter fristen.</TooltipContent>
                           </Tooltip>
                         </TableHead>
                         <TableHead>Klassifikation</TableHead>
                         <TableHead>
                           <Tooltip>
                             <TooltipTrigger>Frist (dage)</TooltipTrigger>
-                            <TooltipContent>Tom = kampagnens/klientens opbevaringspolitik som i dag. Egne frister pr. felt afgøres i F5.</TooltipContent>
+                            <TooltipContent>Tom = kampagnens/klientens opbevaringspolitik som i dag. Egne frister pr. felt afgøres samlet i F5 og kan ikke sættes her endnu.</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
+                        <TableHead>
+                          <Tooltip>
+                            <TooltipTrigger>Dækning ({DAEKNING_DAGE} d)</TooltipTrigger>
+                            <TooltipContent>Rækker med værdi i feltet af alle rækker de sidste {DAEKNING_DAGE} dage.</TooltipContent>
                           </Tooltip>
                         </TableHead>
                         <TableHead>Begrundelse</TableHead>
@@ -205,11 +251,11 @@ export function KaldFeltKatalog() {
                     </TableHeader>
                     <TableBody>
                       {(prEndpoint.get(e.endpoint) ?? []).map((f) => (
-                        <FeltRaekke key={f.id} felt={f} />
+                        <FeltRaekke key={f.id} felt={f} laast={laast} daekning={daekning} />
                       ))}
                       {(prEndpoint.get(e.endpoint) ?? []).length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                          <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
                             Ingen felter
                           </TableCell>
                         </TableRow>
