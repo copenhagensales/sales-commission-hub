@@ -8,7 +8,7 @@ import { feltTrae, fordeling } from "../_shared/felttrae.ts";
 import { cphIso, senesteHverdag, udledTimestampSemantik } from "./analyse.ts";
 
 const BASE = "https://api.adversus.io/v1";
-const MAKS_KALD = 12;
+const MAKS_KALD = 14;
 const PAUSE_MS = 700;
 
 type Row = Record<string, unknown>;
@@ -55,37 +55,49 @@ Deno.serve(async (req) => {
   const filt = (o: unknown) => encodeURIComponent(JSON.stringify(o));
   const ud: Row = { integration: integrationNavn, dag, vindue_min: vindue, raadata_gemt: false };
 
-  // 1) /recordings – feltnavne, download udfyldt?, klip
-  const r1 = await get(`/recordings?pageSize=20&includeMeta=true`);
+  // 1) /recordings – NYESTE (uploadet inden for 'dag' + 2 døgn; listen er ellers ældst-først), feltnavne, download udfyldt?, klip, host for download-link (kun domæne)
+  const rFra = cphIso(dag, 0);
+  const r1 = await get(`/recordings?pageSize=20&includeMeta=true&filters=${filt({ timestamp: { $gt: rFra } })}`);
   const recs = liste(r1.data, "recordings");
+  const host = (u: unknown) => { try { return s(u) ? new URL(s(u)).host : null; } catch { return "(ugyldig)"; } };
   ud.recordings = {
     status: r1.status, antal: recs.length, felter: recs[0] ? feltTrae(recs[0]) : null, meta: meta(r1.data),
     download_udfyldt: recs.filter((r) => s((r.recording as Row)?.download)).length,
+    download_hosts: Array.from(new Set(recs.map((r) => host((r.recording as Row)?.download)).filter(Boolean))),
     med_klip: recs.filter((r) => Array.isArray(r.clips) && r.clips.length > 0).length,
+    upload_til_kald_min: (() => { const d = recs.map((r) => Date.parse(s(r.timestamp)) - Date.parse(s((r.cdr as Row)?.timestamp))).filter((x) => Number.isFinite(x)); return d.length ? Math.round(Math.max(...d) / 60000) : null; })(),
   };
-  // 7) kobling cdr.id ↔ dialer_calls.external_id (kun antal)
+  // 7) kobling: recordings.cdr.id ↔ dialer_calls.external_id og /calls.id ↔ dialer_calls.external_id (kun antal)
   const cdrIds = recs.map((r) => s((r.cdr as Row)?.id)).filter(Boolean);
   if (cdrIds.length > 0) {
     const { count } = await svc.from("dialer_calls").select("id", { count: "exact", head: true }).eq("integration_id", di.id).in("external_id", cdrIds);
-    ud.kobling = { optagelser: cdrIds.length, fundet_i_dialer_calls: count ?? 0 };
+    ud.kobling_recordings = { optagelser: cdrIds.length, fundet_i_dialer_calls: count ?? 0 };
   }
   // 2) /calls i vinduet (start-filter) – felter, fordeling af lukkede værdisæt
   const r2 = await get(`/calls?pageSize=100&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t2 } })}`);
   const calls = liste(r2.data, "calls");
-  ud.calls_start = { status: r2.status, antal: calls.length, felter: calls[0] ? feltTrae(calls[0]) : null, meta: meta(r2.data), disposition: fordeling(calls, "disposition"), origin: fordeling(calls, "origin"), anonymous: fordeling(calls, "anonymous") };
-  // 3) timestamp-filterets semantik
+  ud.calls_start = { status: r2.status, antal: calls.length, felter: calls[0] ? feltTrae(calls[0]) : null, meta: meta(r2.data), disposition: fordeling(calls, "disposition"), origin: fordeling(calls, "origin"), anonymous: fordeling(calls, "anonymous"), med_recording_link: calls.filter((c) => s((c.links as Row)?.recording)).length };
+  const callIds = calls.slice(0, 50).map((c) => s(c.id)).filter(Boolean);
+  if (callIds.length > 0) {
+    const { count } = await svc.from("dialer_calls").select("id", { count: "exact", head: true }).eq("integration_id", di.id).in("external_id", callIds);
+    ud.kobling_calls = { kald: callIds.length, fundet_i_dialer_calls: count ?? 0 };
+  }
+  // 3) timestamp-filterets semantik: lukket vindue OG åbent vindue ($gt alene) – ligger de returnerede kalds start/end efter t1?
   const r3 = await get(`/calls?pageSize=100&filters=${filt({ timestamp: { $gt: t1, $lt: t2 } })}`);
   const tcalls = liste(r3.data, "calls");
-  ud.calls_timestamp = { status: r3.status, ...udledTimestampSemantik(tcalls as { start?: unknown; end?: unknown }[], t1, t2) };
+  const r3b = await get(`/calls?pageSize=50&sortProperty=start&filters=${filt({ timestamp: { $gt: t1 } })}`);
+  const tcalls2 = liste(r3b.data, "calls");
+  const starts = tcalls2.map((c) => Date.parse(s(c.start))).filter((x) => Number.isFinite(x));
+  ud.calls_timestamp = { lukket_vindue: { status: r3.status, ...udledTimestampSemantik(tcalls as { start?: unknown; end?: unknown }[], t1, t2) },
+    aabent_vindue: { status: r3b.status, antal: tcalls2.length, start_min_efter_t1: starts.length ? Math.min(...starts) >= Date.parse(t1) : null, start_spaend_timer: starts.length ? Math.round((Math.max(...starts) - Math.min(...starts)) / 3600000) : null } };
   // 4) paginering: stor pageSize over 2 timer
   const r4 = await get(`/calls?pageSize=2000&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t3 } })}`);
   ud.paginering = { status: r4.status, antal_returneret: liste(r4.data, "calls").length, meta: meta(r4.data) };
-  // 5) /calls/{id}/recording – 307 og Location-host, redirect følges IKKE
-  if (cdrIds[0]) {
-    const r5 = await get(`/calls/${encodeURIComponent(cdrIds[0])}/recording`, "manual");
-    let host: string | null = null; try { host = r5.location ? new URL(r5.location).host : null; } catch { host = "(ugyldig)"; }
-    ud.recording_link = { status: r5.status, location_findes: !!r5.location, location_host: host };
-  }
+  // 5) /calls/{id}/recording – 307 og Location-host, redirect følges IKKE: både for recordings.cdr.id og for et /calls-id med links.recording
+  const linkProbe = async (id: string) => { const r5 = await get(`/calls/${encodeURIComponent(id)}/recording`, "manual"); return { status: r5.status, location_findes: !!r5.location, location_host: host(r5.location) }; };
+  if (cdrIds[0]) ud.recording_link_fra_recordings = await linkProbe(cdrIds[0]);
+  const medLink = calls.find((c) => s((c.links as Row)?.recording));
+  if (medLink) ud.recording_link_fra_calls = { links_recording_sti_type: s((medLink.links as Row)?.recording).startsWith("http") ? "absolut" : "relativ", ...(await linkProbe(s(medLink.id))) };
   // 6) /sessions
   const r6 = await get(`/sessions?pageSize=1`);
   ud.sessions = { status: r6.status, felter: liste(r6.data, "sessions")[0] ? feltTrae(liste(r6.data, "sessions")[0], 2) : null };
