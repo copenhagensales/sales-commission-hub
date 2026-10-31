@@ -6,7 +6,7 @@
 import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 import { feltTrae, fordeling } from "../_shared/felttrae.ts";
 import { cphIso, senesteHverdag, udledTimestampSemantik } from "./analyse.ts";
-import { hentCallsV1, mapCallEntry } from "../integration-engine/adapters/adversus-calls.ts";
+import { hentCallsV1, mapCallEntry } from "../_shared/adversus-calls.ts";
 import { budgetNoegle, lavAdversusBudget } from "../_shared/adversus-budget.ts";
 
 const BASE = "https://api.adversus.io/v1";

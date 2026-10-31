@@ -1,4 +1,4 @@
-import { mapAdversusDispositionStatus, mapAdversusHangupCauseStatus } from "./adversus-calls.ts";
+import { mapAdversusDispositionStatus, mapAdversusHangupCauseStatus } from "../../_shared/adversus-calls.ts";
 import { erBudgetFejl, lavStandardBudget, type AdversusBudget, type BudgetFormaal } from "../../_shared/adversus-budget.ts";
 import { DialerAdapter, ApiMetrics } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";

@@ -10,7 +10,7 @@ import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
 import { getSyncState, upsertSyncState, recordSyncError } from "../utils/sync-state.ts";
 import { TimeoutGuard } from "../utils/timeout-guard.ts";
-import { hentCallsV1, mapCallEntry } from "../adapters/adversus-calls.ts";
+import { hentCallsV1, mapCallEntry } from "../../_shared/adversus-calls.ts";
 import { erBudgetFejl } from "../../_shared/adversus-budget.ts";
 
 export const OVERLAP_MS = 2 * 60 * 60 * 1000;      // sent afsluttede kald: start-filter + 2 t overlap
