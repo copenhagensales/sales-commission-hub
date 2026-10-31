@@ -117,13 +117,20 @@ Deno.serve(async (req) => {
   }
   // 5c) sammenligning /cdr (dialer_calls i dag) vs. /v1/calls for hele 'dag' (F1a-port: duration_seconds/status identiske). Kun antal – intet gemmes.
   if (url.searchParams.get("sammenlign") === "1") {
-    const dagFra = cphIso(dag, 0), dagTil = cphIso(dag, 24);
+    const naesteDag = new Date(`${dag}T00:00:00Z`); naesteDag.setUTCDate(naesteDag.getUTCDate() + 1);
+    const dagFra = cphIso(dag, 0), dagTil = cphIso(naesteDag.toISOString().slice(0, 10), 0);  // DST-sikkert dagsvindue
     let kald = 0;
-    const getSammenlign = async (sti: string) => { if (kald++ >= MAKS_KALD_SAMMENLIGN) throw new Error("sammenligning: sideloft nået"); const r = await get(sti); return r.data; };
-    const { entries, sider, total } = await hentCallsV1(getSammenlign, dagFra, dagTil);
+    const getSammenlign = async (sti: string) => { if (kald++ >= MAKS_KALD_SAMMENLIGN) throw new Error("sammenligning: sideloft nået"); const r = await get(sti); if (r.status !== 200) throw new Error(`sammenligning: HTTP ${r.status}`); return r.data; };
+    const { entries, sider, total, komplet } = await hentCallsV1(getSammenlign, dagFra, dagTil, { maksSider: MAKS_KALD_SAMMENLIGN });
     const nye = new Map(entries.map((e) => [s(e.id), mapCallEntry(e, integrationNavn)]));
-    const { data: rows } = await svc.from("dialer_calls").select("external_id, duration_seconds, total_duration_seconds, status, start_time").eq("integration_id", di.id).gte("start_time", dagFra).lt("start_time", dagTil).limit(20000);
-    const gamle = new Map(((rows ?? []) as Row[]).map((r) => [s(r.external_id), r]));
+    const alleRows: Row[] = [];
+    for (let fra = 0; ; fra += 1000) {  // pagineret DB-udtræk (PostgREST-loft)
+      const { data: rows, error: rowsErr } = await svc.from("dialer_calls").select("external_id, duration_seconds, total_duration_seconds, status, start_time").eq("integration_id", di.id).gte("start_time", dagFra).lt("start_time", dagTil).order("start_time", { ascending: true }).range(fra, fra + 999);
+      if (rowsErr) throw rowsErr;
+      alleRows.push(...((rows ?? []) as Row[]));
+      if (!rows || rows.length < 1000) break;
+    }
+    const gamle = new Map(alleRows.map((r) => [s(r.external_id), r]));
     let faelles = 0, varighedEns = 0, totalEns = 0, statusEns = 0, startEns = 0; const statusAfvig: Record<string, number> = {};
     for (const [id, n] of nye) {
       const g = gamle.get(id); if (!g) continue; faelles++;
@@ -132,7 +139,7 @@ Deno.serve(async (req) => {
       if (s(g.status) === n.status) statusEns++; else { const k = `${s(g.status)}→${n.status}`; statusAfvig[k] = (statusAfvig[k] ?? 0) + 1; }
       if (Math.abs(Date.parse(s(g.start_time)) - Date.parse(n.startTime)) < 1000) startEns++;
     }
-    ud.sammenligning = { dag, calls_v1: nye.size, sider, total, dialer_calls_cdr: gamle.size, faelles, kun_i_calls_v1: nye.size - faelles, kun_i_dialer_calls: gamle.size - faelles, varighed_ens: varighedEns, total_ens: totalEns, status_ens: statusEns, start_ens: startEns, status_afvigelser: statusAfvig };
+    ud.sammenligning = { dag, komplet, calls_v1: nye.size, sider, total, dialer_calls_cdr: gamle.size, faelles, kun_i_calls_v1: nye.size - faelles, kun_i_dialer_calls: gamle.size - faelles, varighed_ens: varighedEns, total_ens: totalEns, status_ens: statusEns, start_ens: startEns, status_afvigelser: statusAfvig };
   }
   // 6) /sessions
   const r6 = await get(`/sessions?pageSize=1`);

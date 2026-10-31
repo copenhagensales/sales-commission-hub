@@ -1,3 +1,4 @@
+import { mapAdversusDispositionStatus, mapAdversusHangupCauseStatus } from "./adversus-calls.ts";
 import { DialerAdapter, ApiMetrics } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardCall, StandardSession, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 import { RateLimiter } from "../utils/rate-limiter.ts";
@@ -52,10 +53,22 @@ export class AdversusAdapter implements DialerAdapter {
   private lastRequestTime = 0;
   private throttleMs = 500;
   /** Fælles kvotebegrænser (F1a, _shared/adversus-budget.ts); sættes af kalderen. Fail-open hvis ikke sat. */
-  private budget: { reserver(antal?: number): Promise<string | null>; frigiv(lease: string | null): Promise<void> } | null = null;
-  setBudget(b: { reserver(antal?: number): Promise<string | null>; frigiv(lease: string | null): Promise<void> } | null) { this.budget = b; }
+  private budget: { reserver(antal?: number): Promise<string | null>; frigiv(lease: string | null): Promise<void>; saetFormaal?(f: "salg" | "kald" | "optagelse" | "diagnose" | "andet"): void } | null = null;
+  setBudget(b: typeof this.budget) { this.budget = b; }
+  setBudgetFormaal(f: "salg" | "kald" | "optagelse" | "diagnose" | "andet") { this.budget?.saetFormaal?.(f); }
   /** Offentlig, budgetteret GET mod /v1 (bruges af calls-incremental). */
   getV1(endpoint: string): Promise<unknown> { return this.get(endpoint); }
+  /** ALLE requests mod Adversus går her igennem [F1a]: reservation i budgettet, timeout 100 s (kortere end lease), body læses færdigt, mens lease holdes. */
+  private async budgetFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const lease = this.budget ? await this.budget.reserver(1) : null;
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 100_000);
+    try {
+      const res = await fetch(url, { ...init, signal: ctl.signal });
+      const tomBody = res.status === 204 || res.status === 205 || res.status === 304;
+      const body = tomBody ? null : await res.arrayBuffer();
+      return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    } finally { clearTimeout(t); if (this.budget) await this.budget.frigiv(lease); }
+  }
 
   getMetrics(): ApiMetrics {
     return { ...this._metrics };
@@ -133,13 +146,9 @@ export class AdversusAdapter implements DialerAdapter {
     for (let attempt = 1; attempt <= retries; attempt++) {
       await this.throttle();
       this._metrics.apiCalls++;
-      const lease = this.budget ? await this.budget.reserver(1) : null;
-      let res: Response;
-      try {
-        res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
-          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
-        });
-      } finally { if (this.budget) await this.budget.frigiv(lease); }
+      const res = await this.budgetFetch(`${this.baseUrl}/v1${endpoint}`, {
+        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
+      });
 
       if (res.status === 429) {
         this._metrics.rateLimitHits++;
@@ -211,7 +220,7 @@ export class AdversusAdapter implements DialerAdapter {
     
     const url = `${this.baseUrl}/sales?pageSize=${limit}&page=1&filters=${filterStr}`;
     this._metrics.apiCalls++;
-    const res = await fetch(url, {
+    const res = await this.budgetFetch(url, {
       headers: { Authorization: `Basic ${this.authHeader}` },
     });
     if (!res.ok) throw new Error(`Adversus API Error ${res.status}`);
@@ -701,7 +710,7 @@ export class AdversusAdapter implements DialerAdapter {
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
       try {
         this._metrics.apiCalls++;
-        const res = await fetch(url, {
+        const res = await this.budgetFetch(url, {
           headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
         });
 
@@ -767,7 +776,7 @@ export class AdversusAdapter implements DialerAdapter {
       while (retryAttempt < maxRetries) {
         try {
           this._metrics.apiCalls++;
-          const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
+          const res = await this.budgetFetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
 
           if (res.status === 429) {
             this._metrics.rateLimitHits++;
@@ -837,7 +846,7 @@ export class AdversusAdapter implements DialerAdapter {
       const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=${pageSize}`;
 
       this._metrics.apiCalls++;
-      const res = await fetch(url, {
+      const res = await this.budgetFetch(url, {
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
       });
 
@@ -952,16 +961,12 @@ export class AdversusAdapter implements DialerAdapter {
           try {
             const url = `${this.baseUrl}${endpointBase}&pageSize=${pageSize}&page=${page}`;
             this._metrics.apiCalls++;  // [F1a] /cdr talte ikke med før; nu budgetteret som alle andre kald
-            const cdrLease = this.budget ? await this.budget.reserver(1) : null;
-            let res: Response;
-            try {
-              res = await fetch(url, {
-                headers: {
-                  'Authorization': `Basic ${this.authHeader}`,
-                  'Content-Type': 'application/json'
-                }
-              });
-            } finally { if (this.budget) await this.budget.frigiv(cdrLease); }
+            const res = await this.budgetFetch(url, {
+              headers: {
+                'Authorization': `Basic ${this.authHeader}`,
+                'Content-Type': 'application/json'
+              }
+            });
 
             if (res.status === 429) {
               const waitTime = Math.min(5000 * Math.pow(2, retries), 20000);
@@ -1071,6 +1076,7 @@ export class AdversusAdapter implements DialerAdapter {
             }
             success = true;
           } catch (e) {
+            if (e instanceof Error && e.message.startsWith("ADVERSUS_BUDGET_")) throw e;  // [F1a] udtømt kvote = afbryd kørslen, flyt ikke vandmærket
             console.error(`[Adversus] Exception on page ${page}:`, e);
             retries++;
             if (retries >= maxRetries) {
@@ -1147,59 +1153,14 @@ export class AdversusAdapter implements DialerAdapter {
    * Map Adversus disposition to unified status enum
    */
   private mapAdversusDisposition(disposition: string | undefined): StandardCall['status'] | null {
-    if (!disposition) return null;
-
-    const d = disposition.toLowerCase();
-
-    // Answered / Success dispositions
-    if (d.includes('answered') || d.includes('success') || d.includes('connected') || d.includes('sale') || d === 'answer') {
-      return 'ANSWERED';
-    }
-    // No Answer
-    if (d.includes('no answer') || d.includes('noanswer') || d.includes('no_answer') || d === 'ring') {
-      return 'NO_ANSWER';
-    }
-    // Busy
-    if (d.includes('busy')) {
-      return 'BUSY';
-    }
-    // Failed / Voicemail / Other
-    if (d.includes('voicemail') || d.includes('machine') || d.includes('answering')) {
-      return 'NO_ANSWER'; // Map voicemail to no_answer since VOICEMAIL not in type
-    }
-    if (d.includes('fail') || d.includes('error') || d.includes('invalid')) {
-      return 'FAILED';
-    }
-
-    return null; // Let hangup cause handle it
+    return mapAdversusDispositionStatus(disposition);  // [F1a] én sandhed – deles med /v1/calls-mapperen
   }
 
   /**
    * Map Adversus hangup_cause to unified status enum
    */
   private mapAdversusHangupCause(cause: string | undefined): StandardCall['status'] {
-    if (!cause) return 'OTHER';
-
-    const c = cause.toUpperCase();
-
-    // Answered / Success
-    if (c.includes('NORMAL_CLEARING') || c.includes('SUCCESS') || c.includes('ANSWERED')) {
-      return 'ANSWERED';
-    }
-    // No Answer
-    if (c.includes('NO_USER_RESPONSE') || c.includes('NO_ANSWER') || c.includes('TIMEOUT')) {
-      return 'NO_ANSWER';
-    }
-    // Busy
-    if (c.includes('BUSY') || c.includes('USER_BUSY')) {
-      return 'BUSY';
-    }
-    // Failed
-    if (c.includes('CALL_REJECTED') || c.includes('FAIL') || c.includes('UNALLOCATED') || c.includes('INVALID')) {
-      return 'FAILED';
-    }
-
-    return 'OTHER';
+    return mapAdversusHangupCauseStatus(cause);  // [F1a] én sandhed
   }
 
   // ==========================================

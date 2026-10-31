@@ -208,8 +208,9 @@ export async function syncIntegration(
     );
     // [F1a] Fælles kvotebegrænser pr. integration (Adversus); fail-open ved fejl i begrænseren
     if ((source || integration.provider) === "adversus" && typeof (adapter as any).setBudget === "function") {
-      const { lavAdversusBudget } = await import("../../_shared/adversus-budget.ts");
-      (adapter as any).setBudget(lavAdversusBudget(supabase, integration.id, actionList.includes("sales") ? "salg" : "andet"));
+      const { lavAdversusBudget, budgetNoegle } = await import("../../_shared/adversus-budget.ts");
+      const brugernavn = String((credentials as any)?.username ?? (credentials as any)?.user ?? integration.id);
+      (adapter as any).setBudget(lavAdversusBudget(supabase, await budgetNoegle(brugernavn), "andet"));  // formål sættes pr. handling nedenfor
     }
 
     const runResults: Record<string, unknown> = {};
@@ -266,6 +267,8 @@ export async function syncIntegration(
         log("INFO", `Adversus transient rate limits for ${integration.name} (${earlyMetrics.rateLimitHits} hits) – continuing without abort`);
       }
     }
+
+    (adapter as any).setBudgetFormaal?.("salg");  // [F1a] salg har forrang i budgettet
 
     // Process sales (skip if Enreach rate-limited during meta, or timeout approaching)
     if ((actionList.includes("sales") || action === "sync") && !metaSyncRateLimited && !timer.isExpired()) {
@@ -347,7 +350,12 @@ export async function syncIntegration(
     }
 
     // Process calls (skip if timeout approaching)
-    if (actionList.includes("calls") && !metaSyncRateLimited && !timer.isExpired()) {
+    (adapter as any).setBudgetFormaal?.("kald");
+    if (actionList.includes("calls") && integration?.config?.calls_v1 === true) {
+      // [F1a] calls_v1 = true: /v1/calls-vejen (calls-incremental) er ENESTE skriver af dialer_calls for denne integration – det gamle /cdr-trin springes over
+      actionsSkipped.push("calls");
+      runResults["calls"] = { processed: 0, errors: 0, message: "Skipped: calls_v1 (calls-incremental er eneste skriver)" };
+    } else if (actionList.includes("calls") && !metaSyncRateLimited && !timer.isExpired()) {
       try {
         let calls: any[] = [];
 

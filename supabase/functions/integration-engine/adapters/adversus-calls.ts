@@ -13,14 +13,29 @@ export interface CallEntry {
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
 
-/** Telefonudfald (ikke sessionsudfald, ikke salgsstatus): /calls bruger 'no-answer' – sessions bruger 'noAnswer'. */
-export function dispositionTilStatus(d: unknown): StandardCall["status"] {
-  const s = str(d).toLowerCase().replace(/[\s_-]/g, "");
-  if (s === "answered") return "ANSWERED";
-  if (s === "noanswer") return "NO_ANSWER";
-  if (s === "busy") return "BUSY";
-  if (s === "fail" || s === "failed" || s === "congestion") return "FAILED";
+/** Samme statuskontrakt som den gamle /cdr-mapper (adversus.ts mapAdversusDisposition/mapAdversusHangupCause) – ÉN sandhed, begge mappere kalder disse. */
+export function mapAdversusDispositionStatus(disposition: string | undefined): StandardCall["status"] | null {
+  if (!disposition) return null;
+  const d = disposition.toLowerCase();
+  if (d.includes("answered") || d.includes("success") || d.includes("connected") || d.includes("sale") || d === "answer") return "ANSWERED";
+  if (d.includes("no answer") || d.includes("noanswer") || d.includes("no_answer") || d.includes("no-answer") || d === "ring") return "NO_ANSWER";
+  if (d.includes("busy")) return "BUSY";
+  if (d.includes("voicemail") || d.includes("machine") || d.includes("answering")) return "NO_ANSWER";
+  if (d.includes("fail") || d.includes("error") || d.includes("invalid")) return "FAILED";
+  return null;
+}
+export function mapAdversusHangupCauseStatus(cause: string | undefined): StandardCall["status"] {
+  if (!cause) return "OTHER";
+  const c = cause.toUpperCase();
+  if (c.includes("NORMAL_CLEARING") || c.includes("SUCCESS") || c.includes("ANSWERED")) return "ANSWERED";
+  if (c.includes("NO_USER_RESPONSE") || c.includes("NO_ANSWER") || c.includes("TIMEOUT")) return "NO_ANSWER";
+  if (c.includes("BUSY") || c.includes("USER_BUSY")) return "BUSY";
+  if (c.includes("CALL_REJECTED") || c.includes("FAIL") || c.includes("UNALLOCATED") || c.includes("INVALID")) return "FAILED";
   return "OTHER";
+}
+/** Telefonudfald: disposition først, ellers byeCause (= hangupCause) – identisk med /cdr-vejen. */
+export function statusFraKald(disposition: unknown, byeCause: unknown): StandardCall["status"] {
+  return mapAdversusDispositionStatus(str(disposition) || undefined) ?? mapAdversusHangupCauseStatus(str(byeCause) || undefined);
 }
 
 export function mapCallEntry(e: CallEntry, dialerName: string): StandardCall {
@@ -33,7 +48,7 @@ export function mapCallEntry(e: CallEntry, dialerName: string): StandardCall {
     endTime: str(e.end) || str(e.start) || new Date(0).toISOString(),
     durationSeconds: conversation + queued,
     totalDurationSeconds: num(e.duration),
-    status: dispositionTilStatus(e.disposition),
+    status: statusFraKald(e.disposition, e.byeCause),
     agentExternalId: str(e.userId),
     campaignExternalId: str(e.campaignId),
     leadExternalId: str(e.contactId) || str(e.leadId),
@@ -56,20 +71,23 @@ export function mapCallEntry(e: CallEntry, dialerName: string): StandardCall {
   };
 }
 
-export interface CallsSide { calls: CallEntry[]; pageCount: number; total: number | null }
-
-/** Henter alle sider for et start-vindue. `get` er adapterens budgetterede GET (præfikser /v1). */
-export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, maksSider = 20): Promise<{ entries: CallEntry[]; sider: number; total: number | null }> {
+/** Henter alle sider for et start-vindue. `get` er adapterens budgetterede GET (præfikser /v1). `komplet` = alle sider hentet
+ *  (ellers må vandmærket IKKE flyttes). `stop()` afbryder mellem sider (tidsbudget). */
+export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, opts: { maksSider?: number; stop?: () => boolean } = {}): Promise<{ entries: CallEntry[]; sider: number; total: number | null; komplet: boolean }> {
+  const maksSider = opts.maksSider ?? 30;
   const filt = encodeURIComponent(JSON.stringify({ start: { $gt: fra, $lt: til } }));
-  const entries: CallEntry[] = []; const set = new Set<string>(); let total: number | null = null; let sider = 0;
+  const entries: CallEntry[] = []; const set = new Set<string>(); let total: number | null = null; let sider = 0; let komplet = false;
   for (let side = 1; side <= maksSider; side++) {
+    if (opts.stop?.()) break;
     const data = (await get(`/calls?filters=${filt}&pageSize=1000&page=${side}&includeMeta=true`)) as { calls?: CallEntry[]; meta?: { pagination?: { pageCount?: number; total?: number } } } | null;
-    const calls = Array.isArray(data?.calls) ? data!.calls! : [];
+    if (!data || typeof data !== "object") throw new Error(`calls_v1: tomt svar på side ${side}`);
+    const calls = Array.isArray(data.calls) ? data.calls : [];
     sider++;
     for (const c of calls) { const id = str(c.id); if (id && !set.has(id)) { set.add(id); entries.push(c); } }
-    const pageCount = Number(data?.meta?.pagination?.pageCount ?? 1);
-    total = data?.meta?.pagination?.total != null ? Number(data.meta.pagination.total) : total;
-    if (calls.length === 0 || side >= pageCount) break;
+    const pageCount = Number(data.meta?.pagination?.pageCount ?? 1);
+    total = data.meta?.pagination?.total != null ? Number(data.meta.pagination.total) : total;
+    if (calls.length === 0 || side >= pageCount) { komplet = true; break; }
   }
-  return { entries, sider, total };
+  if (komplet && total != null && entries.length < total && entries.length < sider * 1000) komplet = false; // uoverensstemmelse mellem meta.total og hentede
+  return { entries, sider, total, komplet };
 }

@@ -22,11 +22,14 @@ export function udledTimestampSemantik(rows: KaldRaekke[], fra: string, til: str
 
 /** Dansk klokkeslæt på en dato som UTC-ISO (Europe/Copenhagen). */
 export function cphIso(dag: string, time: number, minut = 0): string {
-  // Uafhængig af maskinens tidszone: dansk klokketime for 12:00Z på dagen giver offset (CET +1 / CEST +2)
-  const probe = new Date(`${dag}T12:00:00Z`);
-  const cphTime = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", hour: "2-digit", hour12: false }).format(probe));
-  const offH = cphTime - 12;
-  return new Date(Date.UTC(+dag.slice(0, 4), +dag.slice(5, 7) - 1, +dag.slice(8, 10), time - offH, minut)).toISOString();
+  // Uafhængig af maskinens tidszone og korrekt på DST-skiftedage: gæt ud fra offset ved 00:00Z, kontrollér dansk klokketime ved gættet og justér
+  const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", hour: "2-digit", hour12: false });
+  const midnatZ = new Date(`${dag}T00:00:00Z`);
+  const offMidnat = Number(fmt.format(midnatZ)) % 24;
+  let t = new Date(Date.UTC(+dag.slice(0, 4), +dag.slice(5, 7) - 1, +dag.slice(8, 10), time - offMidnat, minut));
+  const faktisk = Number(fmt.format(t)) % 24;
+  if (faktisk !== time % 24) t = new Date(t.getTime() - ((faktisk - (time % 24)) * 3600000));
+  return t.toISOString();
 }
 
 /** Seneste hverdag før i dag (YYYY-MM-DD, dansk tid). */

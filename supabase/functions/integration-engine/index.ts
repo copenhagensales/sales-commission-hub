@@ -45,10 +45,20 @@ serve(async (req) => {
 
     // calls-incremental (plan v2.4 F1a): kald fra /v1/calls hvert 2. min / natlig backfill – egen vej, eget vandmærke, budget pr. integration
     if (action === "calls-incremental") {
+      // Adgang: cron-hemmelighed, service_role eller ejer (integration-engine har verify_jwt = false)
+      const { requireCronOrOwner } = await import("../_shared/auth.ts");
+      const auth = await requireCronOrOwner(req);
+      if (auth instanceof Response) return auth;
       const { callsIncremental } = await import("./actions/calls-incremental.ts");
       const { IngestionEngine } = await import("./core.ts");
       const engine = new IngestionEngine();
-      const resultat = await callsIncremental(supabase, engine, log, { integrationId: integration_id ?? integrationId, tilstand: body.tilstand });
+      const koer = () => callsIncremental(supabase, engine, log, { integrationId: integration_id ?? integrationId, tilstand: body.tilstand });
+      if (background) {
+        // Cron (pg_net) venter kun 5 s: kør i baggrunden, svar straks
+        EdgeRuntime.waitUntil(koer().then((r) => log("INFO", "calls-incremental færdig", r)).catch((e) => log("ERROR", `calls-incremental: ${e instanceof Error ? e.message : String(e)}`)));
+        return new Response(JSON.stringify({ success: true, action: "calls-incremental", background: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const resultat = await koer();
       return new Response(JSON.stringify({ success: true, resultat }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

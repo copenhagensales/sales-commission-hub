@@ -15,3 +15,8 @@ Deno.test("senesteHverdag springer weekend over", () => {
   assertEquals(senesteHverdag(new Date("2026-10-31T13:00:00Z")), "2026-10-30");
   assertEquals(senesteHverdag(new Date("2026-11-02T06:00:00Z")), "2026-10-30");
 });
+Deno.test("cphIso: DST-skiftedag 25/10 – 02:00 (før skift) og 10:00 (efter skift)", () => {
+  assertEquals(cphIso("2026-10-25", 0), "2026-10-24T22:00:00.000Z");
+  assertEquals(cphIso("2026-10-25", 10), "2026-10-25T09:00:00.000Z");
+  assertEquals(cphIso("2026-07-01", 10), "2026-07-01T08:00:00.000Z");
+});

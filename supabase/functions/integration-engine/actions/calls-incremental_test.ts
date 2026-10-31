@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { backfillDag, erArbejdstid, inkrementeltVindue } from "./calls-incremental.ts";
+import { backfillDag, dagsvindue, erArbejdstid, inkrementeltVindue } from "./calls-incremental.ts";
 
 Deno.test("inkrementeltVindue: vandmærke − 2 t overlap → nu − 2 min", () => {
   const nu = new Date("2026-10-30T10:00:00Z");
@@ -25,4 +25,10 @@ Deno.test("backfillDag: starter i går, går bagud, stopper ved grænsen", () =>
   const b2 = backfillDag(b1.naeste, 3, nu)!; assertEquals(b2.dag, "2026-10-29");
   const b3 = backfillDag("2026-10-28", 3, nu)!; assertEquals(b3.dag, "2026-10-28");
   assertEquals(backfillDag("2026-10-27", 3, nu), null);
+});
+
+Deno.test("dagsvindue: DST-skiftedag 25/10-2026 er 25 timer, 29/3 er 23 timer", () => {
+  assertEquals(dagsvindue("2026-10-25"), { fra: "2026-10-24T22:00:00.000Z", til: "2026-10-25T23:00:00.000Z" });
+  assertEquals(dagsvindue("2026-03-29"), { fra: "2026-03-28T23:00:00.000Z", til: "2026-03-29T22:00:00.000Z" });
+  assertEquals(dagsvindue("2026-10-30"), { fra: "2026-10-29T23:00:00.000Z", til: "2026-10-30T23:00:00.000Z" });
 });
