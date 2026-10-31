@@ -54,7 +54,7 @@ Deno.test("hentCallsV1: ugyldig struktur kaster (tomt objekt, manglende pageCoun
   const tomMenTotal = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 0, total: 5 } } }), "a", "b");  // tom side men total > 0: IKKE komplet
   assertEquals(tomMenTotal.komplet, false);
   assertEquals(await kast({ calls: "x", meta: { pagination: { pageCount: 1 } } }), true);
-  assertEquals(await kast({ calls: [], meta: { pagination: { pageCount: true } } }), true);  // boolean er ikke et tal
+  assertEquals(await kast({ calls: [{ id: 1 }], meta: { pagination: { pageCount: true } } }), true);  // boolean er ikke et tal (side med kald)
   const ok = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 1, total: 0 } } }), "a", "b");
   assertEquals(ok.komplet, true);
   const forLidt = await hentCallsV1(() => Promise.resolve({ calls: [{ id: 1 }], meta: { pagination: { pageCount: 1, total: 2500 } } }), "a", "b");
