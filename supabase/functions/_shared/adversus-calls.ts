@@ -84,9 +84,10 @@ export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: s
     if (!data || typeof data !== "object" || !Array.isArray(data.calls)) throw new Error(`calls_v1: ugyldigt svar på side ${side}`);
     const calls = data.calls as CallEntry[];
     const pageCountRaa = data.meta?.pagination?.pageCount;
-    // Tomt vindue: Adversus udelader meta, når der ingen kald er (målt i prod 31/10 15:0x) – det er en komplet, tom side 1
-    if (side === 1 && calls.length === 0 && pageCountRaa === undefined) { sider = 1; total = 0; komplet = true; break; }
     const pageCount = typeof pageCountRaa === "number" ? pageCountRaa : Number.NaN;
+    // Tomt vindue (side 1 uden kald): Adversus udelader meta eller sender pageCount 0/null (målt i prod 31/10) – komplet, tom side.
+    // Kun hvis siden HAR kald, kræves gyldig paginering (ellers kan et fejlsvar ligne en komplet side).
+    if (side === 1 && calls.length === 0 && (!Number.isFinite(pageCount) || pageCount <= 1)) { sider = 1; total = Number.isFinite(Number(data.meta?.pagination?.total)) ? Number(data.meta?.pagination?.total) : 0; komplet = total === 0; break; }
     if (!Number.isFinite(pageCount) || pageCount < 1) throw new Error(`calls_v1: meta.pagination.pageCount mangler på side ${side}`);
     sider++; raa += calls.length;
     for (const c of calls) { const id = str(c.id); if (id && !set.has(id)) { set.add(id); entries.push(c); } }

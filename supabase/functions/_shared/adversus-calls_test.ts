@@ -47,6 +47,12 @@ Deno.test("hentCallsV1: ugyldig struktur kaster (tomt objekt, manglende pageCoun
   assertEquals(await kast({ calls: [{ id: 1 }], meta: {} }), true);  // kald uden meta: ugyldigt
   const tom = await hentCallsV1(() => Promise.resolve({ calls: [] }), "a", "b");  // tomt vindue uden meta (prod 31/10): komplet
   assertEquals(tom.komplet, true); assertEquals(tom.total, 0); assertEquals(tom.entries.length, 0);
+  const tom0 = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 0, total: 0 } } }), "a", "b");  // pageCount 0 ved tomt vindue
+  assertEquals(tom0.komplet, true);
+  const tomNull = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: null, total: null } } }), "a", "b");
+  assertEquals(tomNull.komplet, true);
+  const tomMenTotal = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 0, total: 5 } } }), "a", "b");  // tom side men total > 0: IKKE komplet
+  assertEquals(tomMenTotal.komplet, false);
   assertEquals(await kast({ calls: "x", meta: { pagination: { pageCount: 1 } } }), true);
   assertEquals(await kast({ calls: [], meta: { pagination: { pageCount: true } } }), true);  // boolean er ikke et tal
   const ok = await hentCallsV1(() => Promise.resolve({ calls: [], meta: { pagination: { pageCount: 1, total: 0 } } }), "a", "b");
