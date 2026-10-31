@@ -196,7 +196,7 @@ export function KaldFeltKatalog() {
                         <TableHead>
                           <Tooltip>
                             <TooltipTrigger>Frist (dage)</TooltipTrigger>
-                            <TooltipContent>Tom = tabellens politik. Følsom kræver ≤ 90, identifikator ≤ 180.</TooltipContent>
+                            <TooltipContent>Tom = kampagnens/klientens opbevaringspolitik som i dag. Egne frister pr. felt afgøres i F5.</TooltipContent>
                           </Tooltip>
                         </TableHead>
                         <TableHead>Begrundelse</TableHead>
