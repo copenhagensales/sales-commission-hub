@@ -11451,6 +11451,120 @@ export type Database = {
         }
         Relationships: []
       }
+      kald_kanonisk_vaerdi: {
+        Row: {
+          aendret: string
+          begreb: string
+          beskrivelse: string | null
+          label_da: string
+          noegle: string
+          oprettet: string
+          samtale_relevant: boolean
+          sort: number
+        }
+        Insert: {
+          aendret?: string
+          begreb: string
+          beskrivelse?: string | null
+          label_da: string
+          noegle: string
+          oprettet?: string
+          samtale_relevant?: boolean
+          sort?: number
+        }
+        Update: {
+          aendret?: string
+          begreb?: string
+          beskrivelse?: string | null
+          label_da?: string
+          noegle?: string
+          oprettet?: string
+          samtale_relevant?: boolean
+          sort?: number
+        }
+        Relationships: []
+      }
+      kald_vaerdi_mapping: {
+        Row: {
+          aendret: string
+          aendret_af: string | null
+          begreb: string
+          begrundelse: string | null
+          endpoint: string
+          felt_sti: string
+          gyldig_fra: string
+          id: string
+          kampagne_ekstern_id: string | null
+          kanonisk_noegle: string
+          kilde: string
+          kildevaerdi: string
+          oprettet: string
+          status: string
+        }
+        Insert: {
+          aendret?: string
+          aendret_af?: string | null
+          begreb: string
+          begrundelse?: string | null
+          endpoint: string
+          felt_sti: string
+          gyldig_fra?: string
+          id?: string
+          kampagne_ekstern_id?: string | null
+          kanonisk_noegle?: string
+          kilde: string
+          kildevaerdi: string
+          oprettet?: string
+          status?: string
+        }
+        Update: {
+          aendret?: string
+          aendret_af?: string | null
+          begreb?: string
+          begrundelse?: string | null
+          endpoint?: string
+          felt_sti?: string
+          gyldig_fra?: string
+          id?: string
+          kampagne_ekstern_id?: string | null
+          kanonisk_noegle?: string
+          kilde?: string
+          kildevaerdi?: string
+          oprettet?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      kald_vaerdi_mapping_audit: {
+        Row: {
+          aendret: string
+          aendret_af: string | null
+          gammel: Json | null
+          handling: string
+          id: number
+          mapping_id: string
+          ny: Json | null
+        }
+        Insert: {
+          aendret?: string
+          aendret_af?: string | null
+          gammel?: Json | null
+          handling: string
+          id?: number
+          mapping_id: string
+          ny?: Json | null
+        }
+        Update: {
+          aendret?: string
+          aendret_af?: string | null
+          gammel?: Json | null
+          handling?: string
+          id?: number
+          mapping_id?: string
+          ny?: Json | null
+        }
+        Relationships: []
+      }
       kpi_cached_values: {
         Row: {
           calculated_at: string
@@ -20985,6 +21099,14 @@ export type Database = {
           noegle: string
           total: number
         }[]
+      }
+      kald_kanonisk: {
+        Args: { p_kilde: string; p_endpoint: string; p_felt: string; p_vaerdi: string; p_kampagne?: string | null }
+        Returns: string
+      }
+      kald_vaerdi_observeret: {
+        Args: { p_dage?: number }
+        Returns: { kilde: string; endpoint: string; felt_sti: string; begreb: string; kildevaerdi: string; antal: number }[]
       }
       league_auto_advance_seasons: { Args: never; Returns: Json }
       league_current_open_season: {

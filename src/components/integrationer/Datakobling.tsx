@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useKaldFeltKatalog, type KatalogFelt } from "@/hooks/useKaldFeltKatalog";
 import { useApiRegister } from "@/hooks/useApiRegister";
+import { Vaerdioversaettelser } from "@/components/integrationer/Vaerdioversaettelser";
 
 const OBJEKT_LABEL: Record<string, string> = { kald: "Kald", session: "Session", emne: "Emne", optagelse: "Optagelse" };
 
@@ -12,6 +13,15 @@ const OBJEKT_LABEL: Record<string, string> = { kald: "Kald", session: "Session",
  * (kald_felt_katalog.kanonisk_felt). Værdioversættelser (telefonudfald, sessionsudfald, salgsstatus) kommer i F1c som data (kald_vaerdi_mapping).
  */
 export function Datakobling() {
+  return (
+    <div className="space-y-6">
+      <FaellesFelter />
+      <Vaerdioversaettelser />
+    </div>
+  );
+}
+
+function FaellesFelter() {
   const { data: felter = [], isLoading } = useKaldFeltKatalog();
   const { data: register = [] } = useApiRegister();
 
