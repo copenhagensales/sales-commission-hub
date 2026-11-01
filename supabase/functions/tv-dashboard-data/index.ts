@@ -2693,7 +2693,7 @@ async function handleFiberSalesCount(
   while (true) {
     const { data, error } = await supabase
       .from("sale_items")
-      .select("quantity, is_cancelled, sales!inner(sale_datetime)")
+      .select("quantity, is_cancelled, sales!inner(sale_datetime, validation_status)")
       .in("product_id", FIBER_SALE_PRODUCT_IDS_EF)
       .gte("sales.sale_datetime", startIso)
       .lt("sales.sale_datetime", endIso)
@@ -2707,7 +2707,8 @@ async function handleFiberSalesCount(
     }
     if (!data || data.length === 0) break;
     for (const row of data as any[]) {
-      if (row.is_cancelled) continue;
+      // Afviste salg (fx en leaddel afvist ved rettelse) tæller ikke – samme regel som leaderboardet.
+      if (row.is_cancelled || row.sales?.validation_status === "rejected") continue;
       total += Number(row.quantity ?? 0);
     }
     if (data.length < pageSize) break;
@@ -2735,7 +2736,7 @@ async function handleFiberBoardStats(
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "product_id, quantity, mapped_commission, is_cancelled, sales!inner(agent_email, sale_datetime)",
+          "product_id, quantity, mapped_commission, is_cancelled, sales!inner(agent_email, sale_datetime, validation_status)",
         )
         .in("product_id", FIBER_PRODUCT_IDS_EF)
         .gte("sales.sale_datetime", startIso)
@@ -2762,7 +2763,7 @@ async function handleFiberBoardStats(
     const emailByKey: Record<string, string> = {};
 
     for (const row of rows) {
-      if (row.is_cancelled) continue;
+      if (row.is_cancelled || row.sales?.validation_status === "rejected") continue;
       const rawEmail: string | undefined = row.sales?.agent_email;
       if (!rawEmail) continue;
       const email = rawEmail.toLowerCase();
