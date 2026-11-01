@@ -234,12 +234,20 @@ export default function TdcErhvervFiber() {
   const [k, setK] = useState<FiberKladde>(TOM);
   const [visFejl, setVisFejl] = useState(false);
   const [ids, setIds] = useState(() => ({ salg: crypto.randomUUID(), lead: crypto.randomUUID() }));
+  const [bekraeft, setBekraeft] = useState(false);
+  const phone = useIsPhone();
   const fejl = valider(k, mitId);
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
   const send = () => {
     setVisFejl(true);
+    if (Object.keys(fejl).length || !k.type || !k.variant) return;
+    setBekraeft(true);
+  };
+
+  const indsend = () => {
+    setBekraeft(false);
     if (Object.keys(fejl).length || !k.type || !k.variant) return;
     opret.mutate(
       { salgId: ids.salg, leadSalgId: k.type === "lukket" ? ids.lead : null, type: k.type, variant: k.variant, mobilevoice: k.mobilevoice, cvr: normaliserCvr(k.cvr), leadgiverId: k.type === "lukket" ? k.leadgiverId : null },
@@ -279,6 +287,28 @@ export default function TdcErhvervFiber() {
           </CardContent>
         </Card>
       )}
+
+      {bekraeft && (() => {
+        const indhold = (
+          <div className="space-y-4">
+            <ol className="list-decimal space-y-2 pl-5 text-base">
+              <li>Har du lavet 1. opsigelsesmail til kunden?</li>
+              <li>Har du lavet lead til Hunt?</li>
+            </ol>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="min-h-11 text-base" onClick={() => setBekraeft(false)}>Nej</Button>
+              <Button className="min-h-11 text-base" disabled={opret.isPending} onClick={indsend}>Ja</Button>
+            </div>
+          </div>
+        );
+        const titel = "Bekræft før registrering";
+        if (phone) return <BottomSheet open onOpenChange={(v) => !v && setBekraeft(false)} title={titel}><div className="px-4 pb-4">{indhold}</div></BottomSheet>;
+        return (
+          <Dialog open onOpenChange={(v) => !v && setBekraeft(false)}>
+            <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{titel}</DialogTitle></DialogHeader>{indhold}</DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {(maaSaelge || erAdmin) && (
         <Card>
