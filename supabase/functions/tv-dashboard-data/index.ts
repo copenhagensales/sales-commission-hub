@@ -2808,7 +2808,8 @@ async function handleFiberBoardStats(
     }
 
     const emailToEmployeeId: Record<string, string> = {};
-    const relatelMap = isRelatel ? await getRelatelEmailToEmployee(supabase) : {};
+    // Begge varianter skal kende Relatel-medlemmer: TDC udelader leads fra Relatel-sælgere (de tæller på Relatel).
+    const relatelMap = await getRelatelEmailToEmployee(supabase);
     if (isRelatel) {
       for (const [e, v] of Object.entries(relatelMap)) emailToEmployeeId[e] = v.id;
     } else {
@@ -2831,6 +2832,7 @@ async function handleFiberBoardStats(
       const email = rawEmail.toLowerCase();
       // kun aktive Relatel-teammedlemmer, og kun leads lavet efter de kom på teamet
       if (isRelatel && !relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) continue;
+      if (!isRelatel && row.product_id in RELATEL_FIBER_LEAD_POINTS_EF && relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) continue;
       const key = emailToEmployeeId[email] || email;
       emailByKey[key] = email;
 
