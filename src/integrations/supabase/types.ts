@@ -21767,6 +21767,20 @@ export type Database = {
         Args: { p_employee_id: string }
         Returns: undefined
       }
+      tdc_fiber_admin_opret_salg: {
+        Args: {
+          p_cvr: string
+          p_dato: string
+          p_lead_salg_id: string
+          p_leadgiver: string
+          p_lukker: string
+          p_mobilevoice: boolean
+          p_salg_id: string
+          p_type: string
+          p_variant: string
+        }
+        Returns: Json
+      }
       tdc_fiber_er_admin: { Args: never; Returns: boolean }
       tdc_fiber_opret_salg: {
         Args: {
@@ -21780,6 +21794,7 @@ export type Database = {
         }
         Returns: Json
       }
+      tdc_fiber_periode_start: { Args: never; Returns: string }
       tdc_fiber_produkt: {
         Args: { p_mobilevoice: boolean; p_type: string; p_variant: string }
         Returns: string

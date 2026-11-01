@@ -39,8 +39,30 @@ const FEJL: Record<string, string> = {
   tdc_fiber_salg_findes_ikke: "Salget findes ikke.",
   tdc_fiber_kun_i_dag: "Kun salg fra i dag kan rettes.",
   tdc_fiber_leadgiver_er_saelger: "Leadgiveren kan ikke være sælgeren selv.",
+  tdc_fiber_ugyldig_dato: "Datoen skal ligge i den igangværende lønperiode og må ikke være efter i dag.",
+  tdc_fiber_lukker_ikke_paa_listen: "Sælgeren skal stå på listen over fibersælgere.",
 };
 export function oversaetFejl(e: { code?: string; message?: string } | null | undefined): string | null {
   if (!e || e.code !== "P0001" || !e.message) return null;
   return FEJL[e.message] ?? null;
+}
+
+/** Dato (YYYY-MM-DD) som lokal kalenderdag. */
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Lønperioden 15.→14.: første dag i den igangværende periode (databasen: tdc_fiber_periode_start). */
+export function periodeStart(idag: Date): string {
+  const d = new Date(idag.getFullYear(), idag.getMonth(), 15);
+  if (idag.getDate() < 15) d.setMonth(d.getMonth() - 1);
+  return iso(d);
+}
+export const datoIDag = (idag: Date) => iso(idag);
+
+/** Admin-oprettelse: sælger skal vælges og datoen ligge i perioden til og med i dag. */
+export function validerAdmin(k: FiberKladde, lukkerId: string | null, dato: string, idag: Date) {
+  const fejl: ReturnType<typeof valider> & { lukker?: string; dato?: string } = valider(k, lukkerId);
+  if (!lukkerId) fejl.lukker = "Vælg sælgeren.";
+  if (fejl.leadgiver === "Du kan ikke være din egen leadgiver.") fejl.leadgiver = "Leadgiveren kan ikke være sælgeren selv.";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dato) || dato < periodeStart(idag) || dato > iso(idag)) fejl.dato = "Vælg en dato i den igangværende lønperiode, senest i dag.";
+  return fejl;
 }
