@@ -9,13 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import {
-  useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useRetFiberSalg, useTdcFiberAccess, type Kollega, type MitFiberSalg,
+  useAdminOpretFiberSalg, useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useRetFiberSalg, useTdcFiberAccess, type Kollega, type MitFiberSalg,
 } from "@/hooks/useTdcFiberSales";
-import { normaliserCvr, oversaetFejl, valider, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
+import { datoIDag, normaliserCvr, oversaetFejl, periodeStart, valider, validerAdmin, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BottomSheet, useIsPhone } from "@/components/mobile";
-import { Users } from "lucide-react";
+import { CalendarPlus, Users } from "lucide-react";
 
 const TOM: FiberKladde = { type: null, variant: null, mobilevoice: false, cvr: "", leadgiverId: null };
 
@@ -166,12 +166,66 @@ function RetPopup({ salg, saelgerId, kolleger, onClose }: { salg: MitFiberSalg; 
   );
 }
 
+function AdminOpretPopup({ open, onOpenChange, kolleger }: { open: boolean; onOpenChange: (v: boolean) => void; kolleger: Kollega[] }) {
+  const { toast } = useToast();
+  const phone = useIsPhone();
+  const opret = useAdminOpretFiberSalg();
+  const { data: liste = [] } = useTdcFiberAccess();
+  const saelgere = useMemo(() => liste.map((r) => ({ id: r.employee_id, navn: r.navn, team: "Fibersælgere" })).sort((a, b) => a.navn.localeCompare(b.navn, "da")), [liste]);
+  const idag = new Date();
+  const [k, setK] = useState<FiberKladde>(TOM);
+  const [lukker, setLukker] = useState<string | null>(null);
+  const [dato, setDato] = useState(() => datoIDag(new Date()));
+  const [visFejl, setVisFejl] = useState(false);
+  const [ids, setIds] = useState(() => ({ salg: crypto.randomUUID(), lead: crypto.randomUUID() }));
+  const fejl = validerAdmin(k, lukker, dato, idag);
+  const send = () => {
+    setVisFejl(true);
+    if (Object.keys(fejl).length || !k.type || !k.variant || !lukker) return;
+    opret.mutate(
+      { salgId: ids.salg, leadSalgId: k.type === "lukket" ? ids.lead : null, type: k.type, variant: k.variant, mobilevoice: k.mobilevoice, cvr: normaliserCvr(k.cvr), leadgiverId: k.type === "lukket" ? k.leadgiverId : null, lukkerId: lukker, dato },
+      {
+        onSuccess: (status) => {
+          if (status !== "oprettet" && status !== "findes") { toast({ title: "Ukendt svar", description: "Tjek salgene, før du opretter igen.", variant: "destructive" }); return; }
+          toast({ title: status === "findes" ? "Salget var allerede oprettet" : "Salg oprettet" });
+          setK(TOM); setLukker(null); setVisFejl(false); setIds({ salg: crypto.randomUUID(), lead: crypto.randomUUID() }); onOpenChange(false);
+        },
+        onError: (e) => toast({ title: "Ikke oprettet", description: oversaetFejl(e as { code?: string; message?: string }) ?? "Ukendt fejl – tjek salgene, før du prøver igen.", variant: "destructive" }),
+      },
+    );
+  };
+  const indhold = (
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <Label className="text-base">Sælger (lukker)</Label>
+        <Grupperet kolleger={saelgere} value={lukker} onChange={setLukker} placeholder="Vælg sælger" />
+        {visFejl && fejl.lukker && <p className="text-sm text-destructive">{fejl.lukker}</p>}
+      </div>
+      <FiberFelter k={k} setK={setK} fejl={fejl} visFejl={visFejl} kolleger={kolleger} udeluk={lukker} idPrefix="admin" />
+      <div className="space-y-2">
+        <Label htmlFor="admin-dato" className="text-base">Salgsdato</Label>
+        <Input id="admin-dato" type="date" className="min-h-11 text-base" min={periodeStart(idag)} max={datoIDag(idag)} value={dato} onChange={(e) => setDato(e.target.value)} />
+        {visFejl && fejl.dato && <p className="text-sm text-destructive">{fejl.dato}</p>}
+      </div>
+      <Button className="min-h-11 w-full text-base" disabled={opret.isPending} onClick={send}>{opret.isPending ? "Opretter …" : "Opret salg"}</Button>
+    </div>
+  );
+  const titel = "Opret salg for sælger";
+  if (phone) return <BottomSheet open={open} onOpenChange={onOpenChange} title={titel}><div className="px-4 pb-4">{indhold}</div></BottomSheet>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto"><DialogHeader><DialogTitle>{titel}</DialogTitle></DialogHeader>{indhold}</DialogContent>
+    </Dialog>
+  );
+}
+
 export default function TdcErhvervFiber() {
   const { toast } = useToast();
   const { isOwner } = usePermissions();
   const { rolle, mitId, isLoading } = useMinFiberRolle();
   const maaSaelge = !!rolle || isOwner;
   const [adminAaben, setAdminAaben] = useState(false);
+  const [opretAaben, setOpretAaben] = useState(false);
   const erAdmin = isOwner || rolle === "admin";
   const { data: kolleger = [] } = useFiberKolleger(maaSaelge || erAdmin);
   const { data: mine = [] } = useMineFiberSalgIDag(maaSaelge || erAdmin ? mitId : null, erAdmin);
@@ -206,7 +260,8 @@ export default function TdcErhvervFiber() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
       {erAdmin && (
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" className="min-h-11" onClick={() => setOpretAaben(true)}><CalendarPlus className="mr-2 h-4 w-4" />Opret salg for sælger</Button>
           <Button variant="outline" className="min-h-11" onClick={() => setAdminAaben(true)}><Users className="mr-2 h-4 w-4" />Administrér sælgere</Button>
         </div>
       )}
@@ -236,6 +291,7 @@ export default function TdcErhvervFiber() {
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-base">{s.produkt ?? "—"}</span>
                       <span className={cn("text-sm text-muted-foreground")}>{s.saelger} · {s.provision.toLocaleString("da-DK")} kr. · CVR {s.cvr} · {new Date(s.tid).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}</span>
+                      {s.afAdmin && <span className="text-sm text-muted-foreground">Oprettet af admin</span>}
                       {s.leadgiver && <span className="text-sm text-muted-foreground">Lead: {s.leadgiver} · {(s.leadProvision ?? 0).toLocaleString("da-DK")} kr.</span>}
                     </div>
                     {erAdmin && <Button variant="outline" className="min-h-11 shrink-0" onClick={() => setRetter(s)}>Ret</Button>}
@@ -248,6 +304,7 @@ export default function TdcErhvervFiber() {
       )}
 
       {retter && <RetPopup salg={retter} saelgerId={retter.saelgerId} kolleger={kolleger} onClose={() => setRetter(null)} />}
+      {erAdmin && <AdminOpretPopup open={opretAaben} onOpenChange={setOpretAaben} kolleger={kolleger} />}
       {erAdmin && <AdminPopup open={adminAaben} onOpenChange={setAdminAaben} />}
     </div>
   );
