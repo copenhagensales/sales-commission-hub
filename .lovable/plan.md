@@ -12,7 +12,7 @@
    - Reduktion: 70 % af både provision og omsætning (sælgeren får 30 % af den sats, der ellers ville gælde)
    - Gælder fra: 29/10/2026, ingen slutdato
    - Produkter: alle Eesy TM-produkter undtagen 5GI MBB, også bisalg og tillægsprodukter i kurven
-2. Justeringen køres efter den almindelige prisregel/grundsats på hver salgslinje, både ved nye salg og ved genberegning. Der rundes til hele kroner.
+2. **Rækkefølge:** Justeringen er ikke en prisregel og konkurrerer ikke med dem. Først beregnes satsen præcis som i dag: alle eksisterende regler (kampagne, betingelser, datoer og priority) vælger satsen, ellers bruges grundprisen. Bagefter tages 70 % af den færdige sats. Eksempel: en regel giver 400 kr. provision / 1.000 kr. omsætning → med TDC Brands = Ja bliver det 120 kr. / 300 kr. Det gælder både ved nye salg og ved genberegning, og der rundes til hele kroner.
 3. Låste linjer (manuel prislås) røres ikke.
 4. Hver linje får gemt, at justeringen er brugt (regel-id), så det kan ses og spores.
 5. **Engangsgenberegning** af Eesy TM-salg fra 29/10 med TDC Brands = Ja (cirka 46 salg) via den eksisterende genberegning, så de får de nye satser.
