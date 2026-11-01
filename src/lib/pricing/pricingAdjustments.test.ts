@@ -7,10 +7,10 @@ const MBB = "mbb";
 const rule: PricingAdjustmentRule = {
   id: "r1", name: "TDC Brands", conditions: { "TDC Brands": "Ja" }, excludedProductIds: [MBB],
   percentReduction: 70, effectiveFrom: "2026-10-29", effectiveTo: null, priority: 0,
-  productIds: new Set(["abon", MBB]),
+  clientCampaignIds: new Set(["eesy-tm"]),
 };
 const payload = (v: string) => ({ leadResultData: [{ id: 1, label: "TDC Brands", value: v }] });
-const base = { productId: "abon", saleDate: "2026-10-30T10:00:00Z", rawPayload: payload("Ja"), commission: 400, revenue: 1000 };
+const base = { productId: "abon", clientCampaignId: "eesy-tm", saleDate: "2026-10-30T10:00:00Z", rawPayload: payload("Ja"), commission: 400, revenue: 1000 };
 
 for (const [name, apply] of Object.entries({ frontend: applyPricingAdjustments, edge: edge.applyPricingAdjustments })) {
   describe(`prisjustering (${name})`, () => {
@@ -27,8 +27,9 @@ for (const [name, apply] of Object.entries({ frontend: applyPricingAdjustments, 
       expect(apply([rule], { ...base, saleDate: "2026-10-28T21:30:00Z" }).ruleId).toBeNull();
       expect(apply([rule], { ...base, saleDate: "2026-10-28T23:30:00Z" }).ruleId).toBe("r1");
     });
-    it("produkt fra anden kunde ændres ikke", () => {
-      expect(apply([rule], { ...base, productId: "andet" }).ruleId).toBeNull();
+    it("salg på anden kunde ændres ikke", () => {
+      expect(apply([rule], { ...base, clientCampaignId: "andet" }).ruleId).toBeNull();
+      expect(apply([rule], { ...base, clientCampaignId: null }).ruleId).toBeNull();
     });
   });
 }

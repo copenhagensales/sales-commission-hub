@@ -859,7 +859,7 @@ serve(async (req) => {
         // Otherwise use the standard display name from rule
         const displayName = matchedRule.displayName;
 
-        const adj = applyPricingAdjustments(adjustments, { productId: correctProductId, saleDate, rawPayload, commission, revenue });
+        const adj = applyPricingAdjustments(adjustments, { productId: correctProductId, clientCampaignId, saleDate, rawPayload, commission, revenue });
         commission = adj.commission;
         revenue = adj.revenue;
 
@@ -891,7 +891,7 @@ serve(async (req) => {
         if (baseProduct && (baseProduct.commission_dkk > 0 || baseProduct.revenue_dkk > 0)) {
           const qty = item.quantity || 1;
           const adj = applyPricingAdjustments(adjustments, {
-            productId: correctProductId, saleDate, rawPayload,
+            productId: correctProductId, clientCampaignId, saleDate, rawPayload,
             commission: baseProduct.commission_dkk * qty, revenue: baseProduct.revenue_dkk * qty,
           });
           updates.push({

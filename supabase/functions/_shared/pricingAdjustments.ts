@@ -18,12 +18,14 @@ export interface PricingAdjustmentRule {
   effectiveFrom: string | null;
   effectiveTo: string | null;
   priority: number;
-  /** Produkter (på reglens kunde) som reglen kan ramme. */
-  productIds: Set<string>;
+  /** Salgets kundekampagner (client_campaign_id) på reglens kunde. */
+  clientCampaignIds: Set<string>;
 }
 
 export interface AdjustmentInput {
   productId: string | null | undefined;
+  /** Salgets client_campaign_id – afgør kunden (produkter kan være delte/uden kunde). */
+  clientCampaignId: string | null | undefined;
   saleDate: string | null | undefined;
   /** raw_payload fra salget (læser leadResultData, leadResultFields og data). */
   rawPayload: Record<string, unknown> | null | undefined;
@@ -67,7 +69,8 @@ export function readLeadField(rawPayload: Record<string, unknown> | null | undef
 }
 
 function ruleMatches(rule: PricingAdjustmentRule, input: AdjustmentInput): boolean {
-  if (!input.productId || !rule.productIds.has(input.productId)) return false;
+  if (!input.productId) return false;
+  if (!input.clientCampaignId || !rule.clientCampaignIds.has(input.clientCampaignId)) return false;
   if (rule.excludedProductIds.includes(input.productId)) return false;
   if (rule.effectiveFrom || rule.effectiveTo) {
     if (!input.saleDate) return false;
@@ -111,17 +114,15 @@ export async function loadPricingAdjustments(supabase: SupabaseLike): Promise<Pr
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
   const clientIds = [...new Set((rows as { client_id: string }[]).map((r) => r.client_id))];
-  const { data: prods, error: pErr } = await supabase
-    .from("products")
-    .select("id, client_campaigns!inner(client_id)")
-    .in("client_campaigns.client_id", clientIds);
-  if (pErr) throw pErr;
+  const { data: camps, error: cErr } = await supabase
+    .from("client_campaigns")
+    .select("id, client_id")
+    .in("client_id", clientIds);
+  if (cErr) throw cErr;
   const byClient = new Map<string, Set<string>>();
-  for (const p of (prods || []) as { id: string; client_campaigns: { client_id: string } | { client_id: string }[] }[]) {
-    const cc = Array.isArray(p.client_campaigns) ? p.client_campaigns[0] : p.client_campaigns;
-    if (!cc) continue;
-    if (!byClient.has(cc.client_id)) byClient.set(cc.client_id, new Set());
-    byClient.get(cc.client_id)!.add(p.id);
+  for (const c of (camps || []) as { id: string; client_id: string }[]) {
+    if (!byClient.has(c.client_id)) byClient.set(c.client_id, new Set());
+    byClient.get(c.client_id)!.add(c.id);
   }
   return (rows as any[]).map((r) => ({
     id: r.id,
@@ -132,6 +133,6 @@ export async function loadPricingAdjustments(supabase: SupabaseLike): Promise<Pr
     effectiveFrom: r.effective_from,
     effectiveTo: r.effective_to,
     priority: r.priority ?? 0,
-    productIds: byClient.get(r.client_id) ?? new Set(),
+    clientCampaignIds: byClient.get(r.client_id) ?? new Set(),
   }));
 }

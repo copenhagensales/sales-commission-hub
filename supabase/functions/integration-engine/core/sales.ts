@@ -394,7 +394,7 @@ function prepareSaleItems(
 
     // Justering til sidst (fx TDC Brands = Ja → -70 %) oven på den færdige sats
     const adj = applyPricingAdjustments(adjustments, {
-      productId, saleDate: sale.saleDate, rawPayload: sale.rawPayload as Record<string, unknown> | undefined, commission, revenue,
+      productId, clientCampaignId: sale.clientCampaignId, saleDate: sale.saleDate, rawPayload: sale.rawPayload as Record<string, unknown> | undefined, commission, revenue,
     })
     commission = adj.commission
     revenue = adj.revenue
