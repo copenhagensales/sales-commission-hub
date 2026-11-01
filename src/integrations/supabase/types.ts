@@ -17917,6 +17917,49 @@ export type Database = {
         }
         Relationships: []
       }
+      tdc_fiber_access: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          rolle: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          rolle?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          rolle?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tdc_fiber_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tdc_fiber_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tdc_fiber_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_assistant_leaders: {
         Row: {
           created_at: string | null
@@ -21696,6 +21739,22 @@ export type Database = {
       sync_personnel_salary: {
         Args: { p_employee_id: string }
         Returns: undefined
+      }
+      tdc_fiber_opret_salg: {
+        Args: {
+          p_cvr: string
+          p_lead_salg_id: string
+          p_leadgiver: string
+          p_mobilevoice: boolean
+          p_salg_id: string
+          p_type: string
+          p_variant: string
+        }
+        Returns: Json
+      }
+      tdc_fiber_produkt: {
+        Args: { p_mobilevoice: boolean; p_type: string; p_variant: string }
+        Returns: string
       }
       trigger_adversus_calls_incremental: { Args: never; Returns: undefined }
       trigger_adversus_leads_incremental: { Args: never; Returns: undefined }
