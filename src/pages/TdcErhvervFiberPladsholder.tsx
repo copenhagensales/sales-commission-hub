@@ -234,12 +234,20 @@ export default function TdcErhvervFiber() {
   const [k, setK] = useState<FiberKladde>(TOM);
   const [visFejl, setVisFejl] = useState(false);
   const [ids, setIds] = useState(() => ({ salg: crypto.randomUUID(), lead: crypto.randomUUID() }));
+  const [bekraeft, setBekraeft] = useState(false);
+  const phone = useIsPhone();
   const fejl = valider(k, mitId);
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
   const send = () => {
     setVisFejl(true);
+    if (Object.keys(fejl).length || !k.type || !k.variant) return;
+    setBekraeft(true);
+  };
+
+  const indsend = () => {
+    setBekraeft(false);
     if (Object.keys(fejl).length || !k.type || !k.variant) return;
     opret.mutate(
       { salgId: ids.salg, leadSalgId: k.type === "lukket" ? ids.lead : null, type: k.type, variant: k.variant, mobilevoice: k.mobilevoice, cvr: normaliserCvr(k.cvr), leadgiverId: k.type === "lukket" ? k.leadgiverId : null },
