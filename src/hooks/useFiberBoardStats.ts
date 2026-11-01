@@ -7,6 +7,8 @@ export type FiberBoardVariant = "tdc" | "relatel";
 export interface FiberEmployeeStats {
   points: number;
   commission: number;
+  /** TDC: leadprovision fra Relatel-sælgere, der skal trækkes ud af TDC-toplisten. */
+  excludedCommission?: number;
   name?: string;
   avatarUrl?: string | null;
 }

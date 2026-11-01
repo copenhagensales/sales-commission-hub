@@ -246,11 +246,14 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     const merged = sellers.map((s) => {
       seen.add(s.id);
       const f = stats[s.id];
-      return f ? { ...s, fiberPoints: f.points, fiberCommission: f.commission } : s;
+      if (!f) return s;
+      const commission = s.commission - (f.excludedCommission ?? 0);
+      return { ...s, commission, fiberPoints: f.points, fiberCommission: f.commission };
     });
     // Add fiber-only sellers that aren't already in the cached leaderboard
     for (const [empId, f] of Object.entries(stats)) {
       if (seen.has(empId)) continue;
+      if (f.points === 0 && f.commission === 0) continue;
       const name = f.name || empId;
       merged.push({
         id: empId,
@@ -264,7 +267,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         fiberCommission: f.commission,
       });
     }
-    return merged;
+    // TDC: fjern sælgere, der kun stod der pga. Relatel-leads
+    return merged.filter(
+      (s) => !(stats[s.id]?.excludedCommission && s.salesCount === 0 && (s.fiberPoints ?? 0) === 0 && s.commission <= 0),
+    );
   };
 
   const sortedPayrollSellers = useMemo(
