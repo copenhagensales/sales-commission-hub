@@ -151,7 +151,7 @@ export function useMineFiberSalgIDag(mitId: string | null, alle = false) {
       const rows = (data ?? []) as unknown as SalgRaekke[];
       const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string }; registreret_af?: string; oprettet_af_admin?: boolean };
       const leads = new Map(rows.filter((r) => pl(r).rolle === "lead" && r.validation_status !== "rejected").map((r) => [r.id, r]));
-      return rows.filter((r) => pl(r).rolle === "fuldt" || pl(r).rolle === "lukket").map((r) => {
+      return rows.filter((r) => (pl(r).rolle === "fuldt" || pl(r).rolle === "lukket") && r.validation_status !== "rejected").map((r) => {
         const p = pl(r); const item = r.sale_items?.[0]; const navn = item?.display_name ?? "";
         const lead = p.rolle === "lukket" && p.lead_salg_id ? leads.get(p.lead_salg_id) : undefined;
         return {
@@ -180,6 +180,19 @@ export function useRetFiberSalg() {
         p_salg_id: i.salgId, p_ny_lead_id: i.nyLeadId, p_type: i.type, p_variant: i.variant,
         p_mobilevoice: i.mobilevoice, p_cvr: i.cvr, p_leadgiver: i.leadgiverId as string,
       });
+      if (error) throw error;
+      return (data as { status?: string } | null)?.status ?? "ukendt";
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: [KEY_MINE] }),
+  });
+}
+
+export function useSletFiberSalg() {
+  const qc = useQueryClient();
+  return useMutation({
+    retry: 0,
+    mutationFn: async (salgId: string) => {
+      const { data, error } = await supabase.rpc("tdc_fiber_slet_salg", { p_salg_id: salgId });
       if (error) throw error;
       return (data as { status?: string } | null)?.status ?? "ukendt";
     },
