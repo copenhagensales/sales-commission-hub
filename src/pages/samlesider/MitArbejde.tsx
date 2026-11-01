@@ -27,7 +27,7 @@ export function RegistrerSalgSamleside() {
       titel="Registrér salg"
       faner={[
         { id: "salg", label: "Salg", element: <TastSelvSalg />, synlig: salg.salg },
-        { id: "tdc-erhverv-fiber", label: "TDC Erhverv Fiber", element: <TdcErhvervFiberPladsholder />, synlig: salg.salg },
+        { id: "tdc-erhverv-fiber", label: "TDC Erhverv Fiber", element: <TdcErhvervFiberPladsholder />, synlig: salg.tdcFiber },
         { id: "straksbetaling", label: "Straksbetaling", element: <ImmediatePaymentASE />, synlig: salg.straksbetaling },
         { id: "fm", label: "Salgsregistrering", element: <VagtSalesRegistration />, synlig: salg.fm },
       ]}

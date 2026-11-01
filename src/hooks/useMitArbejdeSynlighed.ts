@@ -3,6 +3,7 @@ import { useCanWorkFieldmarketing, useIsFieldmarketingEmployee } from "@/hooks/u
 import { useIsSalgskonsulent } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
+import { useMinFiberRolle } from "@/hooks/useTdcFiberSales";
 
 /**
  * Fanesynlighed for samlesiderne i »Mit arbejde«. Hver fane følger præcis sin gamle rutes regel
@@ -17,6 +18,8 @@ export function useMitArbejdeSynlighed() {
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
+  // TDC Erhverv Fiber: adgangslisten i databasen (tdc_fiber_access) + ejere (admin-boksen).
+  const { rolle: fiberRolle } = useMinFiberRolle();
 
   // Sektionsnøglerne fra det gamle menupunkt (c2): ingen ser mere end før.
   const fmVagt = !!p.canViewFmMySchedule && p.canView("menu_section_fieldmarketing");
@@ -32,6 +35,7 @@ export function useMitArbejdeSynlighed() {
     salg: !!isUnitedMember && p.canView("tab_registrer_salg_salg"),
     straksbetaling: !!hasImmediatePaymentSales && p.canView("tab_registrer_salg_straksbetaling"),
     fm: fmSalg,
+    tdcFiber: !!fiberRolle || !!p.isOwner,
   };
   const spil = {
     superligaen: p.canView("menu_commission_league"),
