@@ -2,7 +2,7 @@ import { Samleside } from "@/components/layout/Samleside";
 import { useMitArbejdeSynlighed } from "@/hooks/useMitArbejdeSynlighed";
 import {
   MySchedule, MyBookingSchedule, TimeStamp, TastSelvSalg, ImmediatePaymentASE,
-  VagtSalesRegistration, CommissionLeague, HeadToHead,
+  VagtSalesRegistration, CommissionLeague, HeadToHead, TdcErhvervFiberPladsholder,
 } from "@/routes/pages";
 
 export function VagterSamleside() {
@@ -27,6 +27,7 @@ export function RegistrerSalgSamleside() {
       titel="Registrér salg"
       faner={[
         { id: "salg", label: "Salg", element: <TastSelvSalg />, synlig: salg.salg },
+        { id: "tdc-erhverv-fiber", label: "TDC Erhverv Fiber", element: <TdcErhvervFiberPladsholder />, synlig: salg.salg },
         { id: "straksbetaling", label: "Straksbetaling", element: <ImmediatePaymentASE />, synlig: salg.straksbetaling },
         { id: "fm", label: "Salgsregistrering", element: <VagtSalesRegistration />, synlig: salg.fm },
       ]}
