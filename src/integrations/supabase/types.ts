@@ -13566,6 +13566,59 @@ export type Database = {
           },
         ]
       }
+      pricing_adjustment_rules: {
+        Row: {
+          client_id: string
+          conditions: Json
+          created_at: string
+          effective_from: string | null
+          effective_to: string | null
+          excluded_product_ids: string[]
+          id: string
+          is_active: boolean
+          name: string
+          percent_reduction: number
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          conditions?: Json
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          excluded_product_ids?: string[]
+          id?: string
+          is_active?: boolean
+          name: string
+          percent_reduction: number
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          conditions?: Json
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          excluded_product_ids?: string[]
+          id?: string
+          is_active?: boolean
+          name?: string
+          percent_reduction?: number
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_adjustment_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_backup_2026_04_28: {
         Row: {
           backup_type: string
@@ -16269,6 +16322,7 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          adjustment_rule_id: string | null
           adversus_external_id: string | null
           adversus_product_title: string | null
           cancelled_quantity: number
@@ -16289,6 +16343,7 @@ export type Database = {
           unit_price: number | null
         }
         Insert: {
+          adjustment_rule_id?: string | null
           adversus_external_id?: string | null
           adversus_product_title?: string | null
           cancelled_quantity?: number
@@ -16309,6 +16364,7 @@ export type Database = {
           unit_price?: number | null
         }
         Update: {
+          adjustment_rule_id?: string | null
           adversus_external_id?: string | null
           adversus_product_title?: string | null
           cancelled_quantity?: number
@@ -16329,6 +16385,13 @@ export type Database = {
           unit_price?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_items_adjustment_rule_id_fkey"
+            columns: ["adjustment_rule_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_adjustment_rules"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_items_matched_pricing_rule_id_fkey"
             columns: ["matched_pricing_rule_id"]

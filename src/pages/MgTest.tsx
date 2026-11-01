@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PricingAdjustmentsTab } from "@/components/mg-test/PricingAdjustmentsTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -2384,6 +2385,7 @@ export default function MgTest() {
             <TabsTrigger value="client-sales">Client Sales</TabsTrigger>
             <TabsTrigger value="datamapping">Datamapping</TabsTrigger>
             <TabsTrigger value="commission-rates">Provisionssatser</TabsTrigger>
+            <TabsTrigger value="adjustments">Justeringer</TabsTrigger>
           </TabsList>
 
           <TabsContent value="product" className="space-y-4">
@@ -3463,6 +3465,10 @@ export default function MgTest() {
           {/* Commission Rates Tab */}
           <TabsContent value="commission-rates">
             <CommissionRatesTab />
+          </TabsContent>
+
+          <TabsContent value="adjustments">
+            <PricingAdjustmentsTab />
           </TabsContent>
         </Tabs>
       </div>
