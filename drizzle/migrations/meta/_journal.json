@@ -540,6 +540,13 @@
       "when": 1793546113669,
       "tag": "0076_tdc_fiber_ejere_kan_taste",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793546947376,
+      "tag": "0077_tdc_fiber_ret_salg",
+      "breakpoints": true
     }
   ]
 }

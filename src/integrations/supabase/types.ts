@@ -17960,6 +17960,33 @@ export type Database = {
           },
         ]
       }
+      tdc_fiber_rettelser: {
+        Row: {
+          efter: Json
+          foer: Json
+          id: string
+          rettet_af: string
+          rettet_at: string
+          salg_id: string
+        }
+        Insert: {
+          efter: Json
+          foer: Json
+          id?: string
+          rettet_af: string
+          rettet_at?: string
+          salg_id: string
+        }
+        Update: {
+          efter?: Json
+          foer?: Json
+          id?: string
+          rettet_af?: string
+          rettet_at?: string
+          salg_id?: string
+        }
+        Relationships: []
+      }
       team_assistant_leaders: {
         Row: {
           created_at: string | null
@@ -21740,6 +21767,7 @@ export type Database = {
         Args: { p_employee_id: string }
         Returns: undefined
       }
+      tdc_fiber_er_admin: { Args: never; Returns: boolean }
       tdc_fiber_opret_salg: {
         Args: {
           p_cvr: string
@@ -21755,6 +21783,18 @@ export type Database = {
       tdc_fiber_produkt: {
         Args: { p_mobilevoice: boolean; p_type: string; p_variant: string }
         Returns: string
+      }
+      tdc_fiber_ret_salg: {
+        Args: {
+          p_cvr: string
+          p_leadgiver: string
+          p_mobilevoice: boolean
+          p_ny_lead_id: string
+          p_salg_id: string
+          p_type: string
+          p_variant: string
+        }
+        Returns: Json
       }
       trigger_adversus_calls_incremental: { Args: never; Returns: undefined }
       trigger_adversus_leads_incremental: { Args: never; Returns: undefined }
