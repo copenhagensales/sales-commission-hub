@@ -36,6 +36,9 @@ const FEJL: Record<string, string> = {
   tdc_fiber_ugyldig_leadgiver: "Leadgiveren skal være aktiv i Relatel eller TDC Erhverv.",
   tdc_fiber_mangler_arbejdsmail: "Dit medarbejderkort mangler en arbejdsmail.",
   tdc_fiber_ugyldigt_produkt: "Produktet kan ikke tastes her.",
+  tdc_fiber_salg_findes_ikke: "Salget findes ikke.",
+  tdc_fiber_kun_i_dag: "Kun salg fra i dag kan rettes.",
+  tdc_fiber_leadgiver_er_saelger: "Leadgiveren kan ikke være sælgeren selv.",
 };
 export function oversaetFejl(e: { code?: string; message?: string } | null | undefined): string | null {
   if (!e || e.code !== "P0001" || !e.message) return null;

@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import {
-  useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useTdcFiberAccess,
+  useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useRetFiberSalg, useTdcFiberAccess, type Kollega, type MitFiberSalg,
 } from "@/hooks/useTdcFiberSales";
 import { normaliserCvr, oversaetFejl, valider, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,81 @@ function AdminPopup({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   );
 }
 
+function FiberFelter({ k, setK, fejl, visFejl, kolleger, udeluk, idPrefix }: {
+  k: FiberKladde; setK: (k: FiberKladde) => void; fejl: ReturnType<typeof valider>; visFejl: boolean;
+  kolleger: Kollega[]; udeluk: string | null; idPrefix: string;
+}) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label className="text-base">Salgstype</Label>
+        <Valg<FiberType> label="Salgstype" value={k.type} onChange={(v) => setK({ ...k, type: v, leadgiverId: v === "fuldt" ? null : k.leadgiverId })} options={[{ v: "fuldt", l: "Fuldt salg" }, { v: "lukket", l: "Lukket salg" }]} />
+        {visFejl && fejl.type && <p className="text-sm text-destructive">{fejl.type}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label className="text-base">Produkt</Label>
+        <Valg<FiberVariant> label="Produkt" value={k.variant} onChange={(v) => setK({ ...k, variant: v })} options={[{ v: "HAP", l: "HAP" }, { v: "VOK", l: "VOK" }]} />
+        {visFejl && fejl.variant && <p className="text-sm text-destructive">{fejl.variant}</p>}
+      </div>
+      <label className="flex min-h-11 items-center justify-between gap-3">
+        <span className="text-base">Inkl. Mobilevoice</span>
+        <Switch checked={k.mobilevoice} onCheckedChange={(v) => setK({ ...k, mobilevoice: v })} />
+      </label>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-cvr`} className="text-base">CVR-nummer</Label>
+        <Input id={`${idPrefix}-cvr`} inputMode="numeric" autoComplete="off" maxLength={11} className="min-h-11 text-base" value={k.cvr} onChange={(e) => setK({ ...k, cvr: e.target.value })} placeholder="8 cifre" />
+        {visFejl && fejl.cvr && <p className="text-sm text-destructive">{fejl.cvr}</p>}
+      </div>
+      {k.type === "lukket" && (
+        <div className="space-y-2">
+          <Label className="text-base">Leadgiver</Label>
+          <Grupperet kolleger={kolleger} value={k.leadgiverId} onChange={(v) => setK({ ...k, leadgiverId: v })} placeholder="Vælg hvem der gav leadet" udeluk={udeluk ? [udeluk] : []} />
+          {visFejl && fejl.leadgiver && <p className="text-sm text-destructive">{fejl.leadgiver}</p>}
+        </div>
+      )}
+    </>
+  );
+}
+
+function RetPopup({ salg, saelgerId, kolleger, onClose }: { salg: MitFiberSalg; saelgerId: string | null; kolleger: Kollega[]; onClose: () => void }) {
+  const { toast } = useToast();
+  const phone = useIsPhone();
+  const ret = useRetFiberSalg();
+  const [k, setK] = useState<FiberKladde>({ type: salg.type, variant: salg.variant, mobilevoice: salg.mobilevoice, cvr: salg.cvr, leadgiverId: salg.leadgiverId });
+  const [visFejl, setVisFejl] = useState(false);
+  const [nyLeadId] = useState(() => crypto.randomUUID());
+  const fejl = valider(k, saelgerId);
+  const gem = () => {
+    setVisFejl(true);
+    if (Object.keys(fejl).length || !k.type || !k.variant) return;
+    ret.mutate(
+      { salgId: salg.id, nyLeadId, type: k.type, variant: k.variant, mobilevoice: k.mobilevoice, cvr: normaliserCvr(k.cvr), leadgiverId: k.type === "lukket" ? k.leadgiverId : null },
+      {
+        onSuccess: (status) => {
+          if (status !== "rettet") { toast({ title: "Ukendt svar", description: "Tjek listen, før du retter igen.", variant: "destructive" }); return; }
+          toast({ title: "Salget er rettet" }); onClose();
+        },
+        onError: (e) => toast({ title: "Ikke gemt", description: oversaetFejl(e as { code?: string; message?: string }) ?? "Ukendt fejl – tjek listen, før du prøver igen.", variant: "destructive" }),
+      },
+    );
+  };
+  const indhold = (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">Sælger: {salg.saelger ?? "—"}</p>
+      <FiberFelter k={k} setK={setK} fejl={fejl} visFejl={visFejl} kolleger={kolleger} udeluk={saelgerId} idPrefix="ret" />
+      {salg.type === "lukket" && k.type === "fuldt" && <p className="text-sm text-muted-foreground">Leadgiverens del afvises og giver 0 kr.; sælgeren får fuld provision.</p>}
+      <Button className="min-h-11 w-full text-base" disabled={ret.isPending} onClick={gem}>{ret.isPending ? "Gemmer …" : "Gem rettelse"}</Button>
+    </div>
+  );
+  const titel = "Ret fibersalg";
+  if (phone) return <BottomSheet open onOpenChange={(v) => !v && onClose()} title={titel}><div className="px-4 pb-4">{indhold}</div></BottomSheet>;
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{titel}</DialogTitle></DialogHeader>{indhold}</DialogContent>
+    </Dialog>
+  );
+}
+
 export default function TdcErhvervFiber() {
   const { toast } = useToast();
   const { isOwner } = usePermissions();
@@ -99,7 +174,8 @@ export default function TdcErhvervFiber() {
   const [adminAaben, setAdminAaben] = useState(false);
   const erAdmin = isOwner || rolle === "admin";
   const { data: kolleger = [] } = useFiberKolleger(maaSaelge || erAdmin);
-  const { data: mine = [] } = useMineFiberSalgIDag(maaSaelge ? mitId : null);
+  const { data: mine = [] } = useMineFiberSalgIDag(maaSaelge || erAdmin ? mitId : null, erAdmin);
+  const [retter, setRetter] = useState<MitFiberSalg | null>(null);
   const opret = useOpretFiberSalg();
   const [k, setK] = useState<FiberKladde>(TOM);
   const [visFejl, setVisFejl] = useState(false);
@@ -142,48 +218,27 @@ export default function TdcErhvervFiber() {
         <Card>
           <CardHeader><CardTitle className="text-lg">Registrér fibersalg</CardTitle></CardHeader>
           <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-base">Salgstype</Label>
-              <Valg<FiberType> label="Salgstype" value={k.type} onChange={(v) => setK({ ...k, type: v, leadgiverId: v === "fuldt" ? null : k.leadgiverId })} options={[{ v: "fuldt", l: "Fuldt salg" }, { v: "lukket", l: "Lukket salg" }]} />
-              {visFejl && fejl.type && <p className="text-sm text-destructive">{fejl.type}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label className="text-base">Produkt</Label>
-              <Valg<FiberVariant> label="Produkt" value={k.variant} onChange={(v) => setK({ ...k, variant: v })} options={[{ v: "HAP", l: "HAP" }, { v: "VOK", l: "VOK" }]} />
-              {visFejl && fejl.variant && <p className="text-sm text-destructive">{fejl.variant}</p>}
-            </div>
-            <label className="flex min-h-11 items-center justify-between gap-3">
-              <span className="text-base">Inkl. Mobilevoice</span>
-              <Switch checked={k.mobilevoice} onCheckedChange={(v) => setK({ ...k, mobilevoice: v })} />
-            </label>
-            <div className="space-y-2">
-              <Label htmlFor="fiber-cvr" className="text-base">CVR-nummer</Label>
-              <Input id="fiber-cvr" inputMode="numeric" autoComplete="off" maxLength={11} className="min-h-11 text-base" value={k.cvr} onChange={(e) => setK({ ...k, cvr: e.target.value })} placeholder="8 cifre" />
-              {visFejl && fejl.cvr && <p className="text-sm text-destructive">{fejl.cvr}</p>}
-            </div>
-            {k.type === "lukket" && (
-              <div className="space-y-2">
-                <Label className="text-base">Leadgiver</Label>
-                <Grupperet kolleger={kolleger} value={k.leadgiverId} onChange={(v) => setK({ ...k, leadgiverId: v })} placeholder="Vælg hvem der gav leadet" udeluk={mitId ? [mitId] : []} />
-                {visFejl && fejl.leadgiver && <p className="text-sm text-destructive">{fejl.leadgiver}</p>}
-              </div>
-            )}
+            <FiberFelter k={k} setK={setK} fejl={fejl} visFejl={visFejl} kolleger={kolleger} udeluk={mitId} idPrefix="fiber" />
             <p className="text-sm text-muted-foreground">Salgsdato: i dag.</p>
             <Button className="min-h-11 w-full text-base" disabled={opret.isPending} onClick={send}>{opret.isPending ? "Sender …" : "Registrér salg"}</Button>
           </CardContent>
         </Card>
       )}
 
-      {maaSaelge && (
+      {(maaSaelge || erAdmin) && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Tastet i dag</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{erAdmin ? "Tastet i dag (alle)" : "Tastet i dag"}</CardTitle></CardHeader>
           <CardContent>
             {mine.length === 0 ? <p className="text-base text-muted-foreground">Ingen salg endnu i dag.</p> : (
               <ul className="divide-y">
                 {mine.map((s) => (
-                  <li key={s.id} className="flex flex-col gap-0.5 py-2">
-                    <span className="text-base">{s.produkt ?? "—"}</span>
-                    <span className={cn("text-sm text-muted-foreground")}>{s.navn} · {s.provision.toLocaleString("da-DK")} kr. · {new Date(s.tid).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <li key={s.id} className="flex items-start justify-between gap-3 py-2">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-base">{s.produkt ?? "—"}</span>
+                      <span className={cn("text-sm text-muted-foreground")}>{s.saelger} · {s.provision.toLocaleString("da-DK")} kr. · CVR {s.cvr} · {new Date(s.tid).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}</span>
+                      {s.leadgiver && <span className="text-sm text-muted-foreground">Lead: {s.leadgiver} · {(s.leadProvision ?? 0).toLocaleString("da-DK")} kr.</span>}
+                    </div>
+                    {erAdmin && <Button variant="outline" className="min-h-11 shrink-0" onClick={() => setRetter(s)}>Ret</Button>}
                   </li>
                 ))}
               </ul>
@@ -192,6 +247,7 @@ export default function TdcErhvervFiber() {
         </Card>
       )}
 
+      {retter && <RetPopup salg={retter} saelgerId={null} kolleger={kolleger} onClose={() => setRetter(null)} />}
       {erAdmin && <AdminPopup open={adminAaben} onOpenChange={setAdminAaben} />}
     </div>
   );

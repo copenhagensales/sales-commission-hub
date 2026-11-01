@@ -102,28 +102,67 @@ export function useOpretFiberSalg() {
   });
 }
 
-export interface MitFiberSalg { id: string; tid: string; rolle: string; navn: string | null; produkt: string | null; provision: number }
+export interface MitFiberSalg {
+  id: string; tid: string; type: FiberType; saelger: string | null; produkt: string | null; provision: number;
+  variant: FiberVariant; mobilevoice: boolean; cvr: string;
+  leadgiverId: string | null; leadgiver: string | null; leadProvision: number | null;
+}
 
-/** Salg jeg har tastet i dag (mine og de leaddele, jeg har registreret). */
-export function useMineFiberSalgIDag(mitId: string | null) {
+type SalgRaekke = {
+  id: string; sale_datetime: string; agent_name: string | null; validation_status: string | null;
+  raw_payload: unknown; sale_items: { display_name: string | null; mapped_commission: number | null }[] | null;
+};
+
+/** Dagens tastede fibersalg. alle=false: kun dem, jeg har registreret. alle=true (admin): alle. */
+export function useMineFiberSalgIDag(mitId: string | null, alle = false) {
   return useQuery({
-    queryKey: [KEY_MINE, mitId],
+    queryKey: [KEY_MINE, mitId, alle],
     enabled: !!mitId,
     queryFn: async (): Promise<MitFiberSalg[]> => {
       const start = new Date(); start.setHours(0, 0, 0, 0);
-      const { data, error } = await supabase
+      let q = supabase
         .from("sales")
-        .select("id, sale_datetime, agent_name, raw_payload, sale_items(display_name, mapped_commission)")
+        .select("id, sale_datetime, agent_name, validation_status, raw_payload, sale_items(display_name, mapped_commission)")
         .eq("source", "tdc_fiber_manual")
-        .eq("raw_payload->>registreret_af", mitId as string)
         .gte("sale_datetime", start.toISOString())
         .order("sale_datetime", { ascending: false });
+      if (!alle) q = q.eq("raw_payload->>registreret_af", mitId as string);
+      const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []).map((s) => {
-        const rp = (s.raw_payload ?? {}) as { rolle?: string };
-        const item = s.sale_items?.[0];
-        return { id: s.id, tid: s.sale_datetime, rolle: rp.rolle ?? "", navn: s.agent_name, produkt: item?.display_name ?? null, provision: Number(item?.mapped_commission ?? 0) };
+      const rows = (data ?? []) as unknown as SalgRaekke[];
+      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string } };
+      const leads = new Map(rows.filter((r) => pl(r).rolle === "lead" && r.validation_status !== "rejected").map((r) => [r.id, r]));
+      return rows.filter((r) => pl(r).rolle === "fuldt" || pl(r).rolle === "lukket").map((r) => {
+        const p = pl(r); const item = r.sale_items?.[0]; const navn = item?.display_name ?? "";
+        const lead = p.rolle === "lukket" && p.lead_salg_id ? leads.get(p.lead_salg_id) : undefined;
+        return {
+          id: r.id, tid: r.sale_datetime, type: p.rolle as FiberType, saelger: r.agent_name, produkt: item?.display_name ?? null,
+          provision: Number(item?.mapped_commission ?? 0),
+          variant: (navn.includes(" VOK") ? "VOK" : "HAP") as FiberVariant, mobilevoice: navn.includes("Mobilevoice"),
+          cvr: p.leadResultFields?.["OPP nr"] ?? "",
+          leadgiverId: p.rolle === "lukket" ? p.leadgiver_employee_id ?? null : null,
+          leadgiver: lead?.agent_name ?? null,
+          leadProvision: lead ? Number(lead.sale_items?.[0]?.mapped_commission ?? 0) : null,
+        };
       });
     },
+  });
+}
+
+export interface RetFiberInput { salgId: string; nyLeadId: string; type: FiberType; variant: FiberVariant; mobilevoice: boolean; cvr: string; leadgiverId: string | null }
+
+export function useRetFiberSalg() {
+  const qc = useQueryClient();
+  return useMutation({
+    retry: 0,
+    mutationFn: async (i: RetFiberInput) => {
+      const { data, error } = await supabase.rpc("tdc_fiber_ret_salg", {
+        p_salg_id: i.salgId, p_ny_lead_id: i.nyLeadId, p_type: i.type, p_variant: i.variant,
+        p_mobilevoice: i.mobilevoice, p_cvr: i.cvr, p_leadgiver: i.leadgiverId as string,
+      });
+      if (error) throw error;
+      return (data as { status?: string } | null)?.status ?? "ukendt";
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: [KEY_MINE] }),
   });
 }
