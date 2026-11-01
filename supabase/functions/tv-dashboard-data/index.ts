@@ -2692,22 +2692,25 @@ const RELATEL_FIBER_LEAD_POINTS_EF: Record<string, number> = {
 };
 const RELATEL_TEAM_NAME = "Relatel";
 
-/** Mail (lowercase) → employee_id for aktive medlemmer af Relatel-teamet (agentmapping + arbejdsmail). */
-async function getRelatelEmailToEmployee(supabase: any): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
+/** Mail (lowercase) → employee_id + medlem siden, for aktive medlemmer af Relatel-teamet (agentmapping + arbejdsmail). */
+async function getRelatelEmailToEmployee(
+  supabase: any,
+): Promise<Record<string, { id: string; since: string }>> {
+  const out: Record<string, { id: string; since: string }> = {};
   const { data: team } = await supabase.from("teams").select("id").eq("name", RELATEL_TEAM_NAME).maybeSingle();
   if (!team?.id) return out;
   const { data: members } = await supabase
     .from("team_members")
-    .select("employee_id, employee_master_data!inner(is_active, work_email)")
+    .select("employee_id, created_at, employee_master_data!inner(is_active, work_email)")
     .eq("team_id", team.id)
     .eq("employee_master_data.is_active", true);
-  const ids: string[] = [];
+  const sinceById: Record<string, string> = {};
   for (const m of (members || []) as any[]) {
-    ids.push(m.employee_id);
+    sinceById[m.employee_id] = m.created_at;
     const w = m.employee_master_data?.work_email?.toLowerCase();
-    if (w) out[w] = m.employee_id;
+    if (w) out[w] = { id: m.employee_id, since: m.created_at };
   }
+  const ids = Object.keys(sinceById);
   if (ids.length > 0) {
     const { data: maps } = await supabase
       .from("employee_agent_mapping")
@@ -2715,10 +2718,17 @@ async function getRelatelEmailToEmployee(supabase: any): Promise<Record<string, 
       .in("employee_id", ids);
     for (const m of (maps || []) as any[]) {
       const e = m.agents?.email?.toLowerCase();
-      if (e) out[e] = m.employee_id;
+      if (e) out[e] = { id: m.employee_id, since: sinceById[m.employee_id] };
     }
   }
   return out;
+}
+
+/** Relatel: leadet tæller kun, hvis sælgeren var på Relatel-teamet, da det blev lavet. */
+function relatelLeadCounts(map: Record<string, { id: string; since: string }>, email: string, saleIso: string): boolean {
+  const m = map[email];
+  if (!m) return false;
+  return new Date(saleIso).getTime() >= new Date(m.since).getTime();
 }
 
 async function handleFiberSalesCount(
@@ -2753,7 +2763,7 @@ async function handleFiberSalesCount(
     for (const row of data as any[]) {
       // Afviste salg (fx en leaddel afvist ved rettelse) tæller ikke – samme regel som leaderboardet.
       if (row.is_cancelled || row.sales?.validation_status === "rejected") continue;
-      if (isRelatel && !relatelEmails[String(row.sales?.agent_email ?? "").toLowerCase()]) continue;
+      if (isRelatel && !relatelLeadCounts(relatelEmails, String(row.sales?.agent_email ?? "").toLowerCase(), row.sales?.sale_datetime)) continue;
       total += Number(row.quantity ?? 0);
     }
     if (data.length < pageSize) break;
@@ -2797,9 +2807,10 @@ async function handleFiberBoardStats(
       from += pageSize;
     }
 
-    let emailToEmployeeId: Record<string, string> = {};
+    const emailToEmployeeId: Record<string, string> = {};
+    const relatelMap = isRelatel ? await getRelatelEmailToEmployee(supabase) : {};
     if (isRelatel) {
-      emailToEmployeeId = await getRelatelEmailToEmployee(supabase);
+      for (const [e, v] of Object.entries(relatelMap)) emailToEmployeeId[e] = v.id;
     } else {
       const { data: mappingData } = await supabase
         .from("employee_agent_mapping")
@@ -2818,7 +2829,8 @@ async function handleFiberBoardStats(
       const rawEmail: string | undefined = row.sales?.agent_email;
       if (!rawEmail) continue;
       const email = rawEmail.toLowerCase();
-      if (isRelatel && !emailToEmployeeId[email]) continue; // kun aktive Relatel-teammedlemmer
+      // kun aktive Relatel-teammedlemmer, og kun leads lavet efter de kom på teamet
+      if (isRelatel && !relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) continue;
       const key = emailToEmployeeId[email] || email;
       emailByKey[key] = email;
 
