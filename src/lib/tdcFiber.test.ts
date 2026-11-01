@@ -23,6 +23,11 @@ describe("TDC fiber regler", () => {
     expect(gyldigtCvr("123456789")).toBe(false);
     expect(gyldigtCvr("1234567a")).toBe(false);
   });
+  it("rettelse til fuldt salg fjerner krav om leadgiver, til lukket kræver den", () => {
+    expect(valider({ ...base, type: "fuldt", leadgiverId: null }, "saelger")).toEqual({});
+    expect(valider({ ...base, type: "lukket", leadgiverId: null }, "saelger").leadgiver).toBeDefined();
+    expect(valider({ ...base, type: "lukket", leadgiverId: "saelger" }, "saelger").leadgiver).toBeDefined();
+  });
   it("fejl oversættes kun ved præcis match", () => {
     expect(oversaetFejl({ code: "P0001", message: "tdc_fiber_ugyldigt_cvr" })).toBe("CVR skal være 8 cifre.");
     expect(oversaetFejl({ code: "P0001", message: "noget tdc_fiber_ugyldigt_cvr" })).toBeNull();

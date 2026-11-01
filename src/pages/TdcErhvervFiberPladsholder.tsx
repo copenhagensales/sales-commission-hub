@@ -247,7 +247,7 @@ export default function TdcErhvervFiber() {
         </Card>
       )}
 
-      {retter && <RetPopup salg={retter} saelgerId={null} kolleger={kolleger} onClose={() => setRetter(null)} />}
+      {retter && <RetPopup salg={retter} saelgerId={retter.saelgerId} kolleger={kolleger} onClose={() => setRetter(null)} />}
       {erAdmin && <AdminPopup open={adminAaben} onOpenChange={setAdminAaben} />}
     </div>
   );

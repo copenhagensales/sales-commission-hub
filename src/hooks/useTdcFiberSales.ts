@@ -103,7 +103,7 @@ export function useOpretFiberSalg() {
 }
 
 export interface MitFiberSalg {
-  id: string; tid: string; type: FiberType; saelger: string | null; produkt: string | null; provision: number;
+  id: string; tid: string; type: FiberType; saelgerId: string | null; saelger: string | null; produkt: string | null; provision: number;
   variant: FiberVariant; mobilevoice: boolean; cvr: string;
   leadgiverId: string | null; leadgiver: string | null; leadProvision: number | null;
 }
@@ -130,13 +130,13 @@ export function useMineFiberSalgIDag(mitId: string | null, alle = false) {
       const { data, error } = await q;
       if (error) throw error;
       const rows = (data ?? []) as unknown as SalgRaekke[];
-      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string } };
+      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string }; registreret_af?: string };
       const leads = new Map(rows.filter((r) => pl(r).rolle === "lead" && r.validation_status !== "rejected").map((r) => [r.id, r]));
       return rows.filter((r) => pl(r).rolle === "fuldt" || pl(r).rolle === "lukket").map((r) => {
         const p = pl(r); const item = r.sale_items?.[0]; const navn = item?.display_name ?? "";
         const lead = p.rolle === "lukket" && p.lead_salg_id ? leads.get(p.lead_salg_id) : undefined;
         return {
-          id: r.id, tid: r.sale_datetime, type: p.rolle as FiberType, saelger: r.agent_name, produkt: item?.display_name ?? null,
+          id: r.id, tid: r.sale_datetime, type: p.rolle as FiberType, saelgerId: p.registreret_af ?? null, saelger: r.agent_name, produkt: item?.display_name ?? null,
           provision: Number(item?.mapped_commission ?? 0),
           variant: (navn.includes(" VOK") ? "VOK" : "HAP") as FiberVariant, mobilevoice: navn.includes("Mobilevoice"),
           cvr: p.leadResultFields?.["OPP nr"] ?? "",
