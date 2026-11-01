@@ -547,6 +547,13 @@
       "when": 1793546947376,
       "tag": "0077_tdc_fiber_ret_salg",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793548841797,
+      "tag": "0078_tdc_fiber_admin_opret_salg",
+      "breakpoints": true
     }
   ]
 }
