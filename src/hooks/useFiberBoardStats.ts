@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
+/** "relatel" = kun Lead Provi, 1 pr. lead, kun aktive Relatel-teammedlemmer. */
+export type FiberBoardVariant = "tdc" | "relatel";
+
 export interface FiberEmployeeStats {
   points: number;
   commission: number;
@@ -24,12 +27,13 @@ export function useFiberBoardStats(
   periodStart: Date,
   periodEnd: Date,
   enabled: boolean = true,
+  variant: FiberBoardVariant = "tdc",
 ) {
   const startIso = periodStart.toISOString();
   const endIso = periodEnd.toISOString();
 
   return useQuery<FiberStatsMap>({
-    queryKey: ["fiber-board-stats", startIso, endIso],
+    queryKey: ["fiber-board-stats", variant, startIso, endIso],
     enabled,
     staleTime: 60_000,
     refetchInterval: 120_000,
@@ -37,7 +41,7 @@ export function useFiberBoardStats(
       const res = await tvEdgeFetch(
         `tv-dashboard-data?action=fiber-board-stats&start=${encodeURIComponent(
           startIso,
-        )}&end=${encodeURIComponent(endIso)}`,
+        )}&end=${encodeURIComponent(endIso)}&variant=${variant}`,
       );
       if (!res.ok) throw new Error(`fiber-board-stats fetch failed: ${res.status}`);
       return (await res.json()) as FiberStatsMap;

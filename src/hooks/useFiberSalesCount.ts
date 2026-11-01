@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
+import type { FiberBoardVariant } from "@/hooks/useFiberBoardStats";
 
 /**
  * Tæller antal fiber-salg (sum af quantity) for en periode.
@@ -13,12 +14,13 @@ export function useFiberSalesCount(
   periodStart: Date,
   periodEnd: Date,
   enabled: boolean = true,
+  variant: FiberBoardVariant = "tdc",
 ) {
   const startIso = periodStart.toISOString();
   const endIso = periodEnd.toISOString();
 
   return useQuery<number>({
-    queryKey: ["fiber-sales-count", startIso, endIso],
+    queryKey: ["fiber-sales-count", variant, startIso, endIso],
     enabled,
     staleTime: 60_000,
     refetchInterval: 120_000,
@@ -26,7 +28,7 @@ export function useFiberSalesCount(
       const res = await tvEdgeFetch(
         `tv-dashboard-data?action=fiber-sales-count&start=${encodeURIComponent(
           startIso,
-        )}&end=${encodeURIComponent(endIso)}`,
+        )}&end=${encodeURIComponent(endIso)}&variant=${variant}`,
       );
       if (!res.ok) throw new Error(`fiber-sales-count fetch failed: ${res.status}`);
       const json = await res.json();
