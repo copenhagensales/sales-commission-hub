@@ -102,16 +102,17 @@ export function useOpretFiberSalg() {
 export interface MitFiberSalg { id: string; tid: string; rolle: string; navn: string | null; produkt: string | null; provision: number }
 
 /** Salg jeg har tastet i dag (mine og de leaddele, jeg har registreret). */
-export function useMineFiberSalgIDag(enabled = true) {
+export function useMineFiberSalgIDag(mitId: string | null) {
   return useQuery({
-    queryKey: [KEY_MINE],
-    enabled,
+    queryKey: [KEY_MINE, mitId],
+    enabled: !!mitId,
     queryFn: async (): Promise<MitFiberSalg[]> => {
       const start = new Date(); start.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from("sales")
         .select("id, sale_datetime, agent_name, raw_payload, sale_items(display_name, mapped_commission)")
         .eq("source", "tdc_fiber_manual")
+        .eq("raw_payload->>registreret_af", mitId as string)
         .gte("sale_datetime", start.toISOString())
         .order("sale_datetime", { ascending: false });
       if (error) throw error;
