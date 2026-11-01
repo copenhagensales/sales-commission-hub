@@ -3,11 +3,12 @@
 ## Hvad sælgeren oplever
 1. Sælgeren udfylder formularen og trykker »Registrér salg«.
 2. Formularen tjekkes først (CVR m.m.). Er noget forkert, vises fejlen som i dag, og der kommer ingen boks.
-3. Ellers åbnes en bekræftelsesboks (skuffe fra bunden på telefon, vindue på computer) med to spørgsmål:
-   - Har du sendt 1. opsigelsesmail til kunden?
-   - Har du lavet lead til Hunt?
-4. Hvert spørgsmål har »Ja« / »Nej«. Knappen »Bekræft og registrér« er først aktiv, når begge er »Ja«. Svarer man »Nej«, står der kort, at det skal gøres først.
-5. »Annullér« lukker boksen; det indtastede bevares.
+3. Ellers åbnes én bekræftelsesboks (skuffe fra bunden på telefon, vindue på computer), hvor begge punkter står samtidigt:
+   1. Har du lavet 1. opsigelsesmail til kunden?
+   2. Har du lavet lead til Hunt?
+4. I bunden af boksen er to knapper: »Ja« og »Nej«.
+   - »Ja« registrerer salget.
+   - »Nej« lukker boksen uden at registrere; det indtastede bevares.
 
 ## Afgrænsning
 - Gælder sælgerens egen formular. Admins' »Opret salg for sælger« og rettelser får ikke boksen (sig til, hvis de også skal).
