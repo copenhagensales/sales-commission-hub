@@ -1,26 +1,16 @@
-# Fiberlead mangler på dagsrapporten
+# Sean skal ikke stå på TDC Erhverv-boardet
 
-## Årsag (bekræftet i koden)
-`src/pages/reports/DailyReports.tsx:1010-1013` springer en dag over, når timer = 0 og salg = 0 (og ikke syg/ferie):
+## Årsag
+Sidste rettelse fjernede kun Seans **fiberpoint** fra TDC-boardet (derfor står han med 0 fiber). Han står der stadig, fordi toplisterne (`ClientDashboard.tsx:111`, `useCachedLeaderboards`) hentes fra den fælles provisions-topliste for kunden TDC Erhverv. Leadet ligger på en TDC Erhverv-kampagne, så hans 625 kr. leadprovision lander i TDC's topliste – uanset at han er på Relatel.
 
-```text
-if (hours === 0 && salesCount === 0 && !isSick && !isVacation) continue;
-```
+## Ændring (kun boardvisning)
+1. `tv-dashboard-data` (TDC-varianten af fiber-statistikken) returnerer også, pr. periode, de Relatel-leadgivere og den leadprovision, der skal ud af TDC-boardet (samme regel som nu: leadgiver var på Relatel, da leadet blev lavet).
+2. `ClientDashboard.tsx` trækker den provision fra på TDC-boardet og fjerner sælgeren fra toplisten, hvis der så intet er tilbage (0 salg, 0 fiber, 0 kr.). Har en sælger også rigtige TDC-salg, bliver han stående med resten.
+3. Relatel-boardet er uændret (Sean vises der med 1 fiber).
 
-Fiberleads er bisalg (`counts_as_sale=false`), så salgsantal er 0. Seans lead er oprettet søndag, hvor han ikke har timer, så dagen – og dermed provisionen (625 kr.) – forsvinder fra rapporten, selvom salget findes. Det samme gælder alle bisalg på dage uden timer (også Oliver).
-
-Sekundært: rapporten filtrerer ikke afviste/slettede salg fra (fx fibersalg slettet med "Slet"), så de kunne tælle med 0 kr. men stadig vise produktlinjer.
-
-## Ændring (kun visning i dagsrapporten)
-1. Behold en dag, hvis den har provision, omsætning eller produktlinjer – også når timer og salg er 0.
-2. Udelad afviste salgslinjer, så slettede fibersalg ikke vises.
-
-Ingen ændring af salg, provision, priser, løn-beregning, rettigheder eller database. Totaler bliver ikke ændret for dage, der allerede vises; kun manglende provision kommer med.
-
-## Bemærk
-- Hvis rapporten filtreres på kunden Relatel, vil Seans lead stadig ikke vises, fordi salget ligger på TDC Erhverv-kampagnen. Det er uændret adfærd.
-- Lønsiden (sælgerløn) bruger en anden beregning; denne ændring rører den ikke.
+Ingen ændring af provision, løn, salg, dagsrapporter, den fælles topliste-beregning eller databasen.
 
 ## Kontrol
-- Åbn dagsrapporten for lønperioden og bekræft, at Sean og Oliver vises med 625 kr. søndag.
-- Tjek at totaler for øvrige sælgere er uændrede.
+- Kald `tv-dashboard-data` og bekræft at Sean er markeret til udelukkelse for i dag/uge/lønperiode.
+- TDC-boardet: Sean væk fra Top i dag/uge/lønperiode; Oliver uændret med 0,5 fiber/625 kr.
+- Relatel-boardet: Sean stadig med 1 fiber.
