@@ -292,9 +292,20 @@ export function ChatView({ conversationId, titel, onTilbage }: ChatViewProps) {
   useEffect(() => {
     const el = composerRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => setComposerH(Math.ceil(el.getBoundingClientRect().height)));
+    // Højden sættes i næste frame og kun ved ændring, så layoutskiftet ikke udløser en ResizeObserver-løkke.
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const h = Math.ceil(el.getBoundingClientRect().height);
+        setComposerH((prev) => (prev === h ? prev : h));
+      });
+    });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
   }, []);
   const sendLaas = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

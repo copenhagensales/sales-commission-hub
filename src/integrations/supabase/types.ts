@@ -1268,45 +1268,6 @@ export type Database = {
         }
         Relationships: []
       }
-      api_integrations: {
-        Row: {
-          created_at: string | null
-          enabled_sources: Json | null
-          id: string
-          is_active: boolean | null
-          last_sync_at: string | null
-          name: string
-          secrets: Json | null
-          sync_frequency_minutes: number | null
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          enabled_sources?: Json | null
-          id?: string
-          is_active?: boolean | null
-          last_sync_at?: string | null
-          name: string
-          secrets?: Json | null
-          sync_frequency_minutes?: number | null
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          enabled_sources?: Json | null
-          id?: string
-          is_active?: boolean | null
-          last_sync_at?: string | null
-          name?: string
-          secrets?: Json | null
-          sync_frequency_minutes?: number | null
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       api_konto: {
         Row: {
           aendret: string
@@ -1341,7 +1302,22 @@ export type Database = {
           oprettet?: string
           sort?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "api_konto_api_noegle_fkey"
+            columns: ["api_noegle"]
+            isOneToOne: false
+            referencedRelation: "api_register"
+            referencedColumns: ["noegle"]
+          },
+          {
+            foreignKeyName: "api_konto_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: true
+            referencedRelation: "dialer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       api_konto_klient: {
         Row: {
@@ -1359,7 +1335,22 @@ export type Database = {
           konto_id?: string
           oprettet?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "api_konto_klient_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_konto_klient_konto_id_fkey"
+            columns: ["konto_id"]
+            isOneToOne: false
+            referencedRelation: "api_konto"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       api_register: {
         Row: {
@@ -11533,7 +11524,22 @@ export type Database = {
           oprettet?: string
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "kald_vaerdi_mapping_begreb_kanonisk_noegle_fkey"
+            columns: ["begreb", "kanonisk_noegle"]
+            isOneToOne: false
+            referencedRelation: "kald_kanonisk_vaerdi"
+            referencedColumns: ["begreb", "noegle"]
+          },
+          {
+            foreignKeyName: "kald_vaerdi_mapping_kilde_fkey"
+            columns: ["kilde"]
+            isOneToOne: false
+            referencedRelation: "api_register"
+            referencedColumns: ["noegle"]
+          },
+        ]
       }
       kald_vaerdi_mapping_audit: {
         Row: {
@@ -11550,7 +11556,7 @@ export type Database = {
           aendret_af?: string | null
           gammel?: Json | null
           handling: string
-          id?: number
+          id?: never
           mapping_id: string
           ny?: Json | null
         }
@@ -11559,7 +11565,7 @@ export type Database = {
           aendret_af?: string | null
           gammel?: Json | null
           handling?: string
-          id?: number
+          id?: never
           mapping_id?: string
           ny?: Json | null
         }
@@ -17911,30 +17917,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tdc_cancellation_imports: {
-        Row: {
-          id: string
-          raw_data: Json
-          row_index: number
-          uploaded_at: string
-          uploaded_by: string | null
-        }
-        Insert: {
-          id?: string
-          raw_data: Json
-          row_index: number
-          uploaded_at?: string
-          uploaded_by?: string | null
-        }
-        Update: {
-          id?: string
-          raw_data?: Json
-          row_index?: number
-          uploaded_at?: string
-          uploaded_by?: string | null
-        }
-        Relationships: []
-      }
       team_assistant_leaders: {
         Row: {
           created_at: string | null
@@ -19447,45 +19429,6 @@ export type Database = {
           },
         ]
       }
-      webhook_endpoints: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          endpoint_path: string
-          id: string
-          is_active: boolean | null
-          last_received_at: string | null
-          name: string
-          total_requests: number | null
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          endpoint_path: string
-          id?: string
-          is_active?: boolean | null
-          last_received_at?: string | null
-          name: string
-          total_requests?: number | null
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          endpoint_path?: string
-          id?: string
-          is_active?: boolean | null
-          last_received_at?: string | null
-          name?: string
-          total_requests?: number | null
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       weekly_goals: {
         Row: {
           created_at: string | null
@@ -20170,10 +20113,12 @@ export type Database = {
       am_i_superadmin: { Args: never; Returns: boolean }
       api_konto_kampagner: {
         Args: { p_integration_id: string }
-        Returns: { campaign_external_id: string }[]
+        Returns: {
+          campaign_external_id: string
+        }[]
       }
       api_konto_saet_klienter: {
-        Args: { p_konto: string; p_clients: string[] }
+        Args: { p_clients: string[]; p_konto: string }
         Returns: number
       }
       assign_role_by_email: {
@@ -21101,12 +21046,25 @@ export type Database = {
         }[]
       }
       kald_kanonisk: {
-        Args: { p_kilde: string; p_endpoint: string; p_felt: string; p_vaerdi: string; p_kampagne?: string | null }
+        Args: {
+          p_endpoint: string
+          p_felt: string
+          p_kampagne?: string
+          p_kilde: string
+          p_vaerdi: string
+        }
         Returns: string
       }
       kald_vaerdi_observeret: {
         Args: { p_dage?: number }
-        Returns: { kilde: string; endpoint: string; felt_sti: string; begreb: string; kildevaerdi: string; antal: number }[]
+        Returns: {
+          antal: number
+          begreb: string
+          endpoint: string
+          felt_sti: string
+          kilde: string
+          kildevaerdi: string
+        }[]
       }
       league_auto_advance_seasons: { Args: never; Returns: Json }
       league_current_open_season: {
@@ -21740,6 +21698,7 @@ export type Database = {
         Returns: undefined
       }
       trigger_adversus_calls_incremental: { Args: never; Returns: undefined }
+      trigger_adversus_leads_incremental: { Args: never; Returns: undefined }
       trigger_kpi_calculation: { Args: never; Returns: undefined }
       trigger_kpi_incremental: { Args: never; Returns: undefined }
       trigger_leaderboard_calculation: { Args: never; Returns: undefined }
