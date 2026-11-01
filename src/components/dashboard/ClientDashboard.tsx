@@ -247,7 +247,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
       seen.add(s.id);
       const f = stats[s.id];
       if (!f) return s;
-      const commission = s.commission - (f.excludedCommission ?? 0);
+      // Relatel: leadprovision ligger på TDC-kampagner og er ikke i Relatel-toplisten → læg den til
+      const commission = isRelatelFiber
+        ? s.commission + f.commission
+        : s.commission - (f.excludedCommission ?? 0);
       return { ...s, commission, fiberPoints: f.points, fiberCommission: f.commission };
     });
     // Add fiber-only sellers that aren't already in the cached leaderboard
@@ -261,8 +264,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         displayName: getDisplayName(name),
         avatarUrl: f.avatarUrl ?? null,
         salesCount: 0,
-        // Relatel: fiberleads påvirker ikke boardets provision
-        commission: isRelatelFiber ? 0 : f.commission,
+        commission: f.commission,
         fiberPoints: f.points,
         fiberCommission: f.commission,
       });
