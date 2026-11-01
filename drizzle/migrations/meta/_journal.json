@@ -568,6 +568,13 @@
       "when": 1793553681926,
       "tag": "0080_tdc_fiber_slet_salg",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1793562520137,
+      "tag": "0081_pricing_adjustment_rules",
+      "breakpoints": true
     }
   ]
 }
