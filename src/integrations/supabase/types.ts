@@ -21815,6 +21815,7 @@ export type Database = {
         Args: { p_sale_id: string }
         Returns: boolean
       }
+      tdc_fiber_slet_salg: { Args: { p_salg_id: string }; Returns: Json }
       trigger_adversus_calls_incremental: { Args: never; Returns: undefined }
       trigger_adversus_leads_incremental: { Args: never; Returns: undefined }
       trigger_kpi_calculation: { Args: never; Returns: undefined }

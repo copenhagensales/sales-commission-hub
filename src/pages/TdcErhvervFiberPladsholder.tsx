@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import {
-  useAdminOpretFiberSalg, useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useRetFiberSalg, useTdcFiberAccess, type Kollega, type MitFiberSalg,
+  useAdminOpretFiberSalg, useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useRetFiberSalg, useSletFiberSalg, useTdcFiberAccess, type Kollega, type MitFiberSalg,
 } from "@/hooks/useTdcFiberSales";
 import { datoIDag, normaliserCvr, oversaetFejl, periodeStart, valider, validerAdmin, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
 import { cn } from "@/lib/utils";
@@ -230,6 +230,8 @@ export default function TdcErhvervFiber() {
   const { data: kolleger = [] } = useFiberKolleger(maaSaelge || erAdmin);
   const { data: mine = [] } = useMineFiberSalgIDag(maaSaelge || erAdmin ? mitId : null, erAdmin);
   const [retter, setRetter] = useState<MitFiberSalg | null>(null);
+  const [sletter, setSletter] = useState<MitFiberSalg | null>(null);
+  const slet = useSletFiberSalg();
   const opret = useOpretFiberSalg();
   const [k, setK] = useState<FiberKladde>(TOM);
   const [visFejl, setVisFejl] = useState(false);
@@ -324,7 +326,12 @@ export default function TdcErhvervFiber() {
                       {s.afAdmin && <span className="text-sm text-muted-foreground">Oprettet af admin</span>}
                       {s.leadgiver && <span className="text-sm text-muted-foreground">Lead: {s.leadgiver} · {(s.leadProvision ?? 0).toLocaleString("da-DK")} kr.</span>}
                     </div>
-                    {erAdmin && <Button variant="outline" className="min-h-11 shrink-0" onClick={() => setRetter(s)}>Ret</Button>}
+                    {erAdmin && (
+                      <div className="flex shrink-0 gap-2">
+                        <Button variant="outline" className="min-h-11" onClick={() => setRetter(s)}>Ret</Button>
+                        <Button variant="destructive" className="min-h-11" onClick={() => setSletter(s)}>Slet</Button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -334,6 +341,21 @@ export default function TdcErhvervFiber() {
       )}
 
       {retter && <RetPopup salg={retter} saelgerId={retter.saelgerId} kolleger={kolleger} onClose={() => setRetter(null)} />}
+      {sletter && (
+        <Dialog open onOpenChange={(o) => { if (!o && !slet.isPending) setSletter(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Slet salg?</DialogTitle></DialogHeader>
+            <p className="text-base">Vil du slette salget? Det giver 0 kr. og tæller ikke længere.{sletter.leadgiver ? " Leadgiverens del slettes også." : ""}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="min-h-11" disabled={slet.isPending} onClick={() => setSletter(null)}>Nej</Button>
+              <Button variant="destructive" className="min-h-11" disabled={slet.isPending} onClick={() => slet.mutate(sletter.id, {
+                onSuccess: () => { toast({ title: "Salget er slettet" }); setSletter(null); },
+                onError: (e) => toast({ title: "Ikke slettet", description: oversaetFejl(e as { code?: string; message?: string }) ?? (e as { message?: string }).message ?? "Ukendt fejl", variant: "destructive" }),
+              })}>Ja, slet</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       {erAdmin && <AdminOpretPopup open={opretAaben} onOpenChange={setOpretAaben} kolleger={kolleger} />}
       {erAdmin && <AdminPopup open={adminAaben} onOpenChange={setAdminAaben} />}
     </div>
