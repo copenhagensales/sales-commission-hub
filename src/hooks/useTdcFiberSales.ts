@@ -37,6 +37,9 @@ export function useMinFiberRolle() {
   return { rolle, mitId: mitId ?? null, isLoading: q.isLoading };
 }
 
+/** Visningsrækkefølge for teams i leadgiver-/sælgervalg. */
+const TEAM_RAEKKEFOELGE = ["TDC Erhverv", "Relatel"];
+
 export interface Kollega { id: string; navn: string; team: string }
 
 /** Aktive medarbejdere i teams Relatel og TDC Erhverv (leadgivere og kandidater til listen). */
@@ -55,7 +58,7 @@ export function useFiberKolleger(enabled = true) {
       type Row = { employee_id: string; teams: { name: string }; employee_master_data: { first_name: string | null; last_name: string | null } };
       return ((data ?? []) as unknown as Row[])
         .map((r) => ({ id: r.employee_id, team: r.teams.name, navn: `${r.employee_master_data.first_name ?? ""} ${r.employee_master_data.last_name ?? ""}`.trim() }))
-        .sort((a, b) => a.team.localeCompare(b.team, "da") || a.navn.localeCompare(b.navn, "da"));
+        .sort((a, b) => TEAM_RAEKKEFOELGE.indexOf(a.team) - TEAM_RAEKKEFOELGE.indexOf(b.team) || a.navn.localeCompare(b.navn, "da"));
     },
   });
 }
