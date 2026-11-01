@@ -2822,7 +2822,7 @@ async function handleFiberBoardStats(
       }
     }
 
-    const result: Record<string, { points: number; commission: number; name?: string; avatarUrl?: string | null }> = {};
+    const result: Record<string, { points: number; commission: number; excludedCommission?: number; name?: string; avatarUrl?: string | null }> = {};
     const emailByKey: Record<string, string> = {};
 
     for (const row of rows) {
@@ -2832,8 +2832,15 @@ async function handleFiberBoardStats(
       const email = rawEmail.toLowerCase();
       // kun aktive Relatel-teammedlemmer, og kun leads lavet efter de kom på teamet
       if (isRelatel && !relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) continue;
-      if (!isRelatel && row.product_id in RELATEL_FIBER_LEAD_POINTS_EF && relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) continue;
       const key = emailToEmployeeId[email] || email;
+      if (!isRelatel && row.product_id in RELATEL_FIBER_LEAD_POINTS_EF && relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) {
+        // Lead fra Relatel-sælger: hører til Relatel-boardet. Frontend trækker provisionen ud af TDC-toplisten.
+        const ex = result[key] ?? { points: 0, commission: 0 };
+        ex.excludedCommission = (ex.excludedCommission ?? 0) + Number(row.mapped_commission ?? 0);
+        result[key] = ex;
+        emailByKey[key] = email;
+        continue;
+      }
       emailByKey[key] = email;
 
       const qty = Number(row.quantity ?? 0);
