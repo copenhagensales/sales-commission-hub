@@ -292,7 +292,7 @@ export default function TdcErhvervFiber() {
         const indhold = (
           <div className="space-y-4">
             <ol className="list-decimal space-y-2 pl-5 text-base">
-              <li>Har du lavet 1. opsigelsesmail til kunden?</li>
+              <li>Har du lavet første opsigelsesmail til kunden?</li>
               <li>Har du lavet lead til Hunt?</li>
             </ol>
             <div className="grid grid-cols-2 gap-2">
