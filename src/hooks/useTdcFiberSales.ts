@@ -102,10 +102,29 @@ export function useOpretFiberSalg() {
   });
 }
 
+export interface AdminFiberSalgInput extends FiberSalgInput { lukkerId: string; dato: string }
+
+/** Admin/ejer opretter salg for en sælger på listen, evt. tilbagedateret i lønperioden. */
+export function useAdminOpretFiberSalg() {
+  const qc = useQueryClient();
+  return useMutation({
+    retry: 0,
+    mutationFn: async (i: AdminFiberSalgInput) => {
+      const { data, error } = await supabase.rpc("tdc_fiber_admin_opret_salg", {
+        p_salg_id: i.salgId, p_lead_salg_id: i.leadSalgId as string, p_type: i.type, p_variant: i.variant,
+        p_mobilevoice: i.mobilevoice, p_cvr: i.cvr, p_lukker: i.lukkerId, p_leadgiver: i.leadgiverId as string, p_dato: i.dato,
+      });
+      if (error) throw error;
+      return (data as { status?: string } | null)?.status ?? "ukendt";
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: [KEY_MINE] }),
+  });
+}
+
 export interface MitFiberSalg {
   id: string; tid: string; type: FiberType; saelgerId: string | null; saelger: string | null; produkt: string | null; provision: number;
   variant: FiberVariant; mobilevoice: boolean; cvr: string;
-  leadgiverId: string | null; leadgiver: string | null; leadProvision: number | null;
+  leadgiverId: string | null; leadgiver: string | null; leadProvision: number | null; afAdmin: boolean;
 }
 
 type SalgRaekke = {
@@ -130,7 +149,7 @@ export function useMineFiberSalgIDag(mitId: string | null, alle = false) {
       const { data, error } = await q;
       if (error) throw error;
       const rows = (data ?? []) as unknown as SalgRaekke[];
-      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string }; registreret_af?: string };
+      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string }; registreret_af?: string; oprettet_af_admin?: boolean };
       const leads = new Map(rows.filter((r) => pl(r).rolle === "lead" && r.validation_status !== "rejected").map((r) => [r.id, r]));
       return rows.filter((r) => pl(r).rolle === "fuldt" || pl(r).rolle === "lukket").map((r) => {
         const p = pl(r); const item = r.sale_items?.[0]; const navn = item?.display_name ?? "";
@@ -143,6 +162,7 @@ export function useMineFiberSalgIDag(mitId: string | null, alle = false) {
           leadgiverId: p.rolle === "lukket" ? p.leadgiver_employee_id ?? null : null,
           leadgiver: lead?.agent_name ?? null,
           leadProvision: lead ? Number(lead.sale_items?.[0]?.mapped_commission ?? 0) : null,
+          afAdmin: p.oprettet_af_admin === true,
         };
       });
     },
