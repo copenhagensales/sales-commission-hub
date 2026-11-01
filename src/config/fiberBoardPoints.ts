@@ -34,3 +34,14 @@ export const FIBER_SALE_PRODUCT_IDS: string[] = [
   "7a792b7d-d5f7-40cf-86d4-12b8165b23e7", // Lukket salg VOK (Inkl. Mobilevoice salg)
   "8d7b6403-28a2-40ee-9877-be42e60e0f36", // Fuldt salg VOK (Inkl. Mobilevoice salg)
 ];
+
+/**
+ * Relatel-boardet: Relatel kan kun lave fiberleads (ikke lukke selv).
+ * Kun Lead Provi-varianterne tæller, og hvert lead tæller 1 (på TDC Erhverv 0,5).
+ */
+export const RELATEL_FIBER_LEAD_POINTS: Record<string, number> = {
+  "e63c9da4-3862-49e6-97df-ce5ca9ecc2e6": 1.0, // Lead Provi HAP
+  "bd6ae50b-1516-4692-be9e-09b2317bf612": 1.0, // Lead Provi VOK
+  "4ecf9122-5b57-497f-96b7-adbce0fb6652": 1.0, // Lead Provi HAP (Inkl. Mobilevoice salg)
+  "b0030dec-23b3-4cf8-9d88-0b4affe1312c": 1.0, // Lead Provi VOK (Inkl. Mobilevoice salg)
+};

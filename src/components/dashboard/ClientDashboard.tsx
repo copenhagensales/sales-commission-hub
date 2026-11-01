@@ -56,6 +56,8 @@ export interface ClientDashboardConfig {
     secondaryLabel?: string;
     /** Show fiber-point and fiber-provi columns (TDC Erhverv only). */
     fiberBoard?: boolean;
+    /** Relatel: fiberleads tælles 1 pr. stk. ved siden af switch. */
+    relatelFiber?: boolean;
     /** Visuel stil: "cph" = Copenhagen Sales board-look (kun præsentation). */
     theme?: "cph";
   };
@@ -81,7 +83,9 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const showSalesPerHour = config.features?.salesPerHour === true;
   const showCrossSales = config.features?.crossSales === true;
   const useLiveMode = config.features?.liveMode !== false;
-  const showFiber = config.features?.fiberBoard === true;
+  const isRelatelFiber = config.features?.relatelFiber === true;
+  const showFiber = config.features?.fiberBoard === true || isRelatelFiber;
+  const fiberVariant = isRelatelFiber ? "relatel" : "tdc";
 
   // Determine scope
   const aggregateClientIds = config.features?.aggregateClientIds;
@@ -224,17 +228,17 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const payrollStart = payrollPeriod.start;
   const payrollEnd = addDays(payrollPeriod.end, 1); // exclusive upper bound
 
-  const { data: fiberToday } = useFiberBoardStats(todayStart, todayEnd, showFiber);
-  const { data: fiberWeek } = useFiberBoardStats(weekStart, weekEnd, showFiber);
-  const { data: fiberPayroll } = useFiberBoardStats(payrollStart, payrollEnd, showFiber);
+  const { data: fiberToday } = useFiberBoardStats(todayStart, todayEnd, showFiber, fiberVariant);
+  const { data: fiberWeek } = useFiberBoardStats(weekStart, weekEnd, showFiber, fiberVariant);
+  const { data: fiberPayroll } = useFiberBoardStats(payrollStart, payrollEnd, showFiber, fiberVariant);
 
   // Fiber sales counts (excl. Lead Provi) for KPI-card suffix
   const monthStart = startOfMonth(today);
   const monthEnd = addDays(endOfMonth(today), 1);
-  const { data: fiberCountToday = 0 } = useFiberSalesCount(todayStart, todayEnd, showFiber);
-  const { data: fiberCountWeek = 0 } = useFiberSalesCount(weekStart, weekEnd, showFiber);
-  const { data: fiberCountMonth = 0 } = useFiberSalesCount(monthStart, monthEnd, showFiber);
-  const { data: fiberCountPayroll = 0 } = useFiberSalesCount(payrollStart, payrollEnd, showFiber);
+  const { data: fiberCountToday = 0 } = useFiberSalesCount(todayStart, todayEnd, showFiber, fiberVariant);
+  const { data: fiberCountWeek = 0 } = useFiberSalesCount(weekStart, weekEnd, showFiber, fiberVariant);
+  const { data: fiberCountMonth = 0 } = useFiberSalesCount(monthStart, monthEnd, showFiber, fiberVariant);
+  const { data: fiberCountPayroll = 0 } = useFiberSalesCount(payrollStart, payrollEnd, showFiber, fiberVariant);
 
   const mergeFiber = (sellers: LeaderboardSeller[], stats?: FiberStatsMap): LeaderboardSeller[] => {
     if (!showFiber || !stats) return sellers;
@@ -254,7 +258,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         displayName: getDisplayName(name),
         avatarUrl: f.avatarUrl ?? null,
         salesCount: 0,
-        commission: f.commission,
+        // Relatel: fiberleads påvirker ikke boardets provision
+        commission: isRelatelFiber ? 0 : f.commission,
         fiberPoints: f.points,
         fiberCommission: f.commission,
       });
@@ -264,15 +269,15 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
 
   const sortedPayrollSellers = useMemo(
     () => mergeFiber(cachedSellersPayroll.map(mapToSeller), fiberPayroll),
-    [cachedSellersPayroll, fiberPayroll, showFiber],
+    [cachedSellersPayroll, fiberPayroll, showFiber, isRelatelFiber],
   );
   const sortedWeeklySellers = useMemo(
     () => mergeFiber(cachedSellersWeek.map(mapToSeller), fiberWeek),
-    [cachedSellersWeek, fiberWeek, showFiber],
+    [cachedSellersWeek, fiberWeek, showFiber, isRelatelFiber],
   );
   const sortedDailySellers = useMemo(
     () => mergeFiber(cachedSellersToday.map(mapToSeller), fiberToday),
-    [cachedSellersToday, fiberToday, showFiber],
+    [cachedSellersToday, fiberToday, showFiber, isRelatelFiber],
   );
 
   // Live sellers (only used in live mode)

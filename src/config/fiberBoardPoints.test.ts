@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { FIBER_BOARD_POINTS, FIBER_SALE_PRODUCT_IDS } from "./fiberBoardPoints";
+import { FIBER_BOARD_POINTS, FIBER_SALE_PRODUCT_IDS, RELATEL_FIBER_LEAD_POINTS } from "./fiberBoardPoints";
 
 const root = resolve(__dirname, "../..");
 const edge = readFileSync(resolve(root, "supabase/functions/tv-dashboard-data/index.ts"), "utf8");
@@ -29,5 +29,16 @@ describe("TDC fiber-point", () => {
       expect(FIBER_BOARD_POINTS[id]).toBe(forventet[type as keyof typeof forventet]);
       expect(FIBER_SALE_PRODUCT_IDS.includes(id)).toBe(type !== "lead");
     }
+  });
+
+  it("Relatel: serverens leadliste er identisk med sidens", () => {
+    expect(parseMap(edge, "RELATEL_FIBER_LEAD_POINTS_EF")).toEqual(RELATEL_FIBER_LEAD_POINTS);
+  });
+
+  it("Relatel: kun de 4 Lead Provi-produkter tæller, og hvert lead giver 1", () => {
+    const leads = [...migration.matchAll(/WHEN 'lead\|(HAP|VOK)\|(true|false)'\s+THEN '([0-9a-f-]{36})'/g)].map((m) => m[3]);
+    expect(leads).toHaveLength(4);
+    expect(Object.keys(RELATEL_FIBER_LEAD_POINTS).sort()).toEqual([...leads].sort());
+    for (const id of leads) expect(RELATEL_FIBER_LEAD_POINTS[id]).toBe(1);
   });
 });

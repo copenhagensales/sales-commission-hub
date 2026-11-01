@@ -14,6 +14,7 @@ export default function RelatelDashboard() {
           crossSales: true,
           liveMode: true,
           theme: "cph",
+          relatelFiber: true,
 
         },
       }}

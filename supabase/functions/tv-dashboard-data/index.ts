@@ -273,28 +273,30 @@ Deno.serve(async (req) => {
     if (action === "fiber-sales-count") {
       const start = url.searchParams.get("start") || "";
       const end = url.searchParams.get("end") || "";
-      const cacheKey = `fiber-sales-count-${start}-${end}`;
+      const variant = url.searchParams.get("variant") === "relatel" ? "relatel" : "tdc";
+      const cacheKey = `fiber-sales-count-${variant}-${start}-${end}`;
       const cached = getCached<any>(cacheKey);
       if (cached) {
         return new Response(JSON.stringify(cached), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return await handleFiberSalesCount(supabase, start, end, corsHeaders, cacheKey);
+      return await handleFiberSalesCount(supabase, start, end, corsHeaders, cacheKey, variant);
     }
 
     // Fiber board stats (per-seller points/commission) - TV bypass RLS
     if (action === "fiber-board-stats") {
       const start = url.searchParams.get("start") || "";
       const end = url.searchParams.get("end") || "";
-      const cacheKey = `fiber-board-stats-${start}-${end}`;
+      const variant = url.searchParams.get("variant") === "relatel" ? "relatel" : "tdc";
+      const cacheKey = `fiber-board-stats-${variant}-${start}-${end}`;
       const cached = getCached<any>(cacheKey);
       if (cached) {
         return new Response(JSON.stringify(cached), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return await handleFiberBoardStats(supabase, start, end, corsHeaders, cacheKey);
+      return await handleFiberBoardStats(supabase, start, end, corsHeaders, cacheKey, variant);
     }
 
     // TDC Månedsmål-board (TV uden login) - bypass RLS
@@ -2680,21 +2682,63 @@ const FIBER_SALE_PRODUCT_IDS_EF = [
   "8d7b6403-28a2-40ee-9877-be42e60e0f36",
 ];
 
+// Relatel kan kun lave fiberleads: kun Lead Provi tæller, 1 pr. stk., og kun for aktive Relatel-teammedlemmer.
+// Keep in sync with src/config/fiberBoardPoints.ts
+const RELATEL_FIBER_LEAD_POINTS_EF: Record<string, number> = {
+  "e63c9da4-3862-49e6-97df-ce5ca9ecc2e6": 1.0, // Lead Provi HAP
+  "bd6ae50b-1516-4692-be9e-09b2317bf612": 1.0, // Lead Provi VOK
+  "4ecf9122-5b57-497f-96b7-adbce0fb6652": 1.0, // Lead Provi HAP (Inkl. Mobilevoice salg)
+  "b0030dec-23b3-4cf8-9d88-0b4affe1312c": 1.0, // Lead Provi VOK (Inkl. Mobilevoice salg)
+};
+const RELATEL_TEAM_NAME = "Relatel";
+
+/** Mail (lowercase) → employee_id for aktive medlemmer af Relatel-teamet (agentmapping + arbejdsmail). */
+async function getRelatelEmailToEmployee(supabase: any): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const { data: team } = await supabase.from("teams").select("id").eq("name", RELATEL_TEAM_NAME).maybeSingle();
+  if (!team?.id) return out;
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("employee_id, employee_master_data!inner(is_active, work_email)")
+    .eq("team_id", team.id)
+    .eq("employee_master_data.is_active", true);
+  const ids: string[] = [];
+  for (const m of (members || []) as any[]) {
+    ids.push(m.employee_id);
+    const w = m.employee_master_data?.work_email?.toLowerCase();
+    if (w) out[w] = m.employee_id;
+  }
+  if (ids.length > 0) {
+    const { data: maps } = await supabase
+      .from("employee_agent_mapping")
+      .select("employee_id, agents!inner(email)")
+      .in("employee_id", ids);
+    for (const m of (maps || []) as any[]) {
+      const e = m.agents?.email?.toLowerCase();
+      if (e) out[e] = m.employee_id;
+    }
+  }
+  return out;
+}
+
 async function handleFiberSalesCount(
   supabase: any,
   startIso: string,
   endIso: string,
   corsHeaders: Record<string, string>,
   cacheKey?: string,
+  variant: "tdc" | "relatel" = "tdc",
 ) {
+  const isRelatel = variant === "relatel";
+  const relatelEmails = isRelatel ? await getRelatelEmailToEmployee(supabase) : {};
   let total = 0;
   const pageSize = 1000;
   let from = 0;
   while (true) {
     const { data, error } = await supabase
       .from("sale_items")
-      .select("quantity, is_cancelled, sales!inner(sale_datetime, validation_status)")
-      .in("product_id", FIBER_SALE_PRODUCT_IDS_EF)
+      .select("quantity, is_cancelled, sales!inner(sale_datetime, validation_status, agent_email)")
+      .in("product_id", isRelatel ? Object.keys(RELATEL_FIBER_LEAD_POINTS_EF) : FIBER_SALE_PRODUCT_IDS_EF)
       .gte("sales.sale_datetime", startIso)
       .lt("sales.sale_datetime", endIso)
       .range(from, from + pageSize - 1);
@@ -2709,6 +2753,7 @@ async function handleFiberSalesCount(
     for (const row of data as any[]) {
       // Afviste salg (fx en leaddel afvist ved rettelse) tæller ikke – samme regel som leaderboardet.
       if (row.is_cancelled || row.sales?.validation_status === "rejected") continue;
+      if (isRelatel && !relatelEmails[String(row.sales?.agent_email ?? "").toLowerCase()]) continue;
       total += Number(row.quantity ?? 0);
     }
     if (data.length < pageSize) break;
@@ -2727,8 +2772,11 @@ async function handleFiberBoardStats(
   endIso: string,
   corsHeaders: Record<string, string>,
   cacheKey?: string,
+  variant: "tdc" | "relatel" = "tdc",
 ) {
   try {
+    const isRelatel = variant === "relatel";
+    const pointsMap = isRelatel ? RELATEL_FIBER_LEAD_POINTS_EF : FIBER_BOARD_POINTS_EF;
     const rows: any[] = [];
     const pageSize = 1000;
     let from = 0;
@@ -2738,7 +2786,7 @@ async function handleFiberBoardStats(
         .select(
           "product_id, quantity, mapped_commission, is_cancelled, sales!inner(agent_email, sale_datetime, validation_status)",
         )
-        .in("product_id", FIBER_PRODUCT_IDS_EF)
+        .in("product_id", Object.keys(pointsMap))
         .gte("sales.sale_datetime", startIso)
         .lt("sales.sale_datetime", endIso)
         .range(from, from + pageSize - 1);
@@ -2749,14 +2797,17 @@ async function handleFiberBoardStats(
       from += pageSize;
     }
 
-    const { data: mappingData } = await supabase
-      .from("employee_agent_mapping")
-      .select("employee_id, agents!inner(email)");
-
-    const emailToEmployeeId: Record<string, string> = {};
-    for (const m of (mappingData || []) as any[]) {
-      const email = m.agents?.email?.toLowerCase();
-      if (email && m.employee_id) emailToEmployeeId[email] = m.employee_id;
+    let emailToEmployeeId: Record<string, string> = {};
+    if (isRelatel) {
+      emailToEmployeeId = await getRelatelEmailToEmployee(supabase);
+    } else {
+      const { data: mappingData } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agents!inner(email)");
+      for (const m of (mappingData || []) as any[]) {
+        const email = m.agents?.email?.toLowerCase();
+        if (email && m.employee_id) emailToEmployeeId[email] = m.employee_id;
+      }
     }
 
     const result: Record<string, { points: number; commission: number; name?: string; avatarUrl?: string | null }> = {};
@@ -2767,12 +2818,13 @@ async function handleFiberBoardStats(
       const rawEmail: string | undefined = row.sales?.agent_email;
       if (!rawEmail) continue;
       const email = rawEmail.toLowerCase();
+      if (isRelatel && !emailToEmployeeId[email]) continue; // kun aktive Relatel-teammedlemmer
       const key = emailToEmployeeId[email] || email;
       emailByKey[key] = email;
 
       const qty = Number(row.quantity ?? 0);
       const commission = Number(row.mapped_commission ?? 0);
-      const pointsPerUnit = FIBER_BOARD_POINTS_EF[row.product_id] ?? 0;
+      const pointsPerUnit = pointsMap[row.product_id] ?? 0;
 
       const entry = result[key] ?? { points: 0, commission: 0 };
       entry.points += pointsPerUnit * qty;
