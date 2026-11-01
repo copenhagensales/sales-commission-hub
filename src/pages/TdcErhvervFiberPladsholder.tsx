@@ -288,6 +288,28 @@ export default function TdcErhvervFiber() {
         </Card>
       )}
 
+      {bekraeft && (() => {
+        const indhold = (
+          <div className="space-y-4">
+            <ol className="list-decimal space-y-2 pl-5 text-base">
+              <li>Har du lavet 1. opsigelsesmail til kunden?</li>
+              <li>Har du lavet lead til Hunt?</li>
+            </ol>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="min-h-11 text-base" onClick={() => setBekraeft(false)}>Nej</Button>
+              <Button className="min-h-11 text-base" disabled={opret.isPending} onClick={indsend}>Ja</Button>
+            </div>
+          </div>
+        );
+        const titel = "Bekræft før registrering";
+        if (phone) return <BottomSheet open onOpenChange={(v) => !v && setBekraeft(false)} title={titel}><div className="px-4 pb-4">{indhold}</div></BottomSheet>;
+        return (
+          <Dialog open onOpenChange={(v) => !v && setBekraeft(false)}>
+            <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{titel}</DialogTitle></DialogHeader>{indhold}</DialogContent>
+          </Dialog>
+        );
+      })()}
+
       {(maaSaelge || erAdmin) && (
         <Card>
           <CardHeader><CardTitle className="text-base">{erAdmin ? "Tastet i dag (alle)" : "Tastet i dag"}</CardTitle></CardHeader>
