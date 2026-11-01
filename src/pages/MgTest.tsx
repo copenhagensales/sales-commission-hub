@@ -2384,6 +2384,7 @@ export default function MgTest() {
             <TabsTrigger value="client-sales">Client Sales</TabsTrigger>
             <TabsTrigger value="datamapping">Datamapping</TabsTrigger>
             <TabsTrigger value="commission-rates">Provisionssatser</TabsTrigger>
+            <TabsTrigger value="adjustments">Justeringer</TabsTrigger>
           </TabsList>
 
           <TabsContent value="product" className="space-y-4">
