@@ -350,7 +350,7 @@ export default function TdcErhvervFiber() {
               <Button variant="outline" className="min-h-11" disabled={slet.isPending} onClick={() => setSletter(null)}>Nej</Button>
               <Button variant="destructive" className="min-h-11" disabled={slet.isPending} onClick={() => slet.mutate(sletter.id, {
                 onSuccess: () => { toast({ title: "Salget er slettet" }); setSletter(null); },
-                onError: (e) => toast({ title: "Ikke slettet", description: oversaetFejl(e), variant: "destructive" }),
+                onError: (e) => toast({ title: "Ikke slettet", description: oversaetFejl(e as { code?: string; message?: string }) ?? (e as { message?: string }).message ?? "Ukendt fejl", variant: "destructive" }),
               })}>Ja, slet</Button>
             </div>
           </DialogContent>
