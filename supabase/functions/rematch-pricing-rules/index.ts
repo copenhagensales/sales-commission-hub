@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { applyPricingAdjustments, loadPricingAdjustments } from "../_shared/pricingAdjustments.ts";
 import { evaluateTextCondition, type TextListCondition } from "../_shared/textCondition.ts";
 
 const corsHeaders = {
@@ -698,7 +699,9 @@ serve(async (req) => {
 
 
     // Process each sale_item
-    const updates: { id: string; product_id: string; matched_pricing_rule_id: string | null; mapped_commission: number; mapped_revenue: number; needs_mapping: boolean; display_name: string | null }[] = [];
+    const updates: { id: string; product_id: string; matched_pricing_rule_id: string | null; adjustment_rule_id?: string | null; mapped_commission: number; mapped_revenue: number; needs_mapping: boolean; display_name: string | null }[] = [];
+    // Justeringer til sidst (fx TDC Brands = Ja → -70 %). Fejl stopper hellere end at gemme forkerte satser.
+    const adjustments = await loadPricingAdjustments(supabase);
     let matchedCount = 0;
     let noMatchCount = 0;
     let productCorrectedCount = 0;
@@ -856,10 +859,15 @@ serve(async (req) => {
         // Otherwise use the standard display name from rule
         const displayName = matchedRule.displayName;
 
+        const adj = applyPricingAdjustments(adjustments, { productId: correctProductId, saleDate, rawPayload, commission, revenue });
+        commission = adj.commission;
+        revenue = adj.revenue;
+
         updates.push({
           id: item.id,
           product_id: correctProductId,
           matched_pricing_rule_id: matchedRule.ruleId,
+          adjustment_rule_id: adj.ruleId,
           mapped_commission: commission,
           mapped_revenue: revenue,
           needs_mapping: false,
@@ -882,12 +890,17 @@ serve(async (req) => {
         const baseProduct = productsMap.get(correctProductId);
         if (baseProduct && (baseProduct.commission_dkk > 0 || baseProduct.revenue_dkk > 0)) {
           const qty = item.quantity || 1;
+          const adj = applyPricingAdjustments(adjustments, {
+            productId: correctProductId, saleDate, rawPayload,
+            commission: baseProduct.commission_dkk * qty, revenue: baseProduct.revenue_dkk * qty,
+          });
           updates.push({
             id: item.id,
             product_id: correctProductId,
             matched_pricing_rule_id: null,
-            mapped_commission: baseProduct.commission_dkk * qty,
-            mapped_revenue: baseProduct.revenue_dkk * qty,
+            adjustment_rule_id: adj.ruleId,
+            mapped_commission: adj.commission,
+            mapped_revenue: adj.revenue,
             needs_mapping: false,
             display_name: null, // No rule = no display name override
           });
@@ -963,6 +976,7 @@ serve(async (req) => {
               .update({
                 product_id: update.product_id,
                 matched_pricing_rule_id: update.matched_pricing_rule_id,
+                adjustment_rule_id: update.adjustment_rule_id ?? null,
                 mapped_commission: update.mapped_commission,
                 mapped_revenue: update.mapped_revenue,
                 needs_mapping: update.needs_mapping,
