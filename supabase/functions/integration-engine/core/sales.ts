@@ -1,4 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { applyPricingAdjustments, loadPricingAdjustments, type PricingAdjustmentRule } from "../../_shared/pricingAdjustments.ts"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { evaluateTextCondition, type TextListCondition } from "../../_shared/textCondition.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
@@ -311,7 +312,8 @@ function prepareSaleItems(
   pricingRulesMap: Map<string, PricingRule[]>,
   campaignMappingsMap: Map<string, string>,
   itemsArray: any[],
-  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
+  log?: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
+  adjustments: PricingAdjustmentRule[] = []
 ) {
   // Extract leadResultData from rawPayload (Adversus format)
   const leadResultData = (sale.rawPayload?.leadResultData as Array<{ id?: number; label: string; value: string }>) || [];
@@ -390,6 +392,13 @@ function prepareSaleItems(
       }
     }
 
+    // Justering til sidst (fx TDC Brands = Ja → -70 %) oven på den færdige sats
+    const adj = applyPricingAdjustments(adjustments, {
+      productId, saleDate: sale.saleDate, rawPayload: sale.rawPayload as Record<string, unknown> | undefined, commission, revenue,
+    })
+    commission = adj.commission
+    revenue = adj.revenue
+
     // Get display name from matched rule if configured
     const displayName = matchedRule?.displayName || null;
 
@@ -404,6 +413,7 @@ function prepareSaleItems(
       mapped_revenue: revenue,
       needs_mapping: !productId,
       matched_pricing_rule_id: matchedRuleId,
+      adjustment_rule_id: adj.ruleId,
       display_name: displayName,
     })
   }
@@ -418,7 +428,8 @@ async function processSalesBatch(
   pricingRulesMap: Map<string, PricingRule[]>,
   campaignMappingsMap: Map<string, string>,
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  gdprFilter: IngestionFilter
+  gdprFilter: IngestionFilter,
+  adjustments: PricingAdjustmentRule[] = []
 ) {
   let processed = 0
   let errors = 0
@@ -598,7 +609,8 @@ async function processSalesBatch(
             pricingRulesMap,
             campaignMappingsMap,
             saleItemsToInsert,
-            log
+            log,
+            adjustments
           )
         }
       }
@@ -768,6 +780,10 @@ export async function processSales(
     }
   }
 
+  // Justeringer til sidst. Fejl stopper kørslen hellere end at gemme forkerte satser.
+  const adjustments = await loadPricingAdjustments(supabase)
+  if (adjustments.length > 0) log("INFO", `Loaded ${adjustments.length} pricing adjustments`)
+
   let totalProcessed = 0
   let totalErrors = 0
 
@@ -791,7 +807,8 @@ export async function processSales(
       pricingRulesMap,
       campaignMappingsMap,
       log,
-      gdprFilter
+      gdprFilter,
+      adjustments
     )
     totalProcessed += processed
     totalErrors += errors
