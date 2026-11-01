@@ -13,6 +13,9 @@ import {
 } from "@/hooks/useTdcFiberSales";
 import { normaliserCvr, oversaetFejl, valider, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BottomSheet, useIsPhone } from "@/components/mobile";
+import { Users } from "lucide-react";
 
 const TOM: FiberKladde = { type: null, variant: null, mobilevoice: false, cvr: "", leadgiverId: null };
 
@@ -58,9 +61,7 @@ function AdminBoks() {
   const paaListe = (liste ?? []).map((r) => r.employee_id);
   const fejl = (e: unknown) => toast({ title: "Ikke gemt", description: e instanceof Error ? e.message : "Ukendt fejl", variant: "destructive" });
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">Admin – hvem må taste fibersalg</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
+    <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="flex-1"><Grupperet kolleger={kolleger} value={valgt} onChange={setValgt} placeholder="Vælg medarbejder" udeluk={paaListe} /></div>
           <Button className="min-h-11" disabled={!valgt || aendr.isPending} onClick={() => valgt && aendr.mutate({ handling: "tilfoej", employeeId: valgt }, { onSuccess: () => setValgt(null), onError: fejl })}>Tilføj</Button>
@@ -75,8 +76,18 @@ function AdminBoks() {
             </li>
           ))}
         </ul>
-      </CardContent>
-    </Card>
+    </div>
+  );
+}
+
+function AdminPopup({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const phone = useIsPhone();
+  const titel = "Hvem må taste fibersalg";
+  if (phone) return <BottomSheet open={open} onOpenChange={onOpenChange} title={titel}><div className="px-4 pb-4"><AdminBoks /></div></BottomSheet>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{titel}</DialogTitle></DialogHeader><AdminBoks /></DialogContent>
+    </Dialog>
   );
 }
 
@@ -84,7 +95,8 @@ export default function TdcErhvervFiber() {
   const { toast } = useToast();
   const { isOwner } = usePermissions();
   const { rolle, mitId, isLoading } = useMinFiberRolle();
-  const maaSaelge = !!rolle;
+  const maaSaelge = !!rolle || isOwner;
+  const [adminAaben, setAdminAaben] = useState(false);
   const erAdmin = isOwner || rolle === "admin";
   const { data: kolleger = [] } = useFiberKolleger(maaSaelge || erAdmin);
   const { data: mine = [] } = useMineFiberSalgIDag(maaSaelge ? mitId : null);
@@ -117,8 +129,13 @@ export default function TdcErhvervFiber() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
+      {erAdmin && (
+        <div className="flex justify-end">
+          <Button variant="outline" className="min-h-11" onClick={() => setAdminAaben(true)}><Users className="mr-2 h-4 w-4" />Administrér sælgere</Button>
+        </div>
+      )}
       {!maaSaelge && (
-        <Card><CardContent className="py-6 text-base text-muted-foreground">Du er ikke på listen over fibersælgere.{erAdmin ? " Du kan tilføje sælgere herunder." : ""}</CardContent></Card>
+        <Card><CardContent className="py-6 text-base text-muted-foreground">Du er ikke på listen over fibersælgere.</CardContent></Card>
       )}
 
       {maaSaelge && (
@@ -175,7 +192,7 @@ export default function TdcErhvervFiber() {
         </Card>
       )}
 
-      {erAdmin && <AdminBoks />}
+      {erAdmin && <AdminPopup open={adminAaben} onOpenChange={setAdminAaben} />}
     </div>
   );
 }
