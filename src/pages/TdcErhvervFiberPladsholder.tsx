@@ -11,7 +11,7 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import {
   useAdminOpretFiberSalg, useAendrFiberAdgang, useFiberKolleger, useMineFiberSalgIDag, useMinFiberRolle, useOpretFiberSalg, useRetFiberSalg, useSletFiberSalg, useTdcFiberAccess, type Kollega, type MitFiberSalg,
 } from "@/hooks/useTdcFiberSales";
-import { datoIDag, normaliserCvr, oversaetFejl, periodeStart, valider, validerAdmin, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
+import { datoIDag, kraeverLeadgiver, normaliserCvr, oversaetFejl, periodeStart, valider, validerAdmin, type FiberKladde, type FiberType, type FiberVariant } from "@/lib/tdcFiber";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BottomSheet, useIsPhone } from "@/components/mobile";
