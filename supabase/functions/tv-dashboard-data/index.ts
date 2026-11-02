@@ -2999,6 +2999,43 @@ async function handleMonthlyGoal(
       warnings.push(`Salgsdata: ${e?.message || "ukendt fejl"}`);
     }
 
+    // Relatel: fiberleads (ligger på TDC-kampagner) tæller som 1 salg pr. lead,
+    // når sælgeren var på Relatel-teamet, da leadet blev lavet.
+    if (clientId === RELATEL_CLIENT_ID_EF) {
+      try {
+        const relatelMap = await getRelatelEmailToEmployee(supabase);
+        const pageSize = 1000;
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from("sale_items")
+            .select("product_id, is_cancelled, sales!inner(sale_datetime, validation_status, agent_email)")
+            .in("product_id", Object.keys(RELATEL_FIBER_LEAD_POINTS_EF))
+            .gte("sales.sale_datetime", startIso)
+            .lte("sales.sale_datetime", endIso)
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          for (const row of data as any[]) {
+            const st = row.sales?.validation_status;
+            if (row.is_cancelled || st === "rejected" || st === "cancelled") continue;
+            const email = String(row.sales?.agent_email ?? "").toLowerCase();
+            if (!relatelLeadCounts(relatelMap, email, row.sales?.sale_datetime)) continue;
+            items.push({
+              agentEmail: email,
+              productId: row.product_id ?? null,
+              quantity: 1,
+              saleDate: new Date(row.sales.sale_datetime).toLocaleDateString("en-CA", { timeZone: "Europe/Copenhagen" }),
+            });
+          }
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+      } catch (e: any) {
+        warnings.push(`Fiberleads: ${e?.message || "ukendt fejl"}`);
+      }
+    }
+
     const payload = {
       sellers,
       items,
