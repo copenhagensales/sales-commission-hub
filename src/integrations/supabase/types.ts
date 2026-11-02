@@ -365,6 +365,76 @@ export type Database = {
           },
         ]
       }
+      agent_ekstern_alias: {
+        Row: {
+          aendret: string
+          agent_id: string | null
+          aktiv: boolean | null
+          anvendt_tid: string | null
+          bagud_hentet_tid: string | null
+          ekstern_id: string
+          email: string | null
+          ikke_vores: boolean
+          kilde: string
+          konto_id: string | null
+          navn: string | null
+          oprettet: string
+          oprindelse: string
+        }
+        Insert: {
+          aendret?: string
+          agent_id?: string | null
+          aktiv?: boolean | null
+          anvendt_tid?: string | null
+          bagud_hentet_tid?: string | null
+          ekstern_id: string
+          email?: string | null
+          ikke_vores?: boolean
+          kilde: string
+          konto_id?: string | null
+          navn?: string | null
+          oprettet?: string
+          oprindelse: string
+        }
+        Update: {
+          aendret?: string
+          agent_id?: string | null
+          aktiv?: boolean | null
+          anvendt_tid?: string | null
+          bagud_hentet_tid?: string | null
+          ekstern_id?: string
+          email?: string | null
+          ikke_vores?: boolean
+          kilde?: string
+          konto_id?: string | null
+          navn?: string | null
+          oprettet?: string
+          oprindelse?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_ekstern_alias_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_ekstern_alias_kilde_fkey"
+            columns: ["kilde"]
+            isOneToOne: false
+            referencedRelation: "api_register"
+            referencedColumns: ["noegle"]
+          },
+          {
+            foreignKeyName: "agent_ekstern_alias_konto_id_fkey"
+            columns: ["konto_id"]
+            isOneToOne: false
+            referencedRelation: "api_konto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_presence: {
         Row: {
           can_receive_calls: boolean | null
@@ -419,54 +489,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      agent_ekstern_alias: {
-        Row: {
-          aendret: string
-          agent_id: string | null
-          aktiv: boolean | null
-          anvendt_tid: string | null
-          bagud_hentet_tid: string | null
-          ikke_vores: boolean
-          konto_id: string | null
-          ekstern_id: string
-          email: string | null
-          kilde: string
-          navn: string | null
-          oprettet: string
-          oprindelse: string
-        }
-        Insert: {
-          aendret?: string
-          agent_id?: string | null
-          aktiv?: boolean | null
-          anvendt_tid?: string | null
-          bagud_hentet_tid?: string | null
-          ikke_vores?: boolean
-          konto_id?: string | null
-          ekstern_id: string
-          email?: string | null
-          kilde: string
-          navn?: string | null
-          oprettet?: string
-          oprindelse: string
-        }
-        Update: {
-          aendret?: string
-          agent_id?: string | null
-          aktiv?: boolean | null
-          anvendt_tid?: string | null
-          bagud_hentet_tid?: string | null
-          ikke_vores?: boolean
-          konto_id?: string | null
-          ekstern_id?: string
-          email?: string | null
-          kilde?: string
-          navn?: string | null
-          oprettet?: string
-          oprindelse?: string
-        }
-        Relationships: []
       }
       agents: {
         Row: {
@@ -20294,13 +20316,10 @@ export type Database = {
       adversus_api_budget_status: { Args: { p_bruger: string }; Returns: Json }
       adversus_api_budget_timestat: { Args: never; Returns: undefined }
       agent_alias_anvend: {
-        Args: { p_kilde: string; p_ekstern_id: string }
+        Args: { p_ekstern_id: string; p_kilde: string }
         Returns: number
       }
-      agent_alias_anvend_alle: {
-        Args: { p_kilde: string }
-        Returns: number
-      }
+      agent_alias_anvend_alle: { Args: { p_kilde: string }; Returns: number }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       api_konto_kampagner: {
