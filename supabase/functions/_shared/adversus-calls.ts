@@ -76,9 +76,19 @@ export function mapCallEntry(e: CallEntry, dialerName: string): StandardCall {
 
 /** Henter alle sider for et start-vindue. `get` er adapterens budgetterede GET (præfikser /v1). `komplet` = alle sider hentet
  *  (ellers må vandmærket IKKE flyttes). `stop()` afbryder mellem sider (tidsbudget). */
-export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, opts: { maksSider?: number; stop?: () => boolean } = {}): Promise<{ entries: CallEntry[]; sider: number; total: number | null; komplet: boolean }> {
+/** Filter til /calls: start-vindue + (krav 10) valgfri liste af bruger-id'er (userId $in; numeriske id'er sendes som tal). */
+export function callsFilter(fra: string, til: string, brugerIds?: string[]): string {
+  const f: Record<string, unknown> = { start: { $gt: fra, $lt: til } };
+  if (brugerIds) f.userId = { $in: brugerIds.map((id) => (/^\d+$/.test(id) ? Number(id) : id)) };
+  return encodeURIComponent(JSON.stringify(f));
+}
+export type HentCallsResultat = { entries: CallEntry[]; sider: number; total: number | null; komplet: boolean; frasorteret: number; filterRespekteret: boolean | null };
+/** `brugerIds` (krav 10, »kun egne medarbejdere«): Adversus bedes kun om disse bruger-id'er; tom liste = intet hentes (ingen request).
+ *  Svaret efterkontrolleres: kald fra andre bruger-id'er frasorteres FØR de forlader funktionen (filterRespekteret=false → skal logges). */
+export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, opts: { maksSider?: number; stop?: () => boolean; brugerIds?: string[] } = {}): Promise<HentCallsResultat> {
   const maksSider = opts.maksSider ?? 30;
-  const filt = encodeURIComponent(JSON.stringify({ start: { $gt: fra, $lt: til } }));
+  if (opts.brugerIds && opts.brugerIds.length === 0) return { entries: [], sider: 0, total: 0, komplet: true, frasorteret: 0, filterRespekteret: null };
+  const filt = callsFilter(fra, til, opts.brugerIds);
   const entries: CallEntry[] = []; const set = new Set<string>(); let total: number | null = null; let sider = 0; let raa = 0; let komplet = false;
   for (let side = 1; side <= maksSider; side++) {
     if (opts.stop?.()) break;
@@ -99,5 +109,8 @@ export async function hentCallsV1(get: (sti: string) => Promise<unknown>, fra: s
     if (calls.length === 0) break;  // tom side før pageCount: ikke komplet
   }
   if (komplet && total != null && raa < total) komplet = false;  // meta.total større end hentet (rå antal, før dedup)
-  return { entries, sider, total, komplet };
+  if (!opts.brugerIds) return { entries, sider, total, komplet, frasorteret: 0, filterRespekteret: null };
+  const tilladt = new Set(opts.brugerIds);
+  const egne = entries.filter((e) => tilladt.has(str(e.userId)));
+  return { entries: egne, sider, total, komplet, frasorteret: entries.length - egne.length, filterRespekteret: entries.length === egne.length };
 }

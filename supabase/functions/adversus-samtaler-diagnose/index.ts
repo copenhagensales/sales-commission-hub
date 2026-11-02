@@ -105,6 +105,16 @@ Deno.serve(async (req) => {
   // 4) paginering: stor pageSize over 2 timer
   const r4 = await get(`/calls?pageSize=2000&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t3 } })}`);
   ud.paginering = { status: r4.status, antal_returneret: liste(r4.data, "calls").length, meta: meta(r4.data) };
+  // 4b) Krav 10 (F1a-3): respekterer /calls filteret userId $in? Sammenlignes med det ufiltrerede vindue (r2, ≤ 100 kald). Kun bruger-id'er gemmes i svaret.
+  const bf = url.searchParams.get("brugerfilter");
+  if (bf) {
+    const ids = bf.split(",").map((x) => x.trim()).filter((x) => /^\d{1,12}$/.test(x)).slice(0, 20);
+    const r6 = await get(`/calls?pageSize=1000&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t2 }, userId: { $in: ids.map(Number) } })}`);
+    const fcalls = liste(r6.data, "calls");
+    const retur = [...new Set(fcalls.map((c) => s(c.userId)))];
+    ud.brugerfilter = { status: r6.status, anmodet: ids, antal_filtreret: fcalls.length, bruger_ider_retur: retur, alle_inden_for: retur.every((u) => ids.includes(u)),
+      forventet_fra_ufiltreret_vindue: calls.filter((c) => ids.includes(s(c.userId))).length, ufiltreret_antal_i_vindue: calls.length, meta: meta(r6.data) };
+  }
   // 5) /calls/{id}/recording – 307 og Location-host, redirect følges IKKE: både for recordings.cdr.id og for et /calls-id med links.recording
   const linkProbe = async (id: string) => { const r5 = await get(`/calls/${encodeURIComponent(id)}/recording`, "manual"); return { status: r5.status, location_findes: !!r5.location, location_host: host(r5.location) }; };
   if (cdrIds[0]) ud.recording_link_fra_recordings = await linkProbe(cdrIds[0]);

@@ -1,12 +1,13 @@
 import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { hentCallsV1, mapCallEntry, statusFraKald } from "./adversus-calls.ts";
+import { callsFilter, hentCallsV1, mapCallEntry, statusFraKald } from "./adversus-calls.ts";
 
-Deno.test("mapCallEntry: duration_seconds = conversation + queued (besvaret→slut), total = duration, ingen nummer/extension", () => {
+Deno.test("mapCallEntry: duration_seconds = conversation + queued (besvaret→slut), total = duration; nummer/extension mappes (kataloget filtrerer)", () => {
   const c = mapCallEntry({ id: 123, campaignId: 7, leadId: 9, contactId: 11, userId: 5, disposition: "answered", byeCause: "NORMAL_CLEARING", start: "2026-10-30T09:00:00Z", answer: "2026-10-30T09:00:10Z", connect: "2026-10-30T09:00:14Z", end: "2026-10-30T09:02:00Z", duration: 120, queued: 4, billable: 110, dialing: 10, conversation: 106, sip: "200", origin: "outbound", anonymous: "n", number: "+4512345678", extension: "101", links: { recording: "https://x/y" } } as never, "Lovablecph");
   assertEquals(c.externalId, "123"); assertEquals(c.durationSeconds, 110); assertEquals(c.totalDurationSeconds, 120);
   assertEquals(c.status, "ANSWERED"); assertEquals(c.leadExternalId, "11"); assertEquals(c.agentExternalId, "5");
   assertEquals(c.recordingUrl, undefined);
-  assertEquals(JSON.stringify(c).includes("+4512345678"), false); assertEquals(JSON.stringify(c).includes('"101"'), false);
+  // F1b-2: mapperen leverer alle felter; KATALOGET afgør i processCalls, hvad der gemmes (number/extension er »hentes=nej« som standard)
+  assertEquals(c.metadata?.number, "+4512345678"); assertEquals(c.metadata?.extension, "101");
   assertEquals(c.metadata?.hasRecording, true); assertEquals(c.metadata?.agentConversationSeconds, 106); assertEquals(c.metadata?.queuedSeconds, 4);
 });
 Deno.test("statusFraKald: samme kontrakt som /cdr-mapperen (disposition først, ellers byeCause)", () => {
@@ -59,4 +60,21 @@ Deno.test("hentCallsV1: ugyldig struktur kaster (tomt objekt, manglende pageCoun
   assertEquals(ok.komplet, true);
   const forLidt = await hentCallsV1(() => Promise.resolve({ calls: [{ id: 1 }], meta: { pagination: { pageCount: 1, total: 2500 } } }), "a", "b");
   assertEquals(forLidt.komplet, false);
+});
+
+Deno.test("hentCallsV1 (krav 10): brugerIds → userId $in i filteret (tal), fremmede kald frasorteres, tom liste = ingen request", async () => {
+  const f = JSON.parse(decodeURIComponent(callsFilter("a", "b", ["12", "x7"])));
+  assertEquals(f.userId, { $in: [12, "x7"] }); assertEquals(f.start, { $gt: "a", $lt: "b" });
+  assertEquals(JSON.parse(decodeURIComponent(callsFilter("a", "b"))).userId, undefined);
+  const kaldt: string[] = [];
+  const get = (sti: string) => { kaldt.push(sti); return Promise.resolve({ calls: [{ id: 1, userId: 12 }, { id: 2, userId: 99 }, { id: 3, userId: "12" }], meta: { pagination: { pageCount: 1, total: 3 } } }); };
+  const r = await hentCallsV1(get, "a", "b", { brugerIds: ["12"] });
+  assertEquals(kaldt.length, 1); assertEquals(decodeURIComponent(kaldt[0]).includes('"userId":{"$in":[12]}'), true);
+  assertEquals(r.entries.map((e) => e.id), [1, 3]); assertEquals(r.frasorteret, 1); assertEquals(r.filterRespekteret, false); assertEquals(r.komplet, true);
+  const ok = await hentCallsV1(() => Promise.resolve({ calls: [{ id: 1, userId: 12 }], meta: { pagination: { pageCount: 1, total: 1 } } }), "a", "b", { brugerIds: ["12"] });
+  assertEquals(ok.filterRespekteret, true); assertEquals(ok.frasorteret, 0);
+  const tom = await hentCallsV1(() => { throw new Error("må ikke kaldes"); }, "a", "b", { brugerIds: [] });
+  assertEquals(tom.komplet, true); assertEquals(tom.entries.length, 0); assertEquals(tom.filterRespekteret, null);
+  const uden = await hentCallsV1(() => Promise.resolve({ calls: [{ id: 1, userId: 99 }], meta: { pagination: { pageCount: 1, total: 1 } } }), "a", "b");
+  assertEquals(uden.entries.length, 1); assertEquals(uden.filterRespekteret, null);
 });

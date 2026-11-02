@@ -107,8 +107,8 @@ function FeltRaekke({ felt, laast, daekning }: { felt: KatalogFelt; laast: boole
           className="w-24 h-8 text-xs"
           placeholder="politik"
           value={retention}
-          disabled
-          title="Frister pr. felt afgøres samlet i F5 – indtil da gælder kampagne-/klientpolitikken"
+          disabled={spaerret}
+          title="Tom = kampagne-/klientpolitikken. En frist her går forud, hvis den er kortere."
           onChange={(e) => setRetention(e.target.value)}
           onBlur={() => {
             const ny = retention === "" ? null : Number(retention);
@@ -155,19 +155,22 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
   const { data, isLoading, error } = useKaldFeltKatalog(kilde);
   const { data: daekning } = useKaldFeltDaekning(DAEKNING_DAGE);
   const [soeg, setSoeg] = useState("");
+  const [visning, setVisning] = useState<"alle" | "hentes" | "undlades">("alle");
 
   const prEndpoint = useMemo(() => {
     const m = new Map<string, KatalogFelt[]>();
     const q = soeg.trim().toLowerCase();
     for (const f of data ?? []) {
       if (kampagner && f.kampagne_ekstern_id && !kampagner.includes(f.kampagne_ekstern_id)) continue;
+      if (visning === "hentes" && !f.hentes) continue;
+      if (visning === "undlades" && f.hentes) continue;
       if (q && !`${f.felt_navn} ${f.felt_sti} ${f.beskrivelse ?? ""} ${f.metadata_noegle ?? ""} ${f.maal_kolonne ?? ""} ${f.kampagne_ekstern_id ?? ""}`.toLowerCase().includes(q)) continue;
       const liste = m.get(f.endpoint) ?? [];
       liste.push(f);
       m.set(f.endpoint, liste);
     }
     return m;
-  }, [data, soeg, kampagner]);
+  }, [data, soeg, kampagner, visning]);
 
   const synlige = useMemo(() => (data ?? []).filter((f) => !(kampagner && f.kampagne_ekstern_id && !kampagner.includes(f.kampagne_ekstern_id))), [data, kampagner]);
   const endpoints = useMemo(() => {
@@ -191,13 +194,21 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
         <CardDescription>
           {laast
             ? "Låst: felterne vises, men kan først ændres, når denne API flyttes over på kataloget i en senere leverance."
-            : "Alle felter API'en kan levere: hvor de gemmes, om de hentes, klassifikation, frist og dækning. Standard er »hent alt«; kataloget klassificerer og sætter frister. Ændringer logges."}
+            : "Alle felter API'en kan levere: vælg hvad der hentes og hvad der undlades, klassifikation, frist pr. felt og dækning. Standard er »hent alt«. Ændringer logges."}
         </CardDescription>
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <Badge variant="outline">{total} felter</Badge>
           <Badge variant="outline">{hentes} hentes</Badge>
           <Badge variant={uklassificeret > 0 ? "destructive" : "outline"}>{uklassificeret} ikke klassificeret</Badge>
-          <Input className="ml-auto w-64 h-8" placeholder="Søg felt…" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
+          <Select value={visning} onValueChange={(v) => setVisning(v as "alle" | "hentes" | "undlades")}>
+            <SelectTrigger className="ml-auto h-8 w-[150px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="alle">Alle felter</SelectItem>
+              <SelectItem value="hentes">Kun dem der hentes</SelectItem>
+              <SelectItem value="undlades">Kun dem der undlades</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input className="w-64 h-8" placeholder="Søg felt…" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
         </div>
       </CardHeader>
       <CardContent>
@@ -240,7 +251,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
                         <TableHead>
                           <Tooltip>
                             <TooltipTrigger>Frist (dage)</TooltipTrigger>
-                            <TooltipContent>Tom = kampagnens/klientens opbevaringspolitik som i dag. Egne frister pr. felt afgøres samlet i F5 og kan ikke sættes her endnu.</TooltipContent>
+                            <TooltipContent>Tom = kampagnens/klientens opbevaringspolitik. En frist pr. felt går forud, hvis den er kortere. Ændringer gælder fremad og logges.</TooltipContent>
                           </Tooltip>
                         </TableHead>
                         <TableHead>

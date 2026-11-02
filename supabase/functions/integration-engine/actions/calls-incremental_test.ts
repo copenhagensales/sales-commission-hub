@@ -46,3 +46,16 @@ Deno.test("afstemningsDage: genoptager alle manglende dage, ældste først, høj
   assertEquals(afstemningsDage("2026-09-01", "2026-10-31")[0], "2026-09-02");  // ældste manglende først – intet springes over
   assertEquals(afstemningsDage("2026-10-20", "2026-10-31")[0], "2026-10-21");
 });
+
+Deno.test("hentBrugereV1: alle brugere (også uden e-mail), displayName foretrækkes, sider følges", async () => {
+  const { hentBrugereV1 } = await import("./calls-incremental.ts");
+  const sider: Record<number, unknown> = {
+    1: { users: [{ id: 1, name: "A", displayName: "Anna", email: "a@x.dk", active: true }, { id: 2, name: "B", email: "", active: false }], meta: { pagination: { pageCount: 2 } } },
+    2: { users: [{ id: 3, name: "C" }], meta: { pagination: { pageCount: 2 } } },
+  };
+  const m = await hentBrugereV1((sti) => Promise.resolve(sider[Number(new URL("https://x" + sti).searchParams.get("page"))]));
+  assertEquals(m.size, 3);
+  assertEquals(m.get("1"), { navn: "Anna", email: "a@x.dk", aktiv: true });
+  assertEquals(m.get("2"), { navn: "B", email: null, aktiv: false });
+  assertEquals(m.get("3"), { navn: "C", email: null, aktiv: null });
+});

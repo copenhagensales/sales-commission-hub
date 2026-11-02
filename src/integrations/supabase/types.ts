@@ -420,6 +420,54 @@ export type Database = {
           },
         ]
       }
+      agent_ekstern_alias: {
+        Row: {
+          aendret: string
+          agent_id: string | null
+          aktiv: boolean | null
+          anvendt_tid: string | null
+          bagud_hentet_tid: string | null
+          ikke_vores: boolean
+          konto_id: string | null
+          ekstern_id: string
+          email: string | null
+          kilde: string
+          navn: string | null
+          oprettet: string
+          oprindelse: string
+        }
+        Insert: {
+          aendret?: string
+          agent_id?: string | null
+          aktiv?: boolean | null
+          anvendt_tid?: string | null
+          bagud_hentet_tid?: string | null
+          ikke_vores?: boolean
+          konto_id?: string | null
+          ekstern_id: string
+          email?: string | null
+          kilde: string
+          navn?: string | null
+          oprettet?: string
+          oprindelse: string
+        }
+        Update: {
+          aendret?: string
+          agent_id?: string | null
+          aktiv?: boolean | null
+          anvendt_tid?: string | null
+          bagud_hentet_tid?: string | null
+          ikke_vores?: boolean
+          konto_id?: string | null
+          ekstern_id?: string
+          email?: string | null
+          kilde?: string
+          navn?: string | null
+          oprettet?: string
+          oprindelse?: string
+        }
+        Relationships: []
+      }
       agents: {
         Row: {
           base_salary_monthly: number | null
@@ -1275,6 +1323,7 @@ export type Database = {
           api_noegle: string
           id: string
           integration_id: string | null
+          kun_egne_medarbejdere: boolean
           navn: string
           note: string | null
           oprettet: string
@@ -1286,6 +1335,7 @@ export type Database = {
           api_noegle: string
           id?: string
           integration_id?: string | null
+          kun_egne_medarbejdere?: boolean
           navn: string
           note?: string | null
           oprettet?: string
@@ -1297,6 +1347,7 @@ export type Database = {
           api_noegle?: string
           id?: string
           integration_id?: string | null
+          kun_egne_medarbejdere?: boolean
           navn?: string
           note?: string | null
           oprettet?: string
@@ -20242,6 +20293,14 @@ export type Database = {
       }
       adversus_api_budget_status: { Args: { p_bruger: string }; Returns: Json }
       adversus_api_budget_timestat: { Args: never; Returns: undefined }
+      agent_alias_anvend: {
+        Args: { p_kilde: string; p_ekstern_id: string }
+        Returns: number
+      }
+      agent_alias_anvend_alle: {
+        Args: { p_kilde: string }
+        Returns: number
+      }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       api_konto_kampagner: {

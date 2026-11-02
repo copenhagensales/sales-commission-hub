@@ -35,7 +35,9 @@ async function processCallsBatch(
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
   agentMapByDialerId: Map<string, string>,
   integrationId: string,
-  katalog: Katalog | null
+  katalog: Katalog | null,
+  aliasMap: Map<string, string>,
+  udenKobling: Set<string>
 ) {
   let processed = 0
   let errors = 0
@@ -51,6 +53,11 @@ async function processCallsBatch(
         if (agentEmail) {
           agentId = agentMapByEmail.get(agentEmail) || null
         }
+      }
+      // [F1a-3] Alias som data: samme medarbejder kan have flere eksterne bruger-id'er (agent_ekstern_alias, fyldt fra salg/UI)
+      if (!agentId && call.agentExternalId) {
+        agentId = aliasMap.get(`${kildeForIntegrationType(call.integrationType)}|${call.agentExternalId}`) || null
+        if (!agentId) udenKobling.add(`${kildeForIntegrationType(call.integrationType)}|${call.agentExternalId}`)
       }
       if (agentId) matched++
       const raa = {
@@ -76,9 +83,12 @@ async function processCallsBatch(
       // [F1b-2] Feltkataloget afgør, hvad der skrives (kolonner og metadata-nøgler); recording_url forbliver null uanset katalog.
       // Fallback uden katalog (utilgængeligt eller uden rækker for kilden): kode-allowlisten som hidtil (dialer-call-privacy.ts).
       const kilde = kildeForIntegrationType(call.integrationType)
-      const callData = katalog && harKilde(katalog, kilde)
+      const callData: Record<string, unknown> = katalog && harKilde(katalog, kilde)
         ? { ...anvendKatalog(katalog, "dialer_calls", kilde, raa).raekke, recording_url: null }
         : { ...raa, metadata: sanitizeDialerCallMetadata(call.metadata) }
+      // [F1a-3] Ingen tabt sælger: kan sælgeren ikke matches, udelades agent_id fra rækken, så en allerede sat agent_id bevares ved upsert
+      // (PostgREST opdaterer kun de kolonner, der sendes). Nye rækker får null som før.
+      if (!agentId) delete callData.agent_id
       allCallsData.push(callData)
       processed++
     } catch (e) {
@@ -88,10 +98,13 @@ async function processCallsBatch(
     }
   }
   try {
-    if (allCallsData.length > 0) {
+    // Ens nøgler pr. upsert-kald (PostgREST-krav): rækker med og uden agent_id sendes hver for sig
+    const grupper = [allCallsData.filter((r) => "agent_id" in r), allCallsData.filter((r) => !("agent_id" in r))]
+    for (const gruppe of grupper) {
+      if (gruppe.length === 0) continue
       const { error: upsertError } = await supabase
         .from("dialer_calls")
-        .upsert(allCallsData, {
+        .upsert(gruppe, {
           onConflict: "external_id,integration_type,dialer_name",
           ignoreDuplicates: false,
         })
@@ -147,6 +160,17 @@ export async function processCalls(
   // [F1b-2] Kataloget hentes én gang pr. kørsel (cache 5 min). Fejl → fallback til kode-allowlisten med advarsel (Tier 1 må ikke stoppe).
   let katalog: Katalog | null = null
   try { katalog = await hentKatalog(supabase) } catch (e) { log("WARN", `feltkatalog utilgængeligt – kode-allowlist bruges: ${e instanceof Error ? e.message : String(e)}`) }
+  // [F1a-3] Sælger-alias (eksternt bruger-id → agent) – data fra salg/UI; ukendte id'er registreres som »uden kobling« til UI'et
+  const aliasMap = new Map<string, string>()
+  try {
+    const { data: aliaser, error } = await supabase.from("agent_ekstern_alias").select("kilde, ekstern_id, agent_id").not("agent_id", "is", null)
+    if (error) throw error
+    for (const a of (aliaser ?? []) as { kilde: string; ekstern_id: string; agent_id: string }[]) aliasMap.set(`${a.kilde}|${a.ekstern_id}`, a.agent_id)
+  } catch (e) { log("WARN", `agent_ekstern_alias utilgængelig: ${e instanceof Error ? e.message : String(e)}`) }
+  const udenKobling = new Set<string>()
+  // [F1a-3] Kontoen (Integrationer-siden), så ukendte id'er kan vises på den rigtige konto; valgfri
+  let kontoId: string | null = null
+  try { const { data: k } = await supabase.from("api_konto").select("id").eq("integration_id", integrationId).maybeSingle(); kontoId = (k as { id?: string } | null)?.id ?? null } catch { kontoId = null }
   let totalProcessed = 0
   let totalErrors = 0
   let totalMatched = 0
@@ -163,12 +187,21 @@ export async function processCalls(
       log,
       agentMapByDialerId,
       integrationId,
-      katalog
+      katalog,
+      aliasMap,
+      udenKobling
     )
     totalProcessed += processed
     totalErrors += errors
     totalMatched += matched
     log("INFO", `Lote ${batchNum + 1} completado: ${processed} procesadas, ${matched} matched, ${errors} errores`)
+  }
+  // [F1a-3] Ukendte sælger-id'er registreres (agent_id null) – vises i UI som »Sælgere uden kobling«; eksisterende rækker røres ikke
+  if (udenKobling.size > 0) {
+    const raekker = [...udenKobling].map((k) => { const [kilde, ekstern_id] = k.split("|"); return { kilde, ekstern_id, oprindelse: "kald", konto_id: kontoId } })
+    const { error } = await supabase.from("agent_ekstern_alias").upsert(raekker, { onConflict: "kilde,ekstern_id", ignoreDuplicates: true })
+    if (error) log("WARN", `agent_ekstern_alias: kunne ikke registrere ${raekker.length} ukendte sælger-id'er: ${error.message}`)
+    else log("INFO", `${raekker.length} sælger-id'er uden kobling registreret (agent_ekstern_alias)`)
   }
   return { processed: totalProcessed, errors: totalErrors, matched: totalMatched }
 }

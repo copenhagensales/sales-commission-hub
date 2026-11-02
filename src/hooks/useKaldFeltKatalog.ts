@@ -76,7 +76,7 @@ export function daekningNoegle(f: KatalogFelt): string | null {
 }
 
 export type KatalogFeltAendring = Partial<
-  Pick<KatalogFelt, "hentes" | "klassifikation" | "retention_dage" | "begrundelse" | "status" | "historik">
+  Pick<KatalogFelt, "hentes" | "klassifikation" | "retention_dage" | "begrundelse" | "status" | "historik" | "kanonisk_felt">
 >;
 
 /** Opdaterer ét felt. Audit skrives af DB-trigger (hvem/hvornår/gammel→ny). */

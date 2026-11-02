@@ -8,6 +8,8 @@ import { ArrowLeft, ExternalLink, Lock } from "lucide-react";
 import { KaldFeltKatalog } from "@/components/settings/KaldFeltKatalog";
 import { DialerIntegrations } from "@/components/settings/DialerIntegrations";
 import { IntegrationLogs } from "@/components/settings/IntegrationLogs";
+import { SaelgereUdenKobling } from "@/components/integrationer/SaelgereUdenKobling";
+import { Switch } from "@/components/ui/switch";
 import { KlientVaelger } from "@/components/integrationer/KlientVaelger";
 import { useKaldFeltKatalog } from "@/hooks/useKaldFeltKatalog";
 import {
@@ -16,6 +18,7 @@ import {
   useDialerKonti,
   useKampagnePolitikker,
   useKontoKampagner,
+  useOpdaterKonto,
   useSyncState,
   useSystemPolitikker,
   type ApiKonto,
@@ -56,6 +59,7 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
   const { data: dialer = [] } = useDialerKonti(ids);
   const { data: sync = [] } = useSyncState(ids);
   const d = dialer[0];
+  const opdaterKonto = useOpdaterKonto();
   const cfg = (d?.config ?? {}) as Record<string, unknown>;
   const status = API_STATUS_LABEL[api.status] ?? API_STATUS_LABEL.laast;
   return (
@@ -79,9 +83,23 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
               <div><span className="text-muted-foreground">Aktiv:</span> {d.is_active ? "Ja" : "Nej"} · <span className="text-muted-foreground">Teknisk navn:</span> {d.name}</div>
               <div><span className="text-muted-foreground">Sidste salgs-sync:</span> {tid(d.last_sync_at)} {d.last_status && <span className="text-xs text-muted-foreground">({d.last_status})</span>}</div>
               {d.provider === "adversus" && (
-                <div className="sm:col-span-2">
-                  <span className="text-muted-foreground">Henter kald:</span> {cfg.calls_v1 === true ? "ja, ny /calls-vej" : "legacy /cdr"} · <span className="text-muted-foreground">Henter emner:</span> {cfg.leads_v1 === true ? "ja" : "nej"}
-                </div>
+                <>
+                  <div className="sm:col-span-2">
+                    <span className="text-muted-foreground">Henter kald:</span> {cfg.calls_v1 === true ? "ja, ny /calls-vej" : "legacy /cdr"} · <span className="text-muted-foreground">Henter emner:</span> {cfg.leads_v1 === true ? "ja" : "nej"}
+                  </div>
+                  <div className="sm:col-span-2 flex items-center gap-3">
+                    <Switch id={`kun-egne-${konto.id}`} checked={konto.kun_egne_medarbejdere} disabled={opdaterKonto.isPending || cfg.calls_v1 !== true}
+                      onCheckedChange={(v) => opdaterKonto.mutate({ id: konto.id, aendring: { kun_egne_medarbejdere: v } })} />
+                    <label htmlFor={`kun-egne-${konto.id}`} className="text-sm">
+                      Hent kun egne medarbejderes kald{konto.kun_egne_medarbejdere ? " (til)" : " (fra)"}
+                      <span className="block text-xs text-muted-foreground">
+                        {cfg.calls_v1 === true
+                          ? "Til: dialeren bedes kun om kald for bruger-id'er, der er koblet til en medarbejder (fremmede konti). Fra: alle kontoens kald hentes (Copenhagen Sales' egen konto)."
+                          : "Gælder først, når kontoen hentes via den nye /calls-vej (ikke aktiv her endnu). Indstillingen er sat på forhånd og kan ikke ændres, før kontoen er på den nye vej."}
+                      </span>
+                    </label>
+                  </div>
+                </>
               )}
             </>
           )}
@@ -96,6 +114,7 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
           )}
         </CardContent>
       </Card>
+      {konto.integration_id && <SaelgereUdenKobling kilde={api.noegle} kontoId={konto.id} kunEgne={konto.kun_egne_medarbejdere} />}
       {sync.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Seneste kørsler</CardTitle></CardHeader>
