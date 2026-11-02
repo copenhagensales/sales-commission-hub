@@ -575,6 +575,13 @@
       "when": 1793562520137,
       "tag": "0081_pricing_adjustment_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793605249299,
+      "tag": "0082_tdc_fiber_kun_lead",
+      "breakpoints": true
     }
   ]
 }
