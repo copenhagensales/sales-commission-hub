@@ -102,7 +102,7 @@ export function useOpretFiberSalg() {
   });
 }
 
-export interface AdminFiberSalgInput extends FiberSalgInput { lukkerId: string; dato: string }
+export interface AdminFiberSalgInput extends FiberSalgInput { lukkerId: string | null; dato: string }
 
 /** Admin/ejer opretter salg for en sælger på listen, evt. tilbagedateret i lønperioden. */
 export function useAdminOpretFiberSalg() {
@@ -112,7 +112,7 @@ export function useAdminOpretFiberSalg() {
     mutationFn: async (i: AdminFiberSalgInput) => {
       const { data, error } = await supabase.rpc("tdc_fiber_admin_opret_salg", {
         p_salg_id: i.salgId, p_lead_salg_id: i.leadSalgId as string, p_type: i.type, p_variant: i.variant,
-        p_mobilevoice: i.mobilevoice, p_cvr: i.cvr, p_lukker: i.lukkerId, p_leadgiver: i.leadgiverId as string, p_dato: i.dato,
+        p_mobilevoice: i.mobilevoice, p_cvr: i.cvr, p_lukker: i.lukkerId as string, p_leadgiver: i.leadgiverId as string, p_dato: i.dato,
       });
       if (error) throw error;
       return (data as { status?: string } | null)?.status ?? "ukendt";
@@ -149,10 +149,19 @@ export function useMineFiberSalgIDag(mitId: string | null, alle = false) {
       const { data, error } = await q;
       if (error) throw error;
       const rows = (data ?? []) as unknown as SalgRaekke[];
-      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string }; registreret_af?: string; oprettet_af_admin?: boolean };
+      const pl = (r: SalgRaekke) => (r.raw_payload ?? {}) as { rolle?: string; lead_salg_id?: string | null; leadgiver_employee_id?: string | null; leadResultFields?: { "OPP nr"?: string }; registreret_af?: string; oprettet_af_admin?: boolean; kun_lead?: boolean };
       const leads = new Map(rows.filter((r) => pl(r).rolle === "lead" && r.validation_status !== "rejected").map((r) => [r.id, r]));
-      return rows.filter((r) => (pl(r).rolle === "fuldt" || pl(r).rolle === "lukket") && r.validation_status !== "rejected").map((r) => {
-        const p = pl(r); const item = r.sale_items?.[0]; const navn = item?.display_name ?? "";
+      return rows.filter((r) => (pl(r).rolle === "fuldt" || pl(r).rolle === "lukket" || (pl(r).rolle === "lead" && pl(r).kun_lead === true)) && r.validation_status !== "rejected").map((r) => {
+        const p = pl(r);
+        if (p.rolle === "lead") {
+          const it = r.sale_items?.[0]; const n = it?.display_name ?? "";
+          return {
+            id: r.id, tid: r.sale_datetime, type: "kun_lead" as FiberType, saelgerId: null, saelger: null, produkt: it?.display_name ?? null, provision: 0,
+            variant: (n.includes(" VOK") ? "VOK" : "HAP") as FiberVariant, mobilevoice: n.includes("Mobilevoice"),
+            cvr: p.leadResultFields?.["OPP nr"] ?? "", leadgiverId: p.leadgiver_employee_id ?? null, leadgiver: r.agent_name,
+            leadProvision: Number(it?.mapped_commission ?? 0), afAdmin: true,
+          };
+        } const item = r.sale_items?.[0]; const navn = item?.display_name ?? "";
         const lead = p.rolle === "lukket" && p.lead_salg_id ? leads.get(p.lead_salg_id) : undefined;
         return {
           id: r.id, tid: r.sale_datetime, type: p.rolle as FiberType, saelgerId: p.registreret_af ?? null, saelger: r.agent_name, produkt: item?.display_name ?? null,

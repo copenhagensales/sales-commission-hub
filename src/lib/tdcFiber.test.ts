@@ -51,3 +51,17 @@ describe("TDC fiber regler", () => {
     expect(validerAdmin({ ...base, type: "lukket", leadgiverId: "s" }, "s", "2026-11-01", idag).leadgiver).toBeDefined();
   });
 });
+
+describe("kun lead (admin)", () => {
+  const base = { type: "kun_lead" as const, variant: "VOK" as const, mobilevoice: false, cvr: "12345678", leadgiverId: "lg" };
+  const idag = new Date(2026, 10, 2);
+  it("kræver ingen lukker", () => {
+    expect(validerAdmin(base, null, "2026-11-02", idag)).toEqual({});
+  });
+  it("kræver leadgiver", () => {
+    expect(validerAdmin({ ...base, leadgiverId: null }, null, "2026-11-02", idag).leadgiver).toBe("Vælg hvem der gav leadet.");
+  });
+  it("lukket salg kræver stadig lukker", () => {
+    expect(validerAdmin({ ...base, type: "lukket" }, null, "2026-11-02", idag).lukker).toBe("Vælg sælgeren.");
+  });
+});

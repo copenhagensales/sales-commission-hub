@@ -1,5 +1,6 @@
 /** Regler for tastning af TDC Erhverv fibersalg. Databasen (tdc_fiber_opret_salg) håndhæver det samme. */
-export type FiberType = "fuldt" | "lukket";
+export type FiberType = "fuldt" | "lukket" | "kun_lead";
+export const kraeverLeadgiver = (t: FiberType | null) => t === "lukket" || t === "kun_lead";
 export type FiberVariant = "HAP" | "VOK";
 
 export interface FiberKladde {
@@ -19,7 +20,7 @@ export function valider(k: FiberKladde, mitId: string | null) {
   if (!k.type) fejl.type = "Vælg salgstype.";
   if (!k.variant) fejl.variant = "Vælg HAP eller VOK.";
   if (!gyldigtCvr(k.cvr)) fejl.cvr = "CVR skal være 8 cifre.";
-  if (k.type === "lukket" && !k.leadgiverId) fejl.leadgiver = "Vælg hvem der gav leadet.";
+  if (kraeverLeadgiver(k.type) && !k.leadgiverId) fejl.leadgiver = "Vælg hvem der gav leadet.";
   if (k.type === "fuldt" && k.leadgiverId) fejl.leadgiver = "Fuldt salg har ingen leadgiver.";
   if (k.leadgiverId && k.leadgiverId === mitId) fejl.leadgiver = "Du kan ikke være din egen leadgiver.";
   return fejl;
@@ -61,7 +62,7 @@ export const datoIDag = (idag: Date) => iso(idag);
 /** Admin-oprettelse: sælger skal vælges og datoen ligge i perioden til og med i dag. */
 export function validerAdmin(k: FiberKladde, lukkerId: string | null, dato: string, idag: Date) {
   const fejl: ReturnType<typeof valider> & { lukker?: string; dato?: string } = valider(k, lukkerId);
-  if (!lukkerId) fejl.lukker = "Vælg sælgeren.";
+  if (!lukkerId && k.type !== "kun_lead") fejl.lukker = "Vælg sælgeren.";
   if (fejl.leadgiver === "Du kan ikke være din egen leadgiver.") fejl.leadgiver = "Leadgiveren kan ikke være sælgeren selv.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dato) || dato < periodeStart(idag) || dato > iso(idag)) fejl.dato = "Vælg en dato i den igangværende lønperiode, senest i dag.";
   return fejl;
