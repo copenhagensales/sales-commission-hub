@@ -30,6 +30,7 @@ import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCirc
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
 import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
+import { usePricingAdjustments } from "@/hooks/usePricingAdjustments";
 
 interface ProductPricingRulesDialogProps {
   open: boolean;
@@ -108,6 +109,7 @@ export function ProductPricingRulesDialog({
 
   // Kundevendt navn - uafhængigt af pris/provision
   const { data: savedClientDisplayName } = useProductClientDisplayName(productId);
+  const { data: adjustments } = usePricingAdjustments();
   const updateClientDisplayName = useUpdateProductClientDisplayName();
   const [clientDisplayName, setClientDisplayName] = useState("");
 
@@ -1062,6 +1064,27 @@ export function ProductPricingRulesDialog({
             </div>
           </TabsContent>
         </Tabs>
+        {(() => {
+          const gaelder = (adjustments ?? []).filter(
+            (a) => a.is_active && a.client_id === clientId && !a.excluded_product_ids.includes(productId),
+          );
+          if (gaelder.length === 0) return null;
+          return (
+            <div className="mt-4 rounded-md border bg-muted/40 p-3 space-y-2">
+              <p className="text-sm font-medium">Justeringer til sidst</p>
+              {gaelder.map((a) => (
+                <div key={a.id} className="text-sm">
+                  <span className="font-medium">{a.name}</span>: −{a.percent_reduction}% provision og omsætning
+                  {a.effective_from ? ` fra ${format(new Date(a.effective_from), "d/M-yyyy")}` : ""}
+                  {a.clients?.name ? ` · ${a.clients.name}` : ""}
+                </div>
+              ))}
+              <p className="text-sm text-muted-foreground">
+                Beregnes efter prisreglen ovenfor. Rettes under fanen Justeringer.
+              </p>
+            </div>
+          );
+        })()}
       </DialogContent>
     </Dialog>
   );
