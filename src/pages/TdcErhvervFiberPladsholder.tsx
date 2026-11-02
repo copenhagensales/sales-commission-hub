@@ -91,15 +91,15 @@ function AdminPopup({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   );
 }
 
-function FiberFelter({ k, setK, fejl, visFejl, kolleger, udeluk, idPrefix }: {
+function FiberFelter({ k, setK, fejl, visFejl, kolleger, udeluk, idPrefix, medKunLead = false }: {
   k: FiberKladde; setK: (k: FiberKladde) => void; fejl: ReturnType<typeof valider>; visFejl: boolean;
-  kolleger: Kollega[]; udeluk: string | null; idPrefix: string;
+  kolleger: Kollega[]; udeluk: string | null; idPrefix: string; medKunLead?: boolean;
 }) {
   return (
     <>
       <div className="space-y-2">
         <Label className="text-base">Salgstype</Label>
-        <Valg<FiberType> label="Salgstype" value={k.type} onChange={(v) => setK({ ...k, type: v, leadgiverId: v === "fuldt" ? null : k.leadgiverId })} options={[{ v: "fuldt", l: "Fuldt salg" }, { v: "lukket", l: "Lukket salg" }]} />
+        <Valg<FiberType> label="Salgstype" value={k.type} onChange={(v) => setK({ ...k, type: v, leadgiverId: v === "fuldt" ? null : k.leadgiverId })} options={[{ v: "fuldt", l: "Fuldt salg" }, { v: "lukket", l: "Lukket salg" }, ...(medKunLead ? [{ v: "kun_lead" as FiberType, l: "Kun lead (lukket i Adversus)" }] : [])]} />
         {visFejl && fejl.type && <p className="text-sm text-destructive">{fejl.type}</p>}
       </div>
       <div className="space-y-2">
@@ -116,7 +116,8 @@ function FiberFelter({ k, setK, fejl, visFejl, kolleger, udeluk, idPrefix }: {
         <Input id={`${idPrefix}-cvr`} inputMode="numeric" autoComplete="off" maxLength={11} className="min-h-11 text-base" value={k.cvr} onChange={(e) => setK({ ...k, cvr: e.target.value })} placeholder="8 cifre" />
         {visFejl && fejl.cvr && <p className="text-sm text-destructive">{fejl.cvr}</p>}
       </div>
-      {k.type === "lukket" && (
+      {k.type === "kun_lead" && <p className="text-sm text-muted-foreground">Kun leadgiverens del oprettes. Lukkerens salg kommer fra Adversus.</p>}
+      {kraeverLeadgiver(k.type) && (
         <div className="space-y-2">
           <Label className="text-base">Leadgiver</Label>
           <Grupperet kolleger={kolleger} value={k.leadgiverId} onChange={(v) => setK({ ...k, leadgiverId: v })} placeholder="Vælg hvem der gav leadet" udeluk={udeluk ? [udeluk] : []} />
@@ -181,9 +182,9 @@ function AdminOpretPopup({ open, onOpenChange, kolleger }: { open: boolean; onOp
   const fejl = validerAdmin(k, lukker, dato, idag);
   const send = () => {
     setVisFejl(true);
-    if (Object.keys(fejl).length || !k.type || !k.variant || !lukker) return;
+    if (Object.keys(fejl).length || !k.type || !k.variant || (!lukker && k.type !== "kun_lead")) return;
     opret.mutate(
-      { salgId: ids.salg, leadSalgId: k.type === "lukket" ? ids.lead : null, type: k.type, variant: k.variant, mobilevoice: k.mobilevoice, cvr: normaliserCvr(k.cvr), leadgiverId: k.type === "lukket" ? k.leadgiverId : null, lukkerId: lukker, dato },
+      { salgId: ids.salg, leadSalgId: k.type === "lukket" ? ids.lead : null, type: k.type, variant: k.variant, mobilevoice: k.mobilevoice, cvr: normaliserCvr(k.cvr), leadgiverId: kraeverLeadgiver(k.type) ? k.leadgiverId : null, lukkerId: k.type === "kun_lead" ? null : lukker, dato },
       {
         onSuccess: (status) => {
           if (status !== "oprettet" && status !== "findes") { toast({ title: "Ukendt svar", description: "Tjek salgene, før du opretter igen.", variant: "destructive" }); return; }
@@ -197,11 +198,13 @@ function AdminOpretPopup({ open, onOpenChange, kolleger }: { open: boolean; onOp
   const indhold = (
     <div className="space-y-5">
       <div className="space-y-2">
+        {k.type !== "kun_lead" && <>
         <Label className="text-base">Sælger (lukker)</Label>
         <Grupperet kolleger={saelgere} value={lukker} onChange={setLukker} placeholder="Vælg sælger" />
         {visFejl && fejl.lukker && <p className="text-sm text-destructive">{fejl.lukker}</p>}
+        </>}
       </div>
-      <FiberFelter k={k} setK={setK} fejl={fejl} visFejl={visFejl} kolleger={kolleger} udeluk={lukker} idPrefix="admin" />
+      <FiberFelter k={k} setK={setK} fejl={fejl} visFejl={visFejl} kolleger={kolleger} udeluk={k.type === "kun_lead" ? null : lukker} idPrefix="admin" medKunLead />
       <div className="space-y-2">
         <Label htmlFor="admin-dato" className="text-base">Salgsdato</Label>
         <Input id="admin-dato" type="date" className="min-h-11 text-base" min={periodeStart(idag)} max={datoIDag(idag)} value={dato} onChange={(e) => setDato(e.target.value)} />
@@ -321,14 +324,14 @@ export default function TdcErhvervFiber() {
                 {mine.map((s) => (
                   <li key={s.id} className="flex items-start justify-between gap-3 py-2">
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-base">{s.produkt ?? "—"}</span>
-                      <span className={cn("text-sm text-muted-foreground")}>{s.saelger} · {s.provision.toLocaleString("da-DK")} kr. · CVR {s.cvr} · {new Date(s.tid).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span className="text-base">{s.produkt ?? "—"}{s.type === "kun_lead" ? " (kun lead)" : ""}</span>
+                      <span className={cn("text-sm text-muted-foreground")}>{s.type === "kun_lead" ? "Lukket i Adversus" : `${s.saelger} · ${s.provision.toLocaleString("da-DK")} kr.`} · CVR {s.cvr} · {new Date(s.tid).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}</span>
                       {s.afAdmin && <span className="text-sm text-muted-foreground">Oprettet af admin</span>}
                       {s.leadgiver && <span className="text-sm text-muted-foreground">Lead: {s.leadgiver} · {(s.leadProvision ?? 0).toLocaleString("da-DK")} kr.</span>}
                     </div>
                     {erAdmin && (
                       <div className="flex shrink-0 gap-2">
-                        <Button variant="outline" className="min-h-11" onClick={() => setRetter(s)}>Ret</Button>
+                        {s.type !== "kun_lead" && <Button variant="outline" className="min-h-11" onClick={() => setRetter(s)}>Ret</Button>}
                         <Button variant="destructive" className="min-h-11" onClick={() => setSletter(s)}>Slet</Button>
                       </div>
                     )}
