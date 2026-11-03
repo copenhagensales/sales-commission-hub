@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
   if (user && pass) authHeader = `Basic ${btoa(`${user}:${pass}`)}`;
   else if (token) authHeader = token.includes(":") ? `Basic ${btoa(token)}` : `Bearer ${token}`;
   if (!authHeader) return json(500, { error: "Legitimation mangler" });
-  let base = s(c?.api_url) || s(di.api_url) || "https://wshero01.herobase.com/api";
+  let base = s(di.api_url) || s(c?.api_url) || "https://wshero01.herobase.com/api";
   if (!base.startsWith("http")) base = "https://" + base;
   base = base.replace(/\/$/, ""); if (!base.endsWith("/api")) base += "/api";
   const headers = { Authorization: authHeader, Accept: "application/json" };
@@ -61,22 +61,31 @@ Deno.serve(async (req) => {
   };
   const liste = (d: unknown): Row[] => (Array.isArray(d) ? d : ((d as Row)?.Results ?? (d as Row)?.results ?? (d as Row)?.Leads ?? (d as Row)?.leads ?? [])) as Row[];
   const ud: Row = { integration: navn, host: new URL(base).host, dag, time, org_codes_antal: orgCodes.length, raadata_gemt: false };
+  let trin = "start";
+  try {
 
+  trin = "kvote";
   // 1) Kvote
   const lim = await get("/myaccount/request/limits"); const cnt = await get("/myaccount/request/counts");
   ud.kvote = { limits: { status: lim.status, felter: feltTrae(lim.data, 2), vaerdier: lim.status === 200 && lim.data && typeof lim.data === "object" ? lim.data : null }, counts: { status: cnt.status, felter: feltTrae(cnt.data, 2), vaerdier: cnt.status === 200 && cnt.data && typeof cnt.data === "object" ? cnt.data : null } };
 
+  trin = "users";
   // 2) Brugere (til sælger-alias)
   const us = await get("/users?Limit=2000"); const users = liste(us.data);
   ud.users = { status: us.status, besked: us.besked, antal: users.length, felter: users[0] ? feltTrae(users[0], 1) : null,
     med_email: users.filter((u) => s(get1(u, ["email", "Email"])).includes("@")).length,
     orgcode_former: former(users, (u) => get1(u, ["orgCode", "OrgCode"])),
-    email_domaener: fordeling(users.map((u) => ({ d: s(get1(u, ["email", "Email"])).split("@")[1] ?? "" })), "d", 12) };
+    email_domaener: fordeling(users.map((u) => ({ d: s(get1(u, ["email", "Email"])).split("@")[1] ?? "" })), "d", 12),
+    orgcode_form_x_domaene: fordeling(users.map((u) => ({ d: `${idForm(get1(u, ["orgCode", "OrgCode"])).replace(/len\d+/, "")}→${(s(get1(u, ["email", "Email"])).split("@")[1] ?? "").toLowerCase()}` })), "d", 16) };
+  const orgDom = new Map<string, string>(); for (const u of users) { const o = s(get1(u, ["orgCode", "OrgCode"])); if (o) orgDom.set(o.toLowerCase(), (s(get1(u, ["email", "Email"])).split("@")[1] ?? "").toLowerCase()); }
+  const domaeneAf = (org: unknown): string => { const o = s(org).toLowerCase(); if (!o) return "tom"; if (o.includes("@")) return o.split("@")[1]; return orgDom.get(o) ?? "ukendt_bruger"; };
 
+  trin = "projects";
   // 3) Projekter
   const pr = await get("/projects"); const projs = liste(pr.data);
   ud.projects = { status: pr.status, antal: projs.length, felter: projs[0] ? feltTrae(projs[0], 1) : null, id_former: former(projs, (p) => get1(p, ["uniqueId", "UniqueId", "id", "Id"])) };
 
+  trin = "leads";
   // 4) Emner/sessions i vinduet (dag → dag+1), ufiltreret
   const erAse = navn.toLowerCase() === "ase";
   const leadsEp = (projects: string) => erAse
@@ -90,7 +99,9 @@ Deno.serve(async (req) => {
     status_felt: fordeling(leads.map((l) => ({ c: s(get1(l, ["status", "Status", "leadStatus", "LeadStatus"])) })), "c"),
     kampagner_distinkte: new Set(leads.map((l) => s(kampId(l)))).size, kampagne_id_former: former(leads, kampId),
     agent_former: former(leads, agentOrg), agenter_distinkte: new Set(leads.map((l) => s(agentOrg(l)))).size,
-    har_telefonfelt: leads[0] ? Object.keys(leads[0]).some((k) => /phone|telefon|number/i.test(k)) : null };
+    har_telefonfelt: leads[0] ? Object.keys(leads[0]).some((k) => /phone|telefon|number/i.test(k)) : null,
+    agent_domaene: fordeling(leads.map((l) => ({ d: domaeneAf(agentOrg(l)) })), "d", 12),
+    kampagne_antal_pr_kode: fordeling(leads.map((l) => ({ k: s(get1(get1(l, ["campaign", "Campaign"]), ["code", "Code"])) })), "k", 20) };
 
   // 5) Projects=-filter: respekteres det? (kun for /simpleleads-konti)
   const testKamp = kampagneParam || s(leads.map((l) => s(kampId(l))).find((x) => x));
@@ -99,8 +110,12 @@ Deno.serve(async (req) => {
     const retur = new Set(fl.map((l) => s(kampId(l))));
     ud.projects_filter = { status: lf.status, besked: lf.besked, anmodet_form: idForm(testKamp), antal_filtreret: fl.length, kampagner_retur: retur.size,
       alle_inden_for: fl.length > 0 ? [...retur].every((x) => x === testKamp) : null, forventet_fra_ufiltreret: leads.filter((l) => s(kampId(l)) === testKamp).length };
+    const lc = await get(`/simpleleads?Projects=*&Campaigns=${encodeURIComponent(testKamp)}&ModifiedFrom=${dag}&ModifiedTo=${plusDag(dag, 1)}&AllClosedStatuses=true&skip=0&take=200`); const cl = liste(lc.data);
+    const returC = new Set(cl.map((l) => s(kampId(l))));
+    ud.campaigns_filter = { status: lc.status, besked: lc.besked, antal_filtreret: cl.length, kampagner_retur: returC.size, alle_inden_for: cl.length > 0 ? [...returC].every((x) => x === testKamp) : null, forventet_fra_ufiltreret: leads.filter((l) => s(kampId(l)) === testKamp).length };
   } else ud.projects_filter = { sprunget_over: erAse ? "ASE bruger /leads?SearchName" : "ingen kampagne i vinduet" };
 
+  trin = "calls";
   // 6) CDR: /calls i ét 2-timers vindue pr. orgCode (maks 2)
   const cdr: Row[] = [];
   for (const org of orgCodes.slice(0, 2)) {
@@ -113,21 +128,33 @@ Deno.serve(async (req) => {
       bruger_id_former: former(calls, (r) => get1(get1(r, ["user", "User"]), ["uniqueId", "UniqueId"]) ?? get1(r, ["UserId", "userId"])),
       bruger_orgcode_former: former(calls, (r) => get1(get1(r, ["user", "User"]), ["orgCode", "OrgCode"])),
       kald_id_former: former(calls, (r) => get1(r, ["uniqueId", "UniqueId", "Id", "id", "CallId"])),
-      lead_id_former: former(calls, (r) => get1(r, ["uniqueLeadId", "LeadUniqueId", "LeadId"])) });
+      lead_id_former: former(calls, (r) => get1(r, ["uniqueLeadId", "LeadUniqueId", "LeadId"])),
+      kampagner_distinkte: new Set(calls.map((r) => s(get1(get1(r, ["campaign", "Campaign"]), ["uniqueId", "UniqueId"])))).size,
+      kampagne_antal_pr_kode: fordeling(calls.map((r) => ({ k: s(get1(get1(r, ["campaign", "Campaign"]), ["code", "Code"])) })), "k", 20),
+      agent_domaene: fordeling(calls.map((r) => ({ d: domaeneAf(get1(get1(r, ["user", "User"]), ["orgCode", "OrgCode"])) })), "d", 12),
+      campaignType: fordeling(calls.map((r) => ({ t: s(get1(r, ["campaignType"])) })), "t"), incoming: fordeling(calls.map((r) => ({ i: s(get1(r, ["incoming"])) })), "i") });
   }
   ud.calls = cdr;
 
+  trin = "hooks";
   // 7) Hooks (B3): findes der hooks, og hvad siger /hooks/meta og /hooks/{id}/example om formatet?
   const hk = await get("/hooks"); const hooks = liste(hk.data);
   ud.hooks = { status: hk.status, besked: hk.besked, antal: hooks.length, felter: hooks[0] ? feltTrae(hooks[0], 1) : null,
     liste: hooks.slice(0, 10).map((h) => ({ leadStatus: s(get1(h, ["LeadStatus", "leadStatus"])), format: s(get1(h, ["Format", "format"])), method: s(get1(h, ["Method", "method"])),
       har_campaignCode: !!s(get1(h, ["CampaignCode", "campaignCode"])), url_host: (() => { try { return new URL(s(get1(h, ["UrlTemplate", "urlTemplate", "Url", "url"]))).host; } catch { return "ugyldig/tom"; } })(),
       contentTemplate_noegler: (() => { const t = s(get1(h, ["ContentTemplate", "contentTemplate"])); try { return Object.keys(JSON.parse(t)); } catch { return t ? ["(ikke JSON)"] : []; } })() })) };
+  const hostAf = (h: Row) => { try { return new URL(s(get1(h, ["UrlTemplate", "urlTemplate", "Url", "url"]))).host; } catch { return ""; } };
+  const egne = hooks.filter((h) => /supabase\.co|copenhagensales|stork/i.test(hostAf(h)));
+  ud.hooks_egne = egne.slice(0, 10).map((h) => ({ id_form: idForm(get1(h, ["id", "Id"])), aktiv: get1(h, ["isActive", "IsActive"]) ?? null, leadStatus: s(get1(h, ["LeadStatus", "leadStatus"])), method: s(get1(h, ["Method", "method"])), standardTemplate: s(get1(h, ["standardTemplateName"])),
+    campaignCode_form: idForm(get1(h, ["CampaignCode", "campaignCode"])), url_host: hostAf(h), url_sti_form: (() => { try { return new URL(s(get1(h, ["UrlTemplate", "urlTemplate"]))).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, "<uuid>"); } catch { return ""; } })(),
+    placeholders: Array.from(new Set((s(get1(h, ["ContentTemplate", "contentTemplate"])).match(/\{[A-Za-z_.]+\}/g) ?? []))).slice(0, 30), headers_noegler: (() => { const t = s(get1(h, ["headers", "Headers"])); try { return Object.keys(JSON.parse(t)); } catch { return t ? ["(tekst)"] : []; } })() }));
+  ud.hooks_hosts = fordeling(hooks.map((h) => ({ h: hostAf(h) })), "h", 8);
   const hm = await get("/hooks/meta");
-  ud.hooks_meta = { status: hm.status, besked: hm.besked, felter: feltTrae(hm.data, 3), vaerdier_hvis_liste: Array.isArray(hm.data) ? hm.data.slice(0, 60).map((x) => (typeof x === "string" ? x : feltTrae(x, 1).join(","))) : null };
+  ud.hooks_meta = { status: hm.status, besked: hm.besked, vaerdier: hm.data && typeof hm.data === "object" ? hm.data : feltTrae(hm.data, 3) };
   const foersteHookId = s(get1(hooks[0] ?? {}, ["id", "Id", "uniqueId", "UniqueId"]));
   if (foersteHookId) { const ex = await get(`/hooks/${encodeURIComponent(foersteHookId)}/example`); ud.hooks_example = { status: ex.status, besked: ex.besked, felter: feltTrae(ex.data, 3) }; }
 
+  } catch (e) { ud.fejl = { trin, besked: (e instanceof Error ? `${e.name}: ${e.message}` : String(e)).replace(/[0-9]{6,}/g, "9…").slice(0, 300) }; }
   ud.rate_limit_headers = rl; ud.api_kald = apiKald;
   return json(200, ud);
 });
