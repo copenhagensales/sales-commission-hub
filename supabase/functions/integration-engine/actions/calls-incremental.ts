@@ -142,14 +142,24 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
         return ((tilladte ?? []) as (string | { agent_alias_tilladt: string })[]).map((t) => (typeof t === "string" ? t : t.agent_alias_tilladt));
       };
       let brugerIds: string[] | undefined;  // sættes efter brugerregistrering/navngivning nedenfor (krav 11, Codex r6: nye brugere skal kendes FØR filtrering)
+      // [F1a-5] Sletteregel-port (fast regel, Mathias 3/11): kun kampagner med en gældende sletteregel hentes – for ALLE konti. Tom liste = intet hentes.
+      // Listen genlæses før lagring (en regel kan være fjernet undervejs). Fejl i opslaget → kørslen fejler for kontoen (der må ikke hentes bredt).
+      const hentKampagnerMedRegel = async (): Promise<string[]> => {
+        const { data, error } = await supabase.rpc("kald_kampagne_regler");
+        if (error) throw error;
+        return ((data ?? []) as { kampagne_ekstern_id: string }[]).map((r) => String(r.kampagne_ekstern_id));
+      };
+      const kampagneIds: string[] = await hentKampagnerMedRegel();
+      if (kampagneIds.length === 0) log("WARN", `calls-incremental ${integ.name}: ingen kampagner med sletteregel – intet hentes`);
       let filterBrudt = false;
       const hentOgGem = async (fra: string, til: string, ids: string[] | undefined = brugerIds): Promise<{ komplet: boolean; processed: number; errors: number; sider: number; total: number | null; frasorteret?: number }> => {
-        const hentet = await hentCallsV1(get, fra, til, { stop, brugerIds: ids });
+        const hentet = await hentCallsV1(get, fra, til, { stop, brugerIds: ids, kampagneIds });
         let { entries } = hentet; const { sider, total, komplet, filterRespekteret } = hentet; let frasorteret = hentet.frasorteret;
-        if (filterRespekteret === false && !filterBrudt) { filterBrudt = true; log("WARN", `calls-incremental ${integ.name}: Adversus respekterede ikke userId-filteret – ${frasorteret} fremmede kald frasorteret før lagring`); }
-        if (kunEgne && entries.length > 0) {  // genkontrol mod den aktuelle tilladelsesliste (valg i UI under hentningen)
-          const nuTilladt = new Set(await hentTilladte());
-          const foer = entries.length; entries = entries.filter((e) => nuTilladt.has(String(e.userId ?? "")));
+        if (filterRespekteret === false && !filterBrudt) { filterBrudt = true; log("WARN", `calls-incremental ${integ.name}: Adversus respekterede ikke userId/campaignId-filteret – ${frasorteret} kald frasorteret før lagring`); }
+        if (entries.length > 0) {  // genkontrol mod de aktuelle lister (valg i UI under hentningen): kampagner med regel + (kun egne) tilladte brugere
+          const nuKamp = new Set(await hentKampagnerMedRegel());
+          const nuTilladt = kunEgne ? new Set(await hentTilladte()) : null;
+          const foer = entries.length; entries = entries.filter((e) => nuKamp.has(String(e.campaignId ?? "")) && (!nuTilladt || nuTilladt.has(String(e.userId ?? ""))));
           frasorteret += foer - entries.length;
         }
         if (!komplet) return { komplet: false, processed: 0, errors: 0, sider, total, frasorteret };
@@ -236,7 +246,7 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
         const r = await hentOgGem(v.fra.toISOString(), v.til.toISOString());
         if (r.komplet && r.errors === 0) await upsertSyncState(supabase, integ.id, "calls_v1", v.til);
         else log("WARN", `calls-incremental ${integ.name}: vandmærke IKKE flyttet (komplet=${r.komplet}, fejl=${r.errors})`);
-        resultat[integ.name] = { vindue: [v.fra.toISOString(), v.til.toISOString()], efterslaeb: v.efterslaeb, ...r, ventet: budget.ventet, ...(kunEgne ? { kun_egne: true, brugere_i_filter: brugerIds?.length ?? 0 } : {}) };
+        resultat[integ.name] = { vindue: [v.fra.toISOString(), v.til.toISOString()], efterslaeb: v.efterslaeb, ...r, ventet: budget.ventet, kampagner_i_filter: kampagneIds.length, ...(kunEgne ? { kun_egne: true, brugere_i_filter: brugerIds?.length ?? 0 } : {}) };
       } else {
         // Nat 1: dagsafstemning (tilbagevendende) – alle dage siden sidst afstemt t.o.m. i går, ældste først; fanger kald uden for overlap/efterslæb
         const iGaar = plusDage(danskDato(nu), -1);

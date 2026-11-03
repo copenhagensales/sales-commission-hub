@@ -187,8 +187,8 @@ export async function smartBackfill(
 
       // Fetch calls for this day
       let callsCount = 0;
-      if ((integration as any)?.config?.calls_v1 === true) {
-        log("INFO", `Backfill day ${dayStart}: calls skipped – calls_v1 (calls-incremental er eneste skriver)`);  // [F1a]
+      if ((integration as any)?.config?.calls_v1 === true || (integration as any)?.provider === "adversus") {
+        log("INFO", `Backfill day ${dayStart}: calls skipped – Adversus-kald hentes kun via calls_v1 (sletteregel-port, F1a-5)`);  // [F1a/F1a-5]
       } else if ((adapter as any).fetchCallsRange) {
         const calls = await (adapter as any).fetchCallsRange({ from: dayStart, to: effectiveEnd });
         if (calls.length > 0) {

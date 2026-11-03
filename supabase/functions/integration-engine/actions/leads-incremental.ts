@@ -65,13 +65,23 @@ export async function leadsIncremental(supabase: any, log: LogFn, opts: { integr
       const get = (sti: string) => adapter.getV1(sti) as Promise<unknown>;
       let defs: Promise<Map<number, { name: string; type: string }>> | null = null;
       const feltDefinitioner = () => (defs ??= hentKampagnefeltDefinitioner(get));
+      // [F1a-5] Sletteregel-port (fast regel, Mathias 3/11): kun emner fra kampagner med gældende sletteregel hentes; tom liste = intet hentes; genlæses før lagring
+      const hentKampagnerMedRegel = async (): Promise<string[]> => {
+        const { data, error } = await supabase.rpc("kald_kampagne_regler");
+        if (error) throw error;
+        return ((data ?? []) as { kampagne_ekstern_id: string }[]).map((r) => String(r.kampagne_ekstern_id));
+      };
+      const kampagneIds = await hentKampagnerMedRegel();
+      if (kampagneIds.length === 0) log("WARN", `leads-incremental ${integ.name}: ingen kampagner med sletteregel – intet hentes`);
       const hentOgGem = async (fra: string, til: string) => {
-        const { entries, sider, total, komplet, udenForVindue } = await hentLeadsV1(get, fra, til, { stop });
-        if (!komplet) return { komplet: false, emner: 0, skrevet: 0, fejl: 0, sider, total, uden_for_vindue: udenForVindue, nye_katalogfelter: 0 };
+        const hentet = await hentLeadsV1(get, fra, til, { stop, kampagneIds });
+        const { sider, total, komplet, udenForVindue } = hentet; let entries = hentet.entries; let frasorteret = hentet.frasorteret;
+        if (!komplet) return { komplet: false, emner: 0, skrevet: 0, fejl: 0, sider, total, uden_for_vindue: udenForVindue, nye_katalogfelter: 0, frasorteret };
+        if (entries.length > 0) { const nu = new Set(await hentKampagnerMedRegel()); const foer = entries.length; entries = entries.filter((e) => nu.has(String(e.campaignId ?? ""))); frasorteret += foer - entries.length; }
         const { raekker, nyeKatalogfelter, kasseredeNoegler } = await forberedLeads(supabase, kat, entries, integ.id, feltDefinitioner);
         const r = raekker.length > 0 ? await skrivLeads(supabase, raekker, log) : { skrevet: 0, fejl: 0 };
         if (udenForVindue > 0) log("WARN", `leads-incremental ${integ.name}: ${udenForVindue} af ${entries.length} emner uden for vinduet – lastUpdatedTime-filteret virker ikke fuldt`);
-        return { komplet: true, emner: entries.length, ...r, sider, total, uden_for_vindue: udenForVindue, nye_katalogfelter: nyeKatalogfelter, kasserede_noegler: kasseredeNoegler };
+        return { komplet: true, emner: entries.length, ...r, sider, total, uden_for_vindue: udenForVindue, nye_katalogfelter: nyeKatalogfelter, kasserede_noegler: kasseredeNoegler, frasorteret };
       };
       if (tilstand === "inkrementel") {
         const state = await getSyncState(supabase, integ.id, "leads_v1");
@@ -88,10 +98,12 @@ export async function leadsIncremental(supabase: any, log: LogFn, opts: { integr
         else {
           let fraId = Number(cursor ?? 0); if (!Number.isFinite(fraId)) fraId = 0;
           while (!stop()) {
-            const side = await hentLeadsFuldSide(get, fraId, FULD_SIDE);
+            const side = await hentLeadsFuldSide(get, fraId, FULD_SIDE, kampagneIds);
             sider++; emner += side.entries.length;
             if (side.entries.length > 0) {
-              const { raekker, nyeKatalogfelter } = await forberedLeads(supabase, kat, side.entries, integ.id, feltDefinitioner);
+              const nuKamp = new Set(await hentKampagnerMedRegel());  // genkontrol før lagring
+              const medRegel = side.entries.filter((e) => nuKamp.has(String(e.campaignId ?? "")));
+              const { raekker, nyeKatalogfelter } = await forberedLeads(supabase, kat, medRegel, integ.id, feltDefinitioner);
               nye += nyeKatalogfelter;
               const r = raekker.length > 0 ? await skrivLeads(supabase, raekker, log) : { skrevet: 0, fejl: 0 };
               skrevet += r.skrevet; fejl += r.fejl;

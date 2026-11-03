@@ -78,3 +78,15 @@ Deno.test("hentCallsV1 (krav 10): brugerIds → userId $in i filteret (tal), fre
   const uden = await hentCallsV1(() => Promise.resolve({ calls: [{ id: 1, userId: 99 }], meta: { pagination: { pageCount: 1, total: 1 } } }), "a", "b");
   assertEquals(uden.entries.length, 1); assertEquals(uden.filterRespekteret, null);
 });
+
+Deno.test("hentCallsV1 (F1a-5): kampagneIds → campaignId $in, fremmede kampagner frasorteres, tom liste = ingen request", async () => {
+  const f = JSON.parse(decodeURIComponent(callsFilter("a", "b", undefined, ["7", "8"])));
+  assertEquals(f.campaignId, { $in: [7, 8] }); assertEquals(f.userId, undefined);
+  const get = () => Promise.resolve({ calls: [{ id: 1, userId: 1, campaignId: 7 }, { id: 2, userId: 1, campaignId: 9 }, { id: 3, userId: 2, campaignId: 8 }], meta: { pagination: { pageCount: 1, total: 3 } } });
+  const r = await hentCallsV1(get, "a", "b", { kampagneIds: ["7", "8"] });
+  assertEquals(r.entries.map((e) => e.id), [1, 3]); assertEquals(r.frasorteret, 1); assertEquals(r.filterRespekteret, false);
+  const begge = await hentCallsV1(get, "a", "b", { brugerIds: ["1"], kampagneIds: ["7", "8"] });
+  assertEquals(begge.entries.map((e) => e.id), [1]);
+  const tom = await hentCallsV1(() => { throw new Error("må ikke kaldes"); }, "a", "b", { kampagneIds: [] });
+  assertEquals(tom.entries.length, 0); assertEquals(tom.komplet, true);
+});

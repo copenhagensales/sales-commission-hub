@@ -86,9 +86,9 @@ Deno.test("sikrKampagnefelter: opretter kun ukendte, navngiver, ignorerer dublet
   assertEquals(n, 1);
   assertEquals(inserts.length, 2);
   assertEquals(inserts[0].felt_sti, "masterData.18"); assertEquals(inserts[0].felt_navn, "Telefon"); assertEquals(inserts[0].metadata_noegle, "m:18");
-  assertEquals(inserts[0].klassifikation, "ukendt"); assertEquals(inserts[0].hentes, true); assertEquals(inserts[0].version, 2); assertEquals(inserts[0].kampagne_ekstern_id, "42");
+  assertEquals(inserts[0].klassifikation, "ukendt"); assertEquals(inserts[0].hentes, false); assertEquals(inserts[0].status, "forslag"); assertEquals(inserts[0].version, 2); assertEquals(inserts[0].kampagne_ekstern_id, "42");  // F1a-5: nye felter er forslag – hentes ikke før afgørelse
   assertEquals(inserts[1].felt_navn, "Resultatfelt 5");
-  assertEquals([...tilladteNoegler(k, "dialer_leads", "adversus", "42")].sort(), ["importId", "m:17", "m:18", "r:5"]);
+  assertEquals([...tilladteNoegler(k, "dialer_leads", "adversus", "42")].sort(), ["importId", "m:17"]);  // forslag er ikke tilladte
   // andet kald: intet nyt
   assertEquals(await sikrKampagnefelter(svc, k, "42", [{ art: "m", id: 18 }]), 0);
 });

@@ -1338,6 +1338,12 @@ export type Database = {
         }
         Relationships: []
       }
+      api_opsaetning_audit: {
+        Row: { id: number; tabel: string; noegle: Json | null; handling: string; gammel: Json | null; ny: Json | null; aendret_af: string | null; aendret: string }
+        Insert: { id?: never; tabel: string; noegle?: Json | null; handling: string; gammel?: Json | null; ny?: Json | null; aendret_af?: string | null; aendret?: string }
+        Update: { id?: never; tabel?: string; noegle?: Json | null; handling?: string; gammel?: Json | null; ny?: Json | null; aendret_af?: string | null; aendret?: string }
+        Relationships: []
+      }
       api_konto: {
         Row: {
           aendret: string
@@ -20353,6 +20359,9 @@ export type Database = {
       }
       agent_alias_anvend_alle: { Args: { p_kilde: string }; Returns: number }
       agent_alias_tilladt: { Args: { p_konto: string }; Returns: string[] }
+      kald_kampagne_regler: { Args: never; Returns: { kampagne_ekstern_id: string; retention_days: number }[] }
+      kald_kampagner_uden_regel: { Args: never; Returns: { kampagne_ekstern_id: string; navn: string | null; aarsag: string }[] }
+      kald_raekker_uden_regel: { Args: never; Returns: { tabel: string; antal: number }[] }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       api_konto_kampagner: {

@@ -20,8 +20,11 @@ import {
   RETNING_LABEL,
   useDialerKonti,
   useKampagnePolitikker,
+  useKampagnerMedRegel,
+  useKampagnerUdenRegel,
   useKontoKampagner,
   useOpdaterKonto,
+  useRaekkerUdenRegel,
   useSyncState,
   useSystemPolitikker,
   type ApiKonto,
@@ -176,14 +179,55 @@ function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegi
   const synlige = kampagner ? felter.filter((f) => !f.kampagne_ekstern_id || kampagner.includes(f.kampagne_ekstern_id)) : felter;
   const medFrist = synlige.filter((f) => f.retention_dage != null);
   const ryddes = synlige.filter((f) => f.hentes && f.status === "aktiv" && !["teknisk", "forretning"].includes(f.klassifikation));
+  const afventer = synlige.filter((f) => f.status === "forslag");
+  const udenRegelQ = useKampagnerUdenRegel(); const medRegelQ = useKampagnerMedRegel(); const raekkerQ = useRaekkerUdenRegel();
+  const udenRegel = udenRegelQ.data ?? []; const medRegel = medRegelQ.data ?? []; const raekkerUdenRegel = raekkerQ.data ?? [];
+  const portFejl = [udenRegelQ.error, medRegelQ.error, raekkerQ.error].filter(Boolean) as Error[];
+  const kontoensUdenRegel = kampagner ? udenRegel.filter((k) => kampagner.includes(k.kampagne_ekstern_id)) : [];
   return (
     <div className="space-y-4">
       <Laast api={api} />
       <Card>
         <CardHeader>
+          <CardTitle>Sletteregel-porten</CardTitle>
+          <CardDescription>
+            Fast regel: intet hentes, før hver datatype har en sletteregel. Hentningen beder kun dialeren om kald og emner for kampagner med en gældende
+            sletteregel (direkte, aktiv politik på den koblede klientkampagne). Nye felter lander som forslag og hentes først, når du har afgjort hentes,
+            klassifikation og frist under fanen <strong>Felter</strong>. Der er ingen standardfrister: rækker uden regel slettes ikke stille, de står her, til reglen er sat.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {portFejl.length > 0 && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-destructive">Kunne ikke læse sletteregel-porten: {portFejl.map((e) => e.message).join(" · ")}. Tallene nedenfor er ikke retvisende.</div>}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div><div className="text-2xl font-semibold">{medRegel.length}</div><div className="text-muted-foreground">kampagner med sletteregel (hentes)</div></div>
+            <div><div className={`text-2xl font-semibold ${udenRegel.length ? "text-destructive" : ""}`}>{udenRegel.length}</div><div className="text-muted-foreground">kampagner uden sletteregel (hentes ikke){kontoensUdenRegel.length ? ` · ${kontoensUdenRegel.length} set på denne konto` : ""}</div></div>
+            <div><div className={`text-2xl font-semibold ${afventer.length ? "text-destructive" : ""}`}>{afventer.length}</div><div className="text-muted-foreground">felter, der afventer din afgørelse</div></div>
+          </div>
+          {udenRegel.length > 0 && (
+            <Table>
+              <TableHeader><TableRow><TableHead>Kampagne</TableHead><TableHead>Navn i dialeren</TableHead><TableHead>Mangler</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {udenRegel.slice(0, 40).map((k) => (
+                  <TableRow key={k.kampagne_ekstern_id} className={kontoensUdenRegel.some((x) => x.kampagne_ekstern_id === k.kampagne_ekstern_id) ? "bg-destructive/5" : undefined}>
+                    <TableCell className="font-mono text-xs">{k.kampagne_ekstern_id}</TableCell>
+                    <TableCell className="text-xs">{k.navn ?? "–"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{k.aarsag}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <div className="text-muted-foreground">
+            Rækker uden sletteregel (røres ikke af oprydningen): {raekkerUdenRegel.map((r) => `${r.tabel} ${Number(r.antal).toLocaleString("da-DK")}`).join(" · ") || "–"}.
+            Kampagner kobles og politikker sættes under <Link to={OPBEVARING_LINK} className="text-primary underline">Compliance › Opbevaring</Link>.
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
           <CardTitle>Sådan ryddes data fra {konto.navn}</CardTitle>
           <CardDescription>
-            Reglerne er data: feltkataloget afgør pr. felt, hvad der beholdes, og kampagne-/klientpolitikkerne afgør hvornår. Statistiske felter
+            Reglerne er data: feltkataloget afgør pr. felt, hvad der beholdes, og kampagnepolitikken afgør hvornår. Statistiske felter
             (teknisk og forretning) beholdes; identifikatorer, personoplysninger og ikke-klassificerede felter ryddes efter politikken. En frist pr. felt
             går forud, hvis den er kortere.
           </CardDescription>
@@ -204,7 +248,7 @@ function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegi
           <CardDescription>Opbevaringspolitik pr. tabel (data_retention_policies) for de tabeller, API'en skriver til.</CardDescription>
         </CardHeader>
         <CardContent>
-          {system.length === 0 && <div className="text-sm text-muted-foreground">Ingen systempolitik for API'ens tabeller – kampagne-/klientpolitik og fallback (90 dage) gælder.</div>}
+          {system.length === 0 && <div className="text-sm text-muted-foreground">Ingen systempolitik for API'ens tabeller – kampagnepolitikken gælder; uden politik hentes og ryddes intet.</div>}
           {system.length > 0 && (
             <Table>
               <TableHeader><TableRow><TableHead>Tabel</TableHead><TableHead>Navn</TableHead><TableHead>Frist (dage)</TableHead><TableHead>Tilstand</TableHead><TableHead>Aktiv</TableHead></TableRow></TableHeader>
@@ -228,12 +272,12 @@ function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegi
           <CardHeader>
             <CardTitle>Kampagnepolitikker for kontoen</CardTitle>
             <CardDescription>
-              Frister pr. klientkampagne (campaign_retention_policies) for de kampagner, kontoen har kald eller emner på. Oprydningen bruger den korteste frist,
-              der gælder for kampagnen (direkte eller via klienten); uden politik gælder 90 dage.
+              Frister pr. klientkampagne (campaign_retention_policies) for de kampagner, kontoen har kald eller emner på. Kun en direkte, aktiv politik på den
+              koblede klientkampagne er en regel; uden regel hentes kampagnen ikke, og eksisterende rækker røres ikke.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {politikker.length === 0 && <div className="text-sm text-muted-foreground">Ingen kampagnepolitikker rammer kontoens kampagner – fallback 90 dage gælder.</div>}
+            {politikker.length === 0 && <div className="text-sm text-muted-foreground">Ingen kampagnepolitikker rammer kontoens kampagner – intet hentes, før de er sat.</div>}
             {politikker.length > 0 && (
               <Table>
                 <TableHeader><TableRow><TableHead>Klientkampagne</TableHead><TableHead>Adversus-kampagner</TableHead><TableHead>Frist (dage)</TableHead><TableHead>Dialer-frist (dage)</TableHead><TableHead>Tilstand</TableHead><TableHead>Aktiv</TableHead></TableRow></TableHeader>

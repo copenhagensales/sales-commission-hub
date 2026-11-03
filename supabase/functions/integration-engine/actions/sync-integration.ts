@@ -348,10 +348,12 @@ export async function syncIntegration(
 
     // Process calls (skip if timeout approaching)
     (adapter as any).setBudgetFormaal?.("kald");
-    if (actionList.includes("calls") && integration?.config?.calls_v1 === true) {
-      // [F1a] calls_v1 = true: /v1/calls-vejen (calls-incremental) er ENESTE skriver af dialer_calls for denne integration – det gamle /cdr-trin springes over
+    if (actionList.includes("calls") && (integration?.config?.calls_v1 === true || integration?.provider === "adversus")) {
+      // [F1a] calls_v1 = true: /v1/calls-vejen (calls-incremental) er ENESTE skriver af dialer_calls for denne integration – det gamle /cdr-trin springes over.
+      // [F1a-5, Codex r3] Adversus-konti henter kald KUN via calls_v1 (hvor Adversus bedes om kampagner med sletteregel): /cdr henter uden regelfilter og er derfor
+      // udgået for Adversus – konti uden calls_v1 henter ingen kald, før de aktiveres (f1a5-aktiver-<konto>.sql).
       actionsSkipped.push("calls");
-      runResults["calls"] = { processed: 0, errors: 0, message: "Skipped: calls_v1 (calls-incremental er eneste skriver)" };
+      runResults["calls"] = { processed: 0, errors: 0, message: integration?.config?.calls_v1 === true ? "Skipped: calls_v1 (calls-incremental er eneste skriver)" : "Skipped: Adversus-kald hentes kun via calls_v1 (sletteregel-port)" };
     } else if (actionList.includes("calls") && !metaSyncRateLimited && !timer.isExpired()) {
       try {
         let calls: any[] = [];
@@ -383,29 +385,48 @@ export async function syncIntegration(
           runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
         }
 
-        if (calls.length > 0) {
-          log("INFO", `Fetched ${calls.length} calls, processing...`);
-          runResults["calls"] = await engine.processCalls(calls, integration.id);
-          actionsExecuted.push("calls");
-        } else if (!runResults["calls"]) {
-          runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "No calls found" };
+        // [F1a-5] Sletteregel-port på den gamle /cdr-vej (Codex r2): kald fra kampagner uden regel lagres hverken i dialer_calls eller i debugloggen.
+        // Fail-closed: kan reglerne ikke læses, behandles intet, og vandmærket flyttes ikke (ingen kald springes over).
+        let portOk = true;
+        const kampagnerMedRegel = new Set<string>();
+        try {
+          const { data: regler, error: rErr } = await supabase.rpc("kald_kampagne_regler");
+          if (rErr) throw rErr;
+          for (const r of (regler ?? []) as { kampagne_ekstern_id: string }[]) kampagnerMedRegel.add(String(r.kampagne_ekstern_id));
+        } catch (e) { portOk = false; log("ERROR", `sletteregel-port (/cdr): kampagneregler kunne ikke læses – intet behandles: ${e instanceof Error ? e.message : String(e)}`); }
+        const harRegel = (c: any) => { const k = c?.campaignExternalId ?? c?.campaignId ?? c?.campaign_id; return k != null && kampagnerMedRegel.has(String(k)); };
+        if (!portOk) {
+          runResults["calls"] = { processed: 0, errors: calls.length, matched: 0, message: "sletteregel-port: regler kunne ikke læses" };
+        } else {
+          const medRegel = calls.filter(harRegel);
+          if (calls.length !== medRegel.length) log("WARN", `sletteregel-port (/cdr): ${calls.length - medRegel.length} kald fra kampagner uden sletteregel lagres ikke`);
+          if (medRegel.length > 0) {
+            log("INFO", `Fetched ${calls.length} calls, processing ${medRegel.length}...`);
+            runResults["calls"] = await engine.processCalls(medRegel, integration.id);
+            actionsExecuted.push("calls");
+          } else if (!runResults["calls"]) {
+            runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: calls.length > 0 ? "No calls with retention rule" : "No calls found" };
+          }
+
+          // Save debug log – kun rå kald fra kampagner med regel (rå kald uden kampagne udelades)
+          const callsDebugData = (adapter as any).getLastDebugData?.();
+          if (callsDebugData?.rawCalls) {
+            const raaMedRegel = (callsDebugData.rawCalls as any[]).filter(harRegel);
+            log("INFO", `Saving calls debug log for ${integration.name} (${raaMedRegel.length} af ${callsDebugData.rawCalls.length} rå kald)...`);
+            const callsDebugEntry = createDebugLogEntry(
+              integration.name,
+              "calls",
+              raaMedRegel,
+              callsDebugData.processedCalls,
+              callsDebugData.skipReasonMap || new Map()
+            );
+            await saveDebugLog(supabase, callsDebugEntry);
+          }
         }
 
-        // Save debug log
-        const callsDebugData = (adapter as any).getLastDebugData?.();
-        if (callsDebugData?.rawCalls) {
-          log("INFO", `Saving calls debug log for ${integration.name}...`);
-          const callsDebugEntry = createDebugLogEntry(
-            integration.name,
-            "calls",
-            callsDebugData.rawCalls,
-            callsDebugData.processedCalls,
-            callsDebugData.skipReasonMap || new Map()
-          );
-          await saveDebugLog(supabase, callsDebugEntry);
-        }
-
-        await upsertSyncState(supabase, integration.id, "calls", callsWindowEnd);
+        // Vandmærket flyttes kun, når intet fejlede (Codex r2: ellers springes kald uden for overlappet over for altid)
+        if (portOk && Number((runResults["calls"] as any)?.errors ?? 0) === 0) await upsertSyncState(supabase, integration.id, "calls", callsWindowEnd);
+        else log("WARN", `calls (/cdr) ${integration.name}: vandmærke IKKE flyttet (port=${portOk}, fejl=${(runResults["calls"] as any)?.errors ?? "?"})`);
       } catch (callsErr) {
         const callsErrMsg = callsErr instanceof Error ? callsErr.message : String(callsErr);
         log("ERROR", `Error in calls sync: ${callsErrMsg}`);

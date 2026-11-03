@@ -17,9 +17,12 @@ const tid = (v: unknown): string | null => { const s = str(v); if (!s) return nu
 
 /** Henter alle sider for et lastUpdatedTime-vindue – samme kontrakt som hentCallsV1: `komplet` = alle sider hentet (ellers flyttes vandmærket ikke).
  *  `udenForVindue` tæller emner, hvis lastModifiedTime ligger uden for vinduet – måler om filteret virker (jf. /calls' uvirksomme timestamp-filter). */
-export async function hentLeadsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, opts: { maksSider?: number; stop?: () => boolean; pageSize?: number } = {}): Promise<{ entries: LeadEntry[]; sider: number; total: number | null; komplet: boolean; udenForVindue: number }> {
+const somTalL = (ids: string[]) => ids.map((id) => (/^\d+$/.test(id) ? Number(id) : id));
+/** [F1a-5] sletteregel-port: `kampagneIds` = kun kampagner med regel (tom liste = ingen request); svaret efterkontrolleres (`frasorteret`). */
+export async function hentLeadsV1(get: (sti: string) => Promise<unknown>, fra: string, til: string, opts: { maksSider?: number; stop?: () => boolean; pageSize?: number; kampagneIds?: string[] } = {}): Promise<{ entries: LeadEntry[]; sider: number; total: number | null; komplet: boolean; udenForVindue: number; frasorteret: number }> {
   const maksSider = opts.maksSider ?? 30, pageSize = opts.pageSize ?? 1000;
-  const filt = encodeURIComponent(JSON.stringify({ lastUpdatedTime: { $gt: fra, $lt: til } }));
+  if (opts.kampagneIds && opts.kampagneIds.length === 0) return { entries: [], sider: 0, total: 0, komplet: true, udenForVindue: 0, frasorteret: 0 };
+  const filt = encodeURIComponent(JSON.stringify({ lastUpdatedTime: { $gt: fra, $lt: til }, ...(opts.kampagneIds ? { campaignId: { $in: somTalL(opts.kampagneIds) } } : {}) }));
   const entries: LeadEntry[] = []; const set = new Set<string>(); let total: number | null = null; let sider = 0; let raa = 0; let komplet = false;
   for (let side = 1; side <= maksSider; side++) {
     if (opts.stop?.()) break;
@@ -40,20 +43,24 @@ export async function hentLeadsV1(get: (sti: string) => Promise<unknown>, fra: s
   const fraMs = new Date(fra).getTime(), tilMs = new Date(til).getTime();
   let udenForVindue = 0;
   for (const e of entries) { const m = tid(e.lastModifiedTime); if (m) { const ms = new Date(m).getTime(); if (ms < fraMs || ms > tilMs) udenForVindue++; } }
-  return { entries, sider, total, komplet, udenForVindue };
+  if (!opts.kampagneIds) return { entries, sider, total, komplet, udenForVindue, frasorteret: 0 };
+  const tilladt = new Set(opts.kampagneIds); const egne = entries.filter((e) => tilladt.has(str(e.campaignId)));
+  return { entries: egne, sider, total, komplet, udenForVindue, frasorteret: entries.length - egne.length };
 }
 
 /** Fuld hentning (første indlæsning, Codex F1b-2 P1): alle emner i id-orden med id > fraId, én side ad gangen (stabil cursor, 1 request pr. side).
  *  `faerdig` = siden var ikke fuld (ingen flere emner). Kører om natten under budgettet, indtil færdig; derefter kun inkrementel. */
-export async function hentLeadsFuldSide(get: (sti: string) => Promise<unknown>, fraId: number, pageSize = 1000): Promise<{ entries: LeadEntry[]; sidsteId: number; faerdig: boolean }> {
-  const filt = encodeURIComponent(JSON.stringify({ id: { $gt: fraId } }));
+export async function hentLeadsFuldSide(get: (sti: string) => Promise<unknown>, fraId: number, pageSize = 1000, kampagneIds?: string[]): Promise<{ entries: LeadEntry[]; sidsteId: number; faerdig: boolean; frasorteret: number }> {
+  if (kampagneIds && kampagneIds.length === 0) return { entries: [], sidsteId: fraId, faerdig: true, frasorteret: 0 };
+  const filt = encodeURIComponent(JSON.stringify({ id: { $gt: fraId }, ...(kampagneIds ? { campaignId: { $in: somTalL(kampagneIds) } } : {}) }));
   const data = (await get(`/leads?filters=${filt}&sortProperty=id&sortDirection=asc&pageSize=${pageSize}&page=1`)) as { leads?: unknown } | null;
   if (!data || typeof data !== "object" || !Array.isArray(data.leads)) throw new Error("leads_v1_fuld: ugyldigt svar");
   const leads = data.leads as LeadEntry[];
   let sidsteId = fraId;
   for (const l of leads) { const id = tal(l.id); if (id != null && id > sidsteId) sidsteId = id; }
   if (leads.length > 0 && sidsteId === fraId) throw new Error("leads_v1_fuld: cursor flyttede sig ikke (id mangler/usorteret)");
-  return { entries: leads, sidsteId, faerdig: leads.length < pageSize };
+  const egne = kampagneIds ? leads.filter((l) => new Set(kampagneIds).has(str(l.campaignId))) : leads;
+  return { entries: egne, sidsteId, faerdig: leads.length < pageSize, frasorteret: leads.length - egne.length };
 }
 
 /** Kampagnefelter i et emne som katalog-ønsker (art m/r, id, evt. navn/type fra feltet selv). */

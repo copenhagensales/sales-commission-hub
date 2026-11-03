@@ -231,3 +231,39 @@ export function useKampagnePolitikker(enabled: boolean) {
     enabled,
   });
 }
+
+/** F1a-5 sletteregel-port: kampagner uden gældende sletteregel (hentes ikke) og rækker, oprydningen ikke rører, fordi reglen mangler. */
+export type KampagneUdenRegel = { kampagne_ekstern_id: string; navn: string | null; aarsag: string };
+export function useKampagnerUdenRegel() {
+  return useQuery({
+    queryKey: ["kald-kampagner-uden-regel"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("kald_kampagner_uden_regel");
+      if (error) throw error;
+      return (data ?? []) as KampagneUdenRegel[];
+    },
+    staleTime: 60 * 1000,
+  });
+}
+export function useRaekkerUdenRegel() {
+  return useQuery({
+    queryKey: ["kald-raekker-uden-regel"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("kald_raekker_uden_regel");
+      if (error) throw error;
+      return (data ?? []) as { tabel: string; antal: number }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+export function useKampagnerMedRegel() {
+  return useQuery({
+    queryKey: ["kald-kampagne-regler"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("kald_kampagne_regler");
+      if (error) throw error;
+      return (data ?? []) as { kampagne_ekstern_id: string; retention_days: number }[];
+    },
+    staleTime: 60 * 1000,
+  });
+}

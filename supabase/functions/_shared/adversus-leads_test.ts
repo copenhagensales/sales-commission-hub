@@ -76,11 +76,11 @@ Deno.test("forberedLeads: ukendte kampagnefelter oprettes (navne fra /campaign-f
   assertEquals(r.nyeKatalogfelter, 3);  // m:2 (42), r:5 (42), m:2 (43)
   assertEquals(inserts.map((i) => `${i.kampagne_ekstern_id}:${i.metadata_noegle}:${i.felt_navn}`).sort(), ["42:m:2:Telefon", "42:r:5:Accept", "43:m:2:Telefon"]);
   assertEquals(r.raekker.length, 3);
-  assertEquals(r.raekker[0].felter, { importId: 1, "m:2": "+4511111111", "r:5": "Ja" });  // m:1 fravalgt for kampagne 42
+  assertEquals(r.raekker[0].felter, { importId: 1 });  // m:1 fravalgt; m:2 og r:5 er nye = forslag → hentes ikke før afgørelse (F1a-5)
   assertEquals(r.raekker[0].katalog_version, 2);
-  assertEquals(r.raekker[1].felter, { "m:2": "+4522222222" });
-  assertEquals(r.raekker[2].felter, { "m:2": "+4533333333" });
-  assertEquals(r.kasseredeNoegler, 1);
+  assertEquals(r.raekker[1].felter, {});
+  assertEquals(r.raekker[2].felter, {});
+  assertEquals(r.kasseredeNoegler, 5);  // m:1 + m:2 (×3) + r:5
   const tomt = await forberedLeads(svc, kat, [{ id: 20, campaignId: 42 }], "int-1", defs);
   assertEquals(tomt.raekker[0].felter, {});
 });
@@ -97,4 +97,17 @@ Deno.test("hentLeadsFuldSide: id-cursor, filter id > fraId, færdig når siden i
   const s3 = await hentLeadsFuldSide(() => Promise.resolve({ leads: [] }), 16, 3);
   assertEquals(s3.faerdig, true); assertEquals(s3.sidsteId, 16);
   await assertRejects(() => hentLeadsFuldSide(() => Promise.resolve({ leads: [{ id: 5 }] }), 10, 3));
+});
+
+Deno.test("hentLeadsV1/hentLeadsFuldSide (F1a-5): kampagneIds i filteret, fremmede emner frasorteres, tom liste = ingen request", async () => {
+  const { hentLeadsV1, hentLeadsFuldSide } = await import("./adversus-leads.ts");
+  const kaldt: string[] = [];
+  const get = (sti: string) => { kaldt.push(sti); return Promise.resolve({ leads: [{ id: 1, campaignId: 7 }, { id: 2, campaignId: 9 }], meta: { pagination: { pageCount: 1, total: 2 } } }); };
+  const r = await hentLeadsV1(get, "2026-10-30T09:00:00Z", "2026-10-30T10:00:00Z", { kampagneIds: ["7"] });
+  assertEquals(decodeURIComponent(kaldt[0]).includes('"campaignId":{"$in":[7]}'), true);
+  assertEquals(r.entries.map((e) => e.id), [1]); assertEquals(r.frasorteret, 1);
+  const side = await hentLeadsFuldSide(get, 0, 1000, ["9"]);
+  assertEquals(side.entries.map((e) => e.id), [2]); assertEquals(side.frasorteret, 1); assertEquals(side.sidsteId, 2);
+  const tom = await hentLeadsV1(() => { throw new Error("må ikke kaldes"); }, "a", "b", { kampagneIds: [] });
+  assertEquals(tom.komplet, true); assertEquals(tom.entries.length, 0);
 });

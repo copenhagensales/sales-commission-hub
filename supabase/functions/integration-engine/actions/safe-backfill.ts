@@ -234,8 +234,8 @@ export async function safeBackfill(
 
       // Fetch calls
       let callsCount = 0;
-      if (datasets.includes("calls") && (integration as any)?.config?.calls_v1 === true) {
-        log("INFO", `Day ${dayStart}: calls skipped – calls_v1 (calls-incremental er eneste skriver af dialer_calls)`);  // [F1a]
+      if (datasets.includes("calls") && ((integration as any)?.config?.calls_v1 === true || (integration as any)?.provider === "adversus")) {
+        log("INFO", `Day ${dayStart}: calls skipped – Adversus-kald hentes kun via calls_v1 (sletteregel-port, F1a-5)`);  // [F1a/F1a-5]
       } else if (datasets.includes("calls") && (adapter as any).fetchCallsRange) {
         const calls = await (adapter as any).fetchCallsRange({ from: dayStart, to: dayEnd });
         if (calls.length > 0) {

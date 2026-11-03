@@ -106,6 +106,16 @@ Deno.serve(async (req) => {
   const r4 = await get(`/calls?pageSize=2000&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t3 } })}`);
   ud.paginering = { status: r4.status, antal_returneret: liste(r4.data, "calls").length, meta: meta(r4.data) };
   // 4b) Krav 10 (F1a-3): respekterer /calls filteret userId $in? Sammenlignes med det ufiltrerede vindue (r2, ≤ 100 kald). Kun bruger-id'er gemmes i svaret.
+  // 4c) F1a-5: respekterer /calls filteret campaignId $in? (måles før sletteregel-porten stoler på det som første lag)
+  const kf = url.searchParams.get("kampagnefilter");
+  if (kf) {
+    const ids = kf.split(",").map((x) => x.trim()).filter((x) => /^\d{1,12}$/.test(x)).slice(0, 150);
+    const r7 = await get(`/calls?pageSize=1000&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t2 }, campaignId: { $in: ids.map(Number) } })}`);
+    const kcalls = liste(r7.data, "calls");
+    const retur = [...new Set(kcalls.map((c) => s(c.campaignId)))];
+    ud.kampagnefilter = { status: r7.status, anmodet: ids.length, antal_filtreret: kcalls.length, kampagner_retur: retur.length, alle_inden_for: retur.every((u) => ids.includes(u)),
+      forventet_fra_ufiltreret_vindue: calls.filter((c) => ids.includes(s(c.campaignId))).length, ufiltreret_antal_i_vindue: calls.length, url_laengde: 200 + JSON.stringify({ campaignId: { $in: ids.map(Number) } }).length, meta: meta(r7.data) };
+  }
   const bf = url.searchParams.get("brugerfilter");
   if (bf) {
     const ids = bf.split(",").map((x) => x.trim()).filter((x) => /^\d{1,12}$/.test(x)).slice(0, 20);

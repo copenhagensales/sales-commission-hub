@@ -147,7 +147,8 @@ export function anvendKatalog<T extends Record<string, unknown>>(kat: Katalog, m
   return { raekke: ud as T, kasserede_noegler: kasserede, nullede_kolonner: nullede, kerne_ignoreret: kerneIgn };
 }
 
-/** Kampagnefelter (emner): finder de felt-id'er, kataloget endnu ikke kender for kampagnen, og opretter dem (hentes = ja, klassifikation ukendt – klassificeres i UI).
+/** Kampagnefelter (emner): finder de felt-id'er, kataloget endnu ikke kender for kampagnen, og opretter dem som FORSLAG (hentes = nej, status forslag):
+ *  intet hentes, før Mathias har taget stilling til sletteregel/klassifikation på Felter-fanen (F1a-5, fast regel 3/11; masterplan trin 2.5: »ukendte felter gemmes ikke, men vises til beslutning«).
  *  `art` m = masterData, r = resultData. Navn/type fra /campaign-fields eller feltets egne name/label/type, ellers »Kampagnefelt <id>«. Idempotent (dubletter ignoreres). */
 export async function sikrKampagnefelter(svc: any, kat: Katalog, kampagne: string, felter: { art: "m" | "r"; id: number; navn?: string; type?: string }[]): Promise<number> {
   const nye: Record<string, unknown>[] = [];
@@ -163,8 +164,8 @@ export async function sikrKampagnefelter(svc: any, kat: Katalog, kampagne: strin
     nye.push({
       kilde: "adversus", endpoint: "/leads", felt_sti: sti, kampagne_ekstern_id: kampagne, adversus_felt_id: f.id,
       felt_navn: f.navn?.trim() || (f.art === "m" ? `Kampagnefelt ${f.id}` : `Resultatfelt ${f.id}`), datatype: f.type?.trim() || "string",
-      beskrivelse: "Oprettet automatisk af hentningen (F1b-2) – klassificeres i UI", maal_tabel: "dialer_leads", metadata_noegle: noegle,
-      hentes: true, klassifikation: "ukendt", status: "aktiv", version: kat.version,
+      beskrivelse: "Fundet af hentningen – afventer din afgørelse (hentes, klassifikation, frist) på Felter-fanen", maal_tabel: "dialer_leads", metadata_noegle: noegle,
+      hentes: false, klassifikation: "ukendt", status: "forslag", version: kat.version,
     });
   }
   if (nye.length === 0) return 0;

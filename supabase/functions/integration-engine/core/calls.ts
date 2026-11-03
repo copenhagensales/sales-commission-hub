@@ -141,11 +141,26 @@ export async function processCalls(
   }
   
   if (filteredCalls.length === 0) return { processed: 0, errors: 0, matched: 0 }
+  // [F1a-5] Sletteregel-port (fast regel, Mathias 3/11) i den fælles sink: kald fra kampagner uden gældende sletteregel lagres ikke – uanset vej (/cdr, /calls).
+  // Fail-closed: kan reglerne ikke læses, lagres intet i denne kørsel. Databasen har samme port som trigger (sidste værn).
+  let medRegel: StandardCall[]
+  try {
+    const { data: regler, error: rErr } = await supabase.rpc("kald_kampagne_regler")
+    if (rErr) throw rErr
+    const ok = new Set(((regler ?? []) as { kampagne_ekstern_id: string }[]).map((r) => String(r.kampagne_ekstern_id)))
+    medRegel = filteredCalls.filter((c) => c.campaignExternalId && ok.has(String(c.campaignExternalId)))
+    const udenRegel = filteredCalls.length - medRegel.length
+    if (udenRegel > 0) log("WARN", `sletteregel-port: ${udenRegel} kald fra kampagner uden sletteregel lagres ikke`)
+  } catch (e) {
+    log("ERROR", `sletteregel-port: kampagneregler kunne ikke læses – intet lagres: ${e instanceof Error ? e.message : String(e)}`)
+    return { processed: 0, errors: filteredCalls.length, matched: 0 }
+  }
+  if (medRegel.length === 0) return { processed: 0, errors: 0, matched: 0 }
   
-  const sampleCall = filteredCalls[0]
+  const sampleCall = medRegel[0]
   log(
     "INFO",
-    `Procesando ${filteredCalls.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`
+    `Procesando ${medRegel.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`
   )
   const agents = await fetchAllPaginated(supabase, "agents", "id, external_adversus_id, external_dialer_id, email", (q) => q);
   const agentMapByExtId = new Map<string, string>(
@@ -174,7 +189,7 @@ export async function processCalls(
   let totalProcessed = 0
   let totalErrors = 0
   let totalMatched = 0
-  const batches = chunk(filteredCalls, batchSize)
+  const batches = chunk(medRegel, batchSize)
   const totalBatches = batches.length
   for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
     const batch = batches[batchNum]

@@ -155,7 +155,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
   const { data, isLoading, error } = useKaldFeltKatalog(kilde);
   const { data: daekning } = useKaldFeltDaekning(DAEKNING_DAGE);
   const [soeg, setSoeg] = useState("");
-  const [visning, setVisning] = useState<"alle" | "hentes" | "undlades">("alle");
+  const [visning, setVisning] = useState<"alle" | "hentes" | "undlades" | "afventer">("alle");
 
   const prEndpoint = useMemo(() => {
     const m = new Map<string, KatalogFelt[]>();
@@ -164,6 +164,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
       if (kampagner && f.kampagne_ekstern_id && !kampagner.includes(f.kampagne_ekstern_id)) continue;
       if (visning === "hentes" && !f.hentes) continue;
       if (visning === "undlades" && f.hentes) continue;
+      if (visning === "afventer" && f.status !== "forslag") continue;
       if (q && !`${f.felt_navn} ${f.felt_sti} ${f.beskrivelse ?? ""} ${f.metadata_noegle ?? ""} ${f.maal_kolonne ?? ""} ${f.kampagne_ekstern_id ?? ""}`.toLowerCase().includes(q)) continue;
       const liste = m.get(f.endpoint) ?? [];
       liste.push(f);
@@ -200,12 +201,13 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
           <Badge variant="outline">{total} felter</Badge>
           <Badge variant="outline">{hentes} hentes</Badge>
           <Badge variant={uklassificeret > 0 ? "destructive" : "outline"}>{uklassificeret} ikke klassificeret</Badge>
-          <Select value={visning} onValueChange={(v) => setVisning(v as "alle" | "hentes" | "undlades")}>
+          <Select value={visning} onValueChange={(v) => setVisning(v as "alle" | "hentes" | "undlades" | "afventer")}>
             <SelectTrigger className="ml-auto h-8 w-[150px] text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="alle">Alle felter</SelectItem>
               <SelectItem value="hentes">Kun dem der hentes</SelectItem>
               <SelectItem value="undlades">Kun dem der undlades</SelectItem>
+              <SelectItem value="afventer">Afventer min afgørelse (forslag)</SelectItem>
             </SelectContent>
           </Select>
           <Input className="w-64 h-8" placeholder="Søg felt…" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
