@@ -209,7 +209,7 @@ export function SupplierReportTab() {
 
   // Butikstillæg (merpris) pr. kæde - grundsatsen på lokationen ændres ikke
   const { data: rateSurcharges } = useLocationRateSurcharges(selectedLocationType);
-  // Direkte afregnede kæde-lokationer: kun refusionsdelen, aldrig fakturagrundlaget
+  // "Coop direkte": kun refusionsdelen, aldrig fakturagrundlaget
   const { data: directRefunds = [] } = useDirectRefunds(selectedLocationType, periodStart, periodEnd);
   const totalDirectRefund = sumDirectRefunds(directRefunds);
 

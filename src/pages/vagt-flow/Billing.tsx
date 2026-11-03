@@ -114,7 +114,7 @@ function BillingOverviewTab() {
     },
   });
 
-  const staticLocationTypes = ["Coop butik", "Meny butik", "Danske Shoppingcentre", "Ocean Outdoor", "Markeder", "Messer", "Anden lokation"];
+  const staticLocationTypes = ["Coop butik", "Coop direkte", "Meny butik", "Danske Shoppingcentre", "Ocean Outdoor", "Markeder", "Messer", "Anden lokation"];
   const dynamicTypes = bookings?.map((b: any) => b.location?.type).filter(Boolean) || [];
   const locationTypes = [...new Set([...staticLocationTypes, ...dynamicTypes])];
 

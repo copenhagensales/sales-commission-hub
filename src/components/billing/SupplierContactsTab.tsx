@@ -35,6 +35,7 @@ import {
 
 const LOCATION_TYPES = [
   "Coop butik",
+  "Coop direkte",
   "Meny butik",
   "Danske Shoppingcentre",
   "Markeder",

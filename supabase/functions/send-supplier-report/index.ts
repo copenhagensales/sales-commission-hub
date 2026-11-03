@@ -85,7 +85,7 @@ async function buildSupplierMail(
     rows: any[];
     attachXlsx: boolean;
     includeSurcharge: boolean;
-    /** Direkte afregnede kæde-lokationer (kun mailtekst, aldrig bilag/total). */
+    /** "Coop direkte"-lokationer (kun mailtekst, aldrig bilag/total). */
     directRefunds?: DirectRefundLine[];
     showDiscount: boolean;
     message?: string | null;

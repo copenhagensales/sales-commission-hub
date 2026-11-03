@@ -1342,7 +1342,6 @@ export type Database = {
         Row: {
           aendret: string
           aktiv: boolean
-          egne_domaener: string[]
           api_noegle: string
           egne_domaener: string[]
           id: string
@@ -1356,7 +1355,6 @@ export type Database = {
         Insert: {
           aendret?: string
           aktiv?: boolean
-          egne_domaener?: string[]
           api_noegle: string
           egne_domaener?: string[]
           id?: string
@@ -1370,7 +1368,6 @@ export type Database = {
         Update: {
           aendret?: string
           aktiv?: boolean
-          egne_domaener?: string[]
           api_noegle?: string
           egne_domaener?: string[]
           id?: string

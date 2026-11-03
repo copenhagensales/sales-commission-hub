@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { COOP_DIREKTE_TYPE } from "@/lib/fm/coopDirekte";
 import {
   buildDirectRefunds,
   COOP_LOCATION_TYPE,
@@ -9,45 +11,40 @@ import {
 } from "@/lib/fm/directRefunds";
 
 /**
- * Direkte afregnede kæde-lokationer til refusionsdelen af Coop-rapporten.
+ * "Coop direkte"-lokationer til refusionsdelen af Coop-rapporten.
  * Kun aktiv for lokationstypen "Coop butik".
  */
 export function useDirectRefunds(locationType: string | undefined, periodStart: Date, periodEnd: Date) {
-  const enabled = locationType === COOP_LOCATION_TYPE;
+  const { data: rules } = useLocationRateSurcharges(COOP_LOCATION_TYPE);
+  const enabled = locationType === COOP_LOCATION_TYPE && !!rules;
   return useQuery({
     queryKey: [
       "supplier-direct-refunds",
       locationType,
       format(periodStart, "yyyy-MM-dd"),
       format(periodEnd, "yyyy-MM-dd"),
+      rules?.map((r) => `${r.id}:${r.surcharge_per_day}`).join(","),
     ],
     queryFn: async (): Promise<DirectRefundLine[]> => {
       const { data, error } = await supabase
         .from("booking")
-        .select(
-          "id, start_date, end_date, booked_days, status, client_id, location!inner(id, name, type, chain, daily_rate, refund_daily_rate, refund_client_id)"
-        )
+        .select("id, start_date, end_date, booked_days, status, client_id, location!inner(id, name, type, daily_rate)")
         .eq("status", "confirmed")
-        .not("location.chain", "is", null)
-        .gt("location.refund_daily_rate", 0)
-        .neq("location.type", COOP_LOCATION_TYPE)
+        .eq("location.type", COOP_DIREKTE_TYPE)
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
         .gte("end_date", format(periodStart, "yyyy-MM-dd"));
       if (error) throw error;
       const bookings = (data ?? []) as unknown as DirectRefundBooking[];
       const clientIds = [
-        ...new Set(bookings.map((b) => b.location?.refund_client_id).filter((v): v is string => !!v)),
+        ...new Set((rules ?? []).map((r) => r.funded_by_client_id).filter((v): v is string => !!v)),
       ];
       const names: Record<string, string> = {};
       if (clientIds.length) {
-        const { data: clients, error: cErr } = await supabase
-          .from("clients")
-          .select("id, name")
-          .in("id", clientIds);
+        const { data: clients, error: cErr } = await supabase.from("clients").select("id, name").in("id", clientIds);
         if (cErr) throw cErr;
         for (const c of clients ?? []) names[c.id] = c.name;
       }
-      return buildDirectRefunds(bookings, periodStart, periodEnd, names);
+      return buildDirectRefunds(bookings, periodStart, periodEnd, rules, names);
     },
     enabled,
   });

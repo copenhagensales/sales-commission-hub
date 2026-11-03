@@ -17,3 +17,11 @@ describe("refusionLinje", () => {
     expect(d).toEqual({ brutto: 1250, refusion: 250, netto: 1000, refunderesAf: "Eesy FM" });
   });
 });
+
+import { coopDirekteLinje as _cdl } from "./refusionLinje";
+describe("Coop direkte visningslinje", () => {
+  it("Kvickly 1.700 med 700 i refusion", () => {
+    expect(formatRefusionLinje(_cdl({ dailyRate: 1700, refundPerDay: 700, refundClientName: "Eesy FM" })!))
+      .toBe("Vi betaler 1.700 · Eesy FM refunderer 700 · Netto 1.000");
+  });
+});

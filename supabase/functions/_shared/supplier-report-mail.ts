@@ -373,7 +373,7 @@ export interface SurchargeSummary {
   directRefunds?: DirectRefundLine[];
 }
 
-/** Direkte afregnet lokation (betalt direkte, ikke via Coop) - refunderes af kunden. */
+/** "Coop direkte"-lokation (betalt direkte, ikke via Coop) - refunderes af kunden. */
 export interface DirectRefundLine {
   locationName: string;
   chain: string | null;
