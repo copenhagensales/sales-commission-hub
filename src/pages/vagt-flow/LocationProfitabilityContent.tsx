@@ -163,6 +163,7 @@ export default function LocationProfitabilityContent() {
   };
 
   // Fetch bookings with location + client data
+  const { data: coopRules } = useLocationRateSurcharges(COOP_RULES_TYPE);
   const { data: bookings, isLoading: loadingBookings } = useQuery({
     queryKey: ["location-profitability-bookings", week, year],
     queryFn: async () => {
@@ -497,7 +498,7 @@ export default function LocationProfitabilityContent() {
         return { ...loc, dailyRate, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, locationCostGross, locationCostNet, missingLockedDiscount, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
-  }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
+  }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation, coopRules]);
 
   // Split by client group
   const { eesyLocations, youseeLocations, otherLocations } = useMemo(() => {
