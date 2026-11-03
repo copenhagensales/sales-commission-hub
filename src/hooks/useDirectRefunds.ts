@@ -11,12 +11,11 @@ import {
 } from "@/lib/fm/directRefunds";
 
 /**
- * "Coop direkte"-lokationer til refusionsdelen af Coop-rapporten.
- * Kun aktiv for lokationstypen "Coop butik".
+ * Refusion til den selvstændige "Coop direkte"-rapport, aldrig Coop butik.
  */
 export function useDirectRefunds(locationType: string | undefined, periodStart: Date, periodEnd: Date) {
   const { data: rules } = useLocationRateSurcharges(COOP_LOCATION_TYPE);
-  const enabled = locationType === COOP_LOCATION_TYPE && !!rules;
+  const enabled = locationType === COOP_DIREKTE_TYPE && !!rules;
   return useQuery({
     queryKey: [
       "supplier-direct-refunds",
