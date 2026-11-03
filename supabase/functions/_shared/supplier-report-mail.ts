@@ -368,7 +368,32 @@ export interface SurchargeSummary {
   refundableAmount: number;
   refundClientName: string;
   chains: SurchargeChainSummary[];
+  /** Refusion fra Coop-tillæg alene (refundableAmount = denne + direkte). */
+  coopRefundableAmount?: number;
+  directRefunds?: DirectRefundLine[];
 }
+
+/** Direkte afregnet lokation (betalt direkte, ikke via Coop) - refunderes af kunden. */
+export interface DirectRefundLine {
+  locationName: string;
+  chain: string | null;
+  minDate: string | null;
+  maxDate: string | null;
+  days: number;
+  perDay: number;
+  amount: number;
+  refundClientName?: string | null;
+}
+
+const fmtShortDate = (iso: string | null) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return y && m && d ? `${d}/${m}` : iso;
+};
+const directPeriod = (d: DirectRefundLine) =>
+  d.minDate && d.maxDate && d.minDate !== d.maxDate
+    ? `${fmtShortDate(d.minDate)}-${fmtShortDate(d.maxDate)}`
+    : fmtShortDate(d.minDate ?? d.maxDate);
 
 export interface SupplierMailLocation {
   name: string;
@@ -463,15 +488,33 @@ export function buildSupplierReportEmail(params: {
           ),
   });
 
-  if (surcharge && surcharge.totalSurcharge > 0) {
+  const directs = surcharge?.directRefunds ?? [];
+  if (surcharge && (surcharge.totalSurcharge > 0 || directs.length > 0)) {
     const chainItems: ListItem[] = surcharge.chains.map((c) => ({
       name: c.chain,
       variant: `${fmtInt(c.days)} dage \u00d7 ${fmtDKK(c.perDay)}`,
       value: fmtDKK(c.amount),
     }));
+    if (directs.length > 0) {
+      chainItems.push({
+        name: `Direkte afregnet \u2013 refunderes af ${surcharge.refundClientName}`,
+        variant: null,
+        value: "",
+      });
+      for (const d of directs) {
+        chainItems.push({
+          name: d.locationName,
+          variant: [directPeriod(d) || null, `${fmtInt(d.days)} dage \u00d7 ${fmtDKK(d.perDay)}`]
+            .filter(Boolean)
+            .join(" \u00b7 "),
+          value: fmtDKK(d.amount),
+        });
+      }
+    }
     chainItems.push({
       name: `Til refusion fra ${surcharge.refundClientName}`,
-      variant: `Merpris i alt ${fmtDKK(surcharge.totalSurcharge)}`,
+      variant:
+        surcharge.totalSurcharge > 0 ? `Merpris i alt ${fmtDKK(surcharge.totalSurcharge)}` : null,
       value: fmtDKK(surcharge.refundableAmount),
     });
     sections.push({
@@ -530,7 +573,7 @@ export function buildSupplierReportEmail(params: {
       ? `Detaljerne pr. lokation ligger i det vedhæftede ark ${attachmentName}.`
       : "Detaljerne pr. lokation kan rekvireres ved at svare på denne mail.",
   );
-  if (surcharge && surcharge.totalSurcharge > 0) {
+  if (surcharge && (surcharge.totalSurcharge > 0 || directs.length > 0)) {
     textLines.push(
       "",
       "Merpris og refusion",
@@ -538,6 +581,15 @@ export function buildSupplierReportEmail(params: {
       ...surcharge.chains.map(
         (c) => `  ${c.chain}: ${c.days} dage x ${fmtDKK(c.perDay)} = ${fmtDKK(c.amount)}`,
       ),
+      ...(directs.length > 0
+        ? [
+            `Direkte afregnet \u2013 refunderes af ${surcharge.refundClientName}:`,
+            ...directs.map(
+              (d) =>
+                `  ${d.locationName} (${directPeriod(d)}): ${d.days} dage x ${fmtDKK(d.perDay)} = ${fmtDKK(d.amount)}`,
+            ),
+          ]
+        : []),
       `Til refusion fra ${surcharge.refundClientName}: ${fmtDKK(surcharge.refundableAmount)}`,
       "Bilaget indeholder kun totalerne pr. lokation.",
     );
