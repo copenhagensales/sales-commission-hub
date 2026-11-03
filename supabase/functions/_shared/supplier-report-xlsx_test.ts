@@ -10,7 +10,7 @@ const row = { locationName: "Kvickly Testby", externalId: "", city: "Testby", da
 Deno.test("Coop direkte Excel viser 6800 betalt, 2800 refusion, 4000 netto uden dobbelt ugensum", async () => {
   const bytes = await buildSupplierReportXlsx({ locationType: "Coop direkte", periodLabel: "oktober 2026", rows: [row] });
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(bytes);
+  await wb.xlsx.load(bytes.buffer as ArrayBuffer);
   const ws = wb.worksheets[0];
   assertEquals(ws.getRow(5).getCell(5).value, 6800);
   assertEquals(ws.getRow(5).getCell(8).value, 2800);
@@ -24,7 +24,7 @@ Deno.test("Coop direkte Excel viser 6800 betalt, 2800 refusion, 4000 netto uden 
 Deno.test("Coop butik Excel forbliver fem kolonner uden direkte refusion", async () => {
   const bytes = await buildSupplierReportXlsx({ locationType: "Coop butik", periodLabel: "oktober 2026", rows: [row] });
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(bytes);
+  await wb.xlsx.load(bytes.buffer as ArrayBuffer);
   assertEquals(wb.worksheets[0].columnCount, 5);
   assertEquals(wb.worksheets[0].getRow(6).getCell(1).value, "Total");
   assertEquals(approvedRowRefund("Coop butik", row), 0);

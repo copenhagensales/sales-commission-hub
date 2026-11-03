@@ -213,6 +213,17 @@ async function buildSupplierMail(
   return { html: mail.html, attachments, attachmentName, periodLabel, totals, surcharge };
 }
 
+/** Gamle opkrævninger ændres aldrig: overlappende direkte refusion afvises. */
+async function directRefundConflict(svc: SupabaseClient, report: { location_type: string; period_start: string; period_end: string }): Promise<boolean> {
+  if (report.location_type !== COOP_DIRECT_REPORT) return false;
+  const { data, error } = await svc.from('supplier_invoice_reports')
+    .select('id').eq('location_type', 'Coop butik').in('status', ['approved', 'sent'])
+    .gt('direct_refund_amount', 0).lte('period_start', report.period_end).gte('period_end', report.period_start)
+    .limit(1);
+  if (error) throw new Error('Tidligere refusionsopkrævninger kunne ikke kontrolleres');
+  return (data ?? []).length > 0;
+}
+
 const serviceClient = () =>
   createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -266,6 +277,12 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
   }
 
   const supplierDisplayName = sub.name || sub.location_type;
+  if (report.location_type !== sub.location_type) {
+    return jsonResponse(409, { error: 'Rapportens lokationstype matcher ikke abonnementet' });
+  }
+  if (await directRefundConflict(svc, report)) {
+    return jsonResponse(409, { error: 'Perioden har direkte refusion på en tidligere godkendt Coop butik-rapport. Afklar opkrævningen først.' });
+  }
   const built = await buildSupplierMail(svc, {
     locationType: sub.location_type,
     supplierName: supplierDisplayName,
@@ -368,6 +385,9 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
   }
 
   const locationType = String(report.location_type);
+  if (await directRefundConflict(svc, report)) {
+    return jsonResponse(409, { error: 'Perioden har direkte refusion på en tidligere godkendt Coop butik-rapport. Afklar opkrævningen først.' });
+  }
   const built = await buildSupplierMail(svc, {
     locationType,
     supplierName: (body.supplierName as string | undefined) || locationType,
