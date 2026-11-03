@@ -43,6 +43,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { LOCATION_TYPES } from "@/lib/fm/locationTypes";
 
 export default function LocationsContent() {
   const [searchParams] = useSearchParams();
@@ -327,10 +328,9 @@ export default function LocationsContent() {
                     <SelectValue placeholder="Vælg type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Butik">Butik</SelectItem>
-                    <SelectItem value="Storcenter">Storcenter</SelectItem>
-                    <SelectItem value="Markeder">Markeder</SelectItem>
-                    <SelectItem value="Messer">Messer</SelectItem>
+                    {LOCATION_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
