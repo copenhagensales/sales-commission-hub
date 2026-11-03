@@ -47,6 +47,7 @@ const LOCATION_TYPES = [
   "Alle typer",
   "Markeder",
   "Coop butik",
+  "Coop direkte",
   "Danske Shoppingcentre",
   "Meny butik",
   "Butik",

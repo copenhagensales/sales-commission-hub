@@ -433,6 +433,7 @@ export default function VagtLocations() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Coop butik">Coop butik</SelectItem>
+                              <SelectItem value="Coop direkte">Coop direkte</SelectItem>
                               <SelectItem value="Meny butik">Meny butik</SelectItem>
                               <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
                               <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
@@ -571,6 +572,7 @@ export default function VagtLocations() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Coop butik">Coop butik</SelectItem>
+                    <SelectItem value="Coop direkte">Coop direkte</SelectItem>
                     <SelectItem value="Meny butik">Meny butik</SelectItem>
                     <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
                     <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>

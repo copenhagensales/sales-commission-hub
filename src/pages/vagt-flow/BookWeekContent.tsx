@@ -573,6 +573,7 @@ export default function BookWeekContent() {
                 <SelectContent>
                   <SelectItem value="all">Alle typer</SelectItem>
                   <SelectItem value="Butik">Butik</SelectItem>
+                  <SelectItem value="Coop direkte">Coop direkte</SelectItem>
                   <SelectItem value="Storcenter">Storcenter</SelectItem>
                   <SelectItem value="Markeder">Markeder</SelectItem>
                   <SelectItem value="Messer">Messer</SelectItem>

@@ -31,6 +31,8 @@ import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
 import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/bookingGross";
 import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { useDirectRefunds } from "@/hooks/useDirectRefunds";
+import { supplierInvoiceBookings, sumDirectRefunds } from "@/lib/fm/directRefunds";
 import { bookingSurcharge } from "@/utils/locationRateSurcharge";
 import { SupplierDispatchPanel } from "./SupplierDispatchPanel";
 
@@ -127,7 +129,7 @@ export function SupplierReportTab() {
         .gte("end_date", format(periodStart, "yyyy-MM-dd"))
         .order("start_date");
       if (error) throw error;
-      return data.filter((b: any) => b.location?.type === selectedLocationType);
+      return supplierInvoiceBookings(data as any[], selectedLocationType);
     },
     enabled: !!selectedLocationType,
   });
@@ -207,6 +209,9 @@ export function SupplierReportTab() {
 
   // Butikstillæg (merpris) pr. kæde - grundsatsen på lokationen ændres ikke
   const { data: rateSurcharges } = useLocationRateSurcharges(selectedLocationType);
+  // "Coop direkte": kun refusionsdelen, aldrig fakturagrundlaget
+  const { data: directRefunds = [] } = useDirectRefunds(selectedLocationType, periodStart, periodEnd);
+  const totalDirectRefund = sumDirectRefunds(directRefunds);
 
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
@@ -465,6 +470,7 @@ export function SupplierReportTab() {
     0
   );
   const hasSurcharge = totalSurchargeAmount > 0;
+  const hasRefundBox = hasSurcharge || directRefunds.length > 0;
 
   // Refusion pr. kæde, så Kvickly og SuperBrugsen kan læses hver for sig
   const refundByChain = locationEntries.reduce((acc: Record<string, { days: number; amount: number; perDay: number }>, loc: any) => {
@@ -481,7 +487,9 @@ export function SupplierReportTab() {
   ).sort(([a], [b]) => a.localeCompare(b));
   const totalRefundDays = refundChainEntries.reduce((s, [, v]) => s + v.days, 0);
   const refundClientName =
-    locationEntries.find((l: any) => l.surchargeRefundable)?.client?.name ?? "kunden";
+    locationEntries.find((l: any) => l.surchargeRefundable)?.client?.name ??
+    directRefunds[0]?.refundClientName ??
+    "kunden";
 
 
   const isAnnualRevenue = discountType === "annual_revenue";
@@ -686,6 +694,9 @@ export function SupplierReportTab() {
         approved_by: userData.user?.id,
         approved_at: new Date().toISOString(),
         report_data: reportData,
+        // Separat fra Coop-tillægget; indgår ikke i total/base/final/rabat/unique_locations
+        direct_refund_amount: totalDirectRefund,
+        direct_refund_data: directRefunds as any,
       };
 
       if (existingReport) {
@@ -1019,8 +1030,8 @@ export function SupplierReportTab() {
             </CardContent>
           </Card>
 
-          {/* Merpris til refusion - kun internt, ikke med i mailen til leverandøren */}
-          {hasSurcharge && (
+          {/* Merpris og refusion - med i mailen til Eesy, aldrig i Excel-arket */}
+          {hasRefundBox && (
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -1032,10 +1043,10 @@ export function SupplierReportTab() {
                     Til refusion fra {refundClientName}
                   </p>
                   <p className="text-3xl font-bold tabular-nums">
-                    {totalSurchargeRefundable.toLocaleString("da-DK")} kr
+                    {(totalSurchargeRefundable + totalDirectRefund).toLocaleString("da-DK")} kr
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {totalRefundDays} dage i alt
+                    {totalRefundDays + directRefunds.reduce((s, d) => s + d.days, 0)} dage i alt
                   </p>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -1051,6 +1062,27 @@ export function SupplierReportTab() {
                     </div>
                   ))}
                 </div>
+                {directRefunds.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-semibold">
+                      Direkte afregnet – refunderes af {directRefunds[0]?.refundClientName ?? refundClientName}
+                    </h3>
+                    <ul className="mt-2 space-y-2">
+                      {directRefunds.map((d) => (
+                        <li key={d.locationId} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+                          <span className="font-medium">{d.locationName}</span>
+                          <span className="text-muted-foreground tabular-nums">
+                            {d.minDate === d.maxDate ? d.minDate : `${d.minDate} – ${d.maxDate}`} · {d.days} dage × {d.perDay.toLocaleString("da-DK")} kr
+                          </span>
+                          <span className="font-semibold tabular-nums">{d.amount.toLocaleString("da-DK")} kr</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Betales direkte til butikken. Indgår ikke i Excel-arket eller fakturagrundlaget til Coop.
+                    </p>
+                  </div>
+                )}
                 {totalSurchargeAmount > totalSurchargeRefundable && (
                   <p className="mt-3 text-xs text-muted-foreground">
                     Merpris i alt {totalSurchargeAmount.toLocaleString("da-DK")} kr, hvoraf{" "}
