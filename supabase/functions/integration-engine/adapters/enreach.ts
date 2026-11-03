@@ -1743,10 +1743,12 @@ export class EnreachAdapter implements DialerAdapter {
             break;
           }
 
+          let nyePaaSiden = 0;
           for (const lead of pageResults) {
             const externalId = this.getStr(lead, ["uniqueId", "UniqueId"]);
             if (!externalId || seenIds.has(externalId)) continue;
             seenIds.add(externalId);
+            nyePaaSiden++;
 
             const closure = this.getStr(lead, ["closure", "Closure"]) || "unknown";
             closureTypes.set(closure, (closureTypes.get(closure) || 0) + 1);
@@ -1793,9 +1795,12 @@ export class EnreachAdapter implements DialerAdapter {
           }
 
           totalProcessed += pageResults.length;
-          console.log(`[EnreachAdapter] Sessions page ${page}: ${pageResults.length} leads (total sessions: ${allSessions.length})`);
+          console.log(`[EnreachAdapter] Sessions page ${page}: ${pageResults.length} leads, ${nyePaaSiden} nye (total sessions: ${allSessions.length})`);
 
-          if (pageResults.length < take) {
+          // [B1, målt 3/11] HeroBase ignorerer skip/take på /simpleleads og /leads og returnerer hele vinduet i ét svar (tryg 538, ase 2.006 pr. dag).
+          // Den gamle løkke hentede derfor samme side igen og igen op til 50.000-loftet (≈ 25–93 spildte requests pr. kørsel – kontoens dagskvote).
+          // Komplet = siden havde ingen nye emner, eller svaret matchede ikke sidestørrelsen (hele vinduet i ét svar / sidste side).
+          if (nyePaaSiden === 0 || pageResults.length !== take) {
             hasMore = false;
           } else {
             skip += take;

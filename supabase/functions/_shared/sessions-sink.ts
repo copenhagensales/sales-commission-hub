@@ -79,22 +79,6 @@ export async function processSessionsSink(supabase: any, sessions: SessionDto[],
   let udenRegel = 0, udenTilladelse = 0, kampagnerRegistreret = 0;
   let liste = sessions;
 
-  // Ukendte kampagner registreres FØR porten (ellers ses de aldrig på Sletteregler-fanen)
-  if (provider === "enreach") {
-    try {
-      const raekker = kampagneRaekker(sessions);
-      if (raekker.length > 0) {
-        const { data: kendte } = await supabase.from("adversus_campaign_mappings").select("adversus_campaign_id").in("adversus_campaign_id", raekker.map((r) => r.adversus_campaign_id));
-        const kendt = new Set(((kendte ?? []) as { adversus_campaign_id: string }[]).map((k) => k.adversus_campaign_id));
-        const nye = raekker.filter((r) => !kendt.has(r.adversus_campaign_id));
-        if (nye.length > 0) {
-          const { error } = await supabase.from("adversus_campaign_mappings").upsert(nye, { onConflict: "adversus_campaign_id", ignoreDuplicates: true });
-          if (error) log("WARN", `kampagneregistrering fejlede: ${error.message}`); else { kampagnerRegistreret = nye.length; log("INFO", `sletteregel-port: ${nye.length} ukendte kampagner registreret som »ikke koblet« (vises på Sletteregler-fanen)`); }
-        }
-      }
-    } catch (e) { log("WARN", `kampagneregistrering: ${e instanceof Error ? e.message : String(e)}`); }
-  }
-
   // Ukendte bruger-id'er → alias »uden kobling« for ALLE Enreach-konti (så kontoens sælgere kan afgøres og dækningskontrollen køres FØR aktivering – også hvor /users er lukket, fx ase).
   // Et id, der selv er en e-mail (HeroBase orgCode for CS-brugere), får e-mailen sat, så domæneregel og automatisk kobling virker uden /users. På den nye vej er en registreringsfejl fail-closed (Codex r2).
   if (provider === "enreach" && konto?.id) {
@@ -111,6 +95,25 @@ export async function processSessionsSink(supabase: any, sessions: SessionDto[],
     }
   }
 
+  // Ukendte kampagner registreres som »ikke koblet« (vises på Sletteregler-fanen) FØR regel-porten, men EFTER »kun egne«: kun kampagner, vores egne medarbejdere
+  // faktisk arbejder på (Mathias 3/11: klientens egne kampagner – fx alkas 46 – skal ikke fylde fanen). Uden kun egne: alle sete kampagner som hidtil.
+  const registrerKampagner = async (grundlag: SessionDto[]) => {
+    if (provider !== "enreach") return;
+    try {
+      const raekker = kampagneRaekker(grundlag);
+      if (raekker.length > 0) {
+        const { data: kendte } = await supabase.from("adversus_campaign_mappings").select("adversus_campaign_id").in("adversus_campaign_id", raekker.map((r) => r.adversus_campaign_id));
+        const kendt = new Set(((kendte ?? []) as { adversus_campaign_id: string }[]).map((k) => k.adversus_campaign_id));
+        const nye = raekker.filter((r) => !kendt.has(r.adversus_campaign_id));
+        if (nye.length > 0) {
+          const { error } = await supabase.from("adversus_campaign_mappings").upsert(nye, { onConflict: "adversus_campaign_id", ignoreDuplicates: true });
+          if (error) log("WARN", `kampagneregistrering fejlede: ${error.message}`); else { kampagnerRegistreret = nye.length; log("INFO", `sletteregel-port: ${nye.length} ukendte kampagner registreret som »ikke koblet« (vises på Sletteregler-fanen)`); }
+        }
+      }
+    } catch (e) { log("WARN", `kampagneregistrering: ${e instanceof Error ? e.message : String(e)}`); }
+  };
+
+
   // Alias-kort – KUN på den nye vej (konti uden flag opfører sig som hidtil: agents' eksterne id'er). Enreach-brugere er org-globale (tryg+alka deler brugere) → alias pr. kilde, ikke pr. konto.
   const aliasMap = new Map<string, string>();
   if (nyVej && provider === "enreach") {
@@ -120,7 +123,21 @@ export async function processSessionsSink(supabase: any, sessions: SessionDto[],
   }
 
   if (nyVej && provider === "enreach") {
-    // (1) Sletteregel-port – fail-closed
+    // (2) først: kun egne (så kampagneregistreringen kun ser vores egne folks arbejde) …
+    if (konto?.id && konto.kun_egne_medarbejdere) {
+      try {
+        const { data: till, error } = await supabase.rpc("agent_alias_tilladt", { p_konto: konto.id });
+        if (error) throw error;
+        const tilladte = new Set(((till ?? []) as ({ agent_alias_tilladt?: string } | string)[]).map((t) => lav(typeof t === "string" ? t : t.agent_alias_tilladt)));
+        const r = delTilladte(liste, tilladte); liste = r.med; udenTilladelse = r.uden;
+        if (udenTilladelse > 0) log("WARN", `kun egne medarbejdere: ${udenTilladelse} sessions fra ikke-tilladte/ukendte bruger-id'er lagres ikke`);
+      } catch (e) {
+        log("ERROR", `kun egne medarbejdere: tilladelsesliste kunne ikke dannes – intet lagres: ${e instanceof Error ? e.message : String(e)}`);
+        return { processed: 0, errors: sessions.length, matched: 0, duplicates: 0, port: true };
+      }
+    }
+    await registrerKampagner(liste);
+    // (1) … derefter sletteregel-port – fail-closed
     try {
       const { data: regler, error } = await supabase.rpc("kald_kampagne_regler");
       if (error) throw error;
@@ -131,21 +148,8 @@ export async function processSessionsSink(supabase: any, sessions: SessionDto[],
       log("ERROR", `sletteregel-port: kampagneregler kunne ikke læses – intet lagres: ${e instanceof Error ? e.message : String(e)}`);
       return { processed: 0, errors: sessions.length, matched: 0, duplicates: 0, port: true };
     }
-    // (2) Kun egne: kun tilladte bruger-id'er lagres (ukendte id'er er registreret ovenfor – fejlede det, er kørslen allerede afbrudt)
-    if (konto?.id) {
-      try {
-        if (konto.kun_egne_medarbejdere) {
-          const { data: till, error } = await supabase.rpc("agent_alias_tilladt", { p_konto: konto.id });
-          if (error) throw error;
-          const tilladte = new Set(((till ?? []) as ({ agent_alias_tilladt?: string } | string)[]).map((t) => lav(typeof t === "string" ? t : t.agent_alias_tilladt)));
-          const r = delTilladte(liste, tilladte); liste = r.med; udenTilladelse = r.uden;
-          if (udenTilladelse > 0) log("WARN", `kun egne medarbejdere: ${udenTilladelse} sessions fra ikke-tilladte/ukendte bruger-id'er lagres ikke`);
-        }
-      } catch (e) {
-        log("ERROR", `kun egne medarbejdere: tilladelsesliste kunne ikke dannes – intet lagres: ${e instanceof Error ? e.message : String(e)}`);
-        return { processed: 0, errors: sessions.length, matched: 0, duplicates: 0, uden_regel: udenRegel, port: true };
-      }
-    }
+  } else {
+    await registrerKampagner(liste);  // uden flag: alle sete kampagner (som hidtil – til Sletteregler-fanen før aktivering)
   }
   if (liste.length === 0) return { processed: 0, errors: 0, matched: 0, duplicates: 0, uden_regel: udenRegel, uden_tilladelse: udenTilladelse, kampagner_registreret: kampagnerRegistreret, port: nyVej };
 
