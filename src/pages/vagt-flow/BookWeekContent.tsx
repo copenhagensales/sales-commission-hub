@@ -50,6 +50,9 @@ import { useOutsideAgreementLocations, outsideAgreementKey } from "@/hooks/useSu
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, effektivDagspris, erLavPris, erLavPrisFejl } from "@/lib/fm/lowPriceGuard";
 
 type LocationTab = "mulige" | "cooldown" | "utilgaengelige";
 
@@ -102,6 +105,7 @@ export default function BookWeekContent() {
   const [quotedDate, setQuotedDate] = useState<string>("");
   const [quotedRef, setQuotedRef] = useState<string>("");
   const [quotedDiscount, setQuotedDiscount] = useState<string>("0");
+  const [createPriceNote, setCreatePriceNote] = useState<string>("");
   const isQuotedLocation = (loc: any) =>
     !!loc && !!outsideAgreement?.has(outsideAgreementKey(loc.type, loc.name));
   const isQuoted = isQuotedLocation(selectedLocation);
@@ -258,6 +262,7 @@ export default function BookWeekContent() {
               discount_percent_locked: parseFloat(quotedDiscount) || 0,
             }
           : {}),
+        ...(createPriceNote.trim() ? { price_note: createPriceNote.trim() } : {}),
         status: 'draft',
       } as any);
 
@@ -282,12 +287,32 @@ export default function BookWeekContent() {
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
     },
     onError: (error: any) => {
+      if (erLavPrisFejl(error)) {
+        toast({ title: "Begrundelse mangler", description: `Prisen er under ${MIN_DAGSPRIS_KR} kr. pr. dag – skriv en begrundelse`, variant: "destructive" });
+        return;
+      }
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
 
   const selectedClient = fieldmarketingClients?.find((c: any) => c.id === selectedClientId);
   const weekStartDate = getWeekStartDate(selectedYear, selectedWeek);
+
+  const createRateLow = (() => {
+    if (!selectedLocation) return false;
+    const isQ = outsideAgreementSet?.has?.(outsideAgreementKey(selectedLocation)) ?? false;
+    const days = isMarketLocation && marketStartDate && marketEndDate
+      ? Math.ceil((marketEndDate.getTime() - marketStartDate.getTime()) / 86400000) + 1
+      : selectedDays.length;
+    const total = isQ ? parseFloat(quotedPrice) : (isMarketLocation && marketTotalPrice ? parseFloat(marketTotalPrice) : NaN);
+    const placement = selectedPlacementId ? locationPlacements.find((p: any) => p.id === selectedPlacementId) : null;
+    return erLavPris(effektivDagspris({
+      totalPrice: Number.isFinite(total) ? total : null,
+      bookedDays: days,
+      dailyRateOverride: placement?.daily_rate ?? null,
+      locationDailyRate: selectedLocation.daily_rate ?? null,
+    }));
+  })();
 
   const processedLocations = useMemo(() => {
     if (!locations || !selectedClient) return { mulige: [], cooldown: [], utilgaengelige: [] };
@@ -906,6 +931,22 @@ export default function BookWeekContent() {
               />
             </div>
 
+            <p className="text-xs text-muted-foreground">{LAV_PRIS_INFOTEKST}</p>
+            {createRateLow && (
+              <div className="space-y-1">
+                <Label htmlFor="create-price-note">
+                  Begrundelse for pris under {MIN_DAGSPRIS_KR} kr. pr. dag (påkrævet)
+                </Label>
+                <Textarea
+                  id="create-price-note"
+                  rows={2}
+                  value={createPriceNote}
+                  onChange={(e) => setCreatePriceNote(e.target.value)}
+                  placeholder="Fx 'Gratis stand aftalt med centret'"
+                />
+              </div>
+            )}
+
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setBookingDialogOpen(false)}>
@@ -936,6 +977,10 @@ export default function BookWeekContent() {
                     toast({ title: "Fejl", description: "Vælg mindst én dag", variant: "destructive" });
                     return;
                   }
+                }
+                if (createRateLow && !createPriceNote.trim()) {
+                  toast({ title: "Begrundelse mangler", description: `Skriv en begrundelse for en pris under ${MIN_DAGSPRIS_KR} kr. pr. dag`, variant: "destructive" });
+                  return;
                 }
                 createBookingMutation.mutate({
                   locationId: selectedLocation.id,
