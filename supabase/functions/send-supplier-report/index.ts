@@ -356,7 +356,8 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     periodStart: String(report.period_start),
     rows,
     attachXlsx: true,
-    includeSurcharge: true,
+    // "Merpris og refusion" er kun intern og sendes aldrig til leverandøren
+    includeSurcharge: false,
     showDiscount: body.hasDiscountRules !== false,
     message: (body.message as string | undefined) ?? null,
   });

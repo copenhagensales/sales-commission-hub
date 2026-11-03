@@ -4,6 +4,7 @@ import { useBookingDiscount } from "@/hooks/useBookingDiscount";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { Info } from "lucide-react";
+import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
 
 const kr = (n: number) => `${Math.round(n).toLocaleString("da-DK")} kr`;
 
@@ -45,6 +46,8 @@ export function BookingEconomySummary({ bookingId }: { bookingId?: string | null
           </p>
         </div>
       </div>
+
+      <RefusionLinje bookingId={bookingId} />
 
       {data.missingRate && (
         <p className="text-xs text-destructive">

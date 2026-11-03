@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl, refusionUoverensstemmelse } from "@/lib/fm/lowPriceGuard";
+import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
 
 export default function LocationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -126,6 +128,10 @@ export default function LocationDetail() {
       toast({ title: "Lokation opdateret" });
     },
     onError: (error: any) => {
+      if (erLavPrisFejl(error)) {
+        toast({ title: "Begrundelse mangler", description: `Dagsprisen er under ${MIN_DAGSPRIS_KR} kr. – skriv en begrundelse`, variant: "destructive" });
+        return;
+      }
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
@@ -217,6 +223,10 @@ export default function LocationDetail() {
 
   const handleSave = () => {
     const { id: _, created_at, updated_at, ...updateData } = formData;
+    if (manglerBegrundelse(Number(updateData.daily_rate), updateData.daily_rate_note)) {
+      toast({ title: "Begrundelse mangler", description: `Skriv en begrundelse for en dagspris under ${MIN_DAGSPRIS_KR} kr.`, variant: "destructive" });
+      return;
+    }
     updateMutation.mutate(updateData);
   };
 
@@ -339,6 +349,83 @@ export default function LocationDetail() {
                     Denne pris bruges kun hvis ingen specifik placering vælges.
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">{LAV_PRIS_INFOTEKST}</p>
+                {erLavPris(Number(formData.daily_rate)) && (
+                  <Textarea
+                    aria-label="Begrundelse for lav dagspris"
+                    className="mt-2"
+                    rows={2}
+                    value={formData.daily_rate_note || ""}
+                    onChange={(e) => setFormData({ ...formData, daily_rate_note: e.target.value })}
+                    placeholder={`Begrundelse for dagspris under ${MIN_DAGSPRIS_KR} kr. (påkrævet)`}
+                    disabled={!canEditLocation}
+                  />
+                )}
+              </div>
+
+              {/* Direkte afregning og refusion (kun visning – DB bruger dagsprisen ovenfor som netto) */}
+              <div className="border-t pt-4 mt-2 space-y-3">
+                <p className="text-sm font-medium">Direkte afregning og refusion (valgfrit)</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="gross-daily-rate">Pris til lokationen (brutto) pr. dag</Label>
+                    <Input
+                      id="gross-daily-rate"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      value={formData.gross_daily_rate ?? ""}
+                      onChange={(e) => setFormData({ ...formData, gross_daily_rate: e.target.value === "" ? null : Number(e.target.value) })}
+                      disabled={!canEditLocation}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="refund-daily-rate">Refusion pr. dag</Label>
+                    <Input
+                      id="refund-daily-rate"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      value={formData.refund_daily_rate ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? null : Number(e.target.value);
+                        const eesy = fieldmarketingClients.find((c: any) => c.name === "Eesy FM");
+                        setFormData({
+                          ...formData,
+                          refund_daily_rate: v,
+                          refund_client_id: formData.refund_client_id ?? (v ? eesy?.id ?? null : null),
+                        });
+                      }}
+                      disabled={!canEditLocation}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Refunderes af</Label>
+                  <Select
+                    value={formData.refund_client_id || "none"}
+                    onValueChange={(v) => setFormData({ ...formData, refund_client_id: v === "none" ? null : v })}
+                    disabled={!canEditLocation}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Vælg kunde" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Ingen</SelectItem>
+                      {fieldmarketingClients.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {refusionUoverensstemmelse({
+                  brutto: formData.gross_daily_rate ?? null,
+                  refusion: formData.refund_daily_rate ?? null,
+                  netto: formData.daily_rate ?? null,
+                }) && (
+                  <p className="text-sm text-destructive">
+                    Brutto minus refusion svarer ikke til dagsprisen (netto). Dagsprisen er det, der rammer lederens DB.
+                  </p>
+                )}
+                <RefusionLinje locationId={id} />
               </div>
 
               {/* Placeringer */}
