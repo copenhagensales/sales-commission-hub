@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl } from "@/lib/fm/lowPriceGuard";
+import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
 import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE, coopDirekteRule } from "@/lib/fm/coopDirekte";
 
@@ -391,6 +392,7 @@ export default function LocationDetail() {
                   </div>
                 );
               })()}
+              <RefusionLinje locationId={id} />
 
               {/* Placeringer */}
               <div className="border-t pt-4 mt-2">

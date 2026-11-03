@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
 import { matchSurcharge } from "@/utils/locationRateSurcharge";
-import { lokationsRefusion, tillaegsRefusion, type RefusionLinjeData } from "@/lib/fm/refusionLinje";
+import { tillaegsRefusion, coopDirekteLinje, type RefusionLinjeData } from "@/lib/fm/refusionLinje";
+import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE } from "@/lib/fm/coopDirekte";
 
 interface LocationRefundRow {
   id: string;
@@ -37,9 +38,11 @@ export function useLocationRefundLine(opts: { locationId?: string | null; bookin
     enabled: !!(opts.locationId || opts.bookingId),
   });
 
-  const { data: surcharges } = useLocationRateSurcharges(loc?.type ?? undefined);
+  // "Coop direkte" bruger Coop-kædereglerne
+  const rulesType = loc?.type === COOP_DIREKTE_TYPE ? COOP_RULES_TYPE : loc?.type ?? undefined;
+  const { data: surcharges } = useLocationRateSurcharges(rulesType);
   const rule = matchSurcharge(loc?.name ?? null, surcharges);
-  const clientId = loc?.refund_daily_rate ? loc.refund_client_id : rule?.funded_by_client_id ?? null;
+  const clientId = rule?.funded_by_client_id ?? null;
 
   const { data: clientName } = useQuery({
     queryKey: ["client-name", clientId],
@@ -53,13 +56,15 @@ export function useLocationRefundLine(opts: { locationId?: string | null; bookin
 
   if (!loc) return null;
   const toNum = (v: number | null) => (v == null ? null : Number(v));
-  const direct = lokationsRefusion({
-    dailyRate: toNum(loc.daily_rate),
-    grossDailyRate: toNum(loc.gross_daily_rate),
-    refundDailyRate: toNum(loc.refund_daily_rate),
-    refundClientName: clientName ?? null,
-  });
-  if (direct) return direct as RefusionLinjeData;
+  if (loc.type === COOP_DIREKTE_TYPE) {
+    return rule
+      ? coopDirekteLinje({
+          dailyRate: toNum(loc.daily_rate),
+          refundPerDay: Number(rule.surcharge_per_day),
+          refundClientName: clientName ?? null,
+        })
+      : null;
+  }
   if (rule) {
     return tillaegsRefusion({
       dailyRate: toNum(loc.daily_rate),
