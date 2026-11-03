@@ -86,7 +86,7 @@ async function buildSupplierMail(
     rows: any[];
     attachXlsx: boolean;
     includeSurcharge: boolean;
-    /** "Coop direkte"-lokationer (kun mailtekst, aldrig bilag/total). */
+    /** Godkendte refusionslinjer til Coop direkte-rapporten alene. */
     directRefunds?: DirectRefundLine[];
     showDiscount: boolean;
     message?: string | null;
@@ -126,7 +126,7 @@ async function buildSupplierMail(
     amount: mailLocations.reduce((s, l) => s + l.amount, 0),
   };
 
-  // Merpris/refusion er intern og må kun med i mailteksten, aldrig i bilaget.
+  // Coop butik: merpris kun i mail. Coop direkte: refusion også i eget Excel.
   let surcharge: SurchargeSummary | null = null;
   if (opts.includeSurcharge) {
     const totalSurcharge = rows.reduce(

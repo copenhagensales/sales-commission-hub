@@ -370,7 +370,7 @@ export interface SurchargeSummary {
   refundableAmount: number;
   refundClientName: string;
   chains: SurchargeChainSummary[];
-  /** Refusion fra Coop-tillæg alene (refundableAmount = denne + direkte). */
+  /** Legacy-snapshot: isolerer Coop-tillæg fra tidligere direkte refusion. */
   coopRefundableAmount?: number;
   directRefunds?: DirectRefundLine[];
 }
@@ -386,16 +386,6 @@ export interface DirectRefundLine {
   amount: number;
   refundClientName?: string | null;
 }
-
-const fmtShortDate = (iso: string | null) => {
-  if (!iso) return "";
-  const [y, m, d] = iso.slice(0, 10).split("-");
-  return y && m && d ? `${d}/${m}` : iso;
-};
-const directPeriod = (d: DirectRefundLine) =>
-  d.minDate && d.maxDate && d.minDate !== d.maxDate
-    ? `${fmtShortDate(d.minDate)}-${fmtShortDate(d.maxDate)}`
-    : fmtShortDate(d.minDate ?? d.maxDate);
 
 export interface SupplierMailLocation {
   name: string;
