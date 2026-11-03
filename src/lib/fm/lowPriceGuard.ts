@@ -5,7 +5,7 @@
 export const MIN_DAGSPRIS_KR = 100;
 
 export const LAV_PRIS_INFOTEKST =
-  "Beløbet trækkes én gang i din DB i den lønperiode, aktiviteten ligger i. At det betales via Corpay, påvirker ikke din DB. Indtast den reelle pris.";
+  "Den reelle pris pr. dag, vi betaler lokationen (ex moms).";
 
 export interface PrisInput {
   totalPrice?: number | null;
