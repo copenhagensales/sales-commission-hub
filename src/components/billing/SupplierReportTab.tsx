@@ -31,8 +31,8 @@ import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
 import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/bookingGross";
 import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
-import { useDirectRefunds } from "@/hooks/useDirectRefunds";
-import { supplierInvoiceBookings, sumDirectRefunds, coopDirekteReportBooking, hasLegacyCoopRefund } from "@/lib/fm/directRefunds";
+import { useDirectRefunds, useLegacyDirectRefundConflict } from "@/hooks/useDirectRefunds";
+import { supplierInvoiceBookings, sumDirectRefunds, coopDirekteReportBooking } from "@/lib/fm/directRefunds";
 import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE } from "@/lib/fm/coopDirekte";
 import { bookingSurcharge } from "@/utils/locationRateSurcharge";
 import { SupplierDispatchPanel } from "./SupplierDispatchPanel";
@@ -212,23 +212,11 @@ export function SupplierReportTab() {
   // Butikstillæg (merpris) pr. kæde - grundsatsen på lokationen ændres ikke
   const { data: rateSurcharges, isLoading: rulesLoading, isError: rulesError } = useLocationRateSurcharges(isCoopDirekte ? COOP_RULES_TYPE : selectedLocationType);
   // Selvstændig rapport; aldrig direkte refusion på Coop butik.
-  const { data: directRefunds = [] } = useDirectRefunds(selectedLocationType, periodStart, periodEnd);
+  const { data: directRefunds = [], isLoading: refundsLoading, isError: refundsError } = useDirectRefunds(selectedLocationType, periodStart, periodEnd);
   const totalDirectRefund = isCoopDirekte ? sumDirectRefunds(directRefunds) : 0;
-  const { data: legacyRefundConflict, isLoading: legacyLoading, isError: legacyError } = useQuery({
-    queryKey: ["supplier-report", "legacy-direct-refund", selectedMonth, periodType],
-    enabled: isCoopDirekte,
-    queryFn: async () => {
-      const start = format(periodStart, "yyyy-MM-dd");
-      const end = format(periodEnd, "yyyy-MM-dd");
-      const { data, error } = await supabase.from("supplier_invoice_reports")
-        .select("location_type, period_start, period_end, status, direct_refund_amount")
-        .eq("location_type", COOP_RULES_TYPE).in("status", ["approved", "sent"])
-        .gt("direct_refund_amount", 0).lte("period_start", end).gte("period_end", start);
-      if (error) throw error;
-      return hasLegacyCoopRefund(data ?? [], start, end);
-    },
-  });
-  const refundNotReady = isCoopDirekte && (rulesLoading || rulesError || legacyLoading || legacyError || legacyRefundConflict);
+  const { data: legacyRefundConflict, isLoading: legacyLoading, isError: legacyError } =
+    useLegacyDirectRefundConflict(isCoopDirekte, periodStart, periodEnd);
+  const refundNotReady = isCoopDirekte && (rulesLoading || rulesError || refundsLoading || refundsError || legacyLoading || legacyError || legacyRefundConflict);
 
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
@@ -1399,7 +1387,7 @@ export function SupplierReportTab() {
                   ...(hasDiscount ? ["Rabat %", "Rabat", "Efter rabat"] : []),
                   ...(isAnnualRevenue ? ["Låst sats"] : []),
                 ];
-                const rows = locationDiscounts.map((loc: any) => {
+                const rows = locationDiscounts.flatMap((loc: any) => {
                   const weekText = [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
                     .sort(([a]: [number, any], [b]: [number, any]) => a - b)
                     .map(([week, daysSet]: [number, Set<number>]) => {
@@ -1415,7 +1403,7 @@ export function SupplierReportTab() {
                       : (loc.lockedPercents ?? []).length === 1
                         ? `${loc.lockedPercents[0]}%`
                         : "";
-                  return [
+                  const locationRow = [
                     loc.location?.name || "",
                     loc.location?.external_id || "",
                     loc.location?.address_city || "",
@@ -1426,6 +1414,11 @@ export function SupplierReportTab() {
                     ...(hasDiscount ? [loc.discount, loc.discountAmount, loc.finalAmount] : []),
                     ...(isAnnualRevenue ? [lockedText] : []),
                   ];
+                  if (!isCoopDirekte) return [locationRow];
+                  return [locationRow, ...getWeekRows(loc).map((w) => [
+                    `  Uge ${w.week}`, "", "", `${format(w.start, "d/M")}–${format(w.end, "d/M")}`,
+                    w.dayCount, w.gross, w.refundPerDay, w.refund, w.gross - w.refund,
+                  ])];
                 });
 
                 // Period label
@@ -1459,7 +1452,12 @@ export function SupplierReportTab() {
                 }
                 if (isAnnualRevenue) totalRow.push("");
 
-                const allData = [...metaRows, headers, ...rows, totalRow];
+                const directTotals = isCoopDirekte ? [
+                  ["Vi betaler", "", "", "", "", sumAmount],
+                  ["Til refusion fra Eesy FM", "", "", "", "", totalReportRefund],
+                  ["Netto", "", "", "", "", sumAmount - totalReportRefund],
+                ] : [];
+                const allData = [...metaRows, headers, ...rows, totalRow, ...directTotals];
                 const colWidths = [25, 10, 15, 40, 8, 12, ...(isCoopDirekte ? [14, 14, 14] : []), ...(hasDiscount ? [10, 12, 12] : []), ...(isAnnualRevenue ? [16] : [])];
                 const boldRowIdxs = [0, 1, 3, allData.length - 1];
                 await downloadExcelAoa(
