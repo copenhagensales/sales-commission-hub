@@ -4,6 +4,7 @@ import {
   buildSupplierReportEmail,
   type SupplierMailLocation,
   type SurchargeSummary,
+  type DirectRefundLine,
 } from "../_shared/supplier-report-mail.ts";
 import {
   buildSupplierReportXlsx,
@@ -84,6 +85,8 @@ async function buildSupplierMail(
     rows: any[];
     attachXlsx: boolean;
     includeSurcharge: boolean;
+    /** Direkte afregnede kæde-lokationer (kun mailtekst, aldrig bilag/total). */
+    directRefunds?: DirectRefundLine[];
     showDiscount: boolean;
     message?: string | null;
   },
@@ -125,7 +128,9 @@ async function buildSupplierMail(
       (s: number, r: any) => s + (Number(r.surchargeRefundableAmount) || 0),
       0,
     );
-    if (totalSurcharge > 0) {
+    const directRefunds = (opts.directRefunds ?? []).filter((d) => Number(d.amount) > 0);
+    const directRefundAmount = directRefunds.reduce((s2, d) => s2 + (Number(d.amount) || 0), 0);
+    if (totalSurcharge > 0 || directRefundAmount > 0) {
       const byChain = new Map<string, { days: number; perDay: number; amount: number }>();
       for (const r of rows as any[]) {
         if (!r.surchargeChain || !Number(r.surchargeRefundableAmount)) continue;
@@ -140,9 +145,13 @@ async function buildSupplierMail(
       }
       surcharge = {
         totalSurcharge,
-        refundableAmount: refundable,
+        refundableAmount: refundable + directRefundAmount,
+        coopRefundableAmount: refundable,
+        directRefunds,
         refundClientName:
-          (rows as any[]).find((r) => r.surchargeRefundable)?.client ?? 'kunden',
+          (rows as any[]).find((r) => r.surchargeRefundable)?.client ??
+          directRefunds[0]?.refundClientName ??
+          'kunden',
         chains: [...byChain.entries()].map(([chain, v]) => ({ chain, ...v })),
       };
     }
@@ -256,6 +265,7 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
     rows,
     attachXlsx: !!sub.attach_xlsx,
     includeSurcharge: !!sub.include_surcharge_summary,
+    directRefunds: (report.direct_refund_data as any[] | null) ?? [],
     showDiscount: false,
   });
 
@@ -356,8 +366,10 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     periodStart: String(report.period_start),
     rows,
     attachXlsx: true,
-    // "Merpris og refusion" er kun intern og sendes aldrig til leverandøren
-    includeSurcharge: false,
+    // Coop-rapporten sendes til Eesy; "Merpris og refusion" skal med i mailen
+    // (aldrig i Excel-bilaget, som videresendes til Coop).
+    includeSurcharge: true,
+    directRefunds: (report.direct_refund_data as any[] | null) ?? [],
     showDiscount: body.hasDiscountRules !== false,
     message: (body.message as string | undefined) ?? null,
   });
