@@ -11,6 +11,7 @@ import {
   xlsxFileName,
 } from "../_shared/supplier-report-xlsx.ts";
 import { udsendFlere } from "../_shared/udsend.ts";
+import { approvedRowRefund, COOP_DIRECT_REPORT } from "../_shared/supplier-report-refunds.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +100,7 @@ async function buildSupplierMail(
   surcharge: SurchargeSummary | null;
 }> {
   const { locationType, supplierName, periodStart, rows } = opts;
+  const isDirect = locationType === COOP_DIRECT_REPORT;
   const periodLabel = monthLabel(periodStart);
   const yearMonth = String(periodStart).slice(0, 7);
 
@@ -108,9 +110,16 @@ async function buildSupplierMail(
     city: r.city ?? '',
     days: Number(r.days) || 0,
     amount: Number(r.amount) || 0,
+    dailyRate: Number(r.dailyRate) || 0,
+    refundPerDay: Number(r.refundPerDay) || 0,
+    refundAmount: approvedRowRefund(locationType, r),
+    weeks: isDirect ? r.weeks ?? [] : [],
   }));
 
-  const mailLocations = toMailLocations(rows, opts.showDiscount);
+  const mailLocations = toMailLocations(rows, !isDirect && opts.showDiscount).map((l, i) => ({
+    ...l, refundAmount: approvedRowRefund(locationType, rows[i]),
+    refundPerDay: isDirect ? Number(rows[i].refundPerDay) || 0 : 0,
+  }));
   const totals = {
     locations: mailLocations.length,
     days: mailLocations.reduce((s, l) => s + l.days, 0),
@@ -128,9 +137,9 @@ async function buildSupplierMail(
       (s: number, r: any) => s + (Number(r.surchargeRefundableAmount) || 0),
       0,
     );
-    const directRefunds = (opts.directRefunds ?? []).filter((d) => Number(d.amount) > 0);
-    const directRefundAmount = directRefunds.reduce((s2, d) => s2 + (Number(d.amount) || 0), 0);
-    if (totalSurcharge > 0 || directRefundAmount > 0) {
+    const directRefunds = isDirect ? (opts.directRefunds ?? []).filter((d) => Number(d.amount) > 0) : [];
+    const directRefundAmount = isDirect ? rows.reduce((sum: number, row) => sum + approvedRowRefund(locationType, row), 0) : 0;
+    if (isDirect || totalSurcharge > 0) {
       const byChain = new Map<string, { days: number; perDay: number; amount: number }>();
       for (const r of rows as any[]) {
         if (!r.surchargeChain || !Number(r.surchargeRefundableAmount)) continue;
@@ -145,13 +154,12 @@ async function buildSupplierMail(
       }
       surcharge = {
         totalSurcharge,
-        refundableAmount: refundable + directRefundAmount,
-        coopRefundableAmount: refundable,
+        refundableAmount: isDirect ? directRefundAmount : refundable,
+        coopRefundableAmount: isDirect ? 0 : refundable,
         directRefunds,
         refundClientName:
-          (rows as any[]).find((r) => r.surchargeRefundable)?.client ??
-          directRefunds[0]?.refundClientName ??
-          'kunden',
+          (isDirect ? directRefunds[0]?.refundClientName ?? 'Eesy FM' :
+            (rows as any[]).find((r) => r.surchargeRefundable)?.client ?? 'kunden'),
         chains: [...byChain.entries()].map(([chain, v]) => ({ chain, ...v })),
       };
     }
