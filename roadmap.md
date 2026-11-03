@@ -1,5 +1,11 @@
 # Roadmap — DB-/lønberegning: korrekthed
 
+## Coop direkte — tre godkendte rettelser (3/11 2026)
+- [ ] Daglig kunde-DB: samme bookingpris og dagsrefusion som kunde-DB; øvrig lønberegning uændret.
+- [ ] Lokationsøkonomi: dagsrækker med refusion pr. kunde og gyldig dag.
+- [ ] Ny lokation: fælles fuld liste med Coop butik og Coop direkte.
+- [ ] Prøver og kontrol af automatiske byggetjek; ingen mails eller dataændringer.
+
 Opgave fra Kasper (30/8 2026): assisterende teamledere med fast månedsløn tælles ikke med i DB pr. klient,
 hardkodede forretningsregler skal ud i systemet, datakvalitet skal advares om, og beregningskernen skal testes.
 
