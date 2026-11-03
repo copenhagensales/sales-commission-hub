@@ -50,7 +50,7 @@ const STALE_TASK_MS = 5 * 60_000;
 const ALARM_RECIPIENT = "km@copenhagensales.dk";
 
 function withDeadline<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: number | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     p,
     new Promise<T>((_, reject) => {

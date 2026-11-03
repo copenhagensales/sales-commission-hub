@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authorizeGdprRequest, corsHeaders } from "../_shared/gdpr-auth.ts";
 import {
   employeeAnonymizationPatch,
@@ -51,7 +51,7 @@ interface CleanupLogEntry {
  * becomes a no-op. Row-count deletes are translated into an equivalent
  * head-count select so the dry run can report exactly what it would remove.
  */
-function makeDryRunClient(sb: ReturnType<typeof createClient>) {
+function makeDryRunClient(sb: SupabaseClient) {
   const noopChain = (): any => {
     const chain: any = new Proxy(function () {}, {
       get(_target, prop) {
@@ -79,7 +79,7 @@ function makeDryRunClient(sb: ReturnType<typeof createClient>) {
         upsert: () => Promise.resolve({ data: null, error: null }),
       };
     },
-  } as unknown as ReturnType<typeof createClient>;
+  } as unknown as SupabaseClient;
 }
 
 Deno.serve(async (req) => {
