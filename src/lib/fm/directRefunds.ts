@@ -94,3 +94,15 @@ export function buildDirectRefunds(
 
 export const sumDirectRefunds = (lines: DirectRefundLine[]) =>
   lines.reduce((s, l) => s + l.amount, 0);
+
+/**
+ * Bookinger der indgår i leverandørrapportens fakturagrundlag (Excel/total/
+ * rabat/unique_locations): kun lokationer af den valgte type. Direkte
+ * afregnede lokationer har en anden type og kommer derfor aldrig med her.
+ */
+export function supplierInvoiceBookings<T extends { location?: { type?: string | null } | null }>(
+  bookings: T[],
+  locationType: string
+): T[] {
+  return bookings.filter((b) => b.location?.type === locationType);
+}
