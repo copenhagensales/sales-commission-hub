@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2, Lock, LockOpen } from "lucide-react";
+import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2, Lock, LockOpen, Copy } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 import { ContractComplianceTab } from "@/components/contracts/ContractComplianceTab";
@@ -282,6 +282,17 @@ export default function Contracts() {
     setEditingTemplate(template);
     setTemplateForm({
       name: template.name,
+      type: template.type,
+      description: template.description || "",
+      content: template.content,
+    });
+    setTemplateDialogOpen(true);
+  };
+
+  const handleDuplicateTemplate = (template: ContractTemplate) => {
+    setEditingTemplate(null);
+    setTemplateForm({
+      name: `${template.name} (kopi)`,
       type: template.type,
       description: template.description || "",
       content: template.content,
@@ -562,6 +573,15 @@ export default function Contracts() {
                               {template.is_confidential ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Duplikér"
+                            aria-label="Duplikér skabelon"
+                            onClick={() => handleDuplicateTemplate(template)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
