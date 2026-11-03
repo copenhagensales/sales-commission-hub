@@ -18,7 +18,8 @@ export function useAgentAlias(kilde: string, kontoId?: string | null) {
     queryKey: [...KEYS.alias(kilde), kontoId ?? "alle"],
     queryFn: async () => {
       let q = supabase.from("agent_ekstern_alias").select("*").eq("kilde", kilde);
-      if (kontoId) q = q.or(`konto_id.eq.${kontoId},konto_id.is.null`);
+      // Enreach-brugere er fælles for konti i samme HeroBase-organisation (B1): vis alle for kilden; Adversus: kontoens egne + id'er uden kendt konto
+      if (kontoId && kilde !== "enreach") q = q.or(`konto_id.eq.${kontoId},konto_id.is.null`);
       const { data, error } = await q.order("agent_id", { nullsFirst: true }).order("ekstern_id");
       if (error) throw error;
       return (data ?? []) as AgentAlias[];

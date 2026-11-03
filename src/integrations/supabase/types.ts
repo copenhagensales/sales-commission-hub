@@ -20398,6 +20398,10 @@ export type Database = {
         Args: { p_clients: string[]; p_konto: string }
         Returns: number
       }
+      dialer_sessions_kampagner_registrer: {
+        Args: { p_integration: string }
+        Returns: number
+      }
       assign_role_by_email: {
         Args: {
           _email: string

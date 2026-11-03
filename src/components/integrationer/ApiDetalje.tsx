@@ -108,20 +108,24 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
             <>
               <div><span className="text-muted-foreground">Aktiv:</span> {d.is_active ? "Ja" : "Nej"} · <span className="text-muted-foreground">Teknisk navn:</span> {d.name}</div>
               <div><span className="text-muted-foreground">Sidste salgs-sync:</span> {tid(d.last_sync_at)} {d.last_status && <span className="text-xs text-muted-foreground">({d.last_status})</span>}</div>
-              {d.provider === "adversus" && (
+              {(d.provider === "adversus" || d.provider === "enreach") && (
                 <>
                   <div className="sm:col-span-2">
-                    <span className="text-muted-foreground">Henter kald:</span> {cfg.calls_v1 === true ? "ja, ny /calls-vej" : "legacy /cdr"} · <span className="text-muted-foreground">Henter emner:</span> {cfg.leads_v1 === true ? "ja" : "nej"}
+                    {d.provider === "adversus" ? (
+                      <><span className="text-muted-foreground">Henter kald:</span> {cfg.calls_v1 === true ? "ja, ny /calls-vej" : "legacy /cdr"} · <span className="text-muted-foreground">Henter emner:</span> {cfg.leads_v1 === true ? "ja" : "nej"}</>
+                    ) : (
+                      <><span className="text-muted-foreground">Henter sessions (emner med lukkestatus):</span> {cfg.sessions_v1 === true ? "ja, med sletteregel-port" : "som hidtil (uden port – aktiveres pr. konto)"}</>
+                    )}
                   </div>
                   <div className="sm:col-span-2 flex items-center gap-3">
-                    <Switch id={`kun-egne-${konto.id}`} checked={konto.kun_egne_medarbejdere} disabled={opdaterKonto.isPending || cfg.calls_v1 !== true}
+                    <Switch id={`kun-egne-${konto.id}`} checked={konto.kun_egne_medarbejdere} disabled={opdaterKonto.isPending || (cfg.calls_v1 !== true && cfg.sessions_v1 !== true)}
                       onCheckedChange={(v) => opdaterKonto.mutate({ id: konto.id, aendring: { kun_egne_medarbejdere: v } })} />
                     <label htmlFor={`kun-egne-${konto.id}`} className="text-sm">
-                      Hent kun egne medarbejderes kald{konto.kun_egne_medarbejdere ? " (til)" : " (fra)"}
+                      Hent kun egne medarbejderes {d.provider === "enreach" ? "sessions" : "kald"}{konto.kun_egne_medarbejdere ? " (til)" : " (fra)"}
                       <span className="block text-xs text-muted-foreground">
-                        {cfg.calls_v1 === true
-                          ? "Til: dialeren bedes kun om kald for brugere, der er koblet til en medarbejder eller har e-mail i et af kontoens egne domæner. Fra: alle kontoens kald hentes."
-                          : "Gælder først, når kontoen hentes via den nye /calls-vej (ikke aktiv her endnu). Indstillingen er sat på forhånd og kan ikke ændres, før kontoen er på den nye vej."}
+                        {cfg.calls_v1 === true || cfg.sessions_v1 === true
+                          ? "Til: kun data for brugere, der er koblet til en medarbejder eller har e-mail i et af kontoens egne domæner, gemmes. Fra: alt fra kontoen gemmes."
+                          : "Gælder først, når kontoen er på den nye vej med sletteregel-port (ikke aktiv her endnu). Indstillingen er sat på forhånd og kan ikke ændres, før kontoen er på den nye vej."}
                       </span>
                     </label>
                   </div>

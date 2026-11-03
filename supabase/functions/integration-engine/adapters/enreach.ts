@@ -1803,10 +1803,13 @@ export class EnreachAdapter implements DialerAdapter {
             await new Promise(r => setTimeout(r, 50));
           }
         } catch (e) {
+          // [B1 krav 6] Komplet eller intet: en sidefejl må ikke give et delresultat, som flytter vandmærket – kørslen fejler, og vinduet hentes igen næste gang.
           console.error(`[EnreachAdapter] Error fetching sessions page ${page}:`, e);
-          hasMore = false;
+          throw new Error(`sessions: side ${page} fejlede: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
+
+      if (hasMore) throw new Error(`sessions: loftet på ${totalProcessed} emner nået, før vinduet var hentet færdigt – vinduet deles op (vandmærket står)`);  // [B1 krav 6] delresultat må ikke tælle som komplet
 
       // Log unique closure types for diagnostics
       console.log(`[EnreachAdapter] ===== SESSION CLOSURE TYPES for ${this.dialerName} =====`);
@@ -1819,8 +1822,16 @@ export class EnreachAdapter implements DialerAdapter {
       return allSessions;
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSessionsRange:", error);
-      return [];
+      throw error instanceof Error ? error : new Error(String(error));  // [B1 krav 6] intet delresultat
     }
+  }
+
+  /** [B1 krav 3] Kontoens brugere (HeroBase /users: orgCode, email, name, username …) til sælger-alias. Kaster ved fejl. */
+  async fetchUserDirectory(): Promise<Record<string, unknown>[]> {
+    const data = (await this.get(`/users?Limit=2000`)) as unknown;
+    if (Array.isArray(data)) return data as Record<string, unknown>[];
+    const w = (data ?? {}) as Record<string, unknown>;
+    return ((w.Results ?? w.results ?? []) as Record<string, unknown>[]);
   }
 
   /**

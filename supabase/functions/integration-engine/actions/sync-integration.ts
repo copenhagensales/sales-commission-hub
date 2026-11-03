@@ -9,6 +9,7 @@ import { TimeoutGuard } from "../utils/timeout-guard.ts";
 import { enqueueFailed } from "../utils/dlq.ts";
 import { acquireRunLock, releaseRunLock, generateRunId } from "../utils/run-lock.ts";
 import { CampaignMappingConfig } from "../types.ts";
+import { registrerEnreachBrugere, tilBrugere } from "../../_shared/enreach-alias.ts";
 
 /**
  * Check if current time is within Danish working hours (08:00-21:00 Europe/Copenhagen)
@@ -441,6 +442,18 @@ export async function syncIntegration(
     // Process sessions (skip if rate-limited or timeout approaching)
     if (actionList.includes("sessions") && !metaSyncRateLimited && !timer.isExpired()) {
       try {
+        // [B1 krav 3] Enreach: kontoens brugere registreres som alias FØR sessions hentes (alle Enreach-konti, så dækningskontrollen kan køres før aktivering).
+        if (integration.provider === "enreach" && typeof (adapter as any)?.fetchUserDirectory === "function") {
+          try {
+            const { data: konto } = await supabase.from("api_konto").select("id, egne_domaener").eq("integration_id", integration.id).maybeSingle();
+            if (konto?.id) {
+              let brugere: ReturnType<typeof tilBrugere> = [];
+              try { brugere = tilBrugere(await (adapter as any).fetchUserDirectory()); }
+              catch (e) { log("WARN", `enreach-alias: /users utilgængelig for ${integration.name} (fx 403 på ase) – automatik kører kun på id'er set i sessions: ${e instanceof Error ? e.message : String(e)}`); }
+              await registrerEnreachBrugere(supabase, brugere, konto.id, (konto.egne_domaener ?? []) as string[], log);
+            } else log("WARN", `enreach-alias: ingen api_konto for ${integration.name} – brugere ikke registreret`);
+          } catch (e) { log("WARN", `enreach-alias: brugerregistrering fejlede (sessions hentes alligevel; ukendte id'er frasorteres på »kun egne«-konti): ${e instanceof Error ? e.message : String(e)}`); }
+        }
         const syncState = await getSyncState(supabase, integration.id, "sessions");
         const windowStart = syncState?.last_success_at
           ? new Date(new Date(syncState.last_success_at).getTime() - 5 * 60 * 1000)
@@ -470,6 +483,9 @@ export async function syncIntegration(
           runResults["sessions"] = { processed: 0, errors: 0, matched: 0, message: "No sessions found" };
         }
 
+        // [B1 krav 6, Codex r1] Vandmærket flyttes KUN, når hentningen var komplet (adapteren kaster ellers) OG lagringen var fejlfri; ellers hentes vinduet igen næste gang
+        const sessFejl = Number((runResults["sessions"] as { errors?: number } | undefined)?.errors ?? 0);
+        if (sessFejl > 0) throw new Error(`sessions: ${sessFejl} rækker kunne ikke lagres – vandmærket står`);
         await upsertSyncState(supabase, integration.id, "sessions", windowEnd);
       } catch (sessErr) {
         const sessErrMsg = sessErr instanceof Error ? sessErr.message : String(sessErr);
