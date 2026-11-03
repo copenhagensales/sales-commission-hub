@@ -15,9 +15,8 @@ const svar = (status: number, body: unknown) => new Response(JSON.stringify(body
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return svar(405, { ok: false });
-  // Fail-closed: uden konfigureret hemmelighed afvises alt (den fælles verifyWebhookSecret er fail-open, når variablen mangler – det må en hook, der skriver data, ikke være)
-  if (!Deno.env.get("ENREACH_HOOK_SECRET")) return svar(503, { ok: false, fejl: "hemmelighed ikke konfigureret" });
-  const afvist = verifyWebhookSecret(req, "ENREACH_HOOK_SECRET", { corsHeaders: cors, headerNames: ["x-webhook-secret"], queryNames: [] });
+  // Fail-closed: uden konfigureret hemmelighed afvises alt (requireConfigured) – en hook, der skriver data, må ikke være åben
+  const afvist = verifyWebhookSecret(req, "ENREACH_HOOK_SECRET", { corsHeaders: cors, headerNames: ["x-webhook-secret"], queryNames: [], requireConfigured: true });
   if (afvist) return afvist;
   const dialerId = new URL(req.url).searchParams.get("dialer_id") ?? "";
   if (!UUID.test(dialerId)) return svar(400, { ok: false, fejl: "dialer_id" });

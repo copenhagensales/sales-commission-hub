@@ -13,7 +13,7 @@ const svar = (status: number, body: unknown) => new Response(JSON.stringify(body
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return svar(405, { ok: false });
-  const afvist = verifyWebhookSecret(req, "KALD_WEBHOOK_SECRET", { corsHeaders: cors, queryNames: ["authKey"] });
+  const afvist = verifyWebhookSecret(req, "KALD_WEBHOOK_SECRET", { corsHeaders: cors, queryNames: ["authKey"], requireConfigured: true });  // fail-closed (B3-rest)
   if (afvist) return afvist;
   const dialerId = new URL(req.url).searchParams.get("dialer_id") ?? "";
   if (!UUID.test(dialerId)) return svar(400, { ok: false, fejl: "dialer_id" });

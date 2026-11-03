@@ -107,7 +107,10 @@ serve(async (req) => {
 
         const webhooks = await response.json();
 
-        return new Response(JSON.stringify({ success: true, webhooks }), {
+        // [B3-rest] Headers (kan indeholde hook-hemmeligheder) udelades af svaret
+        const udenHeaders = (h: unknown) => (h && typeof h === "object" ? Object.fromEntries(Object.entries(h as Record<string, unknown>).filter(([k]) => k.toLowerCase() !== "headers")) : h);
+        const webhooksUdenHeaders = Array.isArray(webhooks) ? webhooks.map(udenHeaders) : webhooks;
+        return new Response(JSON.stringify({ success: true, webhooks: webhooksUdenHeaders }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -292,7 +295,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: true,
-            webhook: result,
+            webhook: result && typeof result === "object" ? Object.fromEntries(Object.entries(result as unknown as Record<string, unknown>).filter(([k]) => k.toLowerCase() !== "headers")) : result,  // [B3-rest] aldrig headers i svar
             message: `Webhook created successfully`,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },

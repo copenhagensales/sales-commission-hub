@@ -30,13 +30,27 @@ function unauthorized(headers: Record<string, string> = {}) {
  * until the secret has been configured on both sides. Configure the secret to
  * activate enforcement.
  */
+/** Konstant-tids-sammenligning (ingen tidlig afslutning ved første forskel). */
+export function sammeHemmelighed(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}
+
 export function verifyWebhookSecret(
   req: Request,
   envName: string,
-  opts: { headerNames?: string[]; queryNames?: string[]; corsHeaders?: Record<string, string> } = {},
+  opts: { headerNames?: string[]; queryNames?: string[]; corsHeaders?: Record<string, string>; requireConfigured?: boolean } = {},
 ): Response | null {
   const expected = Deno.env.get(envName);
   if (!expected) {
+    // requireConfigured (webhooks, der SKRIVER data – kald-webhook, enreach-hook): afvis, når hemmeligheden mangler (fail-closed).
+    // Øvrige (salgs-webhooks) beholder den hidtidige fail-open-adfærd, indtil deres hemmeligheder er bekræftet sat – ændres ikke her.
+    if (opts.requireConfigured) {
+      console.error(`[webhook-auth] ${envName} is not configured — rejecting (requireConfigured)`);
+      return new Response(JSON.stringify({ error: "secret not configured" }), { status: 503, headers: { ...(opts.corsHeaders ?? {}), ...jsonHeaders } });
+    }
     console.warn(
       `[webhook-auth] ${envName} is not configured — webhook is accepting unauthenticated calls. ` +
         `Configure ${envName} and set the same value in the provider to enable enforcement.`,
@@ -60,7 +74,7 @@ export function verifyWebhookSecret(
     }
   }
 
-  if (!received || received !== expected) {
+  if (!received || !sammeHemmelighed(received, expected)) {
     console.error(`[webhook-auth] Rejected call: missing or invalid ${envName}`);
     return unauthorized(opts.corsHeaders);
   }
