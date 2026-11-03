@@ -43,7 +43,7 @@ describe("direkte afregnet refusion", () => {
 
   it("tæller kun dage inden for perioden", () => {
     const r = buildDirectRefunds([bk({ start_date: "2026-10-29", end_date: "2026-11-04" })] as never, start, end);
-    expect(r[0].days).toBe(3);
-    expect(r[0].amount).toBe(2250);
+    expect(r[0].days).toBe(2); // tor 29. + fre 30.; lør 31. ikke booket
+    expect(r[0].amount).toBe(1500);
   });
 });
