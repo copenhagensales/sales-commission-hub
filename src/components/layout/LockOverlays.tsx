@@ -37,8 +37,13 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   // Priority 1: Rejected contract lock (highest priority, no way out)
   const showRejectedContractLock = isRejectedContractLocked && !isPreviewMode;
 
+  // Testene ligger nu på /my-profile?tab=kodeks (/car-quiz og /code-of-conduct redirecter dertil),
+  // så låsene må ikke vises dér – ellers kan testen aldrig tages.
+  const onKodeksTab =
+    location.pathname === "/my-profile" && new URLSearchParams(location.search).get("tab") === "kodeks";
+
   // Don't show car quiz lock if we're already on the car-quiz page
-  const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz";
+  const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz" && !onKodeksTab;
 
   // Priority 2: Skip locks in preview mode
   const showContractLock = isContractLocked && !isPreviewMode && !showRejectedContractLock;
@@ -54,7 +59,7 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   const showPulseSurveyLock = isPulseSurveyLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showGoalLock && !showRejectedContractLock && location.pathname !== "/pulse-survey";
 
   // Priority 6: Code of Conduct lock - skip on the test page itself
-  const showCocLock = isCocLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showGoalLock && !showRejectedContractLock && !showPulseSurveyLock && location.pathname !== "/code-of-conduct";
+  const showCocLock = isCocLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showGoalLock && !showRejectedContractLock && !showPulseSurveyLock && location.pathname !== "/code-of-conduct" && !onKodeksTab;
 
   // Show loading state while checking locks (skip in preview mode)
   if ((rejectedContractLoading || contractLoading || quizLoading || mfaLoading || goalLoading || pulseSurveyLoading || cocLoading) && !isPreviewMode) {
