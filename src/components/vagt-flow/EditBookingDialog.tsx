@@ -1091,6 +1091,16 @@ export function EditBookingDialog({
     },
   });
 
+  const bookingRateLow = (() => {
+    if (bookingEconomy?.priceModel === "quoted") return false;
+    const placement = selectedPlacementId ? bookingPlacements.find((p: any) => p.id === selectedPlacementId) : null;
+    const parsed = parseFloat(dailyRateOverride);
+    const rate = useLocationRate
+      ? (placement?.daily_rate ?? booking?.location?.daily_rate ?? null)
+      : (isNaN(parsed) ? null : parsed);
+    return erLavPris(rate);
+  })();
+
   const handleSaveBooking = () => {
     if (!clientId) {
       toast.error("Vælg venligst en kunde");
