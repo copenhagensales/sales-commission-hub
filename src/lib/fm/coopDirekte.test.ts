@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { lokationsomkostningForDag, coopDirekteRefusionForBooking } from "./coopDirekte";
+import { lokationsomkostningForDag, coopDirekteRefusionForBooking, bookedDates } from "./coopDirekte";
 import type { LocationRateSurcharge } from "@/utils/locationRateSurcharge";
+import { bookingGross } from "@/utils/bookingGross";
 
 const EESY = "eesy";
 const YOUSEE = "yousee";
@@ -39,5 +40,37 @@ describe("Coop direkte lokationsomkostning", () => {
     );
     expect(r.days).toBe(3);
     expect(r.amount).toBe(2100);
+  });
+  it("aftalt totalpris fordeles før refusion, og dagsrækker summerer til netto", () => {
+    const booking = {
+      start_date: "2026-11-02", end_date: "2026-11-08", booked_days: [0, 2, 6],
+      total_price: 5100, daily_rate_override: 9999, location: { ...kvickly, daily_rate: 8888 }, client_id: EESY,
+    };
+    const gross = bookingGross(booking);
+    const costs = bookedDates(booking).map(day =>
+      lokationsomkostningForDag(gross.dailyRate, booking.location, booking.client_id, day, rules)
+    );
+    expect(gross.dailyRate).toBe(1700);
+    expect(costs).toEqual([1000, 1000, 1000]);
+    expect(costs.reduce((sum, cost) => sum + cost, 0)).toBe(3000);
+    expect(gross.total - coopDirekteRefusionForBooking(booking, booking.location, rules).amount).toBe(3000);
+  });
+  it("dagsrækker giver kun refusion på gyldige dage i den viste periode", () => {
+    const booking = { start_date: "2026-11-02", end_date: "2026-11-06", booked_days: [0, 1, 2, 3, 4], client_id: EESY };
+    const limitedRules = [{ ...rule("Kvickly", 700, "2026-11-04"), valid_from: "2026-11-03" }];
+    const costs = bookedDates(booking).map(day => lokationsomkostningForDag(1700, kvickly, EESY, day, limitedRules));
+    expect(costs).toEqual([1700, 1000, 1000, 1700, 1700]);
+    expect(costs.reduce((sum, cost) => sum + cost, 0)).toBe(7100);
+    const clipped = bookedDates(booking, new Date("2026-11-04T00:00:00"), new Date("2026-11-05T00:00:00"));
+    expect(clipped.map(day => lokationsomkostningForDag(1700, kvickly, EESY, day, limitedRules))).toEqual([1000, 1700]);
+  });
+  it("flere bookinger samme dag bevarer hver kundes refusionsgrundlag", () => {
+    const dailyCosts = [
+      lokationsomkostningForDag(1700, kvickly, EESY, dag, rules),
+      lokationsomkostningForDag(1700, kvickly, YOUSEE, dag, rules),
+      lokationsomkostningForDag(1250, superb, EESY, dag, rules),
+    ];
+    expect(dailyCosts).toEqual([1000, 1700, 1000]);
+    expect(dailyCosts.reduce((sum, cost) => sum + cost, 0)).toBe(3700);
   });
 });

@@ -25,6 +25,7 @@ import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erL
 import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
 import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE, coopDirekteRule } from "@/lib/fm/coopDirekte";
+import { LOCATION_TYPES } from "@/lib/fm/locationTypes";
 
 export default function LocationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -307,14 +308,9 @@ export default function LocationDetail() {
                       <SelectValue placeholder="Vælg type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Coop butik">Coop butik</SelectItem>
-                      <SelectItem value="Coop direkte">Coop direkte</SelectItem>
-                      <SelectItem value="Meny butik">Meny butik</SelectItem>
-                      <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
-                      <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
-                      <SelectItem value="Markeder">Markeder</SelectItem>
-                      <SelectItem value="Messer">Messer</SelectItem>
-                      <SelectItem value="Anden lokation">Anden lokation</SelectItem>
+                      {LOCATION_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

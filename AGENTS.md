@@ -14,6 +14,8 @@ Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Ind
 
 ## Øvrige regler
 
+- Location creation/editing type choices share `src/lib/fm/locationTypes.ts`; Coop direkte daily DB costs use `lokationsomkostningForDag` with fetched Coop rules and booking-day gross prices. Why: keep type choices and daily reimbursement calculations consistent across views.
+
 - Undermapper har egne `AGENTS.md` (fx `supabase/functions/AGENTS.md`); læs dem før ændringer dér.
 - EU/EØS-adgang håndhæves ved login af edge-funktionen geo-login-guard mod eea_ip_ranges og non_eea_ip_ranges (DB-IP Lite); kun IP'er der beviseligt er uden for EU/EØS afvises (session tilbagekaldes server-side), ukendt land/fejl lukkes ind. Why: login-hooks får ikke request-headers, og backend leverer kun IP, ikke land.
 - Kolonner fra manuelle uploads defineres og får sletteregler i data_import_* tabellerne (MG → Data import). Gælder i dag kun Eesy TM kurv/kombineret upload. Upload fjerner udefinerede kolonner, men beholder altid dem, matchingen læser. Why: kun definerede data må opbevares, uden at matchingen ændres.

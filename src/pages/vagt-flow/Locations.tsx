@@ -45,6 +45,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { LOCATION_TYPES } from "@/lib/fm/locationTypes";
 
 export default function VagtLocations() {
   const [searchParams] = useSearchParams();
@@ -432,14 +433,9 @@ export default function VagtLocations() {
                               <SelectValue placeholder="Vælg type" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Coop butik">Coop butik</SelectItem>
-                              <SelectItem value="Coop direkte">Coop direkte</SelectItem>
-                              <SelectItem value="Meny butik">Meny butik</SelectItem>
-                              <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
-                              <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
-                              <SelectItem value="Markeder">Markeder</SelectItem>
-                              <SelectItem value="Messer">Messer</SelectItem>
-                              <SelectItem value="Anden lokation">Anden lokation</SelectItem>
+                              {LOCATION_TYPES.map((type) => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         ) : (loc.type || "-")}
@@ -571,14 +567,9 @@ export default function VagtLocations() {
                     <SelectValue placeholder="Vælg type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Coop butik">Coop butik</SelectItem>
-                    <SelectItem value="Coop direkte">Coop direkte</SelectItem>
-                    <SelectItem value="Meny butik">Meny butik</SelectItem>
-                    <SelectItem value="Danske Shoppingcentre">Danske Shoppingcentre</SelectItem>
-                    <SelectItem value="Ocean Outdoor">Ocean Outdoor</SelectItem>
-                    <SelectItem value="Markeder">Markeder</SelectItem>
-                    <SelectItem value="Messer">Messer</SelectItem>
-                    <SelectItem value="Anden lokation">Anden lokation</SelectItem>
+                    {LOCATION_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
