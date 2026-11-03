@@ -23,6 +23,8 @@ import {
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl, refusionUoverensstemmelse } from "@/lib/fm/lowPriceGuard";
 import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
+import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { COOP_LOCATION_TYPE, DIRECT_REFUND_CHAINS } from "@/lib/fm/directRefunds";
 
 export default function LocationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +35,8 @@ export default function LocationDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [formData, setFormData] = useState<any>(null);
+  // Kædereglerne (Coop) bruges kun som forslag til refusion på direkte afregnede lokationer
+  const { data: coopSurcharges } = useLocationRateSurcharges(COOP_LOCATION_TYPE);
   const { canEdit } = usePermissions();
   const canEditLocation = canEdit("menu_fm_locations");
 
@@ -366,6 +370,43 @@ export default function LocationDetail() {
               {/* Direkte afregning og refusion (kun visning – DB bruger dagsprisen ovenfor som netto) */}
               <div className="border-t pt-4 mt-2 space-y-3">
                 <p className="text-sm font-medium">Direkte afregning og refusion (valgfrit)</p>
+                {formData.type !== COOP_LOCATION_TYPE && (
+                  <div className="space-y-1">
+                    <Label>Kæde</Label>
+                    <Select
+                      value={formData.chain || "none"}
+                      onValueChange={(v) => {
+                        const chain = v === "none" ? null : v;
+                        const rule = chain
+                          ? coopSurcharges?.find((r) => r.chain_match.toLowerCase() === chain.toLowerCase())
+                          : undefined;
+                        const tom = formData.refund_daily_rate == null || formData.refund_daily_rate === "";
+                        setFormData({
+                          ...formData,
+                          chain,
+                          ...(rule && tom
+                            ? {
+                                refund_daily_rate: Number(rule.surcharge_per_day),
+                                refund_client_id: rule.funded_by_client_id ?? formData.refund_client_id ?? null,
+                              }
+                            : {}),
+                        });
+                      }}
+                      disabled={!canEditLocation}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Vælg kæde" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Ingen</SelectItem>
+                        {DIRECT_REFUND_CHAINS.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      Med kæde og refusion kommer lokationen med i refusionsdelen af Coop-rapporten til Eesy (ikke i fakturagrundlaget).
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <Label htmlFor="gross-daily-rate">Pris til lokationen (brutto) pr. dag</Label>
