@@ -32,7 +32,8 @@ import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/
 import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
 import { useDirectRefunds } from "@/hooks/useDirectRefunds";
-import { supplierInvoiceBookings, sumDirectRefunds } from "@/lib/fm/directRefunds";
+import { supplierInvoiceBookings, sumDirectRefunds, coopDirekteReportBooking, hasLegacyCoopRefund } from "@/lib/fm/directRefunds";
+import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE } from "@/lib/fm/coopDirekte";
 import { bookingSurcharge } from "@/utils/locationRateSurcharge";
 import { SupplierDispatchPanel } from "./SupplierDispatchPanel";
 
@@ -63,6 +64,7 @@ export function SupplierReportTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
+  const isCoopDirekte = selectedLocationType === COOP_DIREKTE_TYPE;
   const [periodType, setPeriodType] = useState<"month" | "payroll">("month");
   const queryClient = useQueryClient();
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
@@ -168,7 +170,7 @@ export function SupplierReportTab() {
         .eq("is_active", true)
         .order("min_placements", { ascending: false });
       if (error) throw error;
-      return data as DiscountRule[];
+      return selectedLocationType === COOP_DIREKTE_TYPE ? [] : data as DiscountRule[];
     },
     enabled: !!selectedLocationType,
   });
@@ -208,10 +210,25 @@ export function SupplierReportTab() {
   });
 
   // Butikstillæg (merpris) pr. kæde - grundsatsen på lokationen ændres ikke
-  const { data: rateSurcharges } = useLocationRateSurcharges(selectedLocationType);
-  // "Coop direkte": kun refusionsdelen, aldrig fakturagrundlaget
+  const { data: rateSurcharges, isLoading: rulesLoading, isError: rulesError } = useLocationRateSurcharges(isCoopDirekte ? COOP_RULES_TYPE : selectedLocationType);
+  // Selvstændig rapport; aldrig direkte refusion på Coop butik.
   const { data: directRefunds = [] } = useDirectRefunds(selectedLocationType, periodStart, periodEnd);
-  const totalDirectRefund = sumDirectRefunds(directRefunds);
+  const totalDirectRefund = isCoopDirekte ? sumDirectRefunds(directRefunds) : 0;
+  const { data: legacyRefundConflict, isLoading: legacyLoading, isError: legacyError } = useQuery({
+    queryKey: ["supplier-report", "legacy-direct-refund", selectedMonth, periodType],
+    enabled: isCoopDirekte,
+    queryFn: async () => {
+      const start = format(periodStart, "yyyy-MM-dd");
+      const end = format(periodEnd, "yyyy-MM-dd");
+      const { data, error } = await supabase.from("supplier_invoice_reports")
+        .select("location_type, period_start, period_end, status, direct_refund_amount")
+        .eq("location_type", COOP_RULES_TYPE).in("status", ["approved", "sent"])
+        .gt("direct_refund_amount", 0).lte("period_start", end).gte("period_end", start);
+      if (error) throw error;
+      return hasLegacyCoopRefund(data ?? [], start, end);
+    },
+  });
+  const refundNotReady = isCoopDirekte && (rulesLoading || rulesError || legacyLoading || legacyError || legacyRefundConflict);
 
   // Determine discount type
   const discountType = discountRules?.[0]?.discount_type || "placements";
@@ -358,7 +375,8 @@ export function SupplierReportTab() {
     if (days === 0) return acc; // Skip bookings with no days in period
 
     // Merpris (butikstillæg) for denne booking i perioden
-    const sur = bookingSurcharge(booking, rateSurcharges, periodStart, periodEnd);
+    const sur = bookingSurcharge(booking, isCoopDirekte ? [] : rateSurcharges, periodStart, periodEnd);
+    const direct = coopDirekteReportBooking(booking, isCoopDirekte ? rateSurcharges : [], periodStart, periodEnd);
 
     if (!acc[locationId]) {
       acc[locationId] = {
@@ -367,6 +385,8 @@ export function SupplierReportTab() {
         bookings: [],
         // Beløb pr. booking i perioden - bruges til de låste rabatsatser
         bookingAmounts: [] as Array<{ id: string; amount: number; lockedPercent: number | null }>,
+        refundAmount: 0,
+        refundPerDay: 0,
         totalDays: 0,
         totalAmount: 0,
         baseAmount: 0,
@@ -394,6 +414,8 @@ export function SupplierReportTab() {
       lockedPercent:
         booking.discount_percent_locked == null ? null : Number(booking.discount_percent_locked),
     });
+    acc[locationId].refundAmount += direct.refundAmount;
+    acc[locationId].refundPerDay = Math.max(acc[locationId].refundPerDay, direct.refundPerDay);
     acc[locationId].totalDays += days;
     acc[locationId].baseAmount += total;
     acc[locationId].surchargeAmount += sur.amount;
@@ -470,7 +492,8 @@ export function SupplierReportTab() {
     0
   );
   const hasSurcharge = totalSurchargeAmount > 0;
-  const hasRefundBox = hasSurcharge || directRefunds.length > 0;
+  const totalReportRefund = isCoopDirekte ? locationEntries.reduce((sum, loc) => sum + loc.refundAmount, 0) : totalSurchargeRefundable;
+  const hasRefundBox = !isCoopDirekte && hasSurcharge;
 
   // Refusion pr. kæde, så Kvickly og SuperBrugsen kan læses hver for sig
   const refundByChain = locationEntries.reduce((acc: Record<string, { days: number; amount: number; perDay: number }>, loc: any) => {
@@ -492,7 +515,7 @@ export function SupplierReportTab() {
     "kunden";
 
 
-  const isAnnualRevenue = discountType === "annual_revenue";
+  const isAnnualRevenue = !isCoopDirekte && discountType === "annual_revenue";
 
   // Leverandørens aktuelle status (kun annual_revenue) - gælder NYE bookinger
   const { data: discountStatus } = useSupplierDiscountStatus(
@@ -505,7 +528,7 @@ export function SupplierReportTab() {
   let appliedDiscount = 0;
   let appliedRule: DiscountRule | null = null;
 
-  if (discountRules && discountRules.length > 0 && !isAnnualRevenue) {
+  if (!isCoopDirekte && discountRules && discountRules.length > 0 && !isAnnualRevenue) {
     if (discountType === "monthly_revenue") {
       // Monthly revenue: use current period's total non-excluded amount
       const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
@@ -534,6 +557,10 @@ export function SupplierReportTab() {
     const locName = loc.location?.name?.toLowerCase() || "";
     const exc = exceptionMap.get(locName);
 
+    if (isCoopDirekte) {
+      return { ...loc, discount: 0, discountAmount: 0, finalAmount: loc.totalAmount,
+        isExcluded: false, maxDiscount: null, isMixedDiscount: false, missingLocked: false, lockedPercents: [] };
+    }
     if (isAnnualRevenue) {
       // Låste satser pr. booking. Undtagelser er ALLEREDE indregnet i den låste sats,
       // så de må ikke anvendes igen her.
@@ -606,7 +633,7 @@ export function SupplierReportTab() {
   // Samme bruttoformel (bookingGross) og samme rabatsats som lokationsrækken.
   // Merpris fordeles ikke pr. uge.
   const getWeekRows = (loc: any) => {
-    const weeks = new Map<string, { week: number; start: Date; end: Date; days: Set<number>; dayCount: number; gross: number; discount: number }>();
+    const weeks = new Map<string, { week: number; start: Date; end: Date; days: Set<number>; dayCount: number; gross: number; discount: number; refund: number; refundPerDay: number }>();
     for (const b of loc.bookings as any[]) {
       const bStart = maxDate([new Date(b.start_date), periodStart]);
       const bEnd = minDate([new Date(b.end_date), periodEnd]);
@@ -625,9 +652,13 @@ export function SupplierReportTab() {
         if (g.days === 0) continue;
         const pct = loc.isExcluded ? 0 : isAnnualRevenue ? (lockedPct ?? 0) : (loc.discount ?? 0);
         if (!weeks.has(key)) {
-          weeks.set(key, { week: getISOWeek(ws), start: ws, end: we, days: new Set(), dayCount: 0, gross: 0, discount: 0 });
+          weeks.set(key, { week: getISOWeek(ws), start: ws, end: we, days: new Set(), dayCount: 0, gross: 0, discount: 0, refund: 0, refundPerDay: 0 });
         }
-        const w = weeks.get(key)!;
+        const w = weeks.get(key);
+        if (!w) continue;
+        const direct = coopDirekteReportBooking(b, isCoopDirekte ? rateSurcharges : [], clipS, clipE);
+        w.refund += direct.refundAmount;
+        w.refundPerDay = Math.max(w.refundPerDay, direct.refundPerDay);
         getBookedWeekdays(b, clipS, clipE).forEach((s) => s.forEach((x) => w.days.add(x)));
         w.dayCount += g.days;
         w.gross += g.total;
@@ -636,13 +667,14 @@ export function SupplierReportTab() {
     }
     return [...weeks.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
   };
-  const showDiscountCols = !!discountRules && discountRules.length > 0;
+  const showDiscountCols = !isCoopDirekte && !!discountRules && discountRules.length > 0;
   const fmtKr = (n: number) => `${n.toLocaleString("da-DK", { maximumFractionDigits: 2 })} kr`;
 
 
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async () => {
+      if (refundNotReady) throw new Error("Refusionen kan ikke godkendes: kontrollér kæderegler og tidligere Coop-rapporter.");
       const reportData = locationDiscounts.map((loc) => ({
         locationName: loc.location?.name,
         externalId: loc.location?.external_id || "",
@@ -657,7 +689,13 @@ export function SupplierReportTab() {
         surchargeDays: loc.surchargeDays ?? 0,
         surchargeAmount: loc.surchargeAmount ?? 0,
         surchargeRefundable: !!loc.surchargeRefundable,
-        surchargeRefundableAmount: loc.surchargeRefundableAmount ?? 0,
+        surchargeRefundableAmount: isCoopDirekte ? loc.refundAmount : loc.surchargeRefundableAmount ?? 0,
+        refundPerDay: isCoopDirekte ? loc.refundPerDay : 0,
+        refundAmount: isCoopDirekte ? loc.refundAmount : 0,
+        netAmount: loc.totalAmount - (isCoopDirekte ? loc.refundAmount : 0),
+        weeks: getWeekRows(loc).map((w) => ({ week: w.week, days: w.dayCount,
+          dailyRate: w.dayCount ? w.gross / w.dayCount : 0, amount: w.gross,
+          refundPerDay: w.refundPerDay, refundAmount: w.refund, netAmount: w.gross - w.refund })),
         discount: loc.discount,
         discountAmount: loc.discountAmount,
         finalAmount: loc.finalAmount,
@@ -685,20 +723,21 @@ export function SupplierReportTab() {
         total_amount: totalAmountAll,
         base_amount: totalBaseAmount,
         surcharge_amount: totalSurchargeAmount,
-        surcharge_refundable_amount: totalSurchargeRefundable,
+        surcharge_refundable_amount: totalReportRefund,
         discount_percent: isAnnualRevenue ? effectiveDiscountPercent : appliedDiscount,
         discount_amount: totalDiscountAmount,
         final_amount: finalAmount,
-        unique_locations: totalPlacements,
+        unique_locations: isCoopDirekte ? locationEntries.length : totalPlacements,
         status: "approved",
         approved_by: userData.user?.id,
         approved_at: new Date().toISOString(),
         report_data: reportData,
         // Separat fra Coop-tillægget; indgår ikke i total/base/final/rabat/unique_locations
         direct_refund_amount: totalDirectRefund,
-        direct_refund_data: directRefunds as any,
+        direct_refund_data: isCoopDirekte ? directRefunds as any : [],
       };
 
+      if (existingReport?.status === "approved" || existingReport?.sent_at) throw new Error("En godkendt rapport kan ikke overskrives.");
       if (existingReport) {
         const { error } = await supabase
           .from("supplier_invoice_reports")
@@ -734,6 +773,9 @@ export function SupplierReportTab() {
 
   return (
     <div className="space-y-6">
+      {isCoopDirekte && refundNotReady && <p role="alert" className="text-destructive text-sm">
+        {legacyRefundConflict ? "Perioden overlapper en godkendt Coop butik-rapport med direkte refusion. Afklar den tidligere opkrævning før godkendelse, så Eesy ikke opkræves to gange." : "Afventer kontrol af refusionsregler og tidligere opkrævninger. Godkendelse er spærret."}
+      </p>}
       {/* Filters */}
       <div className="flex items-center gap-3">
         <Select value={selectedLocationType} onValueChange={setSelectedLocationType}>
@@ -828,6 +870,11 @@ export function SupplierReportTab() {
                         <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Dagspris</dt><dd className="tabular-nums">{loc.usesTotalPrice ? "samlet" : fmtKr(loc.dailyRate)}</dd></div>
                         {hasSurcharge && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Merpris</dt><dd className="tabular-nums">{loc.surchargeAmount > 0 ? fmtKr(loc.surchargeAmount) : "-"}</dd></div>}
                         <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Beløb</dt><dd className="font-semibold tabular-nums">{fmtKr(loc.totalAmount)}</dd></div>
+                        {isCoopDirekte && <>
+                          <div className="flex justify-between gap-3"><dt>Refusion/dag</dt><dd>{fmtKr(loc.refundPerDay)}</dd></div>
+                          <div className="flex justify-between gap-3"><dt>Refusion</dt><dd>{fmtKr(loc.refundAmount)}</dd></div>
+                          <div className="flex justify-between gap-3"><dt>Netto</dt><dd>{fmtKr(loc.totalAmount - loc.refundAmount)}</dd></div>
+                        </>}
                         {showDiscountCols && <>
                           <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Rabat</dt><dd className="tabular-nums">{loc.isExcluded ? "Separat" : `-${loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%`}</dd></div>
                           <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Efter rabat</dt><dd className="font-semibold tabular-nums">{loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}</dd></div>
@@ -839,7 +886,7 @@ export function SupplierReportTab() {
                           {getWeekRows(loc).map((w) => (
                             <li key={w.start.toISOString()} className="flex justify-between gap-3">
                               <span>Uge {w.week} · {format(w.start, "d/M")}–{format(w.end, "d/M")} · {w.dayCount} dg</span>
-                              <span className="tabular-nums">{fmtKr(w.gross)}</span>
+                              <span className="tabular-nums">{fmtKr(w.gross)}{isCoopDirekte && <><br />Refusion/dag {fmtKr(w.refundPerDay)}<br />Refusion {fmtKr(w.refund)}<br />Netto {fmtKr(w.gross - w.refund)}</>}</span>
                             </li>
                           ))}
                         </ul>
@@ -862,6 +909,11 @@ export function SupplierReportTab() {
                       </>
                     )}
                     <TableHead className="text-right">Beløb</TableHead>
+                    {isCoopDirekte && <>
+                      <TableHead className="text-right">Refusion/dag</TableHead>
+                      <TableHead className="text-right">Refusion</TableHead>
+                      <TableHead className="text-right">Netto</TableHead>
+                    </>}
                     {showDiscountCols && (
                       <>
                         <TableHead className="text-right">Rabat</TableHead>
@@ -914,6 +966,11 @@ export function SupplierReportTab() {
                           </>
                         )}
                         <TableCell className="text-right font-semibold tabular-nums">{fmtKr(loc.totalAmount)}</TableCell>
+                        {isCoopDirekte && <>
+                          <TableCell className="text-right tabular-nums">{fmtKr(loc.refundPerDay)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{fmtKr(loc.refundAmount)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{fmtKr(loc.totalAmount - loc.refundAmount)}</TableCell>
+                        </>}
                         {showDiscountCols && (
                           <>
                             <TableCell className="text-right">
@@ -969,6 +1026,11 @@ export function SupplierReportTab() {
                               </>
                             )}
                             <TableCell className="text-right tabular-nums">{fmtKr(w.gross)}</TableCell>
+                            {isCoopDirekte && <>
+                              <TableCell className="text-right tabular-nums">{fmtKr(w.refundPerDay)}</TableCell>
+                              <TableCell className="text-right tabular-nums">{fmtKr(w.refund)}</TableCell>
+                              <TableCell className="text-right tabular-nums">{fmtKr(w.gross - w.refund)}</TableCell>
+                            </>}
                             {showDiscountCols && (
                               <>
                                 <TableCell className="text-right tabular-nums text-green-600">
@@ -1003,7 +1065,12 @@ export function SupplierReportTab() {
                     <TableCell className="text-right font-bold">
                       {totalAmountAll.toLocaleString("da-DK")} kr
                     </TableCell>
-                    {discountRules && discountRules.length > 0 && (
+                    {isCoopDirekte && <>
+                      <TableCell />
+                      <TableCell className="text-right font-bold">{fmtKr(totalReportRefund)}</TableCell>
+                      <TableCell className="text-right font-bold">{fmtKr(totalAmountAll - totalReportRefund)}</TableCell>
+                    </>}
+                    {showDiscountCols && (
                       <>
                         <TableCell className="text-right font-bold text-green-600">
                           <div className="flex flex-col items-end">
@@ -1030,7 +1097,12 @@ export function SupplierReportTab() {
             </CardContent>
           </Card>
 
-          {/* Merpris og refusion - med i mailen til Eesy, aldrig i Excel-arket */}
+          {isCoopDirekte && <dl className="space-y-2 text-base">
+            <div className="flex justify-between gap-3"><dt>Vi betaler</dt><dd>{fmtKr(totalAmountAll)}</dd></div>
+            <div className="flex justify-between gap-3"><dt>Til refusion fra Eesy FM</dt><dd>{fmtKr(totalReportRefund)}</dd></div>
+            <div className="flex justify-between gap-3 font-semibold"><dt>Netto</dt><dd>{fmtKr(totalAmountAll - totalReportRefund)}</dd></div>
+          </dl>}
+          {/* Coop butik: kun merpris fra Coop-butikker */}
           {hasRefundBox && (
             <Card>
               <CardContent className="pt-6">
@@ -1043,10 +1115,10 @@ export function SupplierReportTab() {
                     Til refusion fra {refundClientName}
                   </p>
                   <p className="text-3xl font-bold tabular-nums">
-                    {(totalSurchargeRefundable + totalDirectRefund).toLocaleString("da-DK")} kr
+                    {totalSurchargeRefundable.toLocaleString("da-DK")} kr
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {totalRefundDays + directRefunds.reduce((s, d) => s + d.days, 0)} dage i alt
+                    {totalRefundDays} dage i alt
                   </p>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -1062,27 +1134,6 @@ export function SupplierReportTab() {
                     </div>
                   ))}
                 </div>
-                {directRefunds.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="text-sm font-semibold">
-                      Direkte afregnet – refunderes af {directRefunds[0]?.refundClientName ?? refundClientName}
-                    </h3>
-                    <ul className="mt-2 space-y-2">
-                      {directRefunds.map((d) => (
-                        <li key={d.locationId} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
-                          <span className="font-medium">{d.locationName}</span>
-                          <span className="text-muted-foreground tabular-nums">
-                            {d.minDate === d.maxDate ? d.minDate : `${d.minDate} – ${d.maxDate}`} · {d.days} dage × {d.perDay.toLocaleString("da-DK")} kr
-                          </span>
-                          <span className="font-semibold tabular-nums">{d.amount.toLocaleString("da-DK")} kr</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Betales direkte til butikken. Indgår ikke i Excel-arket eller fakturagrundlaget til Coop.
-                    </p>
-                  </div>
-                )}
                 {totalSurchargeAmount > totalSurchargeRefundable && (
                   <p className="mt-3 text-xs text-muted-foreground">
                     Merpris i alt {totalSurchargeAmount.toLocaleString("da-DK")} kr, hvoraf{" "}
@@ -1095,7 +1146,7 @@ export function SupplierReportTab() {
           )}
 
           {/* Discount section - only show when discount rules exist */}
-          {discountRules && discountRules.length > 0 && (
+          {showDiscountCols && (
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 mb-4">
@@ -1300,7 +1351,7 @@ export function SupplierReportTab() {
                     missingLocked: !!loc.missingLocked,
                   })),
                   discountType,
-                  hasDiscountRules: !!(discountRules && discountRules.length > 0),
+                  hasDiscountRules: showDiscountCols,
                   minDaysPerLocation,
                   totals: {
                     subtotal: totalAmountAll,
@@ -1341,9 +1392,10 @@ export function SupplierReportTab() {
               variant="outline"
               onClick={async () => {
                 const WEEKDAY_NAMES_SHORT = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
-                const hasDiscount = discountRules && discountRules.length > 0;
+                const hasDiscount = showDiscountCols;
                 const headers = [
                   "Lokation", "ID", "By", "Uger & Dage", "Dage", "Beløb",
+                  ...(isCoopDirekte ? ["Refusion/dag", "Refusion", "Netto"] : []),
                   ...(hasDiscount ? ["Rabat %", "Rabat", "Efter rabat"] : []),
                   ...(isAnnualRevenue ? ["Låst sats"] : []),
                 ];
@@ -1370,6 +1422,7 @@ export function SupplierReportTab() {
                     weekText,
                     loc.totalDays,
                     loc.totalAmount,
+                    ...(isCoopDirekte ? [loc.refundPerDay, loc.refundAmount, loc.totalAmount - loc.refundAmount] : []),
                     ...(hasDiscount ? [loc.discount, loc.discountAmount, loc.finalAmount] : []),
                     ...(isAnnualRevenue ? [lockedText] : []),
                   ];
@@ -1394,6 +1447,7 @@ export function SupplierReportTab() {
                 const sumDays = locationDiscounts.reduce((s: number, l: any) => s + (l.totalDays || 0), 0);
                 const sumAmount = locationDiscounts.reduce((s: number, l: any) => s + (l.totalAmount || 0), 0);
                 const totalRow: any[] = ["Total", "", "", "", sumDays, sumAmount];
+                if (isCoopDirekte) totalRow.push("", totalReportRefund, sumAmount - totalReportRefund);
                 if (hasDiscount) {
                   const sumDisc = locationDiscounts.reduce((s: number, l: any) => s + (l.discountAmount || 0), 0);
                   const sumFinal = locationDiscounts.reduce((s: number, l: any) => s + (l.finalAmount || 0), 0);
@@ -1406,7 +1460,7 @@ export function SupplierReportTab() {
                 if (isAnnualRevenue) totalRow.push("");
 
                 const allData = [...metaRows, headers, ...rows, totalRow];
-                const colWidths = [25, 10, 15, 40, 8, 12, ...(hasDiscount ? [10, 12, 12] : []), ...(isAnnualRevenue ? [16] : [])];
+                const colWidths = [25, 10, 15, 40, 8, 12, ...(isCoopDirekte ? [14, 14, 14] : []), ...(hasDiscount ? [10, 12, 12] : []), ...(isAnnualRevenue ? [16] : [])];
                 const boldRowIdxs = [0, 1, 3, allData.length - 1];
                 await downloadExcelAoa(
                   `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`,
@@ -1437,7 +1491,7 @@ export function SupplierReportTab() {
                   : ""}
               </div>
             ) : (
-              <Button onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending}>
+              <Button onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending || !!refundNotReady}>
                 <Check className="h-4 w-4 mr-2" />
                 {approveMutation.isPending ? "Godkender..." : "Godkend rapport"}
               </Button>
@@ -1451,7 +1505,7 @@ export function SupplierReportTab() {
               locationType={selectedLocationType}
               month={periodLabel}
               reportId={existingReport.id}
-              hasDiscountRules={!!(discountRules && discountRules.length > 0)}
+              hasDiscountRules={showDiscountCols}
               reportData={locationDiscounts.map((loc: any) => ({
                 locationName: loc.location?.name,
                 externalId: loc.location?.external_id || "",
