@@ -1306,7 +1306,7 @@ export function SupplierReportTab() {
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:justify-end">
             <Button
               variant="outline"
               onClick={() => {
