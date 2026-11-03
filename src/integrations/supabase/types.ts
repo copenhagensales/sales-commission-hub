@@ -12518,11 +12518,15 @@ export type Database = {
           cooldown_weeks: number | null
           created_at: string | null
           daily_rate: number | null
+          daily_rate_note: string | null
           external_id: string | null
+          gross_daily_rate: number | null
           id: string
           is_favorite: boolean | null
           name: string
           notes: string | null
+          refund_client_id: string | null
+          refund_daily_rate: number | null
           region: string | null
           status: Database["public"]["Enums"]["location_status"] | null
           type: string | null
@@ -12543,11 +12547,15 @@ export type Database = {
           cooldown_weeks?: number | null
           created_at?: string | null
           daily_rate?: number | null
+          daily_rate_note?: string | null
           external_id?: string | null
+          gross_daily_rate?: number | null
           id?: string
           is_favorite?: boolean | null
           name: string
           notes?: string | null
+          refund_client_id?: string | null
+          refund_daily_rate?: number | null
           region?: string | null
           status?: Database["public"]["Enums"]["location_status"] | null
           type?: string | null
@@ -12568,17 +12576,29 @@ export type Database = {
           cooldown_weeks?: number | null
           created_at?: string | null
           daily_rate?: number | null
+          daily_rate_note?: string | null
           external_id?: string | null
+          gross_daily_rate?: number | null
           id?: string
           is_favorite?: boolean | null
           name?: string
           notes?: string | null
+          refund_client_id?: string | null
+          refund_daily_rate?: number | null
           region?: string | null
           status?: Database["public"]["Enums"]["location_status"] | null
           type?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "location_refund_client_id_fkey"
+            columns: ["refund_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       location_placements: {
         Row: {

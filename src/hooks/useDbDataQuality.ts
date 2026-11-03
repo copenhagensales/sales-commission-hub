@@ -6,6 +6,20 @@ import {
   MISSING_BASIS_LABELS,
   type MissingBasisReason,
 } from "@/lib/calculations/dbModel";
+import { getPayrollPeriod } from "@/lib/calculations/dates";
+import { MIN_DAGSPRIS_KR, effektivDagspris, erLavPris } from "@/lib/fm/lowPriceGuard";
+
+interface LowPriceBookingRow {
+  id: string;
+  start_date: string;
+  end_date: string;
+  booked_days: number[] | null;
+  total_price: number | null;
+  daily_rate_override: number | null;
+  price_note: string | null;
+  client_id: string | null;
+  location: { name: string | null; daily_rate: number | null } | null;
+}
 
 /**
  * Datakvalitet for DB-/lønberegningen.
@@ -20,7 +34,8 @@ export type DbDataQualityCategoryId =
   | "salary_without_team"
   | "inactive_on_team"
   | "team_without_leader_rate"
-  | "client_without_team";
+  | "client_without_team"
+  | "low_booking_price";
 
 export interface DbDataQualityIssue {
   id: string;
@@ -111,6 +126,25 @@ export function useDbDataQuality(
     staleTime: 60 * 1000,
   });
 
+  const { data: lowPriceBookings } = useQuery({
+    queryKey: ["db-data-quality-low-booking-price"],
+    queryFn: async () => {
+      const current = getPayrollPeriod();
+      const prevStart = new Date(current.start.getFullYear(), current.start.getMonth() - 1, 15);
+      const iso = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const { data: rows, error } = await supabase
+        .from("booking")
+        .select("id, start_date, end_date, booked_days, total_price, daily_rate_override, price_note, client_id, location(name, daily_rate)")
+        .gte("end_date", iso(prevStart))
+        .lte("start_date", iso(current.end))
+        .neq("status", "cancelled");
+      if (error) throw error;
+      return (rows ?? []) as unknown as LowPriceBookingRow[];
+    },
+    staleTime: 60 * 1000,
+  });
+
   const categories = useMemo<DbDataQualityCategory[]>(() => {
     const empty: DbDataQualityCategory[] = [
       {
@@ -151,6 +185,14 @@ export function useDbDataQuality(
         description:
           "Klienten har aktivitet i perioden, men er ikke knyttet til et team. Der beregnes derfor hverken leder-, assistent- eller ATP-omkostning.",
         severity: "critical",
+        issues: [],
+      },
+      {
+        id: "low_booking_price",
+        title: `Booking-pris under ${MIN_DAGSPRIS_KR} kr./dag`,
+        description:
+          "FM-bookinger i indeværende og forrige lønperiode med en urealistisk lav pris. Ret prisen før lønnen lukkes – den trækkes i lederens DB.",
+        severity: "warning",
         issues: [],
       },
     ];
@@ -311,8 +353,26 @@ export function useDbDataQuality(
       });
     }
 
+    // 6) FM-bookinger med pris under grænsen (indeværende + forrige lønperiode)
+    for (const b of lowPriceBookings ?? []) {
+      const dage = Array.isArray(b.booked_days) ? b.booked_days.length : 0;
+      const rate = effektivDagspris({
+        totalPrice: b.total_price,
+        bookedDays: dage,
+        dailyRateOverride: b.daily_rate_override,
+        locationDailyRate: b.location?.daily_rate ?? null,
+      });
+      if (!erLavPris(rate)) continue;
+      byId("low_booking_price").issues.push({
+        id: `low-price-${b.id}`,
+        name: `${b.location?.name ?? "Ukendt lokation"} · ${b.start_date}`,
+        detail: `${Math.round(rate ?? 0).toLocaleString("da-DK")} kr./dag${b.price_note ? ` · Begrundelse: ${b.price_note}` : " · Ingen begrundelse"}`,
+        clientId: b.client_id ?? undefined,
+      });
+    }
+
     return empty;
-  }, [data, clientActivity]);
+  }, [data, clientActivity, lowPriceBookings]);
 
   const totalIssues = categories.reduce((sum, c) => sum + c.issues.length, 0);
   const criticalIssues = categories

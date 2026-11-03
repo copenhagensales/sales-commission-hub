@@ -29,6 +29,7 @@ import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { TimeSelect } from "@/components/ui/time-select";
 import { BookingEconomySummary } from "@/components/vagt-flow/BookingEconomySummary";
+import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl } from "@/lib/fm/lowPriceGuard";
 import { useBookingDiscount } from "@/hooks/useBookingDiscount";
 import { Badge } from "@/components/ui/badge";
 
@@ -296,6 +297,8 @@ export function EditBookingDialog({
   const [locationRateInput, setLocationRateInput] = useState<string>("");
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>("");
   const [comment, setComment] = useState<string>("");
+  const [priceNote, setPriceNote] = useState<string>("");
+  const [locationRateNote, setLocationRateNote] = useState<string>("");
 
   // Employee tab state
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
@@ -321,6 +324,7 @@ export function EditBookingDialog({
       setCampaignId(booking.campaign_id || "");
       setSelectedPlacementId(booking.placement_id || "");
       setComment(booking.comment || "");
+      setPriceNote(booking.price_note || "");
       
       // Daily rate override
       const hasOverride = booking.daily_rate_override !== null && booking.daily_rate_override !== undefined;
@@ -888,6 +892,7 @@ export function EditBookingDialog({
       daily_rate_override: number | null;
       placement_id: string | null;
       comment: string | null;
+      price_note?: string;
     }) => {
       const { error } = await supabase
         .from("booking")
@@ -903,17 +908,21 @@ export function EditBookingDialog({
       onOpenChange(false);
     },
     onError: (error: any) => {
+      if (erLavPrisFejl(error)) {
+        toast.error(`Prisen er under ${MIN_DAGSPRIS_KR} kr. pr. dag – skriv en begrundelse`);
+        return;
+      }
       toast.error("Fejl ved opdatering: " + error.message);
     },
   });
 
   // Update location daily rate mutation
   const updateLocationRateMutation = useMutation({
-    mutationFn: async (newRate: number) => {
+    mutationFn: async ({ rate, note }: { rate: number; note: string | null }) => {
       if (!booking.location?.id) throw new Error("Ingen lokation fundet");
       const { error } = await supabase
         .from("location")
-        .update({ daily_rate: newRate })
+        .update(erLavPris(rate) ? { daily_rate: rate, daily_rate_note: note } : { daily_rate: rate })
         .eq("id", booking.location.id);
       if (error) throw error;
     },
@@ -922,9 +931,14 @@ export function EditBookingDialog({
       queryClient.invalidateQueries({ queryKey: ["vagt-market-bookings"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-billing-bookings"] });
       setIsEditingLocationRate(false);
+      setLocationRateNote("");
       toast.success("Lokationens standardpris opdateret");
     },
     onError: (error: any) => {
+      if (erLavPrisFejl(error)) {
+        toast.error(`Dagsprisen er under ${MIN_DAGSPRIS_KR} kr. – skriv en begrundelse`);
+        return;
+      }
       toast.error("Fejl ved opdatering: " + error.message);
     },
   });
@@ -1077,6 +1091,16 @@ export function EditBookingDialog({
     },
   });
 
+  const bookingRateLow = (() => {
+    if (bookingEconomy?.priceModel === "quoted") return false;
+    const placement = selectedPlacementId ? bookingPlacements.find((p: any) => p.id === selectedPlacementId) : null;
+    const parsed = parseFloat(dailyRateOverride);
+    const rate = useLocationRate
+      ? (placement?.daily_rate ?? booking?.location?.daily_rate ?? null)
+      : (isNaN(parsed) ? null : parsed);
+    return erLavPris(rate);
+  })();
+
   const handleSaveBooking = () => {
     if (!clientId) {
       toast.error("Vælg venligst en kunde");
@@ -1098,13 +1122,21 @@ export function EditBookingDialog({
     const finalRateOverride = selectedPlacement && useLocationRate
       ? selectedPlacement.daily_rate
       : rateOverride;
-    
+
+    const isQuoted = bookingEconomy?.priceModel === "quoted";
+    const effRate = isQuoted ? null : (finalRateOverride ?? booking.location?.daily_rate ?? null);
+    if (manglerBegrundelse(effRate, priceNote)) {
+      toast.error(`Skriv en begrundelse for en pris under ${MIN_DAGSPRIS_KR} kr. pr. dag`);
+      return;
+    }
+
     updateBookingMutation.mutate({
       client_id: clientId,
       campaign_id: campaignId,
       daily_rate_override: finalRateOverride,
       placement_id: selectedPlacementId || null,
       comment: comment.trim() || null,
+      ...(erLavPris(effRate) ? { price_note: priceNote.trim() } : {}),
     });
   };
 
@@ -1424,6 +1456,7 @@ export function EditBookingDialog({
               
               <div className="space-y-3">
                 {isEditingLocationRate ? (
+                  <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Lokationens standardpris:</span>
                     <Input
@@ -1442,11 +1475,15 @@ export function EditBookingDialog({
                       className="h-8 w-8 p-0"
                       onClick={() => {
                         const newRate = parseFloat(locationRateInput);
-                        if (!isNaN(newRate) && newRate >= 0) {
-                          updateLocationRateMutation.mutate(newRate);
-                        } else {
+                        if (isNaN(newRate) || newRate < 0) {
                           toast.error("Indtast en gyldig pris");
+                          return;
                         }
+                        if (manglerBegrundelse(newRate, locationRateNote)) {
+                          toast.error(`Skriv en begrundelse for en dagspris under ${MIN_DAGSPRIS_KR} kr.`);
+                          return;
+                        }
+                        updateLocationRateMutation.mutate({ rate: newRate, note: locationRateNote.trim() || null });
                       }}
                       disabled={updateLocationRateMutation.isPending}
                     >
@@ -1460,6 +1497,16 @@ export function EditBookingDialog({
                     >
                       <Ban className="h-4 w-4 text-muted-foreground" />
                     </Button>
+                  </div>
+                  {erLavPris(parseFloat(locationRateInput)) && (
+                    <Textarea
+                      aria-label="Begrundelse for lav dagspris på lokationen"
+                      value={locationRateNote}
+                      onChange={(e) => setLocationRateNote(e.target.value)}
+                      rows={2}
+                      placeholder={`Begrundelse for dagspris under ${MIN_DAGSPRIS_KR} kr. (påkrævet)`}
+                    />
+                  )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1518,6 +1565,21 @@ export function EditBookingDialog({
                     <p className="text-xs text-muted-foreground">
                       Denne pris gælder kun for uge {weekNumber}, {year}
                     </p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">{LAV_PRIS_INFOTEKST}</p>
+                {bookingRateLow && (
+                  <div className="space-y-1">
+                    <Label htmlFor="price-note" className="text-sm">
+                      Begrundelse for pris under {MIN_DAGSPRIS_KR} kr. pr. dag (påkrævet)
+                    </Label>
+                    <Textarea
+                      id="price-note"
+                      value={priceNote}
+                      onChange={(e) => setPriceNote(e.target.value)}
+                      rows={2}
+                      placeholder="Fx 'Gratis stand aftalt med centret'"
+                    />
                   </div>
                 )}
               </div>
