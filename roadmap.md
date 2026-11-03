@@ -1,5 +1,11 @@
 # Roadmap — DB-/lønberegning: korrekthed
 
+## Coop direkte — selvstændig rapport (3/11 2026)
+- [x] Coop direkte: refusion/netto pr. lokation og uge, totaler og godkendelsesspor uden rabat; spærring ved gammel overlappende Coop-opkrævning.
+- [x] Manuel/planlagt mail og Excel: egne refusioner; Coop butik uden direkte refusioner. Scheduler genbruger den godkendte rapport og er uændret.
+- [x] 17 beregningsprøver + 4 mail/Excel-prøver, Deno-check og automatisk build OK. Syntetisk skærmprøve 360/393/430/1280; mobil-audit på faktureringsoversigt 0 fejl (ikke den aktive rapportfane).
+- [ ] Produktionsudrulning og reel godkendelse/afsendelse ikke foretaget: kræver særskilt udrulning og tilladelse til dataændring/afsendelse. Eksisterende abonnementspanel har breddeproblem på 360 px, ikke ændret i dette scope.
+
 ## Coop direkte — tre godkendte rettelser (3/11 2026)
 - [x] Daglig kunde-DB: samme bookingpris og dagsrefusion som kunde-DB; øvrig lønberegning uændret.
 - [x] Lokationsøkonomi: dagsrækker med refusion pr. kunde og gyldig dag.

@@ -8,15 +8,15 @@ import {
   COOP_LOCATION_TYPE,
   type DirectRefundBooking,
   type DirectRefundLine,
+  hasLegacyCoopRefund,
 } from "@/lib/fm/directRefunds";
 
 /**
- * "Coop direkte"-lokationer til refusionsdelen af Coop-rapporten.
- * Kun aktiv for lokationstypen "Coop butik".
+ * Refusion til den selvstændige "Coop direkte"-rapport, aldrig Coop butik.
  */
 export function useDirectRefunds(locationType: string | undefined, periodStart: Date, periodEnd: Date) {
   const { data: rules } = useLocationRateSurcharges(COOP_LOCATION_TYPE);
-  const enabled = locationType === COOP_LOCATION_TYPE && !!rules;
+  const enabled = locationType === COOP_DIREKTE_TYPE && !!rules;
   return useQuery({
     queryKey: [
       "supplier-direct-refunds",
@@ -47,5 +47,23 @@ export function useDirectRefunds(locationType: string | undefined, periodStart: 
       return buildDirectRefunds(bookings, periodStart, periodEnd, rules, names);
     },
     enabled,
+  });
+}
+
+/** Ingen ny godkendelse oven i en tidligere Coop-opkrævning. Kun metadata. */
+export function useLegacyDirectRefundConflict(enabled: boolean, periodStart: Date, periodEnd: Date) {
+  const start = format(periodStart, "yyyy-MM-dd");
+  const end = format(periodEnd, "yyyy-MM-dd");
+  return useQuery({
+    queryKey: ["supplier-report", "legacy-direct-refund", start, end],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("supplier_invoice_reports")
+        .select("location_type, period_start, period_end, status, direct_refund_amount")
+        .eq("location_type", COOP_LOCATION_TYPE).in("status", ["approved", "sent"])
+        .gt("direct_refund_amount", 0).lte("period_start", end).gte("period_end", start);
+      if (error) throw error;
+      return hasLegacyCoopRefund(data ?? [], start, end);
+    },
   });
 }

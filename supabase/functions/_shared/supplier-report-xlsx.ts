@@ -1,7 +1,7 @@
 // Excel-bilag til leverandørrapporter.
-// VIGTIGT: Arket videresendes til leverandøren og må KUN indeholde totaler.
-// Ingen merpris, intet grundbeløb og ingen refusion.
+// Coop butik: kun totaler til Coop. Coop direkte: brutto/refusion/netto til Eesy.
 import ExcelJS from "npm:exceljs@4.4.0";
+import { COOP_DIRECT_REPORT, approvedRowRefund } from "./supplier-report-refunds.ts";
 
 export interface SupplierXlsxRow {
   locationName: string;
@@ -9,6 +9,10 @@ export interface SupplierXlsxRow {
   city: string;
   days: number;
   amount: number;
+  dailyRate?: number;
+  refundPerDay?: number;
+  refundAmount?: number;
+  weeks?: Array<{ week: number; days: number; dailyRate: number; amount: number; refundPerDay: number; refundAmount: number }>;
 }
 
 export function slugifyLocationType(locationType: string): string {
@@ -35,6 +39,7 @@ export async function buildSupplierReportXlsx(params: {
   rows: SupplierXlsxRow[];
 }): Promise<Uint8Array> {
   const { locationType, supplierName, periodLabel, rows } = params;
+  const isDirect = locationType === COOP_DIRECT_REPORT;
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Copenhagen Sales";
@@ -46,6 +51,12 @@ export async function buildSupplierReportXlsx(params: {
     { key: "city", width: 22 },
     { key: "days", width: 10 },
     { key: "amount", width: 16 },
+    ...(isDirect ? [
+      { key: "dailyRate", width: 16 },
+      { key: "refundPerDay", width: 16 },
+      { key: "refundAmount", width: 16 },
+      { key: "netAmount", width: 16 },
+    ] : []),
   ];
 
   const titleRow = ws.addRow([`Leverandør: ${supplierName || locationType}`]);
@@ -55,7 +66,8 @@ export async function buildSupplierReportXlsx(params: {
   ws.addRow([]);
 
   const headerRowIndex = 4;
-  const header = ws.addRow(["Lokation", "Butiksnr/ref", "By", "Dage", "Beløb"]);
+  const header = ws.addRow(["Lokation / uge", "Butiksnr/ref", "By", "Dage", "Beløb",
+    ...(isDirect ? ["Dagspris", "Refusion/dag", "Refusion", "Netto"] : [])]);
   header.font = { ...ARIAL, bold: true };
   header.eachCell((cell) => {
     cell.border = { bottom: { style: "thin" } };
@@ -71,14 +83,30 @@ export async function buildSupplierReportXlsx(params: {
       r.city || "",
       Number(r.days) || 0,
       Number(r.amount) || 0,
+      ...(isDirect ? [Number(r.dailyRate) || 0, Number(r.refundPerDay) || 0,
+        approvedRowRefund(locationType, r), (Number(r.amount) || 0) - approvedRowRefund(locationType, r)] : []),
     ]);
     row.font = ARIAL;
     row.getCell(4).numFmt = "#,##0";
     row.getCell(5).numFmt = MONEY;
+    if (isDirect) {
+      for (let i = 6; i <= 9; i++) row.getCell(i).numFmt = MONEY;
+      for (const w of r.weeks ?? []) {
+        const weekRow = ws.addRow([`  Uge ${w.week}`, "", "", w.days, w.amount,
+          w.dailyRate, w.refundPerDay, w.refundAmount, w.amount - w.refundAmount]);
+        weekRow.font = ARIAL;
+        for (let i = 5; i <= 9; i++) weekRow.getCell(i).numFmt = MONEY;
+      }
+    }
   }
   const lastDataRow = firstDataRow + rows.length - 1;
 
-  const totalRow = ws.addRow([
+  const totalRow = ws.addRow(isDirect ? [
+    "Vi betaler", "", "", rows.reduce((sum, r) => sum + r.days, 0),
+    rows.reduce((sum, r) => sum + r.amount, 0), "", "",
+    rows.reduce((sum, r) => sum + approvedRowRefund(locationType, r), 0),
+    rows.reduce((sum, r) => sum + r.amount - approvedRowRefund(locationType, r), 0),
+  ] : [
     "Total",
     "",
     "",
@@ -91,6 +119,13 @@ export async function buildSupplierReportXlsx(params: {
   });
   totalRow.getCell(4).numFmt = "#,##0";
   totalRow.getCell(5).numFmt = MONEY;
+  if (isDirect) {
+    const refund = rows.reduce((sum, r) => sum + approvedRowRefund(locationType, r), 0);
+    totalRow.getCell(8).numFmt = MONEY;
+    totalRow.getCell(9).numFmt = MONEY;
+    ws.addRow(["Til refusion fra Eesy FM", "", "", "", refund]).getCell(5).numFmt = MONEY;
+    ws.addRow(["Netto", "", "", "", rows.reduce((sum, r) => sum + r.amount, 0) - refund]).getCell(5).numFmt = MONEY;
+  }
 
   ws.views = [{ state: "frozen", ySplit: headerRowIndex }];
 
