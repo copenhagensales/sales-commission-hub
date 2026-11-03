@@ -11,7 +11,6 @@ import {
   xlsxFileName,
 } from "../_shared/supplier-report-xlsx.ts";
 import { udsendFlere } from "../_shared/udsend.ts";
-import { approvedRowRefund, COOP_DIRECT_REPORT } from "../_shared/supplier-report-refunds.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,7 +85,7 @@ async function buildSupplierMail(
     rows: any[];
     attachXlsx: boolean;
     includeSurcharge: boolean;
-    /** Godkendte refusionslinjer til Coop direkte-rapporten alene. */
+    /** "Coop direkte"-lokationer (kun mailtekst, aldrig bilag/total). */
     directRefunds?: DirectRefundLine[];
     showDiscount: boolean;
     message?: string | null;
@@ -100,7 +99,6 @@ async function buildSupplierMail(
   surcharge: SurchargeSummary | null;
 }> {
   const { locationType, supplierName, periodStart, rows } = opts;
-  const isDirect = locationType === COOP_DIRECT_REPORT;
   const periodLabel = monthLabel(periodStart);
   const yearMonth = String(periodStart).slice(0, 7);
 
@@ -110,23 +108,16 @@ async function buildSupplierMail(
     city: r.city ?? '',
     days: Number(r.days) || 0,
     amount: Number(r.amount) || 0,
-    dailyRate: Number(r.dailyRate) || 0,
-    refundPerDay: Number(r.refundPerDay) || 0,
-    refundAmount: approvedRowRefund(locationType, r),
-    weeks: isDirect ? r.weeks ?? [] : [],
   }));
 
-  const mailLocations = toMailLocations(rows, !isDirect && opts.showDiscount).map((l, i) => ({
-    ...l, refundAmount: approvedRowRefund(locationType, rows[i]),
-    refundPerDay: isDirect ? Number(rows[i].refundPerDay) || 0 : 0,
-  }));
+  const mailLocations = toMailLocations(rows, opts.showDiscount);
   const totals = {
     locations: mailLocations.length,
     days: mailLocations.reduce((s, l) => s + l.days, 0),
     amount: mailLocations.reduce((s, l) => s + l.amount, 0),
   };
 
-  // Coop butik: merpris kun i mail. Coop direkte: refusion også i eget Excel.
+  // Merpris/refusion er intern og må kun med i mailteksten, aldrig i bilaget.
   let surcharge: SurchargeSummary | null = null;
   if (opts.includeSurcharge) {
     const totalSurcharge = rows.reduce(
@@ -137,9 +128,9 @@ async function buildSupplierMail(
       (s: number, r: any) => s + (Number(r.surchargeRefundableAmount) || 0),
       0,
     );
-    const directRefunds = isDirect ? (opts.directRefunds ?? []).filter((d) => Number(d.amount) > 0) : [];
-    const directRefundAmount = isDirect ? rows.reduce((sum: number, row) => sum + approvedRowRefund(locationType, row), 0) : 0;
-    if (isDirect || totalSurcharge > 0) {
+    const directRefunds = (opts.directRefunds ?? []).filter((d) => Number(d.amount) > 0);
+    const directRefundAmount = directRefunds.reduce((s2, d) => s2 + (Number(d.amount) || 0), 0);
+    if (totalSurcharge > 0 || directRefundAmount > 0) {
       const byChain = new Map<string, { days: number; perDay: number; amount: number }>();
       for (const r of rows as any[]) {
         if (!r.surchargeChain || !Number(r.surchargeRefundableAmount)) continue;
@@ -154,12 +145,13 @@ async function buildSupplierMail(
       }
       surcharge = {
         totalSurcharge,
-        refundableAmount: isDirect ? directRefundAmount : refundable,
-        coopRefundableAmount: isDirect ? 0 : refundable,
+        refundableAmount: refundable + directRefundAmount,
+        coopRefundableAmount: refundable,
         directRefunds,
         refundClientName:
-          (isDirect ? directRefunds[0]?.refundClientName ?? 'Eesy FM' :
-            (rows as any[]).find((r) => r.surchargeRefundable)?.client ?? 'kunden'),
+          (rows as any[]).find((r) => r.surchargeRefundable)?.client ??
+          directRefunds[0]?.refundClientName ??
+          'kunden',
         chains: [...byChain.entries()].map(([chain, v]) => ({ chain, ...v })),
       };
     }
@@ -211,17 +203,6 @@ async function buildSupplierMail(
   });
 
   return { html: mail.html, attachments, attachmentName, periodLabel, totals, surcharge };
-}
-
-/** Gamle opkrævninger ændres aldrig: overlappende direkte refusion afvises. */
-async function directRefundConflict(svc: SupabaseClient, report: { location_type: string; period_start: string; period_end: string }): Promise<boolean> {
-  if (report.location_type !== COOP_DIRECT_REPORT) return false;
-  const { data, error } = await svc.from('supplier_invoice_reports')
-    .select('id').eq('location_type', 'Coop butik').in('status', ['approved', 'sent'])
-    .gt('direct_refund_amount', 0).lte('period_start', report.period_end).gte('period_end', report.period_start)
-    .limit(1);
-  if (error) throw new Error('Tidligere refusionsopkrævninger kunne ikke kontrolleres');
-  return (data ?? []).length > 0;
 }
 
 const serviceClient = () =>
@@ -277,12 +258,6 @@ async function sendDispatch(dispatchId: string): Promise<Response> {
   }
 
   const supplierDisplayName = sub.name || sub.location_type;
-  if (report.location_type !== sub.location_type) {
-    return jsonResponse(409, { error: 'Rapportens lokationstype matcher ikke abonnementet' });
-  }
-  if (await directRefundConflict(svc, report)) {
-    return jsonResponse(409, { error: 'Perioden har direkte refusion på en tidligere godkendt Coop butik-rapport. Afklar opkrævningen først.' });
-  }
   const built = await buildSupplierMail(svc, {
     locationType: sub.location_type,
     supplierName: supplierDisplayName,
@@ -385,9 +360,6 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
   }
 
   const locationType = String(report.location_type);
-  if (await directRefundConflict(svc, report)) {
-    return jsonResponse(409, { error: 'Perioden har direkte refusion på en tidligere godkendt Coop butik-rapport. Afklar opkrævningen først.' });
-  }
   const built = await buildSupplierMail(svc, {
     locationType,
     supplierName: (body.supplierName as string | undefined) || locationType,

@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildSupplierReportEmail } from "./supplier-report-mail.ts";
 
-Deno.test("Coop butik-mail udelader direkte refusion også fra gamle snapshots", () => {
+Deno.test("mail til Eesy viser direkte afregnede og samlet refusion", () => {
   const { text } = buildSupplierReportEmail({
     supplierName: "Coop", locationType: "Coop butik", periodLabel: "oktober 2026",
     totals: { locations: 1, days: 5, amount: 8500 },
@@ -14,23 +14,9 @@ Deno.test("Coop butik-mail udelader direkte refusion også fra gamle snapshots",
     },
     locations: [{ name: "Kvickly Coop", days: 5, amount: 8500 }],
   });
-  assertEquals(text.includes("Direkte afregnet"), false);
-  assertEquals(text.includes("Kvickly Testby"), false);
-  assert(/Til refusion fra Eesy FM: 3\.500/.test(text));
+  assert(text.includes("Direkte afregnet \u2013 refunderes af Eesy FM"));
+  assert(text.includes("Kvickly Testby (05/10-09/10)"));
+  assert(/Til refusion fra Eesy FM: 7\.000/.test(text));
   const lokationer = text.split("Lokationer:")[1].split("Merpris og refusion")[0];
   assertEquals(lokationer.includes("Kvickly Testby"), false);
-});
-
-Deno.test("Coop direkte-mail viser egen refusion og netto", () => {
-  const { html, text } = buildSupplierReportEmail({
-    supplierName: "Eesy FM", locationType: "Coop direkte", periodLabel: "oktober 2026",
-    totals: { locations: 1, days: 4, amount: 6800 },
-    surcharge: { totalSurcharge: 0, refundableAmount: 2800, refundClientName: "Eesy FM", chains: [] },
-    locations: [{ name: "Kvickly Testby", days: 4, amount: 6800, refundPerDay: 700, refundAmount: 2800 }],
-  });
-  assert(text.includes("Vi betaler: 6.800 kr"));
-  assert(text.includes("Til refusion fra Eesy FM: 2.800 kr"));
-  assert(text.includes("Netto: 4.000 kr"));
-  assert(html.includes("Kvickly Testby"));
-  assertEquals(html.includes("Merpris og refusion"), false);
 });

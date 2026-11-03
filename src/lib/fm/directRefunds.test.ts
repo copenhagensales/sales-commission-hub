@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDirectRefunds, sumDirectRefunds, supplierInvoiceBookings, coopDirekteReportBooking, hasLegacyCoopRefund } from "./directRefunds";
+import { buildDirectRefunds, sumDirectRefunds, supplierInvoiceBookings } from "./directRefunds";
 import type { LocationRateSurcharge } from "@/utils/locationRateSurcharge";
 
 const EESY = "eesy-id";
@@ -19,41 +19,6 @@ const bk = (o: Record<string, unknown>) => ({
 });
 
 describe("direkte afregnet refusion (Coop direkte)", () => {
-  it("egen rapport: Kvickly 1700 × 4 Eesy-dage giver 6800 / 2800 / 4000", () => {
-    const result = coopDirekteReportBooking(bk({ end_date: "2026-10-08" }), rules, start, end);
-    expect(result.days).toBe(4);
-    expect(result.total).toBe(6800);
-    expect(result.refundPerDay).toBe(700);
-    expect(result.refundAmount).toBe(2800);
-    expect(result.netAmount).toBe(4000);
-  });
-
-  it("YouSee betaler fuld brutto uden refusion", () => {
-    const result = coopDirekteReportBooking(bk({ client_id: ANDEN, end_date: "2026-10-08" }), rules, start, end);
-    expect(result.refundAmount).toBe(0);
-    expect(result.refundPerDay).toBe(0);
-    expect(result.netAmount).toBe(6800);
-  });
-
-  it("ugefordeling summerer til perioden og refusion stopper ved gyldighed", () => {
-    const booking = bk({ start_date: "2026-10-08", end_date: "2026-10-13", total_price: 6800 });
-    const limited = [{ ...rules[0], valid_to: "2026-10-12" }];
-    const first = coopDirekteReportBooking(booking, limited, new Date("2026-10-05"), new Date("2026-10-11"));
-    const next = coopDirekteReportBooking(booking, limited, new Date("2026-10-12"), new Date("2026-10-18"));
-    expect(first.total + next.total).toBe(6800);
-    expect(first.refundAmount).toBe(1400);
-    expect(next.refundAmount).toBe(700);
-    expect(first.netAmount + next.netAmount).toBe(4700);
-  });
-
-  it("blokerer ny opkrævning når en gammel godkendt Coop-rapport overlapper", () => {
-    const report = { location_type: "Coop butik", status: "approved", direct_refund_amount: 2800,
-      period_start: "2026-10-01", period_end: "2026-10-31" };
-    expect(hasLegacyCoopRefund([report], "2026-10-15", "2026-11-14")).toBe(true);
-    expect(hasLegacyCoopRefund([report], "2026-11-01", "2026-11-30")).toBe(false);
-    expect(hasLegacyCoopRefund([{ ...report, direct_refund_amount: 0 }], "2026-10-01", "2026-10-31")).toBe(false);
-    expect(hasLegacyCoopRefund([{ ...report, status: "draft" }], "2026-10-01", "2026-10-31")).toBe(false);
-  });
   it("direkte afregnet lokation indgår i refusionssum men ikke i Excel-rækker/total", () => {
     const bookings = [bk({}), bk({ location: coop })];
     const refunds = buildDirectRefunds(bookings as never, start, end, rules, { [EESY]: "Eesy FM" });

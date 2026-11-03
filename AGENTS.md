@@ -14,8 +14,6 @@ Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Ind
 
 ## Øvrige regler
 
-- Supplier reports keep Coop direkte as an independent report with gross/refund/net snapshots and no discounts; Coop butik never includes direct refunds, and overlapping legacy approved Coop refunds block new approval/sending. Why: prevent duplicate reimbursement without rewriting approved history.
-
 - Location creation/editing type choices share `src/lib/fm/locationTypes.ts`; Coop direkte daily DB costs use `lokationsomkostningForDag` with fetched Coop rules and booking-day gross prices. Why: keep type choices and daily reimbursement calculations consistent across views.
 
 - Undermapper har egne `AGENTS.md` (fx `supabase/functions/AGENTS.md`); læs dem før ændringer dér.
