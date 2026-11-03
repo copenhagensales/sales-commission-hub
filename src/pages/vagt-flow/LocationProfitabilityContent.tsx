@@ -353,7 +353,7 @@ export default function LocationProfitabilityContent() {
     // Per locId → list of (clientId, bookedDays) for sale attribution
     const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
     // Brutto/netto lokationsomkostning pr. række (låst rabatsats pr. booking)
-    const costByRow = new Map<string, { gross: number; net: number; missingLocked: boolean }>();
+    const costByRow = new Map<string, { gross: number; net: number; missingLocked: boolean; usesTotalPrice: boolean }>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
@@ -374,7 +374,8 @@ export default function LocationProfitabilityContent() {
           : Number((booking as any).discount_percent_locked);
       const bookingNet =
         lockedPercent == null ? grossInfo.total : grossInfo.total * (1 - lockedPercent / 100);
-      const cost = costByRow.get(key) ?? { gross: 0, net: 0, missingLocked: false };
+      const cost = costByRow.get(key) ?? { gross: 0, net: 0, missingLocked: false, usesTotalPrice: false };
+      if (grossInfo.usesTotalPrice) cost.usesTotalPrice = true;
       cost.gross += grossInfo.total;
       cost.net += bookingNet;
       if (lockedPercent == null) cost.missingLocked = true;
@@ -472,8 +473,10 @@ export default function LocationProfitabilityContent() {
         const totalCommission = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.commission, 0);
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
-        const locationCost = loc.dailyRate * loc.bookedDays.length;
         const cost = costByRow.get(key);
+        // Aftalt samlet pris (total_price) har ingen dagspris – brug bookingGross-beløbet
+        const locationCost = cost?.usesTotalPrice ? cost.gross : loc.dailyRate * loc.bookedDays.length;
+        const dailyRate = cost?.usesTotalPrice && loc.bookedDays.length > 0 ? locationCost / loc.bookedDays.length : loc.dailyRate;
         const locationCostGross = cost?.gross ?? locationCost;
         const locationCostNet = cost?.net ?? locationCost;
         const missingLockedDiscount = cost?.missingLocked ?? false;
@@ -481,7 +484,7 @@ export default function LocationProfitabilityContent() {
         const dietCost = dietCostByLocation.get(key) || 0;
         const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
         const dbPerDay = loc.bookedDays.length > 0 ? db / loc.bookedDays.length : 0;
-        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, locationCostGross, locationCostNet, missingLockedDiscount, hotelCost, dietCost, db, dbPerDay };
+        return { ...loc, dailyRate, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, locationCostGross, locationCostNet, missingLockedDiscount, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
