@@ -20398,10 +20398,6 @@ export type Database = {
         Args: { p_clients: string[]; p_konto: string }
         Returns: number
       }
-      dialer_sessions_kampagner_registrer: {
-        Args: { p_integration: string }
-        Returns: number
-      }
       assign_role_by_email: {
         Args: {
           _email: string
@@ -20539,6 +20535,10 @@ export type Database = {
       }
       data_import_retention_run: { Args: { _dry_run?: boolean }; Returns: Json }
       dialer_politik_cache_opfrisk: { Args: never; Returns: undefined }
+      dialer_sessions_kampagner_registrer: {
+        Args: { p_integration: string }
+        Returns: number
+      }
       domaener_gyldige: { Args: { d: string[] }; Returns: boolean }
       eesy_mobile_subscriptions: { Args: never; Returns: string[] }
       effective_auth_user_id: { Args: never; Returns: string }
