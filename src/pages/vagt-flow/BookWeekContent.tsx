@@ -300,7 +300,7 @@ export default function BookWeekContent() {
 
   const createRateLow = (() => {
     if (!selectedLocation) return false;
-    const isQ = outsideAgreementSet?.has?.(outsideAgreementKey(selectedLocation)) ?? false;
+    const isQ = isQuoted;
     const days = isMarketLocation && marketStartDate && marketEndDate
       ? Math.ceil((marketEndDate.getTime() - marketStartDate.getTime()) / 86400000) + 1
       : selectedDays.length;
