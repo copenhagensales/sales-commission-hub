@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireCronOrOwner } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,9 @@ interface ManageWebhooksRequest {
     leadStatus?: string;
     leadReleaseType?: string;
     campaignCode?: string;
+    headers?: Record<string, string>; // [B3] faste headers, HeroBase sender med (fx x-webhook-secret) – aldrig logget
+    standardTemplateName?: string;   // [B3] fx "PostJson" – HeroBase' egen JSON-skabelon (payload = lead-objektet med uniqueId, campaignId, closure, status, firstProcessedByUser …)
+    contentTemplate?: string;        // [B3] egen skabelon (JSON-tekst med HeroBase' placeholders); bruges kun, hvis standardTemplateName mangler
   };
 }
 
@@ -32,6 +36,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  // [B3] Kun ejer (UI) eller cron-hemmelighed (drift): funktionen opretter/sletter hooks hos HeroBase med kontoens legitimation og var før åben for enhver med anon-nøglen
+  const auth = await requireCronOrOwner(req);
+  if (auth instanceof Response) return auth;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -95,7 +102,7 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`HeroBase API error: ${response.status} - ${errorText}`);
+          throw new Error(`HeroBase API error: ${response.status}`);
         }
 
         const webhooks = await response.json();
@@ -117,7 +124,7 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`HeroBase API error: ${response.status} - ${errorText}`);
+          throw new Error(`HeroBase API error: ${response.status}`);
         }
 
         const campaigns = await response.json();
@@ -139,7 +146,7 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`HeroBase API error: ${response.status} - ${errorText}`);
+          throw new Error(`HeroBase API error: ${response.status}`);
         }
 
         const meta = await response.json();
@@ -178,7 +185,7 @@ serve(async (req) => {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
-          throw new Error(`HeroBase API error: ${response.status} - ${responseText}`);
+          throw new Error(`HeroBase API error: ${response.status}`);  // [B3] intet råt svar i fejl/konsol
         }
 
         let example: unknown = null;
@@ -221,13 +228,16 @@ serve(async (req) => {
           Method: "POST",
           UrlTemplate: webhook_config.url,
           Format: "Json",
-          ContentTemplate: contentTemplate,
           LeadStatus: webhook_config.leadStatus || "UserProcessed",
         };
+        // [B3] Skabelon: HeroBase' standardskabelon (fx PostJson) eller egen skabelon; ellers den hidtidige (hvis placeholders HeroBase ikke kender → tomme felter)
+        if (webhook_config.standardTemplateName && webhook_config.standardTemplateName.trim() !== "") payload.StandardTemplateName = webhook_config.standardTemplateName.trim();
+        else payload.ContentTemplate = webhook_config.contentTemplate && webhook_config.contentTemplate.trim() !== "" ? webhook_config.contentTemplate : contentTemplate;
 
         if (webhook_config.campaignCode && webhook_config.campaignCode.trim() !== "") {
           payload.CampaignCode = webhook_config.campaignCode;
         }
+        if (webhook_config.headers && Object.keys(webhook_config.headers).length > 0) payload.Headers = JSON.stringify(webhook_config.headers);  // [B3]
 
         const response = await fetch(`${apiBaseUrl}/hooks`, {
           method: "POST",
@@ -251,12 +261,12 @@ serve(async (req) => {
             message: `Failed to create webhook in HeroBase: ${response.status}`,
             details: {
               status: response.status,
-              response: responseText,
-              url: webhook_config.url,
+              kode: response.status === 400 ? "HEROBASE_AFVIST" : response.status === 401 || response.status === 403 ? "HEROBASE_ADGANG" : response.status === 429 ? "HEROBASE_KVOTE" : "HEROBASE_FEJL",  // [B3] faste koder – svaret kan gengive Headers (hemmelighed) og logges aldrig
+              url_host: (() => { try { return new URL(webhook_config.url).host; } catch { return "ugyldig"; } })(),
             },
           });
 
-          throw new Error(`HeroBase API error: ${response.status} - ${responseText}`);
+          throw new Error(`HeroBase API error: ${response.status}`);
         }
 
         let result: HeroBaseHook | null = null;
@@ -275,7 +285,7 @@ serve(async (req) => {
           message: `Webhook created in HeroBase`,
           details: {
             webhook_id: result?.id,
-            url: webhook_config.url,
+            url_host: (() => { try { return new URL(webhook_config.url).host; } catch { return "ugyldig"; } })(),  // [B3] aldrig hele URL'en (authKey i querystring)
           },
         });
 
@@ -307,7 +317,7 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`HeroBase API error: ${response.status} - ${errorText}`);
+          throw new Error(`HeroBase API error: ${response.status}`);
         }
 
         // Log success

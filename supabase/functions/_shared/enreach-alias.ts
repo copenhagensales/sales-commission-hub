@@ -48,6 +48,7 @@ export async function registrerEnreachBrugere(supabase: any, brugere: HeroBaseBr
   const pe = new Map<string, string[]>(); for (const a of (agents ?? []) as { id: string; email: string }[]) { const e = lav(a.email); pe.set(e, [...(pe.get(e) ?? []), a.id]); }
   const { data: aabne } = await supabase.from("agent_ekstern_alias").select("ekstern_id, email, ikke_vores").eq("kilde", kilde).eq("konto_id", kontoId).is("agent_id", null).neq("oprindelse", "manuel").not("email", "is", null).limit(2000);
   let koblet = 0, ikkeVores = 0;
+  const saetIkkeVores: string[] = [], fjernIkkeVores: string[] = [];
   for (const a of (aabne ?? []) as { ekstern_id: string; email: string; ikke_vores: boolean }[]) {
     const ids = pe.get(lav(a.email)) ?? [];
     // Automatisk kobling kun ved ENTYDIG e-mail i et af kontoens egne domæner (krav 3; Codex r1: undtagelser som gmail afventer manuelt valg)
@@ -56,7 +57,15 @@ export async function registrerEnreachBrugere(supabase: any, brugere: HeroBaseBr
       if (!error) koblet++;
     } else {
       const skal = domaeneOk(a.email, egneDomaener) === false;
-      if (skal !== a.ikke_vores) { const { error } = await supabase.from("agent_ekstern_alias").update({ ikke_vores: skal, aendret: new Date().toISOString() }).eq("kilde", kilde).eq("ekstern_id", a.ekstern_id).is("agent_id", null).neq("oprindelse", "manuel"); if (!error && skal) ikkeVores++; }
+      if (skal !== a.ikke_vores) (skal ? saetIkkeVores : fjernIkkeVores).push(a.ekstern_id);
+    }
+  }
+  // Domænereglen skrives i portioner (første kørsel på tryg/alka: ~550 fremmede brugere), ikke én forespørgsel pr. række
+  for (const [vaerdi, liste] of [[true, saetIkkeVores], [false, fjernIkkeVores]] as [boolean, string[]][]) {
+    for (let i = 0; i < liste.length; i += 200) {
+      const del = liste.slice(i, i + 200);
+      const { error } = await supabase.from("agent_ekstern_alias").update({ ikke_vores: vaerdi, aendret: new Date().toISOString() }).eq("kilde", kilde).in("ekstern_id", del).is("agent_id", null).neq("oprindelse", "manuel");
+      if (error) log("WARN", `enreach-alias: domæneregel kunne ikke skrives for ${del.length} brugere: ${error.message}`); else if (vaerdi) ikkeVores += del.length;
     }
   }
   // 4) Koblinger anvendes på sessions/kald uden sælger ved HVER kørsel (ét hash-join; funktionen rammer kun konti på den nye vej og kampagner med regel) – så aktivering
