@@ -1,42 +1,15 @@
 /**
  * "Coop direkte"-lokationer: vi betaler butikken direkte (Corpay/bogholder),
- * og kædereglens kunde (Eesy FM) refunderer et beløb pr. dag i sin egen
- * leverandørrapport. Indgår aldrig i Coop butik-rapporten.
+ * og kædereglens kunde (Eesy FM) refunderer et beløb pr. dag. Indgår KUN i
+ * refusionsdelen af Coop-rapporten – aldrig i Excel-arket, fakturagrundlaget,
+ * totaler, rabat eller unique_locations.
  */
 import { format, max as maxDate, min as minDate } from "date-fns";
-import { bookingGross, type GrossBookingInput } from "@/utils/bookingGross";
+import type { GrossBookingInput } from "@/utils/bookingGross";
 import type { LocationRateSurcharge } from "@/utils/locationRateSurcharge";
 import { COOP_DIREKTE_TYPE, coopDirekteRefusionForBooking } from "@/lib/fm/coopDirekte";
 
 export const COOP_LOCATION_TYPE = "Coop butik";
-
-/** Brutto og refusion deler booking og periode; refusion er aldrig et tillæg. */
-export function coopDirekteReportBooking(
-  booking: DirectRefundBooking,
-  rules: LocationRateSurcharge[] | undefined,
-  periodStart: Date,
-  periodEnd: Date
-) {
-  const gross = bookingGross(booking, periodStart, periodEnd);
-  const refund = coopDirekteRefusionForBooking(booking, booking.location, rules, periodStart, periodEnd);
-  return {
-    ...gross,
-    refundAmount: refund.amount,
-    refundPerDay: refund.days > 0 ? refund.perDay : 0,
-    netAmount: gross.total - refund.amount,
-  };
-}
-
-/** Gamle Coop-rapporter bevares; en overlappende opkrævning skal afklares først. */
-export function hasLegacyCoopRefund(
-  reports: Array<{ location_type: string; period_start: string; period_end: string; status: string | null; direct_refund_amount: number | null }>,
-  periodStart: string,
-  periodEnd: string
-): boolean {
-  return reports.some((r) => r.location_type === COOP_LOCATION_TYPE &&
-    (r.status === "approved" || r.status === "sent") && Number(r.direct_refund_amount) > 0 &&
-    r.period_start <= periodEnd && r.period_end >= periodStart);
-}
 
 export interface DirectRefundLocation {
   id: string;
