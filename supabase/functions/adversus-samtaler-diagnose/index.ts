@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
   const budget = lavAdversusBudget(svc, await budgetNoegle(user), "diagnose");  // samme kvote som drift – også ét request kan være det tredje samtidige
 
   let apiKald = 0, rateLimit = 0;
+  let sidsteFejlbesked: string | null = null;  // F1a-5: Adversus' egen besked ved 4xx (fx 403 på /calls for en konto) – kun status/besked, aldrig data
   const get = async (path: string, redirect: RequestRedirect = "follow"): Promise<{ status: number; data: unknown; location: string | null }> => {
     if (apiKald >= MAKS_KALD) return { status: 0, data: null, location: null };
     for (let a = 0; a < 3; a++) {
@@ -57,6 +58,7 @@ Deno.serve(async (req) => {
       const location = res.headers.get("location");
       if (redirect === "manual") return { status: res.status, data: null, location };
       const text = await res.text(); let data: unknown = null; try { data = JSON.parse(text); } catch { data = null; }
+      if (res.status >= 400) sidsteFejlbesked = `${res.status} ${path.split("?")[0]}: ${text.slice(0, 200)}`;
       return { status: res.status, data, location: null };
     }
     return { status: 429, data: null, location: null };
@@ -88,7 +90,7 @@ Deno.serve(async (req) => {
   // 2) /calls i vinduet (start-filter) – felter, fordeling af lukkede værdisæt
   const r2 = await get(`/calls?pageSize=100&includeMeta=true&filters=${filt({ start: { $gt: t1, $lt: t2 } })}`);
   const calls = liste(r2.data, "calls");
-  ud.calls_start = { status: r2.status, antal: calls.length, felter: calls[0] ? feltTrae(calls[0]) : null, meta: meta(r2.data), disposition: fordeling(calls, "disposition"), origin: fordeling(calls, "origin"), anonymous: fordeling(calls, "anonymous"), med_recording_link: calls.filter((c) => s((c.links as Row)?.recording)).length };
+  ud.calls_start = { status: r2.status, antal: calls.length, ...(r2.status >= 400 ? { besked: sidsteFejlbesked } : {}), felter: calls[0] ? feltTrae(calls[0]) : null, meta: meta(r2.data), disposition: fordeling(calls, "disposition"), origin: fordeling(calls, "origin"), anonymous: fordeling(calls, "anonymous"), med_recording_link: calls.filter((c) => s((c.links as Row)?.recording)).length };
   const callIds = calls.slice(0, 50).map((c) => s(c.id)).filter(Boolean);
   if (callIds.length > 0) {
     const { count } = await svc.from("dialer_calls").select("id", { count: "exact", head: true }).eq("integration_id", di.id).in("external_id", callIds);
