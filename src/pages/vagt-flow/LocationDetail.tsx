@@ -21,8 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePermissions } from "@/hooks/usePositionPermissions";
-import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl, refusionUoverensstemmelse } from "@/lib/fm/lowPriceGuard";
-import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
+import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl } from "@/lib/fm/lowPriceGuard";
+import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE, coopDirekteRule } from "@/lib/fm/coopDirekte";
 
 export default function LocationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +34,8 @@ export default function LocationDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [formData, setFormData] = useState<any>(null);
+  // Kæderegler (Coop butik) – refusion for "Coop direkte" afledes af navnet
+  const { data: coopRules } = useLocationRateSurcharges(COOP_RULES_TYPE);
   const { canEdit } = usePermissions();
   const canEditLocation = canEdit("menu_fm_locations");
 
@@ -364,70 +367,30 @@ export default function LocationDetail() {
                 )}
               </div>
 
-              {/* Direkte afregning og refusion (kun visning – DB bruger dagsprisen ovenfor som netto) */}
-              <div className="border-t pt-4 mt-2 space-y-3">
-                <p className="text-sm font-medium">Direkte afregning og refusion (valgfrit)</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="gross-daily-rate">Pris til lokationen (brutto) pr. dag</Label>
-                    <Input
-                      id="gross-daily-rate"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      value={formData.gross_daily_rate ?? ""}
-                      onChange={(e) => setFormData({ ...formData, gross_daily_rate: e.target.value === "" ? null : Number(e.target.value) })}
-                      disabled={!canEditLocation}
-                    />
+              {/* "Coop direkte": refusion fra kædereglen (kun visning). DB = dagspris − refusion for kundens egne bookinger. */}
+              {formData.type === COOP_DIREKTE_TYPE && (() => {
+                const rule = coopDirekteRule({ type: formData.type, name: formData.name }, coopRules);
+                if (!rule) {
+                  return (
+                    <div className="border-t pt-4 mt-2">
+                      <p className="text-sm text-muted-foreground">
+                        Ingen kæderegel fundet ud fra navnet. Navnet skal indeholde Kvickly eller SuperBrugsen for at give refusion.
+                      </p>
+                    </div>
+                  );
+                }
+                const kunde = fieldmarketingClients.find((c: any) => c.id === rule.funded_by_client_id)?.name ?? "kunden";
+                const perDag = Number(rule.surcharge_per_day) || 0;
+                const netto = Math.max(0, (Number(formData.daily_rate) || 0) - perDag);
+                return (
+                  <div className="border-t pt-4 mt-2 space-y-1">
+                    <p className="text-sm font-medium">Refusion</p>
+                    <p className="text-sm text-muted-foreground tabular-nums">
+                      Refusion fra {kunde}: {perDag.toLocaleString("da-DK")} kr./dag ({rule.chain_match}) · Netto {netto.toLocaleString("da-DK")} kr./dag
+                    </p>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="refund-daily-rate">Refusion pr. dag</Label>
-                    <Input
-                      id="refund-daily-rate"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      value={formData.refund_daily_rate ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value === "" ? null : Number(e.target.value);
-                        const eesy = fieldmarketingClients.find((c: any) => c.name === "Eesy FM");
-                        setFormData({
-                          ...formData,
-                          refund_daily_rate: v,
-                          refund_client_id: formData.refund_client_id ?? (v ? eesy?.id ?? null : null),
-                        });
-                      }}
-                      disabled={!canEditLocation}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Refunderes af</Label>
-                  <Select
-                    value={formData.refund_client_id || "none"}
-                    onValueChange={(v) => setFormData({ ...formData, refund_client_id: v === "none" ? null : v })}
-                    disabled={!canEditLocation}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Vælg kunde" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Ingen</SelectItem>
-                      {fieldmarketingClients.map((c: any) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {refusionUoverensstemmelse({
-                  brutto: formData.gross_daily_rate ?? null,
-                  refusion: formData.refund_daily_rate ?? null,
-                  netto: formData.daily_rate ?? null,
-                }) && (
-                  <p className="text-sm text-destructive">
-                    Brutto minus refusion svarer ikke til dagsprisen (netto). Dagsprisen er det, der rammer lederens DB.
-                  </p>
-                )}
-                <RefusionLinje locationId={id} />
-              </div>
+                );
+              })()}
 
               {/* Placeringer */}
               <div className="border-t pt-4 mt-2">
