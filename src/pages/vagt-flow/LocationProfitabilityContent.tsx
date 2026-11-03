@@ -21,6 +21,8 @@ import { format, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { bookingGross } from "@/utils/bookingGross";
+import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
+import { COOP_RULES_TYPE, coopDirekteRefusionForBooking } from "@/lib/fm/coopDirekte";
 
 interface Placement {
   id: string;
@@ -166,7 +168,7 @@ export default function LocationProfitabilityContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, total_price, discount_percent_locked, client:clients!client_id(name), location!inner(id, name, daily_rate), location_placements(daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, total_price, discount_percent_locked, client:clients!client_id(name), location!inner(id, name, daily_rate, type), location_placements(daily_rate)")
         .eq("week_number", week)
         .eq("year", year);
       if (error) throw error;
@@ -354,6 +356,8 @@ export default function LocationProfitabilityContent() {
     const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
     // Brutto/netto lokationsomkostning pr. række (låst rabatsats pr. booking)
     const costByRow = new Map<string, { gross: number; net: number; missingLocked: boolean; usesTotalPrice: boolean }>();
+    // "Coop direkte": refusion fra kædereglen trækkes fra lokationsomkostningen
+    const coopRefundByRow = new Map<string, number>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
@@ -380,6 +384,8 @@ export default function LocationProfitabilityContent() {
       cost.net += bookingNet;
       if (lockedPercent == null) cost.missingLocked = true;
       costByRow.set(key, cost);
+      const coopRefund = coopDirekteRefusionForBooking(booking as any, loc, coopRules).amount;
+      if (coopRefund > 0) coopRefundByRow.set(key, (coopRefundByRow.get(key) ?? 0) + coopRefund);
 
 
       if (!locationMap.has(key)) {
@@ -475,10 +481,14 @@ export default function LocationProfitabilityContent() {
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const cost = costByRow.get(key);
         // Aftalt samlet pris (total_price) har ingen dagspris – brug bookingGross-beløbet
-        const locationCost = cost?.usesTotalPrice ? cost.gross : loc.dailyRate * loc.bookedDays.length;
+        const coopRefund = coopRefundByRow.get(key) ?? 0;
+        const locationCost = Math.max(
+          0,
+          (cost?.usesTotalPrice ? cost.gross : loc.dailyRate * loc.bookedDays.length) - coopRefund
+        );
         const dailyRate = cost?.usesTotalPrice && loc.bookedDays.length > 0 ? locationCost / loc.bookedDays.length : loc.dailyRate;
-        const locationCostGross = cost?.gross ?? locationCost;
-        const locationCostNet = cost?.net ?? locationCost;
+        const locationCostGross = cost ? Math.max(0, cost.gross - coopRefund) : locationCost;
+        const locationCostNet = cost ? Math.max(0, cost.net - coopRefund) : locationCost;
         const missingLockedDiscount = cost?.missingLocked ?? false;
         const hotelCost = hotelCostByLocation.get(key) || 0;
         const dietCost = dietCostByLocation.get(key) || 0;
