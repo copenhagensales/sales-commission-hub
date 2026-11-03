@@ -1,5 +1,10 @@
 # Roadmap — DB-/lønberegning: korrekthed
 
+## Coop direkte — selvstændig rapport (3/11 2026)
+- [ ] Coop direkte: refusion/netto pr. lokation og uge, totaler og godkendelsesspor uden rabat.
+- [ ] Manuel/planlagt mail og Excel: egne refusioner; Coop butik uden direkte refusioner.
+- [ ] Syntetiske prøver og byggetjek; ingen mails, dataændringer eller abonnementer.
+
 ## Coop direkte — tre godkendte rettelser (3/11 2026)
 - [x] Daglig kunde-DB: samme bookingpris og dagsrefusion som kunde-DB; øvrig lønberegning uændret.
 - [x] Lokationsøkonomi: dagsrækker med refusion pr. kunde og gyldig dag.
