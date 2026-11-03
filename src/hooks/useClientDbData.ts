@@ -1,3 +1,4 @@
+import { bookingGross } from "@/utils/bookingGross";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -249,7 +250,7 @@ export function useClientDbData({
       const { data, error } = await supabase
         .from("booking")
         .select(
-          "id, client_id, start_date, end_date, booked_days, daily_rate_override, location:location_id(daily_rate)"
+          "id, client_id, start_date, end_date, booked_days, daily_rate_override, total_price, location:location_id(daily_rate)"
         )
         .or("client_id.not.is.null");
       if (error) throw error;
@@ -467,7 +468,9 @@ export function useClientDbData({
       const bookingEnd = parseISO(booking.end_date);
       const bookedDays = (booking.booked_days as number[]) ?? [];
       const dailyRate =
-        Number(booking.daily_rate_override) ||
+        booking.total_price != null
+          ? bookingGross({ start_date: booking.start_date, end_date: booking.end_date, booked_days: bookedDays, total_price: booking.total_price }).dailyRate
+          : Number(booking.daily_rate_override) ||
         Number((booking.location as { daily_rate?: number } | null)?.daily_rate) ||
         0;
 
