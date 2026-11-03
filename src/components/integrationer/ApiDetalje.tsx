@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,6 +57,26 @@ function Laast({ api }: { api: ApiRegisterRaekke }) {
   );
 }
 
+/** Krav 11: kontoens egne e-maildomæner (data). Brugere med e-mail i et af dem er »vores«; andre markeres automatisk »ikke vores«. */
+function EgneDomaener({ konto }: { konto: ApiKonto }) {
+  const opdater = useOpdaterKonto();
+  const [tekst, setTekst] = useState((konto.egne_domaener ?? []).join(", "));
+  useEffect(() => { setTekst((konto.egne_domaener ?? []).join(", ")); }, [konto.egne_domaener]);
+  const gem = () => {
+    const domaener = [...new Set(tekst.split(/[,\s]+/).map((d) => d.trim().toLowerCase().replace(/^@/, "")).filter(Boolean))];
+    const ugyldige = domaener.filter((d) => !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d));
+    if (ugyldige.length > 0) { toast.error(`Ugyldigt domæne: ${ugyldige.join(", ")}`); return; }
+    if (JSON.stringify(domaener) !== JSON.stringify(konto.egne_domaener ?? [])) opdater.mutate({ id: konto.id, aendring: { egne_domaener: domaener } });
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-muted-foreground">Egne e-maildomæner:</span>
+      <Input className="h-8 w-80 text-xs" value={tekst} disabled={opdater.isPending} placeholder="fx copenhagensales.dk, cph-relatel.dk" onChange={(e) => setTekst(e.target.value)} onBlur={gem} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+      <span className="text-xs text-muted-foreground">Brugere med e-mail i disse domæner regnes som vores medarbejdere; andre markeres »ikke vores«.</span>
+    </div>
+  );
+}
+
 function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
   const ids = konto.integration_id ? [konto.integration_id] : [];
   const { data: dialer = [] } = useDialerKonti(ids);
@@ -94,10 +117,13 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
                       Hent kun egne medarbejderes kald{konto.kun_egne_medarbejdere ? " (til)" : " (fra)"}
                       <span className="block text-xs text-muted-foreground">
                         {cfg.calls_v1 === true
-                          ? "Til: dialeren bedes kun om kald for bruger-id'er, der er koblet til en medarbejder (fremmede konti). Fra: alle kontoens kald hentes (Copenhagen Sales' egen konto)."
+                          ? "Til: dialeren bedes kun om kald for brugere, der er koblet til en medarbejder eller har e-mail i et af kontoens egne domæner. Fra: alle kontoens kald hentes."
                           : "Gælder først, når kontoen hentes via den nye /calls-vej (ikke aktiv her endnu). Indstillingen er sat på forhånd og kan ikke ændres, før kontoen er på den nye vej."}
                       </span>
                     </label>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <EgneDomaener konto={konto} />
                   </div>
                 </>
               )}
@@ -114,7 +140,7 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
           )}
         </CardContent>
       </Card>
-      {konto.integration_id && <SaelgereUdenKobling kilde={api.noegle} kontoId={konto.id} kunEgne={konto.kun_egne_medarbejdere} />}
+      {konto.integration_id && <SaelgereUdenKobling kilde={api.noegle} kontoId={konto.id} kunEgne={konto.kun_egne_medarbejdere} egneDomaener={konto.egne_domaener ?? []} />}
       {sync.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Seneste kørsler</CardTitle></CardHeader>

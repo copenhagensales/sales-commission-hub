@@ -59,3 +59,12 @@ Deno.test("hentBrugereV1: alle brugere (også uden e-mail), displayName foretræ
   assertEquals(m.get("2"), { navn: "B", email: null, aktiv: false });
   assertEquals(m.get("3"), { navn: "C", email: null, aktiv: null });
 });
+
+Deno.test("domaeneOk (krav 11): eget domæne uanset store bogstaver, fremmed domæne = false, ingen e-mail = null", async () => {
+  const { domaeneOk } = await import("./calls-incremental.ts");
+  assertEquals(domaeneOk("Miki@CopenhagenSales.dk", ["copenhagensales.dk"]), true);
+  assertEquals(domaeneOk("rel@cph-relatel.dk", ["cph-relatel.dk", "copenhagensales.dk"]), true);
+  assertEquals(domaeneOk("cra@finansforbundet.dk", ["copenhagensales.dk"]), false);
+  assertEquals(domaeneOk("", ["copenhagensales.dk"]), null); assertEquals(domaeneOk(null, ["copenhagensales.dk"]), null);
+  assertEquals(domaeneOk("x@copenhagensales.dk", []), false);
+});

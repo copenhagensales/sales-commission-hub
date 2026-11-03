@@ -7,7 +7,8 @@ import { IKKE_VORES, useAgentAlias, useAgentValg, useKoblAlias } from "@/hooks/u
 const OPRINDELSE_LABEL: Record<string, string> = { salg: "fra salg", kald_historik: "fra kaldshistorik", kald: "set i kald", brugere: "fra dialerens brugere", manuel: "valgt manuelt" };
 
 /** Sælger-koblinger for en API-konto: id'er uden kobling vælges her (medarbejder eller »ikke vores«); kendte koblinger vises nedenfor. */
-export function SaelgereUdenKobling({ kilde, kontoId, kunEgne }: { kilde: string; kontoId: string; kunEgne: boolean }) {
+export function SaelgereUdenKobling({ kilde, kontoId, kunEgne, egneDomaener }: { kilde: string; kontoId: string; kunEgne: boolean; egneDomaener: string[] }) {
+  const domaeneOk = (email: string | null) => (email && email.includes("@") ? egneDomaener.includes(email.split("@")[1].toLowerCase()) : null);
   const { data: alias = [], isLoading } = useAgentAlias(kilde, kontoId);
   const { data: agents = [] } = useAgentValg();
   const kobl = useKoblAlias();
@@ -23,7 +24,7 @@ export function SaelgereUdenKobling({ kilde, kontoId, kunEgne }: { kilde: string
           Samme medarbejder kan have flere bruger-id'er i dialeren. Koblingen bruger-id → medarbejder er data: den fyldes automatisk fra salg og dialerens
           brugerliste, og id'er uden kobling lander her. Vælg medarbejderen, så sættes sælgeren også på de kald, der mangler den.
           {kunEgne
-            ? " Denne konto henter kun egne medarbejderes kald: brugere uden kobling hentes ikke, før du vælger medarbejder – eller markerer dem som »ikke vores medarbejder«."
+            ? " Denne konto henter kun egne medarbejderes kald: brugere med e-mail i kontoens egne domæner eller med en valgt medarbejder hentes; brugere med fremmed domæne markeres automatisk »ikke vores«, og brugere uden e-mail venter på dit valg."
             : " Brugere, der ikke er Copenhagen Sales' medarbejdere, kan markeres som »ikke vores medarbejder«."}
         </CardDescription>
       </CardHeader>
@@ -40,7 +41,7 @@ export function SaelgereUdenKobling({ kilde, kontoId, kunEgne }: { kilde: string
                 <TableRow key={a.ekstern_id} className={a.ikke_vores ? "opacity-60" : a.agent_id ? undefined : "bg-destructive/5"}>
                   <TableCell className="font-mono text-xs">{a.ekstern_id}</TableCell>
                   <TableCell className="text-xs">{a.navn ?? <span className="text-muted-foreground">–</span>}{a.aktiv === false && <span className="ml-1 text-muted-foreground">(inaktiv)</span>}</TableCell>
-                  <TableCell className="text-xs">{a.email ?? <span className="text-muted-foreground">–</span>}</TableCell>
+                  <TableCell className="text-xs">{a.email ?? <span className="text-muted-foreground">–</span>}{a.email && domaeneOk(a.email) === false && <span className="ml-1 text-muted-foreground">(fremmed domæne)</span>}</TableCell>
                   <TableCell>
                     <Select value={a.ikke_vores ? IKKE_VORES : a.agent_id ?? ""} disabled={kobl.isPending} onValueChange={(v) => kobl.mutate({ kilde, eksternId: a.ekstern_id, agentId: v, kontoId })}>
                       <SelectTrigger className="h-8 w-[260px] text-xs"><SelectValue placeholder="Vælg medarbejder…">{a.ikke_vores ? "Ikke vores medarbejder" : a.agent_id ? agentNavn(a.agent_id) : "Vælg medarbejder…"}</SelectValue></SelectTrigger>

@@ -85,6 +85,13 @@ export async function hentBrugereV1(get: (sti: string) => Promise<unknown>, maks
   return m;
 }
 
+/** [krav 11] E-mailens domæne hører til kontoens egne domæner? null = ingen e-mail (afgøres manuelt). */
+export function domaeneOk(email: string | null | undefined, egneDomaener: string[]): boolean | null {
+  const e = (email ?? "").trim().toLowerCase();
+  if (!e.includes("@")) return null;
+  return egneDomaener.map((d) => d.toLowerCase()).includes(e.split("@")[1]);
+}
+
 async function laas(supabase: any, noegle: string, runId: string): Promise<boolean> {
   await supabase.from("provider_sync_locks").delete().lt("expires_at", new Date().toISOString());
   const { error } = await supabase.from("provider_sync_locks").insert({ provider: noegle, locked_at: new Date().toISOString(), locked_by: runId, expires_at: new Date(Date.now() + LAAS_TTL_MS).toISOString() });
@@ -104,6 +111,9 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
   const valgte = (integrations ?? []).filter((i: any) => i?.config?.calls_v1 === true);  // aktiveringsflag gælder ALTID, også med integrationId
   const resultat: Record<string, unknown> = { tilstand, integrationer: valgte.length };
   const runId = `kald_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // Fase 2 (Codex r8): bagud-hentning for nyligt tilladte brugere kører først, når ALLE kontis normale hentning er færdig – budgettet deles mellem konti
+  type BagudKoe = { integ: any; kontoId: string; brugerIds: string[]; laasNoegle: string; hentOgGem: (fra: string, til: string, ids?: string[]) => Promise<{ komplet: boolean; errors: number }> };
+  const bagudKoe: BagudKoe[] = [];
   for (const integ of valgte) {
     if (stop()) { resultat[integ.name] = { sprunget_over: "tidsbudget" }; continue; }
     const laasNoegle = `kald:${integ.id}`;
@@ -117,19 +127,21 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
       const get = (sti: string) => adapter.getV1(sti) as Promise<unknown>;
       // [F1a-3 krav 10] Kontoens indstilling »kun egne medarbejderes kald«: Adversus bedes KUN om koblede bruger-id'er (filter userId).
       // Uden listen må der ikke hentes bredt (fejl → kørslen fejler for kontoen). Ingen koblede → intet hentes.
-      const { data: konto, error: kontoErr } = await supabase.from("api_konto").select("id, kun_egne_medarbejdere").eq("integration_id", integ.id).maybeSingle();
+      const { data: konto, error: kontoErr } = await supabase.from("api_konto").select("id, kun_egne_medarbejdere, egne_domaener").eq("integration_id", integ.id).maybeSingle();
       if (kontoErr) throw kontoErr;
       // Ingen kontorække = indstillingen kan ikke læses → der må IKKE hentes (Codex r4). Rækken oprettes af trigger for enhver integration (F1b-3).
       if (!konto?.id) throw new Error("api_konto mangler for integrationen – kaldshentning stoppet (krav 10: indstillingen »kun egne medarbejdere« kan ikke læses)");
       const kontoId: string = konto.id;
       const kunEgne = konto.kun_egne_medarbejdere === true;
-      // Koblede bruger-id'er på DENNE konto (konto_id skal være sat – id'er uden konto tæller ikke; Codex r4). Læses igen før lagring, så et »ikke vores« valgt undervejs respekteres.
+      const egneDomaener: string[] = Array.isArray(konto.egne_domaener) ? (konto.egne_domaener as string[]) : [];
+      // Tilladte bruger-id'er på DENNE konto = agent_alias_tilladt(konto) i databasen (ENE definition, krav 11: koblet ELLER e-mail i eget domæne, ikke »ikke vores«).
+      // Læses igen før lagring, så et »ikke vores« valgt undervejs respekteres (Codex r4).
       const hentTilladte = async (): Promise<string[]> => {
-        const { data: koblede, error: kErr } = await supabase.from("agent_ekstern_alias").select("ekstern_id").eq("kilde", "adversus").eq("konto_id", kontoId).not("agent_id", "is", null).eq("ikke_vores", false);
+        const { data: tilladte, error: kErr } = await supabase.rpc("agent_alias_tilladt", { p_konto: kontoId });
         if (kErr) throw kErr;
-        return ((koblede ?? []) as { ekstern_id: string }[]).map((a) => a.ekstern_id);
+        return ((tilladte ?? []) as (string | { agent_alias_tilladt: string })[]).map((t) => (typeof t === "string" ? t : t.agent_alias_tilladt));
       };
-      const brugerIds: string[] | undefined = kunEgne ? await hentTilladte() : undefined;
+      let brugerIds: string[] | undefined;  // sættes efter brugerregistrering/navngivning nedenfor (krav 11, Codex r6: nye brugere skal kendes FØR filtrering)
       let filterBrudt = false;
       const hentOgGem = async (fra: string, til: string, ids: string[] | undefined = brugerIds): Promise<{ komplet: boolean; processed: number; errors: number; sider: number; total: number | null; frasorteret?: number }> => {
         const hentet = await hentCallsV1(get, fra, til, { stop, brugerIds: ids });
@@ -145,6 +157,79 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
         const r: any = calls.length > 0 ? await engine.processCalls(calls, integ.id) : { processed: 0, errors: 0 };
         return { komplet: true, processed: Number(r.processed ?? 0), errors: Number(r.errors ?? 0), sider, total, frasorteret };
       };
+      // [F1a-3] Sælger-alias fra Adversus /users: ukendte bruger-id'er (agent_id null, intet navn) får navn/e-mail, og e-mail kobler til agenten.
+      // Kører FØR hentningen (Codex r6), så nye brugere er kendt, inden tilladelseslisten dannes. Én person kan have flere Adversus-brugere, derfor alias frem for agents.
+      try {
+        let brugereCache: Awaited<ReturnType<typeof hentBrugereV1>> | null = null;
+        const hentBrugere = async () => brugereCache ?? (brugereCache = await hentBrugereV1(get));
+        // [krav 10/11] Om natten: ALLE kontoens brugere registreres som alias (uden navn → navngives/klassificeres nedenfor), så listen er klar FØR
+        // »kun egne« slås til, og fremmede brugere dukker op selv om userId-filteret holder deres kald ude.
+        // Registrering: om natten altid; i arbejdstid på »kun egne«-konti hver time (1 request), så en ny medarbejder højst venter en time på at blive hentet
+        const usersState = kunEgne && tilstand === "inkrementel" ? await getSyncState(supabase, integ.id, "users_v1") : null;
+        const usersGammel = !usersState?.last_success_at || (nu.getTime() - new Date(usersState.last_success_at).getTime()) > 60 * 60 * 1000;
+        if ((tilstand !== "inkrementel" || (kunEgne && usersGammel)) && !stop()) {
+          const alle = await hentBrugere();
+          const raekker = [...alle.keys()].map((id) => ({ kilde: "adversus", ekstern_id: id, oprindelse: "brugere", konto_id: kontoId }));
+          if (raekker.length > 0) {
+            const { error } = await supabase.from("agent_ekstern_alias").upsert(raekker, { onConflict: "kilde,ekstern_id", ignoreDuplicates: true });
+            if (error) log("WARN", `agent_ekstern_alias: kunne ikke registrere kontoens ${raekker.length} brugere: ${error.message}`);
+            // Rækker uden konto (fx seedet fra salg), som er brugere på denne konto, hører til her (bruger-id'er er globale hos Adversus – målt 2/11)
+            const { error: e2 } = await supabase.from("agent_ekstern_alias").update({ konto_id: kontoId }).eq("kilde", "adversus").is("konto_id", null).in("ekstern_id", [...alle.keys()].slice(0, 500));
+            if (e2) log("WARN", `agent_ekstern_alias: kunne ikke sætte konto på eksisterende rækker: ${e2.message}`);
+          }
+          resultat[`${integ.name}_brugere_registreret`] = raekker.length;
+          await upsertSyncState(supabase, integ.id, "users_v1", nu);
+        }
+        const { data: ukendte } = await supabase.from("agent_ekstern_alias").select("ekstern_id").eq("kilde", "adversus").is("agent_id", null).eq("ikke_vores", false).is("navn", null).limit(200);
+        if ((ukendte ?? []).length > 0) {
+          const brugere = await hentBrugere();
+          const { data: agenter } = await supabase.from("agents").select("id, email, external_adversus_id, external_dialer_id");
+          // Kun ENTYDIGE e-mails kobler automatisk (Codex r1: fælles/genbrugte postkasser → manuel afklaring); agents' eksterne id kobler direkte
+          const antalPrEmail = new Map<string, number>(); const agentAfEmail = new Map<string, string>(); const agentAfEkstId = new Map<string, string>();
+          for (const a of (agenter ?? []) as { id: string; email: string | null; external_adversus_id: string | null; external_dialer_id: string | null }[]) {
+            if (a.email) { const e = a.email.toLowerCase(); antalPrEmail.set(e, (antalPrEmail.get(e) ?? 0) + 1); agentAfEmail.set(e, a.id); }
+            if (a.external_adversus_id) agentAfEkstId.set(String(a.external_adversus_id), a.id);
+            if (a.external_dialer_id) agentAfEkstId.set(String(a.external_dialer_id), a.id);
+          }
+          let opdateret = 0, koblet = 0, tvetydige = 0, fremmede = 0;
+          for (const u of ukendte as { ekstern_id: string }[]) {
+            const b = brugere.get(u.ekstern_id);
+            if (!b) continue;
+            const e = b.email?.toLowerCase() ?? null;
+            const entydig = e ? (antalPrEmail.get(e) ?? 0) === 1 : false;
+            if (e && !entydig && (antalPrEmail.get(e) ?? 0) > 1) tvetydige++;
+            const agentId = agentAfEkstId.get(u.ekstern_id) ?? (entydig ? agentAfEmail.get(e!) ?? null : null);
+            // [krav 11] fremmed domæne (e-mail uden for kontoens egne domæner) og ingen kobling → automatisk »ikke vores« (manuelle valg er ikke i 'ukendte')
+            const ikkeVores = !agentId && domaeneOk(e, egneDomaener) === false;
+            if (ikkeVores) fremmede++;
+            // Betingelserne gentages i skrivningen (Codex r6): et manuelt valg truffet efter læsningen må ikke overskrives
+            const { error } = await supabase.from("agent_ekstern_alias").update({ navn: b.navn, email: b.email, aktiv: b.aktiv, agent_id: agentId, ...(ikkeVores ? { ikke_vores: true } : {}), oprindelse: "brugere", aendret: new Date().toISOString() })
+              .eq("kilde", "adversus").eq("ekstern_id", u.ekstern_id).is("agent_id", null).eq("ikke_vores", false).neq("oprindelse", "manuel");
+            if (!error) { opdateret++; if (agentId) koblet++; }
+          }
+          resultat[`${integ.name}_brugere`] = { ukendte: ukendte!.length, navngivet: opdateret, koblet: koblet, tvetydige, fremmede_domaener: fremmede };
+        }
+        // [krav 11] Reklassificering ved domæneændring (Codex r6 P2): automatisk klassificerede brugere (oprindelse 'brugere', ingen medarbejder) følger kontoens aktuelle domæner
+        const { data: auto } = await supabase.from("agent_ekstern_alias").select("ekstern_id, email, ikke_vores").eq("kilde", "adversus").eq("konto_id", kontoId).eq("oprindelse", "brugere").is("agent_id", null).not("email", "is", null);
+        let omklassificeret = 0;
+        for (const r of (auto ?? []) as { ekstern_id: string; email: string; ikke_vores: boolean }[]) {
+          const skalVaereIkkeVores = domaeneOk(r.email, egneDomaener) === false;
+          if (skalVaereIkkeVores === r.ikke_vores) continue;
+          const { error } = await supabase.from("agent_ekstern_alias").update({ ikke_vores: skalVaereIkkeVores, aendret: new Date().toISOString() }).eq("kilde", "adversus").eq("ekstern_id", r.ekstern_id).eq("oprindelse", "brugere").is("agent_id", null);
+          if (!error) omklassificeret++;
+        }
+        if (omklassificeret > 0) resultat[`${integ.name}_omklassificeret`] = omklassificeret;
+        brugerIds = kunEgne ? await hentTilladte() : undefined;
+        // Reparation (Codex r1 P2 / r2): koblinger med agent, der endnu ikke er anvendt på kald (anvendt_tid null – fra /users ovenfor, fra UI, eller
+        // et tidligere fejlet forsøg) → ét idempotent kald, uafhængigt af om der var ukendte id'er i denne kørsel.
+        const { data: uanvendt } = await supabase.from("agent_ekstern_alias").select("ekstern_id").eq("kilde", "adversus").not("agent_id", "is", null).is("anvendt_tid", null).limit(1);
+        if ((uanvendt ?? []).length > 0) {
+          const { data: repareret, error: rErr } = await supabase.rpc("agent_alias_anvend_alle", { p_kilde: "adversus" });
+          if (rErr) log("WARN", `agent_alias_anvend_alle fejlede: ${rErr.message}`);
+          else resultat[`${integ.name}_alias_anvendt`] = { kald_repareret: Number(repareret ?? 0) };
+        }
+      } catch (e) { log("WARN", `calls-incremental ${integ.name}: alias/users-opslag fejlede: ${e instanceof Error ? e.message : String(e)}`); }
+      if (kunEgne && brugerIds === undefined) brugerIds = await hentTilladte();  // alias-trinnet fejlede før listen blev dannet → dan den nu (ellers kastes, og der hentes ikke)
       if (tilstand === "inkrementel") {
         const state = await getSyncState(supabase, integ.id, "calls_v1");
         const v = inkrementeltVindue(state?.last_success_at ? new Date(state.last_success_at) : null, nu);
@@ -180,70 +265,7 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
         }
         resultat[integ.name] = { afstemning: afstemning.length ? afstemning : "allerede", backfill: backfill ?? { dage_koert: dageKoert, cursor }, ventet: budget.ventet };
       }
-      // [F1a-3] Sælger-alias fra Adversus /users: ukendte bruger-id'er (agent_id null, intet navn) får navn/e-mail, og e-mail kobler til agenten.
-      // Kun når der ER ukendte id'er – ellers ingen requests. Én person kan have flere Adversus-brugere (hjælpecentret), derfor alias frem for agents.
-      try {
-        let brugereCache: Awaited<ReturnType<typeof hentBrugereV1>> | null = null;
-        const hentBrugere = async () => brugereCache ?? (brugereCache = await hentBrugereV1(get));
-        // [krav 10] »Kun egne«-konto om natten: ALLE kontoens brugere registreres som alias (uden navn → navngives nedenfor), så ejer kan afgøre vores/ikke vores.
-        // Med userId-filteret dukker fremmede brugere ellers aldrig op via kald.
-        if (kunEgne && tilstand !== "inkrementel" && !stop()) {
-          const alle = await hentBrugere();
-          const raekker = [...alle.keys()].map((id) => ({ kilde: "adversus", ekstern_id: id, oprindelse: "brugere", konto_id: kontoId }));
-          if (raekker.length > 0) {
-            const { error } = await supabase.from("agent_ekstern_alias").upsert(raekker, { onConflict: "kilde,ekstern_id", ignoreDuplicates: true });
-            if (error) log("WARN", `agent_ekstern_alias: kunne ikke registrere kontoens ${raekker.length} brugere: ${error.message}`);
-            // Rækker uden konto (fx seedet fra salg), som er brugere på denne konto, hører til her (bruger-id'er er globale hos Adversus – målt 2/11)
-            const { error: e2 } = await supabase.from("agent_ekstern_alias").update({ konto_id: kontoId }).eq("kilde", "adversus").is("konto_id", null).in("ekstern_id", [...alle.keys()].slice(0, 500));
-            if (e2) log("WARN", `agent_ekstern_alias: kunne ikke sætte konto på eksisterende rækker: ${e2.message}`);
-          }
-          resultat[`${integ.name}_brugere_registreret`] = raekker.length;
-        }
-        const { data: ukendte } = await supabase.from("agent_ekstern_alias").select("ekstern_id").eq("kilde", "adversus").is("agent_id", null).eq("ikke_vores", false).is("navn", null).limit(200);
-        if ((ukendte ?? []).length > 0) {
-          const brugere = await hentBrugere();
-          const { data: agenter } = await supabase.from("agents").select("id, email").not("email", "is", null);
-          // Kun ENTYDIGE e-mails kobler automatisk (Codex r1: fælles/genbrugte postkasser → manuel afklaring)
-          const antalPrEmail = new Map<string, number>(); const agentAfEmail = new Map<string, string>();
-          for (const a of (agenter ?? []) as { id: string; email: string }[]) { const e = a.email.toLowerCase(); antalPrEmail.set(e, (antalPrEmail.get(e) ?? 0) + 1); agentAfEmail.set(e, a.id); }
-          let opdateret = 0, koblet = 0, tvetydige = 0;
-          for (const u of ukendte as { ekstern_id: string }[]) {
-            const b = brugere.get(u.ekstern_id);
-            if (!b) continue;
-            const e = b.email?.toLowerCase() ?? null;
-            const entydig = e ? (antalPrEmail.get(e) ?? 0) === 1 : false;
-            if (e && !entydig && (antalPrEmail.get(e) ?? 0) > 1) tvetydige++;
-            const agentId = entydig ? agentAfEmail.get(e!) ?? null : null;
-            const { error } = await supabase.from("agent_ekstern_alias").update({ navn: b.navn, email: b.email, aktiv: b.aktiv, agent_id: agentId, oprindelse: "brugere", aendret: new Date().toISOString() }).eq("kilde", "adversus").eq("ekstern_id", u.ekstern_id).is("agent_id", null);
-            if (!error) { opdateret++; if (agentId) koblet++; }
-          }
-          resultat[`${integ.name}_brugere`] = { ukendte: ukendte!.length, navngivet: opdateret, koblet_via_email: koblet, tvetydige };
-        }
-        // Reparation (Codex r1 P2 / r2): koblinger med agent, der endnu ikke er anvendt på kald (anvendt_tid null – fra /users ovenfor, fra UI, eller
-        // et tidligere fejlet forsøg) → ét idempotent kald, uafhængigt af om der var ukendte id'er i denne kørsel.
-        const { data: uanvendt } = await supabase.from("agent_ekstern_alias").select("ekstern_id").eq("kilde", "adversus").not("agent_id", "is", null).is("anvendt_tid", null).limit(1);
-        if ((uanvendt ?? []).length > 0) {
-          const { data: repareret, error: rErr } = await supabase.rpc("agent_alias_anvend_alle", { p_kilde: "adversus" });
-          if (rErr) log("WARN", `agent_alias_anvend_alle fejlede: ${rErr.message}`);
-          else resultat[`${integ.name}_alias_anvendt`] = { kald_repareret: Number(repareret ?? 0) };
-        }
-        // [krav 10] »Kun egne«-konto: en bruger, der er koblet efter at filteret var aktivt, har ingen historik → hentes bagud (backfill-vinduet) én gang.
-        // 1 bruger pr. kørsel i arbejdstid, op til 3 om natten; markeres først når vinduet er hentet komplet uden fejl.
-        if (kunEgne && kontoId) {
-          const { data: nye } = await supabase.from("agent_ekstern_alias").select("ekstern_id, aendret").eq("kilde", "adversus").eq("konto_id", kontoId).not("agent_id", "is", null).eq("ikke_vores", false).is("bagud_hentet_tid", null).limit(tilstand === "inkrementel" ? 1 : 3);
-          const bagud: unknown[] = [];
-          for (const n of (nye ?? []) as { ekstern_id: string; aendret: string }[]) {
-            if (stop()) break;
-            const bfDage = Number(integ?.config?.calls_v1_backfill_dage ?? 30);
-            const fra = new Date(nu.getTime() - bfDage * 86_400_000).toISOString(); const til = new Date(nu.getTime() - BAGKANT_MS).toISOString();
-            const r = await hentOgGem(fra, til, [n.ekstern_id]);
-            // Markeres kun, hvis rækken er uændret siden start (en omkobling i UI undervejs nulstiller og får en ny bagud-hentning)
-            if (r.komplet && r.errors === 0) await supabase.from("agent_ekstern_alias").update({ bagud_hentet_tid: new Date().toISOString() }).eq("kilde", "adversus").eq("ekstern_id", n.ekstern_id).eq("aendret", n.aendret).is("bagud_hentet_tid", null);
-            bagud.push({ bruger: n.ekstern_id, ...r });
-          }
-          if (bagud.length > 0) resultat[`${integ.name}_bagud`] = bagud;
-        }
-      } catch (e) { log("WARN", `calls-incremental ${integ.name}: alias/users-opslag fejlede: ${e instanceof Error ? e.message : String(e)}`); }
+      if (kunEgne && (brugerIds?.length ?? 0) > 0) bagudKoe.push({ integ, kontoId, brugerIds: brugerIds!, laasNoegle, hentOgGem });
       budgetVentet = budget.ventet;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -253,6 +275,42 @@ export async function callsIncremental(supabase: any, engine: IngestionEngine, l
     } finally {
       await frigivLaas(supabase, laasNoegle, runId);
     }
+  }
+  // Fase 2: bagud-hentning (genoptagelig dag for dag; cursor i dialer_sync_state 'calls_v1_bagud:<id>'; starter ved i dag). Låsen tages igen pr. konto.
+  for (const k of bagudKoe) {
+    if (stop()) break;
+    if (!(await laas(supabase, k.laasNoegle, runId))) continue;
+    try {
+      const { data: nye } = await supabase.from("agent_ekstern_alias").select("ekstern_id, aendret").eq("kilde", "adversus").eq("konto_id", k.kontoId).in("ekstern_id", k.brugerIds).is("bagud_hentet_tid", null).limit(tilstand === "inkrementel" ? 1 : 3);
+      const bagud: unknown[] = [];
+      for (const n of (nye ?? []) as { ekstern_id: string; aendret: string }[]) {
+        if (stop()) break;
+        const bfDage = Number(k.integ?.config?.calls_v1_backfill_dage ?? 30);
+        const ds = `calls_v1_bagud:${n.ekstern_id}`;
+        const st = await getSyncState(supabase, k.integ.id, ds);
+        const frisk = `${danskDato(nu)}|${plusDage(danskDato(nu), -bfDage)}`;
+        let cursor: string | null = st?.cursor ?? frisk;
+        // Codex r8: en gammel 'faerdig' fra før aliasændringen (fx »ikke vores« → tilladt igen) gælder ikke – start forfra, så fravalgsperioden hentes
+        if (cursor === "faerdig" && st?.last_success_at && new Date(st.last_success_at).getTime() < new Date(n.aendret).getTime()) cursor = frisk;
+        let dageKoert = 0; let fejl: unknown = null;
+        while (cursor !== "faerdig" && !stop()) {
+          const b = backfillDag(cursor, bfDage, nu);
+          if (!b) { cursor = "faerdig"; break; }
+          const r = await k.hentOgGem(b.fra, b.til, [n.ekstern_id]);
+          if (!r.komplet || r.errors > 0) { fejl = { dag: b.dag, komplet: r.komplet, fejl: r.errors }; break; }
+          cursor = b.naeste; dageKoert++;
+          await upsertSyncState(supabase, k.integ.id, ds, nu, cursor);
+        }
+        if (cursor === "faerdig") {
+          await upsertSyncState(supabase, k.integ.id, ds, nu, "faerdig");
+          // Markeres kun, hvis rækken er uændret siden start (en omkobling i UI undervejs nulstiller og får en ny vurdering)
+          await supabase.from("agent_ekstern_alias").update({ bagud_hentet_tid: new Date().toISOString() }).eq("kilde", "adversus").eq("ekstern_id", n.ekstern_id).eq("aendret", n.aendret).is("bagud_hentet_tid", null);
+        }
+        bagud.push({ bruger: n.ekstern_id, dage_koert: dageKoert, cursor, ...(fejl ? { fejl } : {}) });
+      }
+      if (bagud.length > 0) resultat[`${k.integ.name}_bagud`] = bagud;
+    } catch (e) { log("WARN", `calls-incremental ${k.integ.name}: bagud-hentning fejlede: ${e instanceof Error ? e.message : String(e)}`); }
+    finally { await frigivLaas(supabase, k.laasNoegle, runId); }
   }
   return resultat;
 }

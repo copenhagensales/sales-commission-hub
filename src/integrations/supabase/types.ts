@@ -1342,6 +1342,7 @@ export type Database = {
         Row: {
           aendret: string
           aktiv: boolean
+          egne_domaener: string[]
           api_noegle: string
           id: string
           integration_id: string | null
@@ -1354,6 +1355,7 @@ export type Database = {
         Insert: {
           aendret?: string
           aktiv?: boolean
+          egne_domaener?: string[]
           api_noegle: string
           id?: string
           integration_id?: string | null
@@ -1366,6 +1368,7 @@ export type Database = {
         Update: {
           aendret?: string
           aktiv?: boolean
+          egne_domaener?: string[]
           api_noegle?: string
           id?: string
           integration_id?: string | null
@@ -20340,6 +20343,7 @@ export type Database = {
         Returns: number
       }
       agent_alias_anvend_alle: { Args: { p_kilde: string }; Returns: number }
+      agent_alias_tilladt: { Args: { p_konto: string }; Returns: string[] }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       api_konto_kampagner: {

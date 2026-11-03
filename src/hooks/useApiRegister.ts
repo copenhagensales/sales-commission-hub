@@ -86,7 +86,7 @@ export function useKlienter() {
 export function useOpdaterKonto() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, aendring }: { id: string; aendring: Partial<Pick<ApiKonto, "navn" | "note" | "aktiv" | "kun_egne_medarbejdere">> }) => {
+    mutationFn: async ({ id, aendring }: { id: string; aendring: Partial<Pick<ApiKonto, "navn" | "note" | "aktiv" | "kun_egne_medarbejdere" | "egne_domaener">> }) => {
       const { error } = await supabase.from("api_konto").update({ ...aendring, aendret: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
