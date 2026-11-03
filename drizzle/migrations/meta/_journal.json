@@ -589,6 +589,13 @@
       "when": 1793701837775,
       "tag": "0083_fm_lavpris_spaerring_og_refusion",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793702534061,
+      "tag": "0084_fm_direkte_refusion_kaede",
+      "breakpoints": true
     }
   ]
 }

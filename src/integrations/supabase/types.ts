@@ -12511,6 +12511,7 @@ export type Database = {
           bookable_client_ids: string[] | null
           can_book_eesy: boolean | null
           can_book_yousee: boolean | null
+          chain: string | null
           client_campaign_mapping: Json | null
           contact_email: string | null
           contact_person_name: string | null
@@ -12540,6 +12541,7 @@ export type Database = {
           bookable_client_ids?: string[] | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
+          chain?: string | null
           client_campaign_mapping?: Json | null
           contact_email?: string | null
           contact_person_name?: string | null
@@ -12569,6 +12571,7 @@ export type Database = {
           bookable_client_ids?: string[] | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
+          chain?: string | null
           client_campaign_mapping?: Json | null
           contact_email?: string | null
           contact_person_name?: string | null
@@ -17648,6 +17651,8 @@ export type Database = {
           approved_by: string | null
           base_amount: number | null
           created_at: string
+          direct_refund_amount: number | null
+          direct_refund_data: Json | null
           discount_amount: number
           discount_percent: number
           final_amount: number
@@ -17669,6 +17674,8 @@ export type Database = {
           approved_by?: string | null
           base_amount?: number | null
           created_at?: string
+          direct_refund_amount?: number | null
+          direct_refund_data?: Json | null
           discount_amount?: number
           discount_percent?: number
           final_amount?: number
@@ -17690,6 +17697,8 @@ export type Database = {
           approved_by?: string | null
           base_amount?: number | null
           created_at?: string
+          direct_refund_amount?: number | null
+          direct_refund_data?: Json | null
           discount_amount?: number
           discount_percent?: number
           final_amount?: number

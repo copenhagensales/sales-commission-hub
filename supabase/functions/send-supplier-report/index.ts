@@ -356,8 +356,10 @@ async function sendManual(body: Record<string, any>): Promise<Response> {
     periodStart: String(report.period_start),
     rows,
     attachXlsx: true,
-    // "Merpris og refusion" er kun intern og sendes aldrig til leverandøren
-    includeSurcharge: false,
+    // Coop-rapporten sendes til Eesy; "Merpris og refusion" skal med i mailen
+    // (aldrig i Excel-bilaget, som videresendes til Coop).
+    includeSurcharge: true,
+    directRefunds: (report.direct_refund_data as any[] | null) ?? [],
     showDiscount: body.hasDiscountRules !== false,
     message: (body.message as string | undefined) ?? null,
   });
