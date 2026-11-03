@@ -1338,12 +1338,6 @@ export type Database = {
         }
         Relationships: []
       }
-      api_opsaetning_audit: {
-        Row: { id: number; tabel: string; noegle: Json | null; handling: string; gammel: Json | null; ny: Json | null; aendret_af: string | null; aendret: string }
-        Insert: { id?: never; tabel: string; noegle?: Json | null; handling: string; gammel?: Json | null; ny?: Json | null; aendret_af?: string | null; aendret?: string }
-        Update: { id?: never; tabel?: string; noegle?: Json | null; handling?: string; gammel?: Json | null; ny?: Json | null; aendret_af?: string | null; aendret?: string }
-        Relationships: []
-      }
       api_konto: {
         Row: {
           aendret: string
@@ -1433,6 +1427,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      api_opsaetning_audit: {
+        Row: {
+          aendret: string
+          aendret_af: string | null
+          gammel: Json | null
+          handling: string
+          id: number
+          noegle: Json | null
+          ny: Json | null
+          tabel: string
+        }
+        Insert: {
+          aendret?: string
+          aendret_af?: string | null
+          gammel?: Json | null
+          handling: string
+          id?: never
+          noegle?: Json | null
+          ny?: Json | null
+          tabel: string
+        }
+        Update: {
+          aendret?: string
+          aendret_af?: string | null
+          gammel?: Json | null
+          handling?: string
+          id?: never
+          noegle?: Json | null
+          ny?: Json | null
+          tabel?: string
+        }
+        Relationships: []
       }
       api_register: {
         Row: {
@@ -20359,9 +20386,6 @@ export type Database = {
       }
       agent_alias_anvend_alle: { Args: { p_kilde: string }; Returns: number }
       agent_alias_tilladt: { Args: { p_konto: string }; Returns: string[] }
-      kald_kampagne_regler: { Args: never; Returns: { kampagne_ekstern_id: string; retention_days: number }[] }
-      kald_kampagner_uden_regel: { Args: never; Returns: { kampagne_ekstern_id: string; navn: string | null; aarsag: string }[] }
-      kald_raekker_uden_regel: { Args: never; Returns: { tabel: string; antal: number }[] }
       am_i_invoiceflow_user: { Args: never; Returns: boolean }
       am_i_superadmin: { Args: never; Returns: boolean }
       api_konto_kampagner: {
@@ -21299,6 +21323,21 @@ export type Database = {
           total: number
         }[]
       }
+      kald_kampagne_regler: {
+        Args: never
+        Returns: {
+          kampagne_ekstern_id: string
+          retention_days: number
+        }[]
+      }
+      kald_kampagner_uden_regel: {
+        Args: never
+        Returns: {
+          aarsag: string
+          kampagne_ekstern_id: string
+          navn: string
+        }[]
+      }
       kald_kanonisk: {
         Args: {
           p_endpoint: string
@@ -21309,6 +21348,14 @@ export type Database = {
         }
         Returns: string
       }
+      kald_raekker_uden_regel: {
+        Args: never
+        Returns: {
+          antal: number
+          tabel: string
+        }[]
+      }
+      kald_regel_adgang: { Args: never; Returns: undefined }
       kald_vaerdi_observeret: {
         Args: { p_dage?: number }
         Returns: {
