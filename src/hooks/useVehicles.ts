@@ -70,3 +70,29 @@ export function useSetVehicleActive() {
     onSuccess: invalidate,
   });
 }
+
+/**
+ * Sletter kun biler, der aldrig er brugt. booking_vehicle sletter med CASCADE,
+ * så en brugt bil ville fjerne bookinghistorik – den skal slås fra i stedet.
+ */
+export function useDeleteVehicle() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    retry: 0,
+    mutationFn: async (id: string) => {
+      const tjek = await Promise.all([
+        supabase.from("booking_vehicle").select("id", { count: "exact", head: true }).eq("vehicle_id", id),
+        supabase.from("mileage_report").select("id", { count: "exact", head: true }).eq("vehicle_id", id),
+        supabase.from("vehicle_return_confirmation").select("id", { count: "exact", head: true }).eq("vehicle_id", id),
+      ]);
+      for (const r of tjek) {
+        if (r.error) throw new Error("Kunne ikke tjekke, om bilen er brugt. Prøv igen.");
+        if ((r.count ?? 0) > 0) throw new Error("Bilen er brugt på bookinger eller kørsel og kan ikke slettes. Slå den fra i stedet.");
+      }
+      const { data, error } = await supabase.from("vehicle").delete().eq("id", id).select("id");
+      if (error) throw new Error("Bilen kunne ikke slettes. Slå den fra i stedet.");
+      if (!data || data.length === 0) throw new Error("Du har ikke rettighed til at slette biler.");
+    },
+    onSuccess: invalidate,
+  });
+}

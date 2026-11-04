@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, Plus, Pencil } from "lucide-react";
+import { Car, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { SkeletonList } from "@/components/mobile";
 import { toast } from "sonner";
 import {
-  useAllVehicles, useCanManageVehicles, useSaveVehicle, useSetVehicleActive, type Vehicle,
+  useAllVehicles, useCanManageVehicles, useSaveVehicle, useSetVehicleActive, useDeleteVehicle, type Vehicle,
 } from "@/hooks/useVehicles";
 
 export default function VehiclesContent() {
@@ -17,6 +17,8 @@ export default function VehiclesContent() {
   const { data: canManage } = useCanManageVehicles();
   const save = useSaveVehicle();
   const setActive = useSetVehicleActive();
+  const del = useDeleteVehicle();
+  const [sletter, setSletter] = useState<Vehicle | null>(null);
   const [editing, setEditing] = useState<Vehicle | "new" | null>(null);
   const [form, setForm] = useState({ name: "", license_plate: "", notes: "" });
 
@@ -88,6 +90,9 @@ export default function VehiclesContent() {
                   <Button variant="outline" className="min-h-11 flex-1" disabled={setActive.isPending} onClick={() => toggle(v)}>
                     {v.is_active ? "Slå fra" : "Slå til"}
                   </Button>
+                  <Button variant="outline" className="min-h-11 min-w-11" aria-label={`Slet ${v.name}`} onClick={() => setSletter(v)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -118,6 +123,33 @@ export default function VehiclesContent() {
           <DialogFooter>
             <Button variant="outline" className="min-h-11" onClick={() => setEditing(null)}>Annullér</Button>
             <Button className="min-h-11" disabled={save.isPending} onClick={submit}>Gem</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={sletter !== null} onOpenChange={(o) => !o && setSletter(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Slet {sletter?.name}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Kun biler, der aldrig er brugt på en booking eller i kørsel, kan slettes. Er bilen brugt, så slå den fra i stedet.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" className="min-h-11" onClick={() => setSletter(null)}>Annullér</Button>
+            <Button
+              variant="destructive"
+              className="min-h-11"
+              disabled={del.isPending}
+              onClick={() =>
+                sletter &&
+                del.mutate(sletter.id, {
+                  onSuccess: () => { toast.success("Bilen er slettet."); setSletter(null); },
+                  onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke slette bilen."),
+                })
+              }
+            >
+              Slet
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
