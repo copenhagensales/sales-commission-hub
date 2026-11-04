@@ -20380,6 +20380,9 @@ export type Database = {
       }
       adversus_api_budget_status: { Args: { p_bruger: string }; Returns: Json }
       adversus_api_budget_timestat: { Args: never; Returns: undefined }
+      adversus_event_anonymiser: { Args: { p: Json }; Returns: Json }
+      adversus_event_kampagne: { Args: { p: Json }; Returns: string }
+      adversus_event_konto: { Args: { p: Json }; Returns: string }
       agent_alias_anvend: {
         Args: { p_ekstern_id: string; p_kilde: string }
         Returns: number
@@ -21360,6 +21363,17 @@ export type Database = {
         }[]
       }
       kald_regel_adgang: { Args: never; Returns: undefined }
+      kald_vaerdi_observeret: {
+        Args: { p_dage?: number }
+        Returns: {
+          antal: number
+          begreb: string
+          endpoint: string
+          felt_sti: string
+          kilde: string
+          kildevaerdi: string
+        }[]
+      }
       kald_webhook_datasaet: {
         Args: { p_integration_id: string }
         Returns: {
@@ -21371,17 +21385,6 @@ export type Database = {
           med_regel: number
           seneste: string
           uden_regel: number
-        }[]
-      }
-      kald_vaerdi_observeret: {
-        Args: { p_dage?: number }
-        Returns: {
-          antal: number
-          begreb: string
-          endpoint: string
-          felt_sti: string
-          kilde: string
-          kildevaerdi: string
         }[]
       }
       league_auto_advance_seasons: { Args: never; Returns: Json }
