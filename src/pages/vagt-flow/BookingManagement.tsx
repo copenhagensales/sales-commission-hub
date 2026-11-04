@@ -1,7 +1,7 @@
 import { SkeletonList } from "@/components/mobile";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle, ClipboardCheck } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle, ClipboardCheck, Car } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
@@ -21,6 +21,7 @@ const HotelsContent = lazy(() => import("./HotelsContent"));
 const LocationProfitabilityContent = lazy(() => import("./LocationProfitabilityContent"));
 const LocationHistoryContent = lazy(() => import("./LocationHistoryContent"));
 const FmChecklistContent = lazy(() => import("./FmChecklistContent"));
+const VehiclesContent = lazy(() => import("./VehiclesContent"));
 
 
 // Tab configuration with permission keys
@@ -34,6 +35,7 @@ const allTabs = [
   { value: "okonomi", label: "Økonomi", icon: BarChart3, permissionKey: "tab_fm_locations" },
   { value: "okonomi-butikker", label: "Økonomi Butikker", icon: BarChart3, permissionKey: "tab_fm_locations" },
   { value: "checklist", label: "Tjekliste", icon: ClipboardCheck, permissionKey: "tab_fm_checklist" },
+  { value: "biler", label: "Biler", icon: Car, permissionKey: "tab_fm_bookings" },
 ];
 
 export default function BookingManagement() {
@@ -211,6 +213,13 @@ export default function BookingManagement() {
             </TabsContent>
           )}
 
+        {visibleTabs.some(t => t.value === "biler") && (
+            <TabsContent value="biler" className="mt-6">
+              <Suspense fallback={<SkeletonList />}>
+                <VehiclesContent />
+              </Suspense>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </MainLayout>
