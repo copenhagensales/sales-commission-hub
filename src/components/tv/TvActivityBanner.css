@@ -1,0 +1,12 @@
+@keyframes tv-activity-drift {
+  0%, 100% { transform: translateX(-24px); opacity: 0.85; }
+  50% { transform: translateX(24px); opacity: 1; }
+}
+
+.tv-activity-logo {
+  animation: tv-activity-drift 24s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-activity-logo { animation: none; }
+}
