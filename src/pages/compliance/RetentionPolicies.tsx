@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 
 interface Campaign {
   id: string;
@@ -173,21 +174,6 @@ export default function RetentionPolicies() {
   const getPolicy = (campaignId: string) =>
     policies?.find((p) => p.client_campaign_id === campaignId);
 
-  const handleRetentionDaysChange = (campaignId: string, value: string) => {
-    const days = value === "" ? null : parseInt(value, 10);
-    if (value !== "" && isNaN(days as number)) return;
-    upsertMutation.mutate({ client_campaign_id: campaignId, retention_days: days });
-  };
-
-  const handleActiveToggle = (campaignId: string, active: boolean) => {
-    const policy = getPolicy(campaignId);
-    if (active && (!policy || !policy.retention_days)) {
-      toast.error("Angiv først antal retention-dage før aktivering.");
-      return;
-    }
-    upsertMutation.mutate({ client_campaign_id: campaignId, is_active: active });
-  };
-
   const handleCleanupModeChange = (campaignId: string, mode: string) => {
     upsertMutation.mutate({ client_campaign_id: campaignId, cleanup_mode: mode });
   };
@@ -245,7 +231,7 @@ export default function RetentionPolicies() {
             <h1 className="text-3xl font-bold text-foreground">Sletningspolitikker</h1>
           </div>
           <p className="text-muted-foreground text-lg">
-            Konfigurer retention-perioder og rensningstype per kampagne
+            Rensningstype og status per kampagne. Frister og aktivering sættes ét sted: <Link to="/integrationer" className="text-primary underline">Administration › Integrationer › konto › Sletteregler</Link> (kladde → prøvet → godkendt → aktiv; aktivering kræver superadmin).
           </p>
         </div>
 
@@ -373,15 +359,8 @@ export default function RetentionPolicies() {
                               onCheckedChange={(v) => handleNoDataHeldToggle(campaign.id, v)}
                             />
                           </td>
-                          <td className="py-3 pr-4">
-                            <Input
-                              type="number"
-                              min={1}
-                              placeholder="—"
-                              className="w-24 h-8 text-sm"
-                              value={policy?.retention_days ?? ""}
-                              onChange={(e) => handleRetentionDaysChange(campaign.id, e.target.value)}
-                            />
+                          <td className="py-3 pr-4 text-sm" title="Fristen sættes under Administration › Integrationer › konto › Sletteregler (kladde → prøvet → godkendt → aktiv; aktivering kræver superadmin).">
+                            {policy?.retention_days ?? "—"}
                           </td>
                           <td className="py-3 pr-4">
                             <Input
@@ -416,11 +395,8 @@ export default function RetentionPolicies() {
                               </SelectContent>
                             </Select>
                           </td>
-                          <td className="py-3">
-                            <Switch
-                              checked={policy?.is_active || false}
-                              onCheckedChange={(v) => handleActiveToggle(campaign.id, v)}
-                            />
+                          <td className="py-3 text-sm" title="Aktiveres under Administration › Integrationer › konto › Sletteregler (kun superadmin).">
+                            {policy?.is_active ? <Badge variant="default">Aktiv</Badge> : <span className="text-muted-foreground">Nej</span>}
                           </td>
                         </tr>
                       );

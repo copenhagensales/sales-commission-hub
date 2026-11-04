@@ -50,7 +50,6 @@ function DaekningCelle({ felt, daekning }: { felt: KatalogFelt; daekning?: Map<s
 
 function FeltRaekke({ felt, laast, daekning }: { felt: KatalogFelt; laast: boolean; daekning?: Map<string, Daekning> }) {
   const opdater = useOpdaterKatalogFelt();
-  const [retention, setRetention] = useState<string>(felt.retention_dage == null ? "" : String(felt.retention_dage));
   const [begrundelse, setBegrundelse] = useState<string>(felt.begrundelse ?? "");
   const afledt = felt.felt_sti.startsWith("afledt:");
   const skabelon = felt.status === "skabelon";
@@ -99,22 +98,8 @@ function FeltRaekke({ felt, laast, daekning }: { felt: KatalogFelt; laast: boole
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell className="align-top">
-        <Input
-          type="number"
-          min={0}
-          max={3650}
-          className="w-24 h-8 text-xs"
-          placeholder="politik"
-          value={retention}
-          disabled={spaerret}
-          title="Tom = kampagne-/klientpolitikken. En frist her går forud, hvis den er kortere."
-          onChange={(e) => setRetention(e.target.value)}
-          onBlur={() => {
-            const ny = retention === "" ? null : Number(retention);
-            if (ny !== felt.retention_dage) gem({ retention_dage: ny });
-          }}
-        />
+      <TableCell className="align-top text-xs" title="Frister sættes under fanen Sletteregler på API-kontoen (kladde → prøvet → godkendt → aktiv; aktivering kræver superadmin).">
+        {felt.retention_dage == null ? <span className="text-muted-foreground">kampagnens</span> : `${felt.retention_dage} d`}
       </TableCell>
       <TableCell className="align-top">
         <DaekningCelle felt={felt} daekning={daekning} />
@@ -253,7 +238,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
                         <TableHead>
                           <Tooltip>
                             <TooltipTrigger>Frist (dage)</TooltipTrigger>
-                            <TooltipContent>Tom = kampagnens/klientens opbevaringspolitik. En frist pr. felt går forud, hvis den er kortere. Ændringer gælder fremad og logges.</TooltipContent>
+                            <TooltipContent>Gældende frist pr. felt (tom = kampagnens frist; en kortere feltfrist går forud). Ændres under fanen Sletteregler på API-kontoen gennem kladde → prøvet → godkendt → aktiv.</TooltipContent>
                           </Tooltip>
                         </TableHead>
                         <TableHead>

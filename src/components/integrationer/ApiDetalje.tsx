@@ -12,23 +12,17 @@ import { KaldFeltKatalog } from "@/components/settings/KaldFeltKatalog";
 import { DialerIntegrations } from "@/components/settings/DialerIntegrations";
 import { IntegrationLogs } from "@/components/settings/IntegrationLogs";
 import { SaelgereUdenKobling } from "@/components/integrationer/SaelgereUdenKobling";
+import { SLETTEREGEL_NOEGLE, Sletteregler } from "@/components/integrationer/Sletteregler";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { Switch } from "@/components/ui/switch";
 import { KlientVaelger } from "@/components/integrationer/KlientVaelger";
-import { ResponsiveTable } from "@/components/mobile/ResponsiveTable";
-import { useKaldFeltKatalog } from "@/hooks/useKaldFeltKatalog";
 import {
   API_STATUS_LABEL,
   RETNING_LABEL,
   useDialerKonti,
-  useKampagnePolitikker,
-  useKampagnerMedRegel,
-  useKampagnerUdenRegel,
   useKontoKampagner,
   useOpdaterKonto,
-  useRaekkerUdenRegel,
   useSyncState,
-  useSystemPolitikker,
-  useWebhookDatasaet,
   type ApiKonto,
   type ApiRegisterRaekke,
   type Klient,
@@ -42,8 +36,6 @@ const DATASET_LABEL: Record<string, string> = {
   leads_v1_fuld: "Emner – fuld indlæsning",
   calls_v1_nat: "Kald – nat (fejl)",
 };
-
-const OPBEVARING_LINK = "/compliance?tab=registre&side=retention-policies";
 
 function tid(v: string | null | undefined): string {
   if (!v) return "–";
@@ -176,173 +168,6 @@ function Oversigt({ konto, api, klienter, valgteKlienter }: Props) {
   );
 }
 
-function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegisterRaekke; kampagner: string[] | undefined }) {
-  const { data: system = [] } = useSystemPolitikker(api.tabeller);
-  const erDialer = !!konto.integration_id;
-  const { data: alleKampagner = [] } = useKampagnePolitikker(erDialer);
-  const politikker = kampagner ? alleKampagner.filter((k) => k.adversusKampagneIds.some((id) => kampagner.includes(id))) : alleKampagner;
-  const { data: felter = [] } = useKaldFeltKatalog(api.noegle);
-  const synlige = kampagner ? felter.filter((f) => !f.kampagne_ekstern_id || kampagner.includes(f.kampagne_ekstern_id)) : felter;
-  const medFrist = synlige.filter((f) => f.retention_dage != null);
-  const ryddes = synlige.filter((f) => f.hentes && f.status === "aktiv" && !["teknisk", "forretning"].includes(f.klassifikation));
-  const afventer = synlige.filter((f) => f.status === "forslag");
-  const udenRegelQ = useKampagnerUdenRegel(); const medRegelQ = useKampagnerMedRegel(); const raekkerQ = useRaekkerUdenRegel();
-  const udenRegel = udenRegelQ.data ?? []; const medRegel = medRegelQ.data ?? []; const raekkerUdenRegel = raekkerQ.data ?? [];
-  const portFejl = [udenRegelQ.error, medRegelQ.error, raekkerQ.error].filter(Boolean) as Error[];
-  const kontoensUdenRegel = kampagner ? udenRegel.filter((k) => kampagner.includes(k.kampagne_ekstern_id)) : [];
-  const webhookQ = useWebhookDatasaet(konto.integration_id);
-  const webhooks = (webhookQ.data ?? []).filter((w) => w.seneste != null || (w.gemt ?? 0) > 0);
-  const tal = (v: number | null | undefined) => (v == null ? "–" : Number(v).toLocaleString("da-DK"));
-  return (
-    <div className="space-y-4">
-      <Laast api={api} />
-      <Card>
-        <CardHeader>
-          <CardTitle>Sletteregel-porten</CardTitle>
-          <CardDescription>
-            Fast regel: intet hentes, før hver datatype har en sletteregel. Hentningen beder kun dialeren om kald og emner for kampagner med en gældende
-            sletteregel (direkte, aktiv politik på den koblede klientkampagne). Nye felter lander som forslag og hentes først, når du har afgjort hentes,
-            klassifikation og frist under fanen <strong>Felter</strong>. Der er ingen standardfrister: rækker uden regel slettes ikke stille, de står her, til reglen er sat.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {portFejl.length > 0 && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-destructive">Kunne ikke læse sletteregel-porten: {portFejl.map((e) => e.message).join(" · ")}. Tallene nedenfor er ikke retvisende.</div>}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div><div className="text-2xl font-semibold">{medRegel.length}</div><div className="text-muted-foreground">kampagner med sletteregel (hentes)</div></div>
-            <div><div className={`text-2xl font-semibold ${udenRegel.length ? "text-destructive" : ""}`}>{udenRegel.length}</div><div className="text-muted-foreground">kampagner uden sletteregel (hentes ikke){kontoensUdenRegel.length ? ` · ${kontoensUdenRegel.length} set på denne konto` : ""}</div></div>
-            <div><div className={`text-2xl font-semibold ${afventer.length ? "text-destructive" : ""}`}>{afventer.length}</div><div className="text-muted-foreground">felter, der afventer din afgørelse</div></div>
-          </div>
-          {udenRegel.length > 0 && (
-            <Table>
-              <TableHeader><TableRow><TableHead>Kampagne</TableHead><TableHead>Navn i dialeren</TableHead><TableHead>Mangler</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {udenRegel.slice(0, 40).map((k) => (
-                  <TableRow key={k.kampagne_ekstern_id} className={kontoensUdenRegel.some((x) => x.kampagne_ekstern_id === k.kampagne_ekstern_id) ? "bg-destructive/5" : undefined}>
-                    <TableCell className="font-mono text-xs">{k.kampagne_ekstern_id}</TableCell>
-                    <TableCell className="text-xs">{k.navn ?? "–"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{k.aarsag}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          <div className="text-muted-foreground">
-            Rækker uden sletteregel (røres ikke af oprydningen): {raekkerUdenRegel.map((r) => `${r.tabel} ${Number(r.antal).toLocaleString("da-DK")}`).join(" · ") || "–"}.
-            Kampagner kobles og politikker sættes under <Link to={OPBEVARING_LINK} className="text-primary underline">Compliance › Opbevaring</Link>.
-          </div>
-        </CardContent>
-      </Card>
-      {erDialer && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Webhooks</CardTitle>
-            <CardDescription>
-              Webhook-hændelser hører til deres API og følger kampagnens sletteregel – de har ingen egen frist. Enreach-hook gemmer kun hændelser for kampagner med regel
-              (afviste tælles). Salgswebhooks (Adversus) bruger fortsat den eksisterende indgang; deres rå hændelser ryddes efter kampagnens regel, og uden kampagne eller
-              regel står de her som »uden regel«, til reglen er sat.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm">
-            {webhookQ.isLoading && <div className="text-muted-foreground">Indlæser webhook-datasæt …</div>}
-            {webhookQ.error && <div className="text-destructive">Kunne ikke læse webhook-datasættene: {(webhookQ.error as Error).message}</div>}
-            {!webhookQ.isLoading && !webhookQ.error && (
-              <ResponsiveTable
-                columns={[
-                  { key: "datasaet", header: "Datasæt", isTitle: true, cell: (w) => <div><div className="font-mono text-sm">{w.datasaet}</div><div className="text-sm text-muted-foreground">{w.beskrivelse}</div></div> },
-                  { key: "gemt", header: "Gemt", isKey: true, cell: (w) => tal(w.gemt) },
-                  { key: "med_regel", header: "Med regel", isKey: true, cell: (w) => tal(w.med_regel) },
-                  { key: "uden_regel", header: "Uden regel", isKey: true, cell: (w) => <span className={(w.uden_regel ?? 0) > 0 ? "text-destructive" : undefined}>{tal(w.uden_regel)}</span> },
-                  { key: "afvist", header: "Afvist", isKey: true, cell: (w) => tal(w.afvist) },
-                  { key: "anonymiseret", header: "Ryddet", cell: (w) => tal(w.anonymiseret) },
-                  { key: "seneste", header: "Seneste", cell: (w) => (w.seneste ? new Date(w.seneste).toLocaleString("da-DK") : "–") },
-                ]}
-                rows={webhooks}
-                rowKey={(w) => w.datasaet}
-                empty="Ingen rå hændelser eller loggede afvigelser fundet (sidste 30 dage). Vellykkede Enreach-hooks tælles ikke – de skriver samme række som hentningen."
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sådan ryddes data fra {konto.navn}</CardTitle>
-          <CardDescription>
-            Reglerne er data: feltkataloget afgør pr. felt, hvad der beholdes, og kampagnepolitikken afgør hvornår. Statistiske felter
-            (teknisk og forretning) beholdes; identifikatorer, personoplysninger og ikke-klassificerede felter ryddes efter politikken. En frist pr. felt
-            går forud, hvis den er kortere.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
-          <div><div className="text-2xl font-semibold">{synlige.length}</div><div className="text-muted-foreground">felter i kataloget for kontoen</div></div>
-          <div><div className="text-2xl font-semibold">{ryddes.length}</div><div className="text-muted-foreground">ryddes efter politik (identifikator/person/følsom/ukendt)</div></div>
-          <div><div className="text-2xl font-semibold">{medFrist.length}</div><div className="text-muted-foreground">felter med egen frist</div></div>
-          <div className="sm:col-span-3 text-muted-foreground">
-            Klassifikation rettes under fanen <strong>Felter</strong>. Kampagne- og systempolitikker rettes under{" "}
-            <Link to={OPBEVARING_LINK} className="text-primary underline">Compliance › Opbevaring</Link>.
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Systempolitikker</CardTitle>
-          <CardDescription>Opbevaringspolitik pr. tabel (data_retention_policies) for de tabeller, API'en skriver til.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {system.length === 0 && <div className="text-sm text-muted-foreground">Ingen systempolitik for API'ens tabeller – kampagnepolitikken gælder; uden politik hentes og ryddes intet.</div>}
-          {system.length > 0 && (
-            <Table>
-              <TableHeader><TableRow><TableHead>Tabel</TableHead><TableHead>Navn</TableHead><TableHead>Frist (dage)</TableHead><TableHead>Tilstand</TableHead><TableHead>Aktiv</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {system.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-mono text-xs">{p.data_type}</TableCell>
-                    <TableCell>{p.display_name}</TableCell>
-                    <TableCell>{p.retention_days ?? "–"}</TableCell>
-                    <TableCell>{p.cleanup_mode}</TableCell>
-                    <TableCell>{p.is_active ? "Ja" : "Nej"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      {erDialer && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Kampagnepolitikker for kontoen</CardTitle>
-            <CardDescription>
-              Frister pr. klientkampagne (campaign_retention_policies) for de kampagner, kontoen har kald eller emner på. Kun en direkte, aktiv politik på den
-              koblede klientkampagne er en regel; uden regel hentes kampagnen ikke, og eksisterende rækker røres ikke.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {politikker.length === 0 && <div className="text-sm text-muted-foreground">Ingen kampagnepolitikker rammer kontoens kampagner – intet hentes, før de er sat.</div>}
-            {politikker.length > 0 && (
-              <Table>
-                <TableHeader><TableRow><TableHead>Klientkampagne</TableHead><TableHead>Adversus-kampagner</TableHead><TableHead>Frist (dage)</TableHead><TableHead>Dialer-frist (dage)</TableHead><TableHead>Tilstand</TableHead><TableHead>Aktiv</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {politikker.map((k) => (
-                    <TableRow key={k.id}>
-                      <TableCell className="font-medium">{k.klientkampagne}</TableCell>
-                      <TableCell className="text-xs">{k.adversusKampagner.length ? k.adversusKampagner.join(", ") : "–"}</TableCell>
-                      <TableCell>{k.retention_days ?? "–"}</TableCell>
-                      <TableCell>{k.dialer_retention_days ?? "–"}</TableCell>
-                      <TableCell>{k.no_data_held ? "ingen data" : k.cleanup_mode}</TableCell>
-                      <TableCell>{k.is_active ? "Ja" : "Nej"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
 function Koersel({ konto, api }: { konto: ApiKonto; api: ApiRegisterRaekke }) {
   if (!konto.integration_id) {
     return (
@@ -369,6 +194,7 @@ export function ApiDetalje(props: Props) {
   const { konto, api, tilbage } = props;
   const { data: kampagner } = useKontoKampagner(konto.integration_id);
   const kampagneFilter = konto.integration_id ? (kampagner ?? []) : undefined;
+  const visSletteregler = usePermissions().canView(SLETTEREGEL_NOEGLE);  // rettighedsnøgle som data (masterplan 1.8); databasen håndhæver skridtene
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -380,7 +206,7 @@ export function ApiDetalje(props: Props) {
         <TabsList className="flex flex-wrap h-auto">
           <TabsTrigger value="oversigt">Oversigt</TabsTrigger>
           <TabsTrigger value="felter">Felter</TabsTrigger>
-          <TabsTrigger value="sletteregler">Sletteregler</TabsTrigger>
+          {visSletteregler && <TabsTrigger value="sletteregler">Sletteregler</TabsTrigger>}
           <TabsTrigger value="koersel">Kørsel</TabsTrigger>
           <TabsTrigger value="log">Log</TabsTrigger>
         </TabsList>
@@ -394,7 +220,7 @@ export function ApiDetalje(props: Props) {
             <KaldFeltKatalog kilde={api.noegle} laast={!api.redigerbar} indlejret kampagner={kampagneFilter} />
           </div>
         </TabsContent>
-        <TabsContent value="sletteregler"><Sletteregler konto={konto} api={api} kampagner={kampagneFilter} /></TabsContent>
+        {visSletteregler && <TabsContent value="sletteregler"><Sletteregler konto={konto} api={api} kampagner={kampagneFilter} /></TabsContent>}
         <TabsContent value="koersel"><Koersel konto={konto} api={api} /></TabsContent>
         <TabsContent value="log">
           <div className="space-y-2">
