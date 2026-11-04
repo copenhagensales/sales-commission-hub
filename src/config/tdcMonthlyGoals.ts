@@ -93,6 +93,35 @@ export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
       },
     ],
   },
+  "2026-11": {
+    team: 820,
+    defaultSeller: 0,
+    sellers: {
+      "Mathias Victor Andersen": 150,
+      "Storm Søegaard": 80,
+      "Sune Novrman": 80,
+      "Thorbjørn Hansen-Larsen": 75,
+      "August Bach Pedersen": 70,
+      "Matias Heller Frederiksen": 65,
+      "Lukas nielsen": 60,
+      "Thomas Wehage": 55,
+      "Andreas Walther Christensen": 55,
+      "Nicholaj Michael Wester": 40,
+      "Mads Demant": 20,
+      "Carl Filt Beyer": 20,
+      "Jasper Christensen": 20,
+      "Julius Rødsø Langkilde": 20,
+    },
+    excludeEmployeeIds: [],
+    combinedSellers: [
+      {
+        name: "Johannes / Oliver",
+        employeeIds: ["80aac0dd-794c-4a68-97ed-374dc6b4cfea", "c3c81fce-3bbb-4a5f-8250-0611bce0d7f1"],
+        extraEmails: ["joh@copenhagensales.dk"],
+        goal: 10,
+      },
+    ],
+  },
 };
 
 export function getTdcMonthlyGoal(date: Date): TdcMonthlyGoal | null {
