@@ -40,6 +40,7 @@ interface ManageWebhooksRequest {
     leadReleaseType?: string;
     campaignCode?: string;
     headers?: Record<string, string>; // [B3] faste headers, HeroBase sender med (fx x-webhook-secret) – aldrig logget
+    headersRaw?: string;              // [B3-test] Headers-feltet som rå tekst (HeroBase' eget format måles: JSON-objekt, »Navn: værdi«-linjer eller liste) – aldrig logget
     standardTemplateName?: string;   // [B3] fx "PostJson" – HeroBase' egen JSON-skabelon (payload = lead-objektet med uniqueId, campaignId, closure, status, firstProcessedByUser …)
     contentTemplate?: string;        // [B3] egen skabelon (JSON-tekst med HeroBase' placeholders); bruges kun, hvis standardTemplateName mangler
   };
@@ -260,7 +261,8 @@ serve(async (req) => {
         if (webhook_config.campaignCode && webhook_config.campaignCode.trim() !== "") {
           payload.CampaignCode = webhook_config.campaignCode;
         }
-        if (webhook_config.headers && Object.keys(webhook_config.headers).length > 0) payload.Headers = JSON.stringify(webhook_config.headers);  // [B3]
+        if (webhook_config.headersRaw && webhook_config.headersRaw.trim() !== "") payload.Headers = webhook_config.headersRaw;  // [B3-test] rå tekst har forrang
+        else if (webhook_config.headers && Object.keys(webhook_config.headers).length > 0) payload.Headers = JSON.stringify(webhook_config.headers);  // [B3]
 
         const response = await fetchHero(`${apiBaseUrl}/hooks`, {
           method: "POST",
