@@ -288,10 +288,15 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     [cachedSellersToday, fiberToday, showFiber, isRelatelFiber],
   );
 
+  // Fiber for den valgte periode (kun live-visning)
+  const liveFiberEnabled = showFiber && useLiveMode && !useCached;
+  const { data: fiberLive } = useFiberBoardStats(selectedPeriod.from, selectedPeriod.to, liveFiberEnabled, fiberVariant);
+  const { data: fiberCountLive = 0 } = useFiberSalesCount(selectedPeriod.from, selectedPeriod.to, liveFiberEnabled, fiberVariant);
+
   // Live sellers (only used in live mode)
   const liveSellers: LeaderboardSeller[] = useMemo(() => {
-    if (!liveData?.sellers) return [];
-    return liveData.sellers.map((s) => {
+    if (!liveData?.sellers) return mergeFiber([], fiberLive);
+    return mergeFiber(liveData.sellers.map((s) => {
       const name = employeeData?.idToNameMap?.get(s.employeeId) || s.employeeName;
       return {
         id: s.employeeId,
@@ -302,8 +307,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
         commission: s.commission,
         crossSales: s.crossSaleCount,
       };
-    });
-  }, [liveData, employeeData]);
+    }), fiberLive);
+  }, [liveData, employeeData, fiberLive, showFiber, isRelatelFiber]);
 
 
   const isLoading = useCached ? (kpisLoading || leaderboardsLoading || aggKpisLoading) : liveLoading;
@@ -437,7 +442,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
           primaryKpis={
             useCached
               ? kpiCards.slice(0, primaryKpiCount).map(toCphKpi)
-              : [{ label: "Salg", value: isLoading ? "..." : liveSalesCount, sub: selectedPeriod.label }]
+              : [{ label: "Salg", value: isLoading ? "..." : liveSalesCount, sub: selectedPeriod.label, suffix: fiberSuffix(fiberCountLive) }]
           }
           secondaryKpis={useCached ? kpiCards.slice(primaryKpiCount).map(toCphKpi) : undefined}
           extraContent={config.extraContent}
@@ -505,6 +510,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 light
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
                 currentEmployeeId={currentEmployeeId}
               />
 
@@ -605,6 +611,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sub={selectedPeriod.label}
                 tvMode={false}
                 icon={CalendarDays}
+                suffix={fiberSuffix(fiberCountLive)}
               />
             </div>
             <div className="grid grid-cols-1 gap-4">
@@ -615,6 +622,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 tvMode={false}
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
               />
 
             </div>
