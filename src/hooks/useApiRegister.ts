@@ -256,6 +256,20 @@ export function useRaekkerUdenRegel() {
     staleTime: 5 * 60 * 1000,
   });
 }
+export type WebhookDatasaet = Database["public"]["Functions"]["kald_webhook_datasaet"]["Returns"][number];
+/** B5 (krav 15): webhook-datasættene pr. konto – samme sletteregel som hentede data (kampagnens regel), vist på Sletteregler-fanen. */
+export function useWebhookDatasaet(integrationId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["kald-webhook-datasaet", integrationId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("kald_webhook_datasaet", { p_integration_id: integrationId as string });
+      if (error) throw error;
+      return (data ?? []) as WebhookDatasaet[];
+    },
+    enabled: !!integrationId,
+    staleTime: 60 * 1000,
+  });
+}
 export function useKampagnerMedRegel() {
   return useQuery({
     queryKey: ["kald-kampagne-regler"],

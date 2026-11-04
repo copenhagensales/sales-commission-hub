@@ -21360,6 +21360,19 @@ export type Database = {
         }[]
       }
       kald_regel_adgang: { Args: never; Returns: undefined }
+      kald_webhook_datasaet: {
+        Args: { p_integration_id: string }
+        Returns: {
+          afvist: number
+          anonymiseret: number
+          beskrivelse: string
+          datasaet: string
+          gemt: number
+          med_regel: number
+          seneste: string
+          uden_regel: number
+        }[]
+      }
       kald_vaerdi_observeret: {
         Args: { p_dage?: number }
         Returns: {

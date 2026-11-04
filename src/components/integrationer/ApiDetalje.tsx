@@ -14,6 +14,7 @@ import { IntegrationLogs } from "@/components/settings/IntegrationLogs";
 import { SaelgereUdenKobling } from "@/components/integrationer/SaelgereUdenKobling";
 import { Switch } from "@/components/ui/switch";
 import { KlientVaelger } from "@/components/integrationer/KlientVaelger";
+import { ResponsiveTable } from "@/components/mobile/ResponsiveTable";
 import { useKaldFeltKatalog } from "@/hooks/useKaldFeltKatalog";
 import {
   API_STATUS_LABEL,
@@ -27,6 +28,7 @@ import {
   useRaekkerUdenRegel,
   useSyncState,
   useSystemPolitikker,
+  useWebhookDatasaet,
   type ApiKonto,
   type ApiRegisterRaekke,
   type Klient,
@@ -188,6 +190,9 @@ function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegi
   const udenRegel = udenRegelQ.data ?? []; const medRegel = medRegelQ.data ?? []; const raekkerUdenRegel = raekkerQ.data ?? [];
   const portFejl = [udenRegelQ.error, medRegelQ.error, raekkerQ.error].filter(Boolean) as Error[];
   const kontoensUdenRegel = kampagner ? udenRegel.filter((k) => kampagner.includes(k.kampagne_ekstern_id)) : [];
+  const webhookQ = useWebhookDatasaet(konto.integration_id);
+  const webhooks = (webhookQ.data ?? []).filter((w) => w.seneste != null || (w.gemt ?? 0) > 0);
+  const tal = (v: number | null | undefined) => (v == null ? "–" : Number(v).toLocaleString("da-DK"));
   return (
     <div className="space-y-4">
       <Laast api={api} />
@@ -227,6 +232,38 @@ function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegi
           </div>
         </CardContent>
       </Card>
+      {erDialer && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Webhooks</CardTitle>
+            <CardDescription>
+              Webhook-hændelser hører til deres API og følger kampagnens sletteregel – de har ingen egen frist. Enreach-hook gemmer kun hændelser for kampagner med regel
+              (afviste tælles). Salgswebhooks (Adversus) bruger fortsat den eksisterende indgang; deres rå hændelser ryddes efter kampagnens regel, og uden kampagne eller
+              regel står de her som »uden regel«, til reglen er sat.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm">
+            {webhookQ.isLoading && <div className="text-muted-foreground">Indlæser webhook-datasæt …</div>}
+            {webhookQ.error && <div className="text-destructive">Kunne ikke læse webhook-datasættene: {(webhookQ.error as Error).message}</div>}
+            {!webhookQ.isLoading && !webhookQ.error && (
+              <ResponsiveTable
+                columns={[
+                  { key: "datasaet", header: "Datasæt", isTitle: true, cell: (w) => <div><div className="font-mono text-sm">{w.datasaet}</div><div className="text-sm text-muted-foreground">{w.beskrivelse}</div></div> },
+                  { key: "gemt", header: "Gemt", isKey: true, cell: (w) => tal(w.gemt) },
+                  { key: "med_regel", header: "Med regel", isKey: true, cell: (w) => tal(w.med_regel) },
+                  { key: "uden_regel", header: "Uden regel", isKey: true, cell: (w) => <span className={(w.uden_regel ?? 0) > 0 ? "text-destructive" : undefined}>{tal(w.uden_regel)}</span> },
+                  { key: "afvist", header: "Afvist", isKey: true, cell: (w) => tal(w.afvist) },
+                  { key: "anonymiseret", header: "Ryddet", cell: (w) => tal(w.anonymiseret) },
+                  { key: "seneste", header: "Seneste", cell: (w) => (w.seneste ? new Date(w.seneste).toLocaleString("da-DK") : "–") },
+                ]}
+                rows={webhooks}
+                rowKey={(w) => w.datasaet}
+                empty="Ingen rå hændelser eller loggede afvigelser fundet (sidste 30 dage). Vellykkede Enreach-hooks tælles ikke – de skriver samme række som hentningen."
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Sådan ryddes data fra {konto.navn}</CardTitle>

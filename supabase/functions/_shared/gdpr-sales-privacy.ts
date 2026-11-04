@@ -181,6 +181,3 @@ export function cutoffIso(retentionDays: number, now = new Date()): string {
 
 /** Fallback retention window used when no campaign rule covers a client. */
 export const FALLBACK_RETENTION_DAYS = 180;
-
-/** Retention window for adversus_events processing artefacts. */
-export const ADVERSUS_EVENTS_RETENTION_DAYS = 90;

@@ -6,7 +6,6 @@ import {
   EMPLOYEE_ANONYMIZED_LAST_NAME,
 } from "../_shared/employee-anonymization.ts";
 import {
-  ADVERSUS_EVENTS_RETENTION_DAYS,
   CANCELLATION_IDENTITY_KEYS,
   cutoffIso,
   FALLBACK_RETENTION_DAYS,
@@ -347,7 +346,6 @@ Deno.serve(async (req) => {
     let eesyRowsAnonymized = 0;
     let cancellationRowsAnonymized = 0;
     let cancellationOppGroupsCleared = 0;
-    let adversusEventsDeleted = 0;
     const systemCopyResults: { table: string; count: number; retention_days: number }[] = [];
 
     const retentionForClient = (clientId: string | null | undefined): number =>
@@ -518,36 +516,11 @@ Deno.serve(async (req) => {
     }
 
 
-    // --- d) adversus_events: processing artefacts, deleted after 90 days ---
-    try {
-      const eventCutoff = cutoffIso(ADVERSUS_EVENTS_RETENTION_DAYS);
-      const { error: delErr, count } = await db
-        .from("adversus_events")
-        .delete({ count: "exact" })
-        .lt("received_at", eventCutoff);
-
-      if (delErr) {
-        log("WARN", `Error deleting adversus_events: ${delErr.message}`);
-      } else {
-        adversusEventsDeleted = count ?? 0;
-        if (adversusEventsDeleted > 0) {
-          systemCopyResults.push({
-            table: "adversus_events",
-            count: adversusEventsDeleted,
-            retention_days: ADVERSUS_EVENTS_RETENTION_DAYS,
-          });
-        }
-        log("INFO", `adversus_events deleted: ${adversusEventsDeleted}`);
-      }
-    } catch (e) {
-      log("WARN", `adversus_events cleanup error: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
+    // B5 (krav 15, 4/11): webhook-hændelser (adversus_events) ryddes af gdpr_run_dialer_calls_cleanup efter kampagnens sletteregel – ingen fast 90-dages-sletning her.
     addLog("fieldmarketing_sales_phone_cleared", fmSalesAnonymized);
     addLog("eesy_fm_powerbi_rows_phone_cleared", eesyRowsAnonymized);
     addLog("cancellation_queue_uploaded_data_cleaned", cancellationRowsAnonymized);
     addLog("anonymize_cancellation_queue_opp_group", cancellationOppGroupsCleared);
-    addLog("adversus_events_deleted", adversusEventsDeleted);
 
 
 
@@ -996,10 +969,9 @@ Deno.serve(async (req) => {
       inactiveEmployeesAnonymized +
       fmSalesAnonymized +
       eesyRowsAnonymized +
-      cancellationRowsAnonymized +
-      adversusEventsDeleted;
+      cancellationRowsAnonymized;
 
-    log("INFO", `GDPR cleanup complete${dryRun ? " (DRY RUN)" : ""}. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Skipped unmapped: ${campaignSalesSkippedUnmapped}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}, FM phones: ${fmSalesAnonymized}, Eesy rows: ${eesyRowsAnonymized}, Cancellation rows: ${cancellationRowsAnonymized}, Adversus events: ${adversusEventsDeleted}`);
+    log("INFO", `GDPR cleanup complete${dryRun ? " (DRY RUN)" : ""}. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Skipped unmapped: ${campaignSalesSkippedUnmapped}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}, FM phones: ${fmSalesAnonymized}, Eesy rows: ${eesyRowsAnonymized}, Cancellation rows: ${cancellationRowsAnonymized}`);
 
     const summaryDetails = {
       dry_run: dryRun,
@@ -1018,7 +990,6 @@ Deno.serve(async (req) => {
       fieldmarketing_sales_phone_cleared: fmSalesAnonymized,
       eesy_fm_powerbi_rows_phone_cleared: eesyRowsAnonymized,
       cancellation_queue_uploaded_data_cleaned: cancellationRowsAnonymized,
-      adversus_events_deleted: adversusEventsDeleted,
       candidates_processed: candidatesProcessed,
       customer_inquiries_deleted: customerInquiriesDeleted,
       customer_inquiries_anonymized: customerInquiriesAnonymized,
@@ -1076,7 +1047,6 @@ Deno.serve(async (req) => {
         fmSalesAnonymized,
         eesyRowsAnonymized,
         cancellationRowsAnonymized,
-        adversusEventsDeleted,
         candidatesProcessed,
         customerInquiriesDeleted,
         customerInquiriesAnonymized,
