@@ -2740,15 +2740,16 @@ async function handleFiberSalesCount(
   variant: "tdc" | "relatel" = "tdc",
 ) {
   const isRelatel = variant === "relatel";
-  const relatelEmails = isRelatel ? await getRelatelEmailToEmployee(supabase) : {};
+  // Begge varianter skal kende Relatel-medlemmer: TDC udelader leads fra Relatel-sælgere.
+  const relatelEmails = await getRelatelEmailToEmployee(supabase);
   let total = 0;
   const pageSize = 1000;
   let from = 0;
   while (true) {
     const { data, error } = await supabase
       .from("sale_items")
-      .select("quantity, is_cancelled, sales!inner(sale_datetime, validation_status, agent_email)")
-      .in("product_id", isRelatel ? Object.keys(RELATEL_FIBER_LEAD_POINTS_EF) : FIBER_SALE_PRODUCT_IDS_EF)
+      .select("product_id, quantity, is_cancelled, sales!inner(sale_datetime, validation_status, agent_email)")
+      .in("product_id", isRelatel ? Object.keys(RELATEL_FIBER_LEAD_POINTS_EF) : FIBER_PRODUCT_IDS_EF)
       .gte("sales.sale_datetime", startIso)
       .lt("sales.sale_datetime", endIso)
       .range(from, from + pageSize - 1);
@@ -2763,8 +2764,15 @@ async function handleFiberSalesCount(
     for (const row of data as any[]) {
       // Afviste salg (fx en leaddel afvist ved rettelse) tæller ikke – samme regel som leaderboardet.
       if (row.is_cancelled || row.sales?.validation_status === "rejected") continue;
-      if (isRelatel && !relatelLeadCounts(relatelEmails, String(row.sales?.agent_email ?? "").toLowerCase(), row.sales?.sale_datetime)) continue;
-      total += Number(row.quantity ?? 0);
+      const email = String(row.sales?.agent_email ?? "").toLowerCase();
+      if (isRelatel) {
+        if (!relatelLeadCounts(relatelEmails, email, row.sales?.sale_datetime)) continue;
+        total += Number(row.quantity ?? 0);
+        continue;
+      }
+      // TDC: samme pointregel som sælgerlisten (Fuldt=1, Lukket/Lead=0,5); Relatel-leads hører til Relatel-boardet.
+      if (row.product_id in RELATEL_FIBER_LEAD_POINTS_EF && relatelLeadCounts(relatelEmails, email, row.sales?.sale_datetime)) continue;
+      total += (FIBER_BOARD_POINTS_EF[row.product_id] ?? 0) * Number(row.quantity ?? 0);
     }
     if (data.length < pageSize) break;
     from += pageSize;
