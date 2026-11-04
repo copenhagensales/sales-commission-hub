@@ -14,6 +14,8 @@ Stork 1.0 lægges om efter masterplanen i repoet (masterplan/masterplan.md). Ind
 
 ## Øvrige regler
 
+- TV activity audio is isolated in `TvActivityBanner` and only mounts its logo query/audio/listeners with `aktivitet=1`; `TvKeepAwake` stays independent. Why: opt-in LG webOS testing must not change other boards.
+
 - Location creation/editing type choices share `src/lib/fm/locationTypes.ts`; daily DB costs use `lokationsomkostningForDag` with booking-day prices, independently of refund rules. Report refunds remain in `coopDirekteRefusionForBooking`. Why: separate location costs from supplier reimbursements consistently across views.
 
 - Undermapper har egne `AGENTS.md` (fx `supabase/functions/AGENTS.md`); læs dem før ændringer dér.
