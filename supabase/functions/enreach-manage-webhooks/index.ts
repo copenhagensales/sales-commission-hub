@@ -7,6 +7,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// [B3-rest 4/11] HeroBase-kald fra denne funktion fejlede gentagne gange med »http2 error: connection error … unspecific protocol error« fra samme
+// genbrugte forbindelse, mens andre funktioner nåede samme host. Alle kald mod HeroBase går derfor gennem fetchHero: ét genforsøg efter 400 ms,
+// og ved transportfejl bruges en frisk klient uden HTTP/2 (hvis runtime'en tillader det). Ingen ændring af svar eller logik.
+const fetchHero = async (url: string, init: RequestInit): Promise<Response> => {
+  try { return await fetch(url, init); }
+  catch (e) {
+    const besked = e instanceof Error ? e.message : String(e);
+    if (!/http2|connection|SendRequest|reset/i.test(besked)) throw e;
+    await new Promise((r) => setTimeout(r, 400));
+    try {
+      const skab = (Deno as unknown as { createHttpClient?: (o: Record<string, unknown>) => unknown }).createHttpClient;
+      if (typeof skab === "function") {
+        const klient = skab({ http1: true, http2: false });
+        return await fetch(url, { ...init, client: klient } as RequestInit);
+      }
+    } catch { /* fald tilbage til almindelig fetch */ }
+    return await fetch(url, init);
+  }
+};
+
 interface ManageWebhooksRequest {
   integration_id: string;
   action: "list" | "create" | "delete" | "meta" | "campaigns" | "example";
@@ -92,7 +112,7 @@ serve(async (req) => {
     // Execute the requested action
     switch (action) {
       case "list": {
-        const response = await fetch(`${apiBaseUrl}/hooks`, {
+        const response = await fetchHero(`${apiBaseUrl}/hooks`, {
           method: "GET",
           headers: {
             Authorization: authHeader,
@@ -117,7 +137,7 @@ serve(async (req) => {
 
       case "campaigns": {
         // Fetch available campaigns from HeroBase
-        const response = await fetch(`${apiBaseUrl}/campaigns`, {
+        const response = await fetchHero(`${apiBaseUrl}/campaigns`, {
           method: "GET",
           headers: {
             Authorization: authHeader,
@@ -139,7 +159,7 @@ serve(async (req) => {
 
       case "meta": {
         // Get metadata about webhook configuration options
-        const response = await fetch(`${apiBaseUrl}/hooks/meta`, {
+        const response = await fetchHero(`${apiBaseUrl}/hooks/meta`, {
           method: "GET",
           headers: {
             Authorization: authHeader,
@@ -167,7 +187,7 @@ serve(async (req) => {
           );
         }
 
-        const response = await fetch(`${apiBaseUrl}/hooks/${webhook_id}/example`, {
+        const response = await fetchHero(`${apiBaseUrl}/hooks/${webhook_id}/example`, {
           method: "GET",
           headers: {
             Authorization: authHeader,
@@ -242,7 +262,7 @@ serve(async (req) => {
         }
         if (webhook_config.headers && Object.keys(webhook_config.headers).length > 0) payload.Headers = JSON.stringify(webhook_config.headers);  // [B3]
 
-        const response = await fetch(`${apiBaseUrl}/hooks`, {
+        const response = await fetchHero(`${apiBaseUrl}/hooks`, {
           method: "POST",
           headers: {
             Authorization: authHeader,
@@ -310,7 +330,7 @@ serve(async (req) => {
           });
         }
 
-        const response = await fetch(`${apiBaseUrl}/hooks/${webhook_id}`, {
+        const response = await fetchHero(`${apiBaseUrl}/hooks/${webhook_id}`, {
           method: "DELETE",
           headers: {
             Authorization: authHeader,
