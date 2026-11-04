@@ -94,7 +94,7 @@ export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
     ],
   },
   "2026-11": {
-    team: 820,
+    team: 800,
     defaultSeller: 0,
     sellers: {
       "Mathias Victor Andersen": 150,
