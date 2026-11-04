@@ -11,15 +11,26 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 const MAKS_BYTES = 256 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const svar = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+/** Afviste kald logges som række med fast kode (aldrig payload/headers/URL), så »modtaget, afvist« kan ses – fx forkert header-format fra HeroBase (4/11: 0 hændelser trods aktivitet). */
+async function logAfvist(dialerId: string, kode: string, ekstra: Record<string, unknown> = {}) {
+  try {
+    const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    await svc.from("integration_logs").insert({ integration_type: "dialer", integration_id: UUID.test(dialerId) ? dialerId : null, integration_name: "enreach-hook", status: "warning", message: `enreach-hook: afvist (${kode})`, details: { via: "hook", afvist: true, kode, ...ekstra } });
+  } catch { /* logning må aldrig stoppe svaret */ }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return svar(405, { ok: false });
+  const dialerId = new URL(req.url).searchParams.get("dialer_id") ?? "";
   // Fail-closed: uden konfigureret hemmelighed afvises alt (requireConfigured) – en hook, der skriver data, må ikke være åben
   const afvist = verifyWebhookSecret(req, "ENREACH_HOOK_SECRET", { corsHeaders: cors, headerNames: ["x-webhook-secret"], queryNames: [], requireConfigured: true });
-  if (afvist) return afvist;
-  const dialerId = new URL(req.url).searchParams.get("dialer_id") ?? "";
-  if (!UUID.test(dialerId)) return svar(400, { ok: false, fejl: "dialer_id" });
+  if (afvist) {
+    // Kun header-NAVNE logges (ikke værdier), så et forkert format fra HeroBase kan ses
+    await logAfvist(dialerId, afvist.status === 503 ? "HEMMELIGHED_MANGLER" : "UAUTORISERET", { header_navne: [...req.headers.keys()].filter((h) => !/^(authorization|cookie|x-webhook-secret)$/i.test(h)).slice(0, 30), har_secret_header: req.headers.has("x-webhook-secret"), content_type: req.headers.get("content-type") ?? null, laengde: Number(req.headers.get("content-length") ?? 0) });
+    return afvist;
+  }
+  if (!UUID.test(dialerId)) { await logAfvist(dialerId, "DIALER_ID"); return svar(400, { ok: false, fejl: "dialer_id" }); }
   if (Number(req.headers.get("content-length") ?? 0) > MAKS_BYTES) return svar(413, { ok: false });
   // Faktisk læste bytes begrænses (Content-Length kan mangle/lyve – Codex B3 r1)
   let tekst = "";
@@ -31,7 +42,7 @@ Deno.serve(async (req) => {
     tekst = new TextDecoder().decode(alt);
   } catch { return svar(400, { ok: false, fejl: "body" }); }
   let body: unknown;
-  try { body = JSON.parse(tekst); } catch { return svar(400, { ok: false, fejl: "json" }); }
+  try { body = JSON.parse(tekst); } catch { await logAfvist(dialerId, "JSON", { laengde: tekst.length, content_type: req.headers.get("content-type") ?? null }); return svar(400, { ok: false, fejl: "json" }); }
 
   const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: integ, error } = await svc.from("dialer_integrations").select("id, name, provider, is_active, config").eq("id", dialerId).maybeSingle();
@@ -39,7 +50,7 @@ Deno.serve(async (req) => {
   if (integ.config?.sessions_v1 !== true) return svar(202, { ok: true, ignoreret: "kontoen er ikke på sessions-porten" });
   const validering: HookValidering = { ok: true, kasseret: [] };
   const dto = tilSessionDto(body, String(integ.name), validering);
-  if (!dto) return svar(400, { ok: false, fejl: "payload uden gyldigt uniqueId" });
+  if (!dto) { await logAfvist(dialerId, "UNIQUEID", { noegler: body && typeof body === "object" ? Object.keys(body as Record<string, unknown>).slice(0, 30) : [] }); return svar(400, { ok: false, fejl: "payload uden gyldigt uniqueId" }); }
   // Codex B3 r2: en payload med kasserede felter eller uden versionstid (lastModifiedTime) afvises HELT – ellers kunne »unknown«/null overskrive gyldige værdier. Polling samler emnet op.
   if (validering.kasseret.length > 0 || !dto.endTime) {
     await svc.from("integration_logs").insert({
