@@ -1,6 +1,5 @@
 import { bookingGross } from "@/utils/bookingGross";
-import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
-import { COOP_RULES_TYPE, lokationsomkostningForDag } from "@/lib/fm/coopDirekte";
+import { lokationsomkostningForDag } from "@/lib/fm/coopDirekte";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -262,9 +261,6 @@ export function useClientDbData({
   });
 
   /** Teams med leder, lederens lønmodel og aktive medlemstal */
-  // Kæderegler til "Coop direkte" (dagspris − refusion for kundens egne bookinger)
-  const { data: coopRules } = useLocationRateSurcharges(COOP_RULES_TYPE);
-
   const { data: teamStructure } = useQuery({
     queryKey: ["db-team-structure", fingerprint],
     queryFn: async () => {
@@ -478,9 +474,7 @@ export function useClientDbData({
           : Number(booking.daily_rate_override) ||
         Number((booking.location as { daily_rate?: number } | null)?.daily_rate) ||
         0;
-      const bookingLocation = booking.location as { type?: string | null; name?: string | null } | null;
-      const dayCost = (day: Date) =>
-        lokationsomkostningForDag(dailyRate, bookingLocation, booking.client_id, day, coopRules);
+      const dayCost = () => lokationsomkostningForDag(dailyRate);
 
       for (const day of periodDaysArray) {
         if (
@@ -490,7 +484,7 @@ export function useClientDbData({
         ) {
           locationCostsMap.set(
             booking.client_id,
-            (locationCostsMap.get(booking.client_id) ?? 0) + dayCost(day)
+            (locationCostsMap.get(booking.client_id) ?? 0) + dayCost()
           );
         }
       }
@@ -504,7 +498,7 @@ export function useClientDbData({
           ) {
             fullMonthLocationCostsMap.set(
               booking.client_id,
-              (fullMonthLocationCostsMap.get(booking.client_id) ?? 0) + dayCost(day)
+              (fullMonthLocationCostsMap.get(booking.client_id) ?? 0) + dayCost()
             );
           }
         }
@@ -806,7 +800,6 @@ export function useClientDbData({
     teamExpenseRows,
     adjustmentPercents,
     bookings,
-    coopRules,
     salesByClient,
     cpoRevenue,
     assistantHoursData,

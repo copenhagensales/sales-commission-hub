@@ -24,7 +24,9 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MIN_DAGSPRIS_KR, LAV_PRIS_INFOTEKST, erLavPris, manglerBegrundelse, erLavPrisFejl } from "@/lib/fm/lowPriceGuard";
 import { RefusionLinje } from "@/components/vagt-flow/RefusionLinje";
 import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
-import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE, coopDirekteRule } from "@/lib/fm/coopDirekte";
+import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE } from "@/lib/fm/coopDirekte";
+import { matchSurcharge } from "@/utils/locationRateSurcharge";
+import { tillaegsRefusion, formatRefusionLinje } from "@/lib/fm/refusionLinje";
 import { LOCATION_TYPES } from "@/lib/fm/locationTypes";
 
 export default function LocationDetail() {
@@ -364,9 +366,9 @@ export default function LocationDetail() {
                 )}
               </div>
 
-              {/* "Coop direkte": refusion fra kædereglen (kun visning). DB = dagspris − refusion for kundens egne bookinger. */}
-              {formData.type === COOP_DIREKTE_TYPE && (() => {
-                const rule = coopDirekteRule({ type: formData.type, name: formData.name }, coopRules);
+              {/* Begge Coop-typer: dagspris og separat Eesy-tillæg, også i kladden. */}
+              {[COOP_DIREKTE_TYPE, COOP_RULES_TYPE].includes(formData.type) && (() => {
+                const rule = matchSurcharge(formData.name, coopRules);
                 if (!rule) {
                   return (
                     <div className="border-t pt-4 mt-2">
@@ -378,17 +380,18 @@ export default function LocationDetail() {
                 }
                 const kunde = fieldmarketingClients.find((c: any) => c.id === rule.funded_by_client_id)?.name ?? "kunden";
                 const perDag = Number(rule.surcharge_per_day) || 0;
-                const netto = Math.max(0, (Number(formData.daily_rate) || 0) - perDag);
+                const line = tillaegsRefusion({ dailyRate: Number(formData.daily_rate) || 0, surchargePerDay: perDag, fundedByName: kunde });
+                if (!line) return null;
                 return (
                   <div className="border-t pt-4 mt-2 space-y-1">
                     <p className="text-sm font-medium">Refusion</p>
                     <p className="text-sm text-muted-foreground tabular-nums">
-                      Refusion fra {kunde}: {perDag.toLocaleString("da-DK")} kr./dag ({rule.chain_match}) · Netto {netto.toLocaleString("da-DK")} kr./dag
+                      {formatRefusionLinje(line)}
                     </p>
                   </div>
                 );
               })()}
-              <RefusionLinje locationId={id} />
+              {![COOP_DIREKTE_TYPE, COOP_RULES_TYPE].includes(formData.type) && <RefusionLinje locationId={id} />}
 
               {/* Placeringer */}
               <div className="border-t pt-4 mt-2">

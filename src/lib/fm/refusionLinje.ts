@@ -3,6 +3,7 @@
  * Kun visning – DB-beregningen bruger fortsat location.daily_rate (netto).
  */
 export interface RefusionLinjeData {
+  dagspris?: number;
   brutto: number;
   refusion: number;
   netto: number;
@@ -35,6 +36,7 @@ export function tillaegsRefusion(input: {
 }): RefusionLinjeData | null {
   if (input.dailyRate == null || input.surchargePerDay <= 0) return null;
   return {
+    dagspris: input.dailyRate,
     brutto: input.dailyRate + input.surchargePerDay,
     refusion: input.surchargePerDay,
     netto: input.dailyRate,
@@ -42,23 +44,18 @@ export function tillaegsRefusion(input: {
   };
 }
 
-/** "Coop direkte": dagsprisen er det vi betaler; kædereglens kunde refunderer. */
+/** "Coop direkte" har samme dagspris og separate tillæg som "Coop butik". */
 export function coopDirekteLinje(input: {
   dailyRate: number | null;
   refundPerDay: number;
   refundClientName: string | null;
 }): RefusionLinjeData | null {
-  if (input.dailyRate == null || input.refundPerDay <= 0) return null;
-  return {
-    brutto: input.dailyRate,
-    refusion: input.refundPerDay,
-    netto: Math.max(0, input.dailyRate - input.refundPerDay),
-    refunderesAf: input.refundClientName ?? "kunden",
-  };
+  return tillaegsRefusion({ dailyRate: input.dailyRate, surchargePerDay: input.refundPerDay, fundedByName: input.refundClientName });
 }
 
 const kr = (n: number) => Math.round(n).toLocaleString("da-DK");
 
 export function formatRefusionLinje(d: RefusionLinjeData): string {
+  if (d.dagspris != null) return `Dagspris ${kr(d.dagspris)} · Eesy-tillæg ${kr(d.refusion)} refunderes af ${d.refunderesAf}`;
   return `Vi betaler ${kr(d.brutto)} · ${d.refunderesAf} refunderer ${kr(d.refusion)} · Netto ${kr(d.netto)}`;
 }

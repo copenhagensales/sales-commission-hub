@@ -4,9 +4,8 @@
  * reelle pris, vi betaler butikken. Kæde og refusion afledes ALTID af navnet
  * mod kædereglerne i location_rate_surcharges (location_type "Coop butik").
  *
- * Lokationsomkostning i DB = dagspris − refusion pr. dag, men kun når
- * bookingens kunde er reglens funded_by_client_id og dagen ligger inden for
- * reglens gyldighed. Alle andre typer: uændret (hele dagsprisen).
+ * Lokationsomkostningen er altid dagsprisen. Eesy-tillæg afregnes separat
+ * i Coop butik-rapportens refusionsafsnit, aldrig som et omkostningsfradrag.
  */
 import { matchSurcharge, type LocationRateSurcharge } from "@/utils/locationRateSurcharge";
 
@@ -53,16 +52,9 @@ export function coopDirekteRefusionForDag(
   return Number(rule.surcharge_per_day) || 0;
 }
 
-/** Lokationsomkostning for én booket dag i DB. Aldrig under 0. */
-export function lokationsomkostningForDag(
-  dailyRate: number,
-  location: CoopDirekteLocation | null | undefined,
-  bookingClientId: string | null | undefined,
-  day: Date,
-  rules: LocationRateSurcharge[] | undefined
-): number {
-  const refusion = coopDirekteRefusionForDag(location, bookingClientId, day, rules);
-  return Math.max(0, dailyRate - refusion);
+/** Lokationsomkostning for én booket dag, eksklusive det separate Eesy-tillæg. */
+export function lokationsomkostningForDag(dailyRate: number): number {
+  return dailyRate;
 }
 
 /** Bookede dage (ISO 0=man … 6=søn) mellem start og slut, evt. klippet. */

@@ -12,8 +12,7 @@ import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { cn } from "@/lib/utils";
 import { VACATION_PAY_RATES } from "@/lib/calculations";
 import { bookingGross } from "@/utils/bookingGross";
-import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
-import { COOP_RULES_TYPE, lokationsomkostningForDag } from "@/lib/fm/coopDirekte";
+import { lokationsomkostningForDag } from "@/lib/fm/coopDirekte";
 
 interface ClientDBDailyBreakdownProps {
   clientId: string;
@@ -59,7 +58,6 @@ export function ClientDBDailyBreakdown({
   });
 
   // Fetch bookings for location costs
-  const { data: coopRules, isPending: rulesPending, isError: rulesError } = useLocationRateSurcharges(COOP_RULES_TYPE);
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ["bookings-for-client-daily", clientId, periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async () => {
@@ -76,7 +74,7 @@ export function ClientDBDailyBreakdown({
   const locationCostsByDate = useMemo(() => {
     const costMap = new Map<string, number>();
     
-    if (!bookings || !coopRules || rulesPending || rulesError) return costMap;
+    if (!bookings) return costMap;
 
     // Get all days in the period
     const daysInPeriod = eachDayOfInterval({ start: periodStart, end: periodEnd });
@@ -96,7 +94,7 @@ export function ClientDBDailyBreakdown({
           const dailyRate = booking.total_price != null
             ? bookingGross(booking).dailyRate
             : Number(booking.daily_rate_override) || Number(booking.location?.daily_rate) || 0;
-          dailyCost += lokationsomkostningForDag(dailyRate, booking.location, booking.client_id, day, coopRules);
+          dailyCost += lokationsomkostningForDag(dailyRate);
         }
       }
 
@@ -106,7 +104,7 @@ export function ClientDBDailyBreakdown({
     }
 
     return costMap;
-  }, [bookings, periodStart, periodEnd, coopRules, rulesPending, rulesError]);
+  }, [bookings, periodStart, periodEnd]);
 
   // Build daily data
   const dailyData = useMemo((): DailyData[] => {
@@ -159,7 +157,7 @@ export function ClientDBDailyBreakdown({
     );
   }, [dailyData]);
 
-  const isLoading = salesLoading || bookingsLoading || rulesPending;
+  const isLoading = salesLoading || bookingsLoading;
 
   // formatCurrency imported from @/lib/calculations
 
@@ -203,12 +201,6 @@ export function ClientDBDailyBreakdown({
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Indlæser...
-                  </TableCell>
-                </TableRow>
-              ) : rulesError ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-destructive">
-                    Refusionsreglerne kunne ikke hentes. Prøv igen.
                   </TableCell>
                 </TableRow>
               ) : dailyData.length === 0 ? (

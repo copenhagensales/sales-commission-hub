@@ -1,5 +1,10 @@
 # Roadmap — DB-/lønberegning: korrekthed
 
+## Coop-priser — ensretning godkendt af Kasper (4/11 2026)
+- [x] Lokationsomkostning uden refusionsfradrag i kunde-DB og lokationsøkonomi, både totaler og dagsrækker.
+- [x] Fælles dagspris-/tillægslinje og hjælpetekst; Coop-rapportens refusionsafsnit uændret.
+- [x] 31 prøver og automatisk byggetjek bestået; prislinje kontrolleret indlogget ved 360/393/430/1280 px uden gemning. Ingen mails eller dataændringer. Reel rapportgodkendelse/afsendelse og fuld økonomiafstemning ikke afprøvet.
+
 ## Coop direkte — tre godkendte rettelser (3/11 2026)
 - [x] Daglig kunde-DB: samme bookingpris og dagsrefusion som kunde-DB; øvrig lønberegning uændret.
 - [x] Lokationsøkonomi: dagsrækker med refusion pr. kunde og gyldig dag.

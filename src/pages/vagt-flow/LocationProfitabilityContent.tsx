@@ -21,8 +21,7 @@ import { format, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { bookingGross } from "@/utils/bookingGross";
-import { useLocationRateSurcharges } from "@/hooks/useLocationRateSurcharges";
-import { COOP_DIREKTE_TYPE, COOP_RULES_TYPE, bookedDates, coopDirekteRefusionForBooking, lokationsomkostningForDag } from "@/lib/fm/coopDirekte";
+import { COOP_DIREKTE_TYPE, bookedDates, lokationsomkostningForDag } from "@/lib/fm/coopDirekte";
 
 interface Placement {
   id: string;
@@ -163,7 +162,6 @@ export default function LocationProfitabilityContent() {
   };
 
   // Fetch bookings with location + client data
-  const { data: coopRules, isPending: rulesPending, isError: rulesError } = useLocationRateSurcharges(COOP_RULES_TYPE);
   const { data: bookings, isLoading: loadingBookings } = useQuery({
     queryKey: ["location-profitability-bookings", week, year],
     queryFn: async () => {
@@ -343,7 +341,7 @@ export default function LocationProfitabilityContent() {
 
   // Build location profitability data — split by (location, client)
   const locationData = useMemo(() => {
-    if (!bookings || !salesData || !coopRules || rulesPending || rulesError) return [];
+    if (!bookings || !salesData) return [];
 
     const placementsByLocation = new Map<string, Placement[]>();
     for (const p of placements || []) {
@@ -357,8 +355,7 @@ export default function LocationProfitabilityContent() {
     const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
     // Brutto/netto lokationsomkostning pr. række (låst rabatsats pr. booking)
     const costByRow = new Map<string, { gross: number; net: number; missingLocked: boolean; usesTotalPrice: boolean }>();
-    // "Coop direkte": refusion fra kædereglen trækkes fra lokationsomkostningen
-    const coopRefundByRow = new Map<string, number>();
+    // "Coop direkte": bookede dagspriser uden fradrag af Eesy-tillæg.
     const directCostsByRow = new Map<string, Record<string, number>>();
 
     for (const booking of bookings) {
@@ -386,14 +383,12 @@ export default function LocationProfitabilityContent() {
       cost.net += bookingNet;
       if (lockedPercent == null) cost.missingLocked = true;
       costByRow.set(key, cost);
-      const coopRefund = coopDirekteRefusionForBooking(booking as any, loc, coopRules).amount;
-      if (coopRefund > 0) coopRefundByRow.set(key, (coopRefundByRow.get(key) ?? 0) + coopRefund);
       if (loc?.type === COOP_DIREKTE_TYPE) {
         const dayCosts = directCostsByRow.get(key) ?? {};
         for (const day of bookedDates(booking, weekStart, weekEnd)) {
           const dateStr = format(day, "yyyy-MM-dd");
           dayCosts[dateStr] = (dayCosts[dateStr] ?? 0) + lokationsomkostningForDag(
-            grossInfo.dailyRate, booking.location, booking.client_id, day, coopRules
+            grossInfo.dailyRate
           );
         }
         directCostsByRow.set(key, dayCosts);
@@ -493,17 +488,16 @@ export default function LocationProfitabilityContent() {
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const cost = costByRow.get(key);
         // Aftalt samlet pris (total_price) har ingen dagspris – brug bookingGross-beløbet
-        const coopRefund = coopRefundByRow.get(key) ?? 0;
         const dailyLocationCosts = directCostsByRow.get(key);
         const locationCost = dailyLocationCosts
           ? Object.values(dailyLocationCosts).reduce((sum, cost) => sum + cost, 0)
           : Math.max(
           0,
-          (cost?.usesTotalPrice ? cost.gross : loc.dailyRate * loc.bookedDays.length) - coopRefund
+          (cost?.usesTotalPrice ? cost.gross : loc.dailyRate * loc.bookedDays.length)
         );
         const dailyRate = cost?.usesTotalPrice && loc.bookedDays.length > 0 ? locationCost / loc.bookedDays.length : loc.dailyRate;
-        const locationCostGross = cost ? Math.max(0, cost.gross - coopRefund) : locationCost;
-        const locationCostNet = cost ? Math.max(0, cost.net - coopRefund) : locationCost;
+        const locationCostGross = cost ? Math.max(0, cost.gross) : locationCost;
+        const locationCostNet = cost ? Math.max(0, cost.net) : locationCost;
         const missingLockedDiscount = cost?.missingLocked ?? false;
         const hotelCost = hotelCostByLocation.get(key) || 0;
         const dietCost = dietCostByLocation.get(key) || 0;
@@ -512,7 +506,7 @@ export default function LocationProfitabilityContent() {
         return { ...loc, dailyRate, dailyLocationCosts, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, locationCostGross, locationCostNet, missingLockedDiscount, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
-  }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation, coopRules, rulesPending, rulesError, weekStart, weekEnd]);
+  }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation, weekStart, weekEnd]);
 
   // Split by client group
   const { eesyLocations, youseeLocations, otherLocations } = useMemo(() => {
@@ -550,7 +544,7 @@ export default function LocationProfitabilityContent() {
     });
   };
 
-  const isLoading = loadingBookings || loadingSales || rulesPending;
+  const isLoading = loadingBookings || loadingSales;
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -739,8 +733,6 @@ export default function LocationProfitabilityContent() {
         <CardContent className="px-0 pb-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Indlæser...</div>
-          ) : rulesError ? (
-            <div className="py-12 text-center text-destructive">Refusionsreglerne kunne ikke hentes. Prøv igen.</div>
           ) : locationData.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Ingen bookinger i denne uge</div>
           ) : (

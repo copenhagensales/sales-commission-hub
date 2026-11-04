@@ -5,7 +5,7 @@
 export const MIN_DAGSPRIS_KR = 100;
 
 export const LAV_PRIS_INFOTEKST =
-  "Den reelle pris pr. dag, vi betaler lokationen (ex moms).";
+  "Dagspris ex moms. Eesy-tillæg for Kvickly/SuperBrugsen beregnes automatisk og skal ikke med her.";
 
 export interface PrisInput {
   totalPrice?: number | null;

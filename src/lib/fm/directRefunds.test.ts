@@ -11,7 +11,7 @@ const rules: LocationRateSurcharge[] = [
     funded_by_client_id: EESY, valid_from: "2026-09-01", valid_to: null, is_active: true, note: null },
 ];
 
-const direkte = { id: "loc-k", name: "Kvickly Testby", type: "Coop direkte", daily_rate: 1700 };
+const direkte = { id: "loc-k", name: "Kvickly Testby", type: "Coop direkte", daily_rate: 1000 };
 const coop = { id: "loc-c", name: "Kvickly Coop", type: "Coop butik", daily_rate: 1000 };
 const bk = (o: Record<string, unknown>) => ({
   start_date: "2026-10-05", end_date: "2026-10-09", booked_days: [0, 1, 2, 3, 4],
@@ -27,6 +27,7 @@ describe("direkte afregnet refusion (Coop direkte)", () => {
     expect(refunds[0].days).toBe(5);
     expect(refunds[0].refundClientName).toBe("Eesy FM");
     expect(sumDirectRefunds(refunds)).toBe(3500);
+    expect(refunds[0].perDay).toBe(700);
     const invoice = supplierInvoiceBookings(bookings, "Coop butik");
     expect(invoice.map((b) => b.location.id)).toEqual(["loc-c"]);
   });
@@ -45,5 +46,10 @@ describe("direkte afregnet refusion (Coop direkte)", () => {
     const r = buildDirectRefunds([bk({ start_date: "2026-10-29", end_date: "2026-11-04" })] as never, start, end, rules);
     expect(r[0].days).toBe(2); // tor 29. + fre 30.; lør 31. ikke booket
     expect(r[0].amount).toBe(1400);
+  });
+  it("regeldatoer afgrænser refusion, uden at Coop butik giver direkte refusion", () => {
+    const limited = [{ ...rules[0], valid_from: "2026-10-06", valid_to: "2026-10-08" }];
+    expect(sumDirectRefunds(buildDirectRefunds([bk({})] as never, start, end, limited))).toBe(2100);
+    expect(buildDirectRefunds([bk({ location: coop })] as never, start, end, rules)).toEqual([]);
   });
 });

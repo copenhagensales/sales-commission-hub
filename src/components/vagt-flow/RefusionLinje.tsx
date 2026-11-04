@@ -1,7 +1,7 @@
 import { useLocationRefundLine } from "@/hooks/useLocationRefundLine";
 import { formatRefusionLinje } from "@/lib/fm/refusionLinje";
 
-/** "Vi betaler X · Eesy refunderer Y · Netto Z" – kun visning. */
+/** Dagspris og separat Eesy-tillæg fra kædereglen – kun visning. */
 export function RefusionLinje(props: { locationId?: string | null; bookingId?: string | null }) {
   const line = useLocationRefundLine(props);
   if (!line) return null;
