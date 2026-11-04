@@ -16260,164 +16260,6 @@ export type Database = {
           },
         ]
       }
-      sb_kampagne_afgoerelse: {
-        Row: {
-          afgjort: string
-          afgjort_af: string | null
-          afgoerelse: string
-          begrundelse: string
-          id: string
-          kampagne_ekstern_id: string
-        }
-        Insert: {
-          afgjort?: string
-          afgjort_af?: string | null
-          afgoerelse?: string
-          begrundelse: string
-          id?: string
-          kampagne_ekstern_id: string
-        }
-        Update: {
-          afgjort?: string
-          afgjort_af?: string | null
-          afgoerelse?: string
-          begrundelse?: string
-          id?: string
-          kampagne_ekstern_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sb_kampagne_afgoerelse_kampagne_ekstern_id_fkey"
-            columns: ["kampagne_ekstern_id"]
-            isOneToOne: true
-            referencedRelation: "adversus_campaign_mappings"
-            referencedColumns: ["adversus_campaign_id"]
-          },
-        ]
-      }
-      sb_klient_sletteregel: {
-        Row: {
-          aendret: string
-          aktiveret: string
-          aktiveret_af: string | null
-          begrundelse: string | null
-          client_id: string
-          frist_dage: number | null
-        }
-        Insert: {
-          aendret?: string
-          aktiveret?: string
-          aktiveret_af?: string | null
-          begrundelse?: string | null
-          client_id: string
-          frist_dage?: number | null
-        }
-        Update: {
-          aendret?: string
-          aktiveret?: string
-          aktiveret_af?: string | null
-          begrundelse?: string | null
-          client_id?: string
-          frist_dage?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sb_klient_sletteregel_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: true
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sb_sletteregel_aendring: {
-        Row: {
-          aendret: string
-          aendret_af: string | null
-          aktiveret: string | null
-          aktiveret_af: string | null
-          begrundelse: string | null
-          foer: Json | null
-          frist_dage: number | null
-          godkendt: string | null
-          godkendt_af: string | null
-          id: string
-          katalog_id: string | null
-          klient_id: string | null
-          klientkampagne_id: string | null
-          maal: string
-          oprettet: string
-          oprettet_af: string | null
-          proevet: string | null
-          proevet_resultat: Json | null
-          status: string
-        }
-        Insert: {
-          aendret?: string
-          aendret_af?: string | null
-          aktiveret?: string | null
-          aktiveret_af?: string | null
-          begrundelse?: string | null
-          foer?: Json | null
-          frist_dage?: number | null
-          godkendt?: string | null
-          godkendt_af?: string | null
-          id?: string
-          katalog_id?: string | null
-          klient_id?: string | null
-          klientkampagne_id?: string | null
-          maal: string
-          oprettet?: string
-          oprettet_af?: string | null
-          proevet?: string | null
-          proevet_resultat?: Json | null
-          status?: string
-        }
-        Update: {
-          aendret?: string
-          aendret_af?: string | null
-          aktiveret?: string | null
-          aktiveret_af?: string | null
-          begrundelse?: string | null
-          foer?: Json | null
-          frist_dage?: number | null
-          godkendt?: string | null
-          godkendt_af?: string | null
-          id?: string
-          katalog_id?: string | null
-          klient_id?: string | null
-          klientkampagne_id?: string | null
-          maal?: string
-          oprettet?: string
-          oprettet_af?: string | null
-          proevet?: string | null
-          proevet_resultat?: Json | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sb_sletteregel_aendring_katalog_id_fkey"
-            columns: ["katalog_id"]
-            isOneToOne: false
-            referencedRelation: "kald_felt_katalog"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sb_sletteregel_aendring_klient_id_fkey"
-            columns: ["klient_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sb_sletteregel_aendring_klientkampagne_id_fkey"
-            columns: ["klientkampagne_id"]
-            isOneToOne: false
-            referencedRelation: "client_campaigns"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       salary_additions: {
         Row: {
           amount: number
@@ -17005,6 +16847,76 @@ export type Database = {
         }
         Relationships: []
       }
+      sb_kampagne_afgoerelse: {
+        Row: {
+          afgjort: string
+          afgjort_af: string | null
+          afgoerelse: string
+          begrundelse: string
+          id: string
+          kampagne_ekstern_id: string
+        }
+        Insert: {
+          afgjort?: string
+          afgjort_af?: string | null
+          afgoerelse?: string
+          begrundelse: string
+          id?: string
+          kampagne_ekstern_id: string
+        }
+        Update: {
+          afgjort?: string
+          afgjort_af?: string | null
+          afgoerelse?: string
+          begrundelse?: string
+          id?: string
+          kampagne_ekstern_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sb_kampagne_afgoerelse_kampagne_ekstern_id_fkey"
+            columns: ["kampagne_ekstern_id"]
+            isOneToOne: true
+            referencedRelation: "adversus_campaign_mappings"
+            referencedColumns: ["adversus_campaign_id"]
+          },
+        ]
+      }
+      sb_klient_sletteregel: {
+        Row: {
+          aendret: string
+          aktiveret: string
+          aktiveret_af: string | null
+          begrundelse: string | null
+          client_id: string
+          frist_dage: number | null
+        }
+        Insert: {
+          aendret?: string
+          aktiveret?: string
+          aktiveret_af?: string | null
+          begrundelse?: string | null
+          client_id: string
+          frist_dage?: number | null
+        }
+        Update: {
+          aendret?: string
+          aktiveret?: string
+          aktiveret_af?: string | null
+          begrundelse?: string | null
+          client_id?: string
+          frist_dage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sb_klient_sletteregel_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sb_signaler: {
         Row: {
           audience: string | null
@@ -17070,6 +16982,94 @@ export type Database = {
           slettet_at?: string
         }
         Relationships: []
+      }
+      sb_sletteregel_aendring: {
+        Row: {
+          aendret: string
+          aendret_af: string | null
+          aktiveret: string | null
+          aktiveret_af: string | null
+          begrundelse: string | null
+          foer: Json | null
+          frist_dage: number | null
+          godkendt: string | null
+          godkendt_af: string | null
+          id: string
+          katalog_id: string | null
+          klient_id: string | null
+          klientkampagne_id: string | null
+          maal: string
+          oprettet: string
+          oprettet_af: string | null
+          proevet: string | null
+          proevet_resultat: Json | null
+          status: string
+        }
+        Insert: {
+          aendret?: string
+          aendret_af?: string | null
+          aktiveret?: string | null
+          aktiveret_af?: string | null
+          begrundelse?: string | null
+          foer?: Json | null
+          frist_dage?: number | null
+          godkendt?: string | null
+          godkendt_af?: string | null
+          id?: string
+          katalog_id?: string | null
+          klient_id?: string | null
+          klientkampagne_id?: string | null
+          maal: string
+          oprettet?: string
+          oprettet_af?: string | null
+          proevet?: string | null
+          proevet_resultat?: Json | null
+          status?: string
+        }
+        Update: {
+          aendret?: string
+          aendret_af?: string | null
+          aktiveret?: string | null
+          aktiveret_af?: string | null
+          begrundelse?: string | null
+          foer?: Json | null
+          frist_dage?: number | null
+          godkendt?: string | null
+          godkendt_af?: string | null
+          id?: string
+          katalog_id?: string | null
+          klient_id?: string | null
+          klientkampagne_id?: string | null
+          maal?: string
+          oprettet?: string
+          oprettet_af?: string | null
+          proevet?: string | null
+          proevet_resultat?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sb_sletteregel_aendring_katalog_id_fkey"
+            columns: ["katalog_id"]
+            isOneToOne: false
+            referencedRelation: "kald_felt_katalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sb_sletteregel_aendring_klient_id_fkey"
+            columns: ["klient_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sb_sletteregel_aendring_klientkampagne_id_fkey"
+            columns: ["klientkampagne_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sb_sti_spaerring: {
         Row: {
@@ -21837,10 +21837,6 @@ export type Database = {
         Args: { p_import_id: string }
         Returns: Json
       }
-      sb_sletteregel_aktiver: { Args: { p_begrundelse: string; p_id: string }; Returns: Json }
-      sb_sletteregel_godkend: { Args: { p_id: string }; Returns: Json }
-      sb_sletteregel_proev: { Args: { p_id: string }; Returns: Json }
-      sb_sletteregel_toerkoersel: { Args: { p_id: string }; Returns: Json }
       sale_is_tdc_erhverv: { Args: { _sale_id: string }; Returns: boolean }
       sale_is_united_client: { Args: { _sale_id: string }; Returns: boolean }
       sales_streak_min_commission: { Args: never; Returns: number }
@@ -22041,6 +22037,24 @@ export type Database = {
         Args: { p_ids: string[]; p_kilde: string }
         Returns: number
       }
+      sb_sletteregel_adgang_skriv: { Args: never; Returns: undefined }
+      sb_sletteregel_aktiver: {
+        Args: { p_begrundelse: string; p_id: string }
+        Returns: Json
+      }
+      sb_sletteregel_godkend: { Args: { p_id: string }; Returns: Json }
+      sb_sletteregel_proev: { Args: { p_id: string }; Returns: Json }
+      sb_sletteregel_taelling: {
+        Args: {
+          p_frist: number
+          p_kamp: string[]
+          p_kat_frist: number
+          p_kat_id: string
+          p_klientkampagner: string[]
+        }
+        Returns: Json
+      }
+      sb_sletteregel_toerkoersel: { Args: { p_id: string }; Returns: Json }
       sb_sti_hash: {
         Args: { p_bucket: string; p_sti: string }
         Returns: string
