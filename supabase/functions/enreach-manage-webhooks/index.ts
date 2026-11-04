@@ -261,8 +261,10 @@ serve(async (req) => {
         if (webhook_config.campaignCode && webhook_config.campaignCode.trim() !== "") {
           payload.CampaignCode = webhook_config.campaignCode;
         }
-        if (webhook_config.headersRaw && webhook_config.headersRaw.trim() !== "") payload.Headers = webhook_config.headersRaw;  // [B3-test] rå tekst har forrang
-        else if (webhook_config.headers && Object.keys(webhook_config.headers).length > 0) payload.Headers = JSON.stringify(webhook_config.headers);  // [B3]
+        // [B3, målt 4/11] HeroBase forventer Headers som rå tekst »navn: værdi« (én pr. linje). Hooks oprettet med Headers som JSON-tekst sender aldrig (0 kald på 16 t); rå tekst leverede på ~30 ms.
+        const headerLinjer = Object.entries(webhook_config.headers ?? {}).filter(([k, v]) => k.trim() !== "" && String(v ?? "").trim() !== "").map(([k, v]) => `${k.trim()}: ${String(v).trim()}`).join("\n");
+        if (webhook_config.headersRaw && webhook_config.headersRaw.trim() !== "") payload.Headers = webhook_config.headersRaw;  // rå tekst som givet
+        else if (headerLinjer !== "") payload.Headers = headerLinjer;
 
         const response = await fetchHero(`${apiBaseUrl}/hooks`, {
           method: "POST",
