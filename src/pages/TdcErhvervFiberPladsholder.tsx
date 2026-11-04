@@ -108,7 +108,7 @@ function FiberFelter({ k, setK, fejl, visFejl, kolleger, udeluk, idPrefix, medKu
         {visFejl && fejl.variant && <p className="text-sm text-destructive">{fejl.variant}</p>}
       </div>
       <label className="flex min-h-11 items-center justify-between gap-3">
-        <span className="text-base">Inkl. Mobilevoice</span>
+        <span className="text-base">Fiber på TDC Nets linjer OG med mobilevoice salg</span>
         <Switch checked={k.mobilevoice} onCheckedChange={(v) => setK({ ...k, mobilevoice: v })} />
       </label>
       <div className="space-y-2">
