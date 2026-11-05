@@ -182,11 +182,14 @@ export default function ImmediatePaymentASE() {
     enabled: !!user?.email,
   });
 
-  // Get ASE sales from last 30 days
-  const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+  // Periode: sælgere har fast 30 dage; ejere/teamleder kan vælge periode.
+  const [fra, setFra] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
+  const [til, setTil] = useState(format(new Date(), "yyyy-MM-dd"));
+  const fraIso = seAlle ? new Date(`${fra}T00:00:00`).toISOString() : subDays(new Date(), 30).toISOString();
+  const tilIso = seAlle ? new Date(`${til}T23:59:59.999`).toISOString() : new Date().toISOString();
 
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["immediate-payment-ase-sales", agentEmails, seAlle],
+    queryKey: ["immediate-payment-ase-sales", agentEmails, seAlle, seAlle ? fra : "", seAlle ? til : ""],
     queryFn: async () => {
       if (!seAlle && agentEmails.length === 0) return [];
 
@@ -217,7 +220,8 @@ export default function ImmediatePaymentASE() {
           )
         `)
         .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", thirtyDaysAgo)
+        .gte("sale_datetime", fraIso)
+        .lte("sale_datetime", tilIso)
         .or("validation_status.neq.rejected,validation_status.is.null")
         .order("sale_datetime", { ascending: false });
 
@@ -303,12 +307,20 @@ export default function ImmediatePaymentASE() {
           <CardHeader>
             <CardTitle>{seAlle ? "Alle sælgeres salg med straksbetaling" : "Dine salg med straksbetaling"}</CardTitle>
             <CardDescription>
-              Salg fra de seneste 30 dage med mulighed for straksbetaling
+              {seAlle ? "Salg i den valgte periode med mulighed for straksbetaling" : "Salg fra de seneste 30 dage med mulighed for straksbetaling"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {seAlle && (
-              <Input className="mb-4 max-w-sm text-base" placeholder="Søg på sælger" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
+              <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end">
+                <label className="flex flex-col gap-1 text-sm text-muted-foreground">Fra
+                  <Input type="date" className="h-11 text-base" value={fra} max={til} onChange={(e) => e.target.value && setFra(e.target.value)} />
+                </label>
+                <label className="flex flex-col gap-1 text-sm text-muted-foreground">Til
+                  <Input type="date" className="h-11 text-base" value={til} min={fra} onChange={(e) => e.target.value && setTil(e.target.value)} />
+                </label>
+                <Input className="h-11 max-w-sm text-base" placeholder="Søg på sælger" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
+              </div>
             )}
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -319,7 +331,7 @@ export default function ImmediatePaymentASE() {
                 <FileX className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="font-medium text-lg">Ingen salg fundet</h3>
                 <p className="text-muted-foreground text-sm max-w-md mt-1">
-                  Du har ingen ASE-salg med mulighed for straksbetaling i de seneste 30 dage.
+                  {seAlle ? "Ingen ASE-salg med mulighed for straksbetaling i perioden." : "Du har ingen ASE-salg med mulighed for straksbetaling i de seneste 30 dage."}
                 </p>
               </div>
             ) : (

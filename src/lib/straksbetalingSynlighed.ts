@@ -1,4 +1,4 @@
-/** Fanen Straksbetaling: ledere med "se alle" ser den altid; øvrige kræver fanerettighed + egne straks-salg. */
-export function straksbetalingSynlig(fane: boolean, seAlle: boolean, harEgneSalg: boolean): boolean {
-  return seAlle || (fane && harEgneSalg);
+/** Fanen Straksbetaling: ledere med "se alle" ser den altid; øvrige kræver fanerettighed + primær kundetilknytning til ASE (United). */
+export function straksbetalingSynlig(fane: boolean, seAlle: boolean, erUnitedSaelger: boolean): boolean {
+  return seAlle || (fane && erUnitedSaelger);
 }

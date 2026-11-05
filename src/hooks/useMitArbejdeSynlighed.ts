@@ -1,7 +1,7 @@
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useCanWorkFieldmarketing, useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useIsSalgskonsulent } from "@/hooks/useCodeOfConduct";
-import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
+import { useErAseSaelger } from "@/hooks/useErAseSaelger";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useMinFiberRolle } from "@/hooks/useTdcFiberSales";
 import { straksbetalingSynlig } from "@/lib/straksbetalingSynlighed";
@@ -16,7 +16,7 @@ export function useMitArbejdeSynlighed() {
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
   // Samme betingelser som de tidligere menupunkter i AppSidebar (hvem ser hvad må ikke blive bredere).
   const { data: isUnitedMember } = useIsUnitedMember();
-  const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+  const { data: erAseSaelger } = useErAseSaelger();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   // TDC Erhverv Fiber: adgangslisten i databasen (tdc_fiber_access) + ejere (admin-boksen).
@@ -34,7 +34,7 @@ export function useMitArbejdeSynlighed() {
   };
   const salg = {
     salg: !!isUnitedMember && p.canView("tab_registrer_salg_salg"),
-    straksbetaling: straksbetalingSynlig(p.canView("tab_registrer_salg_straksbetaling"), p.canView("tab_registrer_salg_straksbetaling_alle"), !!hasImmediatePaymentSales),
+    straksbetaling: straksbetalingSynlig(p.canView("tab_registrer_salg_straksbetaling"), p.canView("tab_registrer_salg_straksbetaling_alle"), !!erAseSaelger),
     fm: fmSalg,
     tdcFiber: !!fiberRolle || !!p.isOwner,
   };
