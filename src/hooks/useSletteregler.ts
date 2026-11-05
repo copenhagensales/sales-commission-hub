@@ -29,9 +29,11 @@ export const SR_KEYS = {
 };
 
 /** Alle ændringer (RLS: ledere læser). Åbne (status ≠ aktiv) + historik (aktiv). */
-export function useSletteregelAendringer() {
+/** @param enabled false = fanen må ikke læse sletteregler (rettighedsnøgle, SR3a Codex r1 P2) – ingen forespørgsel sendes */
+export function useSletteregelAendringer(enabled = true) {
   return useQuery({
     queryKey: SR_KEYS.aendringer,
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase.from("sb_sletteregel_aendring").select("*").order("aendret", { ascending: false });
       if (error) throw error;
@@ -218,9 +220,10 @@ export function useKoblKampagne() {
 }
 
 /** Navne på dem, der har aktiveret (ejer/leder læser medarbejderstamdata); ukendte vises som »superadmin«. */
-export function useSletteregelNavne() {
+export function useSletteregelNavne(enabled = true) {
   return useQuery({
     queryKey: ["sb-sletteregel-navne"],
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase.from("employee_master_data").select("auth_user_id, first_name, last_name").not("auth_user_id", "is", null);
       if (error) return new Map<string, string>();

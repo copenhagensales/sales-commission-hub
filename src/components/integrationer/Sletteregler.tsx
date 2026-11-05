@@ -10,11 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SletteregelDialog, type ProevSnapshot, type SletteregelDialogMaal } from "@/components/integrationer/SletteregelDialog";
 import { SletteregelInfo } from "@/components/integrationer/SletteregelInfo";
+import { AendringInfo, Historik, fristTekst, tid, useSletteregelRedigering } from "@/components/integrationer/sletteregelDele";
 import { ResponsiveTable } from "@/components/mobile/ResponsiveTable";
-import { KATALOG_KLASSIFIKATIONER, useKaldFeltKatalog, type KatalogFelt } from "@/hooks/useKaldFeltKatalog";
+import { useKaldFeltKatalog } from "@/hooks/useKaldFeltKatalog";
 import { useKampagnerMedRegel, useKampagnerUdenRegel, useKontoKlienter, useRaekkerUdenRegel, useSystemPolitikker, useWebhookDatasaet, type ApiKonto, type ApiRegisterRaekke } from "@/hooks/useApiRegister";
-import { usePermissions } from "@/hooks/usePositionPermissions";
-import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import {
   SLETTEREGEL_STATUS,
   forklarToerkoersel,
@@ -37,16 +36,8 @@ import {
   type SletteregelStatus,
 } from "@/hooks/useSletteregler";
 
-export const SLETTEREGEL_NOEGLE = "tab_integrationer_sletteregler";
+export { SLETTEREGEL_NOEGLE } from "@/components/integrationer/sletteregelDele";
 const OPBEVARING_LINK = "/compliance?tab=registre&side=retention-policies";
-
-function tid(v: string | null | undefined): string {
-  return v ? new Date(v).toLocaleString("da-DK", { dateStyle: "short", timeStyle: "short" }) : "–";
-}
-function fristTekst(d: number | null | undefined, tom = "ingen"): string {
-  return d == null ? tom : `${d} d`;
-}
-
 type KampagneRaekke = {
   id: string;
   navn: string;
@@ -62,40 +53,8 @@ type KampagneRaekke = {
 
 type KlientRaekke = { id: string; navn: string; frist?: Klientfrist; kampagner: number; undtagelser: number; aaben?: SletteregelAendring };
 
-function AendringInfo({ a }: { a?: SletteregelAendring }) {
-  if (!a) return <span className="text-muted-foreground">–</span>;
-  const s = SLETTEREGEL_STATUS[a.status as SletteregelStatus];
-  return (
-    <div className="text-xs space-y-0.5">
-      <div className="flex items-center gap-1"><Badge variant={s?.variant ?? "outline"}>{s?.label ?? a.status}</Badge><span>{fristTekst(a.frist_dage, a.maal === "klient" ? "fjern klientregel" : a.maal === "kampagne" ? "følg klienten / ingen" : "følg kampagnen")}</span></div>
-      {a.proevet && <div className="text-muted-foreground" title={`Tørkørsel ${tid(a.proevet)}`}>{forklarToerkoersel(a.proevet_resultat as Parameters<typeof forklarToerkoersel>[0])[0] ?? "–"}</div>}
-      {a.proevet && typeof (a.proevet_resultat as { advarsel?: string } | null)?.advarsel === "string" && <div className="text-destructive">{(a.proevet_resultat as { advarsel: string }).advarsel}</div>}
-      {a.godkendt && <div className="text-muted-foreground">Godkendt {tid(a.godkendt)}</div>}
-    </div>
-  );
-}
-
-function Historik({ rader, navne }: { rader: SletteregelAendring[]; navne: Map<string, string> }) {
-  if (rader.length === 0) return <div className="text-xs text-muted-foreground">Ingen aktiveringer endnu.</div>;
-  return (
-    <ul className="text-xs space-y-0.5">
-      {rader.slice(0, 5).map((h) => {
-        const foer = (h.foer ?? {}) as Record<string, number | boolean | string | null>;
-        const foerFrist = (foer.retention_days ?? foer.retention_dage ?? foer.frist_dage) as number | null | undefined;
-        const foerKilde = typeof foer.regel_kilde === "string" ? ` (${foer.regel_kilde === "klient" ? "fra klient" : "egen"})` : "";
-        const af = h.aktiveret_af ? navne.get(h.aktiveret_af) ?? "superadmin" : "startværdi";
-        return <li key={h.id}><span className="text-muted-foreground">{tid(h.aktiveret)}</span> · {fristTekst(h.frist_dage, "ingen frist")} <span className="text-muted-foreground">(før: {fristTekst(foerFrist ?? null)}{foerKilde})</span> · {af} · {h.begrundelse}</li>;
-      })}
-    </ul>
-  );
-}
-
 export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegisterRaekke; kampagner: string[] | undefined }) {
-  const p = usePermissions();
-  const { isSuperadmin } = useIsSuperadmin();
-  const erEjer = p.position?.name?.toLowerCase() === "ejer";  // samme ejer-afgørelse som Administration (useAdminSynlighed); databasen afgør endeligt (is_owner/is_superadmin)
-  const erLeder = ["ejer", "teamleder", "assisterende teamleder", "assisterende teamleder fm", "fieldmarketing leder", "rekruttering"].includes(p.position?.name?.toLowerCase() ?? "");  // spejler is_teamleder_or_above (tørkørslens krav)
-  const kanRedigere = p.canEdit(SLETTEREGEL_NOEGLE) && api.redigerbar && (erEjer || (isSuperadmin && erLeder));  // oprette/prøve/godkende: ejer eller superadmin m. lederadgang (Codex SR2 r2 P2-8)
+  const { kanRedigere, isSuperadmin } = useSletteregelRedigering(api.redigerbar);
   const erDialer = !!konto.integration_id;
   const { data: kontoKlienterMap } = useKontoKlienter();
   const { data: navne = new Map<string, string>() } = useSletteregelNavne();
@@ -108,7 +67,6 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
   const [dialog, setDialog] = useState<SletteregelDialogMaal | null>(null);
   const [snapshots, setSnapshots] = useState<Map<string, ProevSnapshot>>(new Map());
   const gemSnapshot = (id: string, s: ProevSnapshot) => setSnapshots((m) => new Map(m).set(id, s));
-  const [visAlleKolonner, setVisAlleKolonner] = useState(false);
   const saetHentesIkke = useSaetHentesIkke(); const fjernHentesIkke = useFjernHentesIkke(); const kobl = useKoblKampagne();
   const [visning, setVisning] = useState<"mangler" | "alle" | "aabne" | "afgjort">("mangler");
   const [soeg, setSoeg] = useState("");
@@ -195,8 +153,6 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
   const udfoerHentesIkke = async () => { const ids = hentesIkkeIds ?? []; setHentesIkkeIds(null); for (const id of ids) { try { await saetHentesIkke.mutateAsync({ kampagne_ekstern_id: id, begrundelse }); } catch { /* toast */ } } setValgte(new Set()); };
 
   const udfoldetRaekke = udfoldet && udfoldet !== "faelles" && !udfoldet.startsWith("klient:") ? rader.find((r) => r.id === udfoldet) : undefined;
-  const kolonner: KatalogFelt[] = udfoldet === "faelles" ? felter.filter((f) => !f.kampagne_ekstern_id) : udfoldet && !udfoldet.startsWith("klient:") ? felter.filter((f) => f.kampagne_ekstern_id === udfoldet) : [];
-  const klassLabel = (k: string) => KATALOG_KLASSIFIKATIONER.find((x) => x.value === k)?.label ?? k;
 
   return (
     <div className="space-y-4">
@@ -204,7 +160,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
-            <div><CardTitle>Sletteregler</CardTitle><CardDescription>Intet hentes uden regel. Klienten er reglen, kampagne og kolonne er undtagelser. Tryk »Ret frist« på en række for at ændre.</CardDescription></div>
+            <div><CardTitle>Sletteregler</CardTitle><CardDescription>Intet hentes uden regel. Klienten er reglen, kampagne og kolonne er undtagelser. Klient- og kampagnefrister rettes her med »Ret frist«; kolonnefrister under fanen Kolonner.</CardDescription></div>
             <SletteregelInfo />
           </div>
         </CardHeader>
@@ -215,7 +171,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
             <div><div className="text-2xl font-semibold">{rader.filter((r) => r.gaeldende != null).length}</div><div className="text-muted-foreground">kampagner med sletteregel (hentes)</div></div>
             <div><div className={`text-2xl font-semibold ${antalMangler ? "text-destructive" : ""}`}>{antalMangler}</div><div className="text-muted-foreground">mangler sletteregel (hentes ikke)</div></div>
             <div><div className="text-2xl font-semibold">{antalAabne}</div><div className="text-muted-foreground">åbne ændringer (alle konti)</div></div>
-            <div><div className={`text-2xl font-semibold ${afventerFelter ? "text-destructive" : ""}`}>{afventerFelter}</div><div className="text-muted-foreground">felter, der afventer din afgørelse (fanen Felter)</div></div>
+            <div><div className={`text-2xl font-semibold ${afventerFelter ? "text-destructive" : ""}`}>{afventerFelter}</div><div className="text-muted-foreground">kolonner, der afventer din afgørelse (fanen Kolonner)</div></div>
           </div>
           <div className="text-muted-foreground">Rækker uden sletteregel i Stork (røres ikke af oprydningen): {raekkerUdenRegel.map((r) => `${r.tabel} ${tal(r.antal)}`).join(" · ") || "–"}.</div>
         </CardContent>
@@ -265,7 +221,6 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
                 </SelectContent>
               </Select>
               <Input className="h-8 w-56" placeholder="Søg kampagne…" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
-              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setUdfoldet(udfoldet === "faelles" ? null : "faelles")}>Fælles kolonner ({felter.filter((f) => !f.kampagne_ekstern_id).length})</Button>
               <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setVisUdenData((v) => !v)} title="Kampagner, der er registreret i koblingen, men som porten endnu ikke har hentet data for (alle konti)">{visUdenData ? "Skjul" : "Vis"} registrerede uden data ({[...udenRegel.keys()].filter((id) => !(kampagner ?? []).includes(id)).length})</Button>
               {kanRedigere && valgteRader.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1 rounded-md border p-1 text-xs">
@@ -313,7 +268,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
                   {!r.klientkampagne && !r.afgoerelse && <span className="text-xs text-muted-foreground">kobl først – eller afgør »hentes ikke«</span>}
                   {kanRedigere && !r.afgoerelse && r.gaeldende == null && !r.aaben && <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setBegrundelse(""); setHentesIkkeIds([r.id]); }}>Hentes ikke</Button>}
                   {kanRedigere && r.afgoerelse && <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={fjernHentesIkke.isPending} onClick={() => fjernHentesIkke.mutate(r.id)}>Fortryd »hentes ikke«</Button>}
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setUdfoldet(udfoldet === r.id ? null : r.id)}>{udfoldet === r.id ? "Skjul" : `Kolonner (${felter.filter((f) => f.kampagne_ekstern_id === r.id).length}) · historik`}</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setUdfoldet(udfoldet === r.id ? null : r.id)}>{udfoldet === r.id ? "Skjul historik" : "Historik"}</Button>
                 </div>
               )}
               empty={visning === "mangler" ? "Alle kontoens kampagner har en sletteregel eller en afgørelse." : "Ingen kampagner."}
@@ -322,32 +277,13 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
         </Card>
       )}
 
-      {udfoldet && !udfoldet.startsWith("klient:") && (
+      {udfoldetRaekke?.klientkampagne && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{udfoldet === "faelles" ? `Fælles kolonner for ${api.navn}` : `Kolonner for ${udfoldetRaekke?.navn ?? udfoldet}`}</CardTitle>
-            <CardDescription>
-              {visAlleKolonner ? "Alle kolonner." : "Kun kolonner, der ryddes (person, identifikator, følsom, ukendt)."} En kortere kolonnefrist går forud for kampagnens. Hentes og klassifikation rettes under fanen <strong>Felter</strong>.
-              <Button size="sm" variant="link" className="h-auto p-0 pl-1 text-xs" onClick={() => setVisAlleKolonner((v) => !v)}>{visAlleKolonner ? "Vis kun dem der ryddes" : `Vis alle (${kolonner.length})`}</Button>
-            </CardDescription>
+            <CardTitle className="text-base">Historik for kampagnefristen ({udfoldetRaekke.klientkampagne.name})</CardTitle>
+            <CardDescription>Kolonnefrister, hentes og klassifikation rettes under fanen <strong>Kolonner</strong>.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {udfoldetRaekke?.klientkampagne && (
-              <div><div className="text-sm font-medium mb-1">Historik for kampagnefristen ({udfoldetRaekke.klientkampagne.name})</div><Historik rader={historikFor({ maal: "kampagne", klientkampagne_id: udfoldetRaekke.klientkampagne.id })} navne={navne} /></div>
-            )}
-            <ResponsiveTable
-              columns={[
-                { key: "kolonne", header: "Kolonne", isTitle: true, cell: (f) => { const hist = historikFor({ maal: "kolonne", katalog_id: f.id }); return <div><div className="text-sm">{f.felt_navn}</div><div className="text-xs text-muted-foreground font-mono">{f.felt_sti} · {f.maal_kolonne ? `${f.maal_tabel}.${f.maal_kolonne}` : f.metadata_noegle ? `${f.maal_tabel}.${f.maal_tabel === "dialer_leads" ? "felter" : "metadata"}.${f.metadata_noegle}` : "gemmes ikke"}</div>{hist.length > 0 && <div className="mt-1"><Historik rader={hist} navne={navne} /></div>}</div>; } },
-                { key: "klass", header: "Klassifikation", cell: (f) => <span className="text-sm">{klassLabel(f.klassifikation)}{f.hentes ? "" : " · hentes ikke"}</span> },
-                { key: "frist", header: "Gældende frist", isKey: true, cell: (f) => f.retention_dage == null ? <span className="text-muted-foreground">kampagnens</span> : <span className="font-medium">{f.retention_dage} d</span> },
-                ...(kolonner.some((f) => aabenFor({ maal: "kolonne", katalog_id: f.id })) ? [{ key: "aendring", header: "Ændring", cell: (f: KatalogFelt) => <AendringInfo a={aabenFor({ maal: "kolonne", katalog_id: f.id })} /> }] : []),
-              ]}
-              rows={visAlleKolonner ? kolonner : kolonner.filter((f) => !["teknisk", "forretning"].includes(f.klassifikation) || f.retention_dage != null || !!aabenFor({ maal: "kolonne", katalog_id: f.id }))}
-              rowKey={(f) => f.id}
-              actions={(f) => kanRedigere && f.status !== "skabelon" ? <Button size="sm" variant={aabenFor({ maal: "kolonne", katalog_id: f.id }) ? "default" : "outline"} className="h-8 text-xs" onClick={() => aabnDialog({ maal: { maal: "kolonne", katalog_id: f.id }, titel: f.felt_navn, gaeldende: f.retention_dage, kampagner: [], klientkampagner: [] })}>{aabenFor({ maal: "kolonne", katalog_id: f.id }) ? "Fortsæt ændring" : "Ret frist"}</Button> : null}
-              empty="Ingen kolonner registreret for denne kampagne – de fælles kolonner gælder."
-            />
-          </CardContent>
+          <CardContent><Historik rader={historikFor({ maal: "kampagne", klientkampagne_id: udfoldetRaekke.klientkampagne.id })} navne={navne} /></CardContent>
         </Card>
       )}
 
@@ -390,7 +326,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
         </CardHeader>
       </Card>
 
-      <SletteregelDialog maal={dialogLive} aaben={dialogAaben} open={dialog != null} onOpenChange={(o) => { if (!o) setDialog(null); }} kanRedigere={kanRedigere} erSuperadmin={isSuperadmin} snapshots={snapshots} setSnapshot={gemSnapshot} />
+      <SletteregelDialog maal={dialogLive} aaben={dialogAaben} open={dialog != null} onOpenChange={(o) => { if (!o) setDialog(null); }} kanRedigere={kanRedigere && aendringerQ.isSuccess} erSuperadmin={isSuperadmin} snapshots={snapshots} setSnapshot={gemSnapshot} />
       <Dialog open={aktiverIds != null} onOpenChange={(o) => { if (!o) setAktiverIds(null); }}>
         <DialogContent>
           <DialogHeader>

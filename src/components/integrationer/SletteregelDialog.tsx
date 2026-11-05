@@ -108,8 +108,8 @@ export function SletteregelDialog({ maal, aaben, open, onOpenChange, kanRedigere
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{art === "klient" ? "Klientfrist" : art === "kampagne" ? "Kampagnefrist" : "Kolonnefrist"}: {maal.titel}</DialogTitle>
+        <DialogHeader className="pr-8">
+          <DialogTitle className="break-words">{art === "klient" ? "Klientfrist" : art === "kampagne" ? "Kampagnefrist" : "Kolonnefrist"}: {maal.titel}</DialogTitle>
           <DialogDescription>
             {maal.gaeldende != null ? `Gældende i dag: ${maal.gaeldende} dage${maal.kilde === "klient" ? " (fra klient)" : maal.kilde === "kampagne" ? " (egen)" : ""}.` : "Ingen regel i dag."}
             {" "}Ændringen gælder først, når superadmin aktiverer den.
@@ -141,7 +141,7 @@ export function SletteregelDialog({ maal, aaben, open, onOpenChange, kanRedigere
             {aaben && ugemt && status !== "aktiv" && <p className="text-muted-foreground">Fristen er ændret – tryk »Prøv« for at tælle igen (ændringen bliver en ny kladde).</p>}
             {aaben && !ugemt && foraeldet && status !== "aktiv" && <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-destructive">{udenSnapshot ? "Tørkørslen er lavet i en tidligere session, så grundlaget (klientens kampagner) kan ikke efterprøves." : "Grundlaget har ændret sig siden tørkørslen (klientens frist eller kampagnerne)."} Tryk »Prøv igen«, før du godkender eller aktiverer.</p>}
             {status === "godkendt" && klar && !erSuperadmin && <p className="rounded-md border p-2">Godkendt – afventer superadmin. Reglen aktiveres, når en superadmin trykker Aktivér.</p>}
-            {status === "godkendt" && klar && erSuperadmin && (
+            {status === "godkendt" && klar && erSuperadmin && kanRedigere && (
               <div className="space-y-1">
                 <div className="font-medium">Aktivér med begrundelse</div>
                 <Textarea value={begrundelse} onChange={(e) => setBegrundelse(e.target.value)} placeholder="Påkrævet, fx »aftalt med klienten 4/11«" rows={2} />
@@ -151,14 +151,14 @@ export function SletteregelDialog({ maal, aaben, open, onOpenChange, kanRedigere
         )}
         <DialogFooter className="flex-wrap gap-2 sm:justify-between">
           <div className="flex gap-2">
-            {aaben?.status === "kladde" && !faerdig && <Button variant="ghost" className="text-destructive" disabled={travl} onClick={sletNu}>Slet kladde</Button>}
+            {aaben?.status === "kladde" && !faerdig && kanRedigere && <Button variant="ghost" className="text-destructive" disabled={travl} onClick={sletNu}>Slet kladde</Button>}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>{faerdig ? "Luk" : "Annullér"}</Button>
             {!faerdig && kanRedigere && status !== "aktiv" && (ugemt || foraeldet || status === "kladde" || !aaben) && <Button disabled={!gyldig || travl} onClick={proevNu}>{proev.isPending || gem.isPending ? "Tæller …" : foraeldet || status === "proevet" || status === "godkendt" ? "Prøv igen" : "Prøv"}</Button>}
             {!faerdig && kanRedigere && status === "proevet" && klar && <Button disabled={travl} onClick={godkendNu}>Godkend</Button>}
             {!faerdig && kanRedigere && status === "proevet" && klar && <Button variant="ghost" disabled={travl} onClick={proevNu}>Prøv igen</Button>}
-            {!faerdig && erSuperadmin && status === "godkendt" && klar && <Button disabled={travl || begrundelse.trim() === ""} onClick={aktiverNu}>{aktiver.isPending ? "Aktiverer …" : "Aktivér"}</Button>}
+            {!faerdig && erSuperadmin && kanRedigere && status === "godkendt" && klar && <Button disabled={travl || begrundelse.trim() === ""} onClick={aktiverNu}>{aktiver.isPending ? "Aktiverer …" : "Aktivér"}</Button>}
           </div>
         </DialogFooter>
       </DialogContent>

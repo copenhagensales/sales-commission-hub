@@ -205,7 +205,7 @@ export function ApiDetalje(props: Props) {
       <Tabs defaultValue="oversigt">
         <TabsList className="flex flex-wrap h-auto">
           <TabsTrigger value="oversigt">Oversigt</TabsTrigger>
-          <TabsTrigger value="felter">Felter</TabsTrigger>
+          <TabsTrigger value="felter">Kolonner</TabsTrigger>
           {visSletteregler && <TabsTrigger value="sletteregler">Sletteregler</TabsTrigger>}
           <TabsTrigger value="koersel">Kørsel</TabsTrigger>
           <TabsTrigger value="log">Log</TabsTrigger>
@@ -215,7 +215,7 @@ export function ApiDetalje(props: Props) {
           <div className="space-y-4">
             <Laast api={api} />
             {konto.integration_id && kampagneFilter && kampagneFilter.length === 0 && (
-              <div className="text-sm text-muted-foreground">Kontoen har endnu ingen kald eller emner i Stork – kun de fælles felter vises.</div>
+              <div className="text-sm text-muted-foreground">Kontoen har endnu ingen kald eller emner i Stork – kun de fælles kolonner vises.</div>
             )}
             <KaldFeltKatalog kilde={api.noegle} laast={!api.redigerbar} indlejret kampagner={kampagneFilter} />
           </div>
