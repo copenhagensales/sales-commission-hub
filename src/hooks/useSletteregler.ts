@@ -230,6 +230,69 @@ export function useSletteregelNavne() {
   });
 }
 
+export type Taelling = {
+  skaering?: string; maalt?: string; frist_dage?: number | null; anvendt_frist?: number | null; bemaerkning?: string; advarsel?: string; kampagner_antal?: number; undtagelser?: number; varighed_ms?: number;
+  dialer_calls?: { raekker?: number; emner?: number }; dialer_leads?: { raekker?: number }; dialer_sessions?: { raekker?: number; emner?: number }; adversus_events?: { raekker?: number }; salg?: { raekker?: number };
+};
+
+/** Tælling med de GÆLDENDE regler for samme kampagner/klientkampagner – til sammenligning i dialogen (samme afgrænsning som tørkørslen). */
+export function useGaeldendeTaelling(kampagner: string[], klientkampagner: string[], enabled: boolean) {
+  return useQuery({
+    queryKey: ["sb-sletteregel-gaeldende", ...kampagner, "|", ...klientkampagner],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("sb_sletteregel_taelling", { p_kamp: kampagner, p_klientkampagner: klientkampagner, p_frist: null, p_kat_id: null, p_kat_frist: null });
+      if (error) throw error;
+      return data as Taelling;
+    },
+    enabled: enabled && (kampagner.length > 0 || klientkampagner.length > 0),
+    staleTime: 60 * 1000,
+  });
+}
+
+const tal = (v: number | null | undefined) => (v ?? 0).toLocaleString("da-DK");
+const dato = (iso: string | undefined) => (iso ? new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" }) : "–");
+const flertal = (n: number | undefined, ental: string, fl: string) => `${tal(n)} ${(n ?? 0) === 1 ? ental : fl}`;
+
+/** Tørkørslen i menneskesprog: dato, hvad der rammes, og forskellen til den gældende regel. */
+export type Kilde = "klient" | "kampagne" | null;
+export function forklarToerkoersel(r: (Taelling & { kolonne?: string }) | null | undefined, gaeldende?: Taelling | null, gaeldendeFrist?: number | null, kilde?: Kilde): string[] {
+  if (!r) return [];
+  const linjer: string[] = [];
+  const harTal = !!r.dialer_calls || !!r.dialer_sessions || !!r.salg || !!r.dialer_leads;
+  if (harTal) {
+    const frist = r.anvendt_frist ?? r.frist_dage;
+    const skaering = r.skaering ?? (frist != null && r.maalt ? new Date(new Date(r.maalt).getTime() - frist * 86400000).toISOString() : undefined);  // tællingen gemmer måletidspunkt, ikke skæring
+    const dele = [
+      r.dialer_calls && `${flertal(r.dialer_calls.raekker, "kald", "kald")} fra ${flertal(r.dialer_calls.emner, "kunde", "kunder")}`,
+      r.dialer_leads && (r.dialer_leads.raekker ?? 0) > 0 && flertal(r.dialer_leads.raekker, "emne", "emner"),
+      r.dialer_sessions && (r.dialer_sessions.raekker ?? 0) > 0 && flertal(r.dialer_sessions.raekker, "session", "sessions"),
+      r.adversus_events && (r.adversus_events.raekker ?? 0) > 0 && flertal(r.adversus_events.raekker, "hændelse", "hændelser"),
+      r.salg && `${tal(r.salg.raekker)} salg`,
+    ].filter(Boolean) as string[];
+    if (r.kolonne) linjer.push(`${frist != null ? `${frist} dage på kolonnen: ` : ""}i de berørte kampagner ryddes i alt ${dele.join(", ")} (efter kampagnens eller kolonnens frist, den korteste gælder).`);
+    else linjer.push(`${frist != null ? `${frist} dage: ` : ""}alt før ${dato(skaering)} ryddes – ${dele.join(", ")}.`);
+    if (typeof r.kampagner_antal === "number") linjer.push(`Gælder ${flertal(r.kampagner_antal, "kampagne", "kampagner")}${(r.undtagelser ?? 0) > 0 ? ` (${flertal(r.undtagelser, "kampagne", "kampagner")} med egen frist følger ikke med)` : ""}.`);
+    if (gaeldende !== undefined) {
+      if (gaeldendeFrist == null && !r.kolonne) linjer.push("I dag er der ingen regel, så intet ryddes og intet hentes.");
+      else if (gaeldende === null) linjer.push("Sammenligningen med den gældende regel kunne ikke hentes.");
+      else if (gaeldende && r.kolonne) {  // kolonne: samme tælling med de gældende regler (Codex r2/r3 P2-3) – forskellen er det, kolonnefristen tilføjer eller fjerner
+        const dk = (gaeldende.dialer_calls?.raekker ?? 0), nk = (r.dialer_calls?.raekker ?? 0);
+        linjer.push(`I dag (${gaeldendeFrist == null ? "følger kampagnens frist" : `egen frist ${gaeldendeFrist} dage`}) ryddes ${tal(dk)} kald i de samme kampagner – den nye kolonnefrist ${nk === dk ? "ændrer ikke antallet" : `${nk > dk ? "tilføjer" : "fjerner"} ${tal(Math.abs(nk - dk))} kald`}.`);
+      }
+      else if (gaeldende) {
+        const dk = (gaeldende.dialer_calls?.raekker ?? 0), nk = (r.dialer_calls?.raekker ?? 0), ds = (gaeldende.salg?.raekker ?? 0), ns = (r.salg?.raekker ?? 0);
+        const diff = (n: number, g: number, hvad: string) => (n === g ? `lige så mange ${hvad}` : `${tal(Math.abs(n - g))} ${n > g ? "flere" : "færre"} ${hvad}`);
+        const kildeTekst = kilde === "klient" ? ", fra klient" : kilde === "kampagne" ? ", egen" : "";
+        if (r.kolonne) linjer.push(`I dag (${gaeldendeFrist} dage${kildeTekst}) rammes ${tal(dk)} kald – den nye frist rammer ${diff(nk, dk, "kald")}.`);
+        else linjer.push(`I dag (${gaeldendeFrist} dage${kildeTekst}) rammes ${tal(dk)} kald og ${tal(ds)} salg – den nye frist rammer ${diff(nk, dk, "kald")} og ${diff(ns, ds, "salg")}.`);
+      }
+    }
+  }
+  if (r.bemaerkning && !(typeof r.undtagelser === "number" && r.bemaerkning.includes("egen frist og følger ikke"))) linjer.push(r.bemaerkning);  // undtagelserne er allerede nævnt
+  if (r.advarsel) linjer.push(r.advarsel);
+  return linjer;
+}
+
 /** Tørkørslens resultat som kort tekst. */
 export function toerkoerselTekst(r: unknown): string {
   const o = (r ?? {}) as Record<string, { raekker?: number; emner?: number } | string | number | undefined>;

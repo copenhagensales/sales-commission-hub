@@ -1,5 +1,9 @@
 # Roadmap — DB-/lønberegning: korrekthed
 
+## TV-lydforsøg (Kasper, 4/11 2026)
+- [x] Opt-in Hiper-logo og HTML-lyd med aktivitet=1 i begge TV-visninger; eksisterende TvKeepAwake urørt.
+- [x] 11 prøver af autoplay-afvisning, fjernbetjening, genforsøg og oprydning; MP3-afspilning/diagnose kontrolleret i browser på TV-adgangsfejlsiden, uden dataændringer. Fysisk LG-TV og placering på aktivt Hiper-board ikke afprøvet.
+
 ## Coop-priser — ensretning godkendt af Kasper (4/11 2026)
 - [x] Lokationsomkostning uden refusionsfradrag i kunde-DB og lokationsøkonomi, både totaler og dagsrækker.
 - [x] Fælles dagspris-/tillægslinje og hjælpetekst; Coop-rapportens refusionsafsnit uændret.

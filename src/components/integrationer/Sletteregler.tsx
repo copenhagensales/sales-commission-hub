@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SletteregelDialog, type ProevSnapshot, type SletteregelDialogMaal } from "@/components/integrationer/SletteregelDialog";
+import { SletteregelInfo } from "@/components/integrationer/SletteregelInfo";
 import { ResponsiveTable } from "@/components/mobile/ResponsiveTable";
 import { KATALOG_KLASSIFIKATIONER, useKaldFeltKatalog, type KatalogFelt } from "@/hooks/useKaldFeltKatalog";
 import { useKampagnerMedRegel, useKampagnerUdenRegel, useKontoKlienter, useRaekkerUdenRegel, useSystemPolitikker, useWebhookDatasaet, type ApiKonto, type ApiRegisterRaekke } from "@/hooks/useApiRegister";
@@ -15,7 +17,7 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import {
   SLETTEREGEL_STATUS,
-  toerkoerselTekst,
+  forklarToerkoersel,
   useAktiverSletteregel,
   useFjernHentesIkke,
   useGemKladde,
@@ -24,7 +26,6 @@ import {
   useKoblKampagne,
   useProevSletteregel,
   useSaetHentesIkke,
-  useSletKladde,
   useSletteregelAendringer,
   useSletteregelGrundlag,
   useSletteregelNavne,
@@ -61,55 +62,13 @@ type KampagneRaekke = {
 
 type KlientRaekke = { id: string; navn: string; frist?: Klientfrist; kampagner: number; undtagelser: number; aaben?: SletteregelAendring };
 
-/** Handlingerne for én regel (kampagne eller kolonne): kladde → prøv → godkend → aktivér. Databasen håndhæver hvert skridt. */
-function Handlinger({ maal, aaben, gaeldende, kanRedigere, erSuperadmin, onAktiver, kompakt, klientfrist, onUgemt, raekkeNoegle }: {
-  maal: SletteregelMaal; aaben?: SletteregelAendring; gaeldende: number | null; kanRedigere: boolean; erSuperadmin: boolean; onAktiver: (ids: string[]) => void; kompakt?: boolean; klientfrist?: number | null; onUgemt?: (raekke: string, ugemt: boolean) => void; raekkeNoegle?: string;
-}) {
-  const gem = useGemKladde(); const slet = useSletKladde(); const proev = useProevSletteregel(); const godkend = useGodkendSletteregel();
-  const dbVaerdi = aaben ? (aaben.frist_dage == null ? "" : String(aaben.frist_dage)) : "";
-  const [frist, setFrist] = useState<string>(dbVaerdi);
-  useEffect(() => { setFrist(dbVaerdi); }, [aaben?.id, dbVaerdi]);  // feltet følger kladden i databasen
-  const ugemt = !!aaben && frist.trim() !== dbVaerdi;
-  useEffect(() => { if (onUgemt && raekkeNoegle) onUgemt(raekkeNoegle, ugemt); }, [raekkeNoegle, ugemt]);  // eslint-disable-line react-hooks/exhaustive-deps  -- pr. UI-række (flere kampagner kan dele én ændring, Codex r3)
-  const travl = gem.isPending || slet.isPending || proev.isPending || godkend.isPending;
-  if (!kanRedigere) return <span className="text-xs text-muted-foreground">{aaben ? `${SLETTEREGEL_STATUS[aaben.status as SletteregelStatus]?.label}: ${fristTekst(aaben.frist_dage)}` : "–"}</span>;
-  const gemKladde = () => {
-    const ny = frist.trim() === "" ? null : Number(frist);
-    if (ny != null && (!Number.isInteger(ny) || ny < 0 || ny > 3650)) return;
-    if (!aaben && ny == null && gaeldende == null && !(maal.maal === "kampagne" && klientfrist != null)) return;
-    gem.mutate({ maal, frist_dage: ny, aabenId: aaben?.id });
-  };
-  const status = aaben?.status as SletteregelStatus | undefined;
-  return (
-    <div className={`flex flex-wrap items-center gap-1 ${kompakt ? "" : "min-w-[260px]"}`}>
-      {(!aaben || status === "kladde" || status === "proevet" || status === "godkendt") && (
-        <Input type="number" min={0} max={3650} className="h-9 w-24 text-base sm:h-8 sm:w-20 sm:text-sm" placeholder={aaben ? "ingen" : "dage"} value={frist} disabled={travl}
-          title={aaben ? "Ret kladdens frist (tom = ingen egen frist). En rettet frist er en ny kladde." : maal.maal === "klient" ? "Klientens frist i dage → gemmes som kladde. Tom = klientreglen fjernes." : maal.maal === "kampagne" ? "Egen frist for kampagnen (undtagelse) → kladde. Tom = følg klientens frist." : "Egen frist for kolonnen → kladde. Tom = følg kampagnens frist."}
-          onChange={(e) => setFrist(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") gemKladde(); }} />
-      )}
-      {!aaben && <Button size="sm" variant="outline" className="h-7 text-xs" disabled={travl || (frist.trim() === "" && gaeldende == null && !(maal.maal === "kampagne" && klientfrist != null))} onClick={gemKladde}>{frist.trim() !== "" ? "Gem kladde" : maal.maal === "klient" ? "Fjern klientregel (kladde)" : maal.maal === "kampagne" && klientfrist != null ? "Følg klienten (kladde)" : "Fjern frist (kladde)"}</Button>}
-      {aaben && status !== "aktiv" && (
-        <>
-          {ugemt && <Button size="sm" variant="outline" className="h-7 text-xs" disabled={travl} onClick={gemKladde} title="Gem den rettede frist som ny kladde">Gem</Button>}
-          <Button size="sm" variant="secondary" className="h-7 text-xs" disabled={travl || ugemt} onClick={() => proev.mutate(aaben.id)} title={ugemt ? "Gem først den rettede frist" : "Tørkørsel: hvor mange rækker, emner og salg fristen rammer i dag"}>{status === "kladde" ? "Prøv" : "Prøv igen"}</Button>
-          {status === "proevet" && <Button size="sm" variant="secondary" className="h-7 text-xs" disabled={travl || ugemt} onClick={() => godkend.mutate(aaben.id)}>Godkend</Button>}
-          {status === "godkendt" && (erSuperadmin
-            ? <Button size="sm" className="h-7 text-xs" disabled={travl || ugemt} onClick={() => onAktiver([aaben.id])}>Aktivér</Button>
-            : <span className="text-xs text-muted-foreground" title="Aktivering kræver superadmin (forretningsforståelsen §9)">afventer superadmin</span>)}
-          {status === "kladde" && <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" disabled={travl} onClick={() => slet.mutate(aaben.id)}>Slet</Button>}
-        </>
-      )}
-    </div>
-  );
-}
-
 function AendringInfo({ a }: { a?: SletteregelAendring }) {
   if (!a) return <span className="text-muted-foreground">–</span>;
   const s = SLETTEREGEL_STATUS[a.status as SletteregelStatus];
   return (
     <div className="text-xs space-y-0.5">
       <div className="flex items-center gap-1"><Badge variant={s?.variant ?? "outline"}>{s?.label ?? a.status}</Badge><span>{fristTekst(a.frist_dage, a.maal === "klient" ? "fjern klientregel" : a.maal === "kampagne" ? "følg klienten / ingen" : "følg kampagnen")}</span></div>
-      {a.proevet && <div className="text-muted-foreground" title={`Tørkørsel ${tid(a.proevet)}`}>Rammer: {toerkoerselTekst(a.proevet_resultat)}</div>}
+      {a.proevet && <div className="text-muted-foreground" title={`Tørkørsel ${tid(a.proevet)}`}>{forklarToerkoersel(a.proevet_resultat as Parameters<typeof forklarToerkoersel>[0])[0] ?? "–"}</div>}
       {a.proevet && typeof (a.proevet_resultat as { advarsel?: string } | null)?.advarsel === "string" && <div className="text-destructive">{(a.proevet_resultat as { advarsel: string }).advarsel}</div>}
       {a.godkendt && <div className="text-muted-foreground">Godkendt {tid(a.godkendt)}</div>}
     </div>
@@ -133,8 +92,10 @@ function Historik({ rader, navne }: { rader: SletteregelAendring[]; navne: Map<s
 
 export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: ApiRegisterRaekke; kampagner: string[] | undefined }) {
   const p = usePermissions();
-  const kanRedigere = p.canEdit(SLETTEREGEL_NOEGLE) && api.redigerbar;
   const { isSuperadmin } = useIsSuperadmin();
+  const erEjer = p.position?.name?.toLowerCase() === "ejer";  // samme ejer-afgørelse som Administration (useAdminSynlighed); databasen afgør endeligt (is_owner/is_superadmin)
+  const erLeder = ["ejer", "teamleder", "assisterende teamleder", "assisterende teamleder fm", "fieldmarketing leder", "rekruttering"].includes(p.position?.name?.toLowerCase() ?? "");  // spejler is_teamleder_or_above (tørkørslens krav)
+  const kanRedigere = p.canEdit(SLETTEREGEL_NOEGLE) && api.redigerbar && (erEjer || (isSuperadmin && erLeder));  // oprette/prøve/godkende: ejer eller superadmin m. lederadgang (Codex SR2 r2 P2-8)
   const erDialer = !!konto.integration_id;
   const { data: kontoKlienterMap } = useKontoKlienter();
   const { data: navne = new Map<string, string>() } = useSletteregelNavne();
@@ -144,6 +105,10 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
   const grundlagQ = useSletteregelGrundlag(); const aendringerQ = useSletteregelAendringer(); const afgoerelserQ = useKampagneAfgoerelser();
   const webhookQ = useWebhookDatasaet(konto.integration_id);
   const aktiver = useAktiverSletteregel(); const gem = useGemKladde(); const proev = useProevSletteregel(); const godkend = useGodkendSletteregel();
+  const [dialog, setDialog] = useState<SletteregelDialogMaal | null>(null);
+  const [snapshots, setSnapshots] = useState<Map<string, ProevSnapshot>>(new Map());
+  const gemSnapshot = (id: string, s: ProevSnapshot) => setSnapshots((m) => new Map(m).set(id, s));
+  const [visAlleKolonner, setVisAlleKolonner] = useState(false);
   const saetHentesIkke = useSaetHentesIkke(); const fjernHentesIkke = useFjernHentesIkke(); const kobl = useKoblKampagne();
   const [visning, setVisning] = useState<"mangler" | "alle" | "aabne" | "afgjort">("mangler");
   const [soeg, setSoeg] = useState("");
@@ -153,8 +118,6 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
   const [begrundelse, setBegrundelse] = useState("");
   const [hentesIkkeIds, setHentesIkkeIds] = useState<string[] | null>(null);
   const [bulkFrist, setBulkFrist] = useState("");
-  const [ugemte, setUgemte] = useState<Set<string>>(new Set());
-  const meldUgemt = (id: string, u: boolean) => setUgemte((s) => { if (s.has(id) === u) return s; const n = new Set(s); if (u) n.add(id); else n.delete(id); return n; });
 
   const medRegel = useMemo(() => new Map((medRegelQ.data ?? []).map((r) => [r.kampagne_ekstern_id, r.retention_days] as const)), [medRegelQ.data]);
   const udenRegel = useMemo(() => new Map((udenRegelQ.data ?? []).map((r) => [r.kampagne_ekstern_id, r] as const)), [udenRegelQ.data]);
@@ -164,6 +127,18 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
   const aabenFor = (maal: SletteregelMaal) => aendringer.find((a) => a.status !== "aktiv" && passer(a, maal));
   const historikFor = (maal: SletteregelMaal) => aendringer.filter((a) => a.status === "aktiv" && passer(a, maal)).sort((a, b) => (b.aktiveret ?? "").localeCompare(a.aktiveret ?? ""));
 
+  const kampagnerFor = (klientkampagneIds: string[]) => { const g = grundlagQ.data; if (!g) return []; const set = new Set(klientkampagneIds); return [...g.koblinger.values()].filter((m) => m.client_campaign_id && set.has(m.client_campaign_id) && !afgoerelser.has(m.adversus_campaign_id)).map((m) => m.adversus_campaign_id); };
+  const klientkampagnerUdenEgen = (clientId: string) => { const g = grundlagQ.data; if (!g) return []; return g.klientkampagner.filter((k) => k.client_id === clientId && g.politikker.get(k.id)?.regel_kilde !== "kampagne").map((k) => k.id); };
+  const aabnDialog = (d: SletteregelDialogMaal) => setDialog(d);
+  const dialogAaben = dialog ? aabenFor(dialog.maal) : undefined;
+  // Codex SR2 r2 P1-1/P1-2: dialogens grundlag (gældende frist, klientfrist, kampagne- og klientkampagnemængde) genberegnes fra aktuelle data – ikke fra øjeblikket, dialogen blev åbnet
+  const dialogLive = useMemo<SletteregelDialogMaal | null>(() => {
+    if (!dialog) return null; const g = grundlagQ.data; if (!g) return dialog;
+    if (dialog.maal.maal === "klient") { const id = dialog.maal.klient_id; const kk = klientkampagnerUdenEgen(id); return { ...dialog, gaeldende: g.klientfrister.get(id)?.frist_dage ?? null, kampagner: kampagnerFor(kk), klientkampagner: kk }; }
+    if (dialog.maal.maal === "kampagne") { const kkId = dialog.maal.klientkampagne_id; const kk = g.klientkampagnePrId.get(kkId); const pol = g.politikker.get(kkId); const kf = kk ? g.klientfrister.get(kk.client_id) : undefined;
+      return { ...dialog, gaeldende: pol?.is_active ? pol.retention_days : null, kilde: pol?.is_active ? (pol.regel_kilde as "klient" | "kampagne" | null) : null, klientfrist: kf?.frist_dage ?? null, kampagner: kampagnerFor([kkId]), klientkampagner: [kkId] }; }
+    const f = felter.find((x) => x.id === (dialog.maal as { katalog_id: string }).katalog_id); return { ...dialog, gaeldende: f?.retention_dage ?? null };
+  }, [dialog, grundlagQ.data, felter, afgoerelser]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [visUdenData, setVisUdenData] = useState(false);
   const rader = useMemo<KampagneRaekke[]>(() => {
     const g = grundlagQ.data;
@@ -210,7 +185,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
 
   // samlede handlinger på valgte kampagner
   const valgteRader = synlige.filter((r) => valgte.has(r.id));
-  const valgteUgemte = valgteRader.some((r) => ugemte.has(r.id));
+  const valgteUgemte = false;  // inline-redigering er afløst af dialogen (SR2)
   const koerSamlet = async (fn: (r: KampagneRaekke) => Promise<unknown> | undefined) => { for (const r of valgteRader) { try { await fn(r); } catch { /* fejl vises af mutationens toast */ } } setValgte(new Set()); };
   const samletSaetFrist = () => { const ny = bulkFrist.trim() === "" ? null : Number(bulkFrist); if (ny != null && (!Number.isInteger(ny) || ny < 0)) return; const set = new Set<string>(); void koerSamlet((r) => { if (!r.klientkampagne || set.has(r.klientkampagne.id)) return; set.add(r.klientkampagne.id); return gem.mutateAsync({ maal: { maal: "kampagne", klientkampagne_id: r.klientkampagne.id }, frist_dage: ny, aabenId: r.aaben?.id }); }); };
   const samletProev = () => { const set = new Set<string>(); void koerSamlet((r) => { if (!r.aaben || r.aaben.status === "aktiv" || set.has(r.aaben.id)) return; set.add(r.aaben.id); return proev.mutateAsync(r.aaben.id); }); };
@@ -228,11 +203,10 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
       {!api.redigerbar && <div className="rounded-md border p-2 text-sm text-muted-foreground">Låst API: reglerne vises, men kan først ændres, når API'en er flyttet over på kataloget.</div>}
       <Card>
         <CardHeader>
-          <CardTitle>Sletteregel-porten</CardTitle>
-          <CardDescription>
-            Fast regel: intet hentes, før hver datatype har en sletteregel. Reglerne sættes her, ét sted: klienten er reglen, kampagnen og kolonnen er undtagelser, og alt går gennem kladde → prøvet → godkendt → aktiv;
-            aktivering kræver superadmin og en begrundelse. Der er ingen standardfrister: rækker uden regel slettes ikke stille, de står her, til reglen er sat. Kampagnefristen gælder også salgsrensningen.
-          </CardDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div><CardTitle>Sletteregler</CardTitle><CardDescription>Intet hentes uden regel. Klienten er reglen, kampagne og kolonne er undtagelser. Tryk »Ret frist« på en række for at ændre.</CardDescription></div>
+            <SletteregelInfo />
+          </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {portFejl.length > 0 && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-destructive">Kunne ikke læse sletteregel-porten: {portFejl.map((e) => e.message).join(" · ")}. Tallene nedenfor er ikke retvisende.</div>}
@@ -251,20 +225,20 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
         <Card>
           <CardHeader>
             <CardTitle>Klientregler for {konto.navn}</CardTitle>
-            <CardDescription>Klientens frist er reglen og gælder alle klientens kampagner uden egen frist – også nye. Tørkørslen summerer over klientens kampagner. Ændringer skrives ind pr. kampagne ved aktivering.</CardDescription>
+            <CardDescription>Klientens frist gælder alle klientens kampagner uden egen frist – også nye.</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveTable
               columns={[
                 { key: "navn", header: "Klient", isTitle: true, cell: (k) => <div><div className="text-sm font-medium">{k.navn}</div><div className="text-xs text-muted-foreground">{k.kampagner} kampagner{k.undtagelser ? ` · ${k.undtagelser} med egen frist` : ""}</div></div> },
                 { key: "frist", header: "Klientfrist", isKey: true, cell: (k) => k.frist?.frist_dage != null ? <span className="font-medium" title={`Aktiveret ${tid(k.frist.aktiveret)}: ${k.frist.begrundelse ?? ""}`}>{k.frist.frist_dage} d</span> : <span className="text-muted-foreground">ingen</span> },
-                { key: "aendring", header: "Ændring", cell: (k) => <AendringInfo a={k.aaben} /> },
+                ...(klientRader.some((k) => k.aaben) ? [{ key: "aendring", header: "Ændring", cell: (k: KlientRaekke) => <AendringInfo a={k.aaben} /> }] : []),
               ]}
               rows={klientRader}
               rowKey={(k) => k.id}
               actions={(k) => (
                 <div className="flex flex-wrap items-center gap-1">
-                  <Handlinger maal={{ maal: "klient", klient_id: k.id }} aaben={k.aaben} gaeldende={k.frist?.frist_dage ?? null} kanRedigere={kanRedigere} erSuperadmin={isSuperadmin} onAktiver={(ids) => { setBegrundelse(""); setAktiverIds(ids); }} />
+                  {kanRedigere && <Button size="sm" variant={k.aaben ? "default" : "outline"} className="h-8 text-xs" onClick={() => aabnDialog({ maal: { maal: "klient", klient_id: k.id }, titel: k.navn, gaeldende: k.frist?.frist_dage ?? null, kampagner: kampagnerFor(klientkampagnerUdenEgen(k.id)), klientkampagner: klientkampagnerUdenEgen(k.id) })}>{k.aaben ? "Fortsæt ændring" : "Ret frist"}</Button>}
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setUdfoldet(udfoldet === `klient:${k.id}` ? null : `klient:${k.id}`)}>{udfoldet === `klient:${k.id}` ? "Skjul" : "Historik"}</Button>
                 </div>
               )}
@@ -279,7 +253,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
         <Card>
           <CardHeader>
             <CardTitle>Sletteregler for {konto.navn}</CardTitle>
-            <CardDescription>Én række pr. kampagne, kontoen har kald, emner eller sessions på (365 dage). Kampagnen følger klientens frist, medmindre den får en egen (undtagelse); kolonner (felter) under kampagnen kan få en kortere egen frist.</CardDescription>
+            <CardDescription>Kampagner med data på kontoen. »Fra klient« følger klientens frist; »egen« er en undtagelse.</CardDescription>
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <Select value={visning} onValueChange={(v) => setVisning(v as typeof visning)}>
                 <SelectTrigger className="h-8 w-[200px] text-xs"><SelectValue /></SelectTrigger>
@@ -329,13 +303,13 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
                   </Select>
                 ) : <span className="text-xs">{r.klientkampagne ? `${r.klientkampagne.klient} · ${r.klientkampagne.name}` : "–"}</span> },
                 { key: "gaeldende", header: "Gældende frist", isKey: true, cell: (r) => <span className={r.gaeldende == null ? "text-muted-foreground" : "font-medium"}>{fristTekst(r.gaeldende, "–")}{r.gaeldende != null && r.kilde && <span className="ml-1 text-xs font-normal text-muted-foreground">{r.kilde === "klient" ? "fra klient" : "egen"}</span>}</span> },
-                { key: "aendring", header: "Ændring", cell: (r) => <AendringInfo a={r.aaben} /> },
+                ...(synlige.some((r) => r.aaben) ? [{ key: "aendring", header: "Ændring", cell: (r: KampagneRaekke) => <AendringInfo a={r.aaben} /> }] : []),
               ]}
               rows={synlige}
               rowKey={(r) => r.id}
               actions={(r) => (
                 <div className="flex flex-wrap items-center gap-1">
-                  {r.klientkampagne && !r.afgoerelse && <Handlinger maal={{ maal: "kampagne", klientkampagne_id: r.klientkampagne.id }} aaben={r.aaben} gaeldende={r.gaeldende} klientfrist={r.klientfrist} kanRedigere={kanRedigere} erSuperadmin={isSuperadmin} onAktiver={(ids) => { setBegrundelse(""); setAktiverIds(ids); }} onUgemt={meldUgemt} raekkeNoegle={r.id} />}
+                  {kanRedigere && r.klientkampagne && !r.afgoerelse && <Button size="sm" variant={r.aaben ? "default" : "outline"} className="h-8 text-xs" onClick={() => aabnDialog({ maal: { maal: "kampagne", klientkampagne_id: r.klientkampagne!.id }, titel: r.navn, gaeldende: r.gaeldende, kilde: (r.kilde as "klient" | "kampagne" | null) ?? null, klientfrist: r.klientfrist, kampagner: kampagnerFor([r.klientkampagne!.id]), klientkampagner: [r.klientkampagne!.id] })}>{r.aaben ? "Fortsæt ændring" : "Ret frist"}</Button>}
                   {!r.klientkampagne && !r.afgoerelse && <span className="text-xs text-muted-foreground">kobl først – eller afgør »hentes ikke«</span>}
                   {kanRedigere && !r.afgoerelse && r.gaeldende == null && !r.aaben && <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setBegrundelse(""); setHentesIkkeIds([r.id]); }}>Hentes ikke</Button>}
                   {kanRedigere && r.afgoerelse && <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={fjernHentesIkke.isPending} onClick={() => fjernHentesIkke.mutate(r.id)}>Fortryd »hentes ikke«</Button>}
@@ -353,8 +327,8 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
           <CardHeader>
             <CardTitle className="text-base">{udfoldet === "faelles" ? `Fælles kolonner for ${api.navn}` : `Kolonner for ${udfoldetRaekke?.navn ?? udfoldet}`}</CardTitle>
             <CardDescription>
-              Gældende frist pr. kolonne (tom = kampagnens frist; en kortere kolonnefrist går forud). Hentes og klassifikation rettes under fanen <strong>Felter</strong>.
-              {udfoldet === "faelles" && " Fælles kolonner gælder alle kampagner med regel."}
+              {visAlleKolonner ? "Alle kolonner." : "Kun kolonner, der ryddes (person, identifikator, følsom, ukendt)."} En kortere kolonnefrist går forud for kampagnens. Hentes og klassifikation rettes under fanen <strong>Felter</strong>.
+              <Button size="sm" variant="link" className="h-auto p-0 pl-1 text-xs" onClick={() => setVisAlleKolonner((v) => !v)}>{visAlleKolonner ? "Vis kun dem der ryddes" : `Vis alle (${kolonner.length})`}</Button>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -366,11 +340,11 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
                 { key: "kolonne", header: "Kolonne", isTitle: true, cell: (f) => { const hist = historikFor({ maal: "kolonne", katalog_id: f.id }); return <div><div className="text-sm">{f.felt_navn}</div><div className="text-xs text-muted-foreground font-mono">{f.felt_sti} · {f.maal_kolonne ? `${f.maal_tabel}.${f.maal_kolonne}` : f.metadata_noegle ? `${f.maal_tabel}.${f.maal_tabel === "dialer_leads" ? "felter" : "metadata"}.${f.metadata_noegle}` : "gemmes ikke"}</div>{hist.length > 0 && <div className="mt-1"><Historik rader={hist} navne={navne} /></div>}</div>; } },
                 { key: "klass", header: "Klassifikation", cell: (f) => <span className="text-sm">{klassLabel(f.klassifikation)}{f.hentes ? "" : " · hentes ikke"}</span> },
                 { key: "frist", header: "Gældende frist", isKey: true, cell: (f) => f.retention_dage == null ? <span className="text-muted-foreground">kampagnens</span> : <span className="font-medium">{f.retention_dage} d</span> },
-                { key: "aendring", header: "Ændring", cell: (f) => <AendringInfo a={aabenFor({ maal: "kolonne", katalog_id: f.id })} /> },
+                ...(kolonner.some((f) => aabenFor({ maal: "kolonne", katalog_id: f.id })) ? [{ key: "aendring", header: "Ændring", cell: (f: KatalogFelt) => <AendringInfo a={aabenFor({ maal: "kolonne", katalog_id: f.id })} /> }] : []),
               ]}
-              rows={kolonner}
+              rows={visAlleKolonner ? kolonner : kolonner.filter((f) => !["teknisk", "forretning"].includes(f.klassifikation) || f.retention_dage != null || !!aabenFor({ maal: "kolonne", katalog_id: f.id }))}
               rowKey={(f) => f.id}
-              actions={(f) => <Handlinger maal={{ maal: "kolonne", katalog_id: f.id }} aaben={aabenFor({ maal: "kolonne", katalog_id: f.id })} gaeldende={f.retention_dage} kanRedigere={kanRedigere && f.status !== "skabelon"} erSuperadmin={isSuperadmin} onAktiver={(ids) => { setBegrundelse(""); setAktiverIds(ids); }} kompakt />}
+              actions={(f) => kanRedigere && f.status !== "skabelon" ? <Button size="sm" variant={aabenFor({ maal: "kolonne", katalog_id: f.id }) ? "default" : "outline"} className="h-8 text-xs" onClick={() => aabnDialog({ maal: { maal: "kolonne", katalog_id: f.id }, titel: f.felt_navn, gaeldende: f.retention_dage, kampagner: [], klientkampagner: [] })}>{aabenFor({ maal: "kolonne", katalog_id: f.id }) ? "Fortsæt ændring" : "Ret frist"}</Button> : null}
               empty="Ingen kolonner registreret for denne kampagne – de fælles kolonner gælder."
             />
           </CardContent>
@@ -381,11 +355,7 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
         <Card>
           <CardHeader>
             <CardTitle>Webhooks</CardTitle>
-            <CardDescription>
-              Webhook-hændelser hører til deres API og følger kampagnens sletteregel – de har ingen egen frist. Enreach-hook gemmer kun hændelser for kampagner med regel
-              (afviste tælles). Salgswebhooks (Adversus) bruger fortsat den eksisterende indgang; deres rå hændelser ryddes efter kampagnens regel, og uden kampagne eller
-              regel står de her som »uden regel«, til reglen er sat.
-            </CardDescription>
+            <CardDescription>Webhook-hændelser følger kampagnens sletteregel og har ingen egen frist. Uden kampagne eller regel står de som »uden regel«.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
             {webhookQ.isLoading && <div className="text-muted-foreground">Indlæser webhook-datasæt …</div>}
@@ -412,16 +382,15 @@ export function Sletteregler({ konto, api, kampagner }: { konto: ApiKonto; api: 
 
       <Card>
         <CardHeader>
-          <CardTitle>Sådan ryddes data fra {konto.navn}</CardTitle>
+          <CardTitle>Oprydningen</CardTitle>
           <CardDescription>
-            Kampagnefristen afgør hvornår; kolonnens klassifikation afgør hvad: tekniske og forretningsfelter beholdes, identifikatorer, personoplysninger og ikke-klassificerede felter ryddes.
-            En kortere kolonnefrist går forud. Samme kampagnefrist bruges af salgsrensningen (rensningstype vælges under{" "}
-            <Link to={OPBEVARING_LINK} className="text-primary underline">Compliance › Opbevaring</Link>). Systempolitikken for dialer_calls er kun oprydningens tænd/sluk-kontakt:{" "}
-            {system.filter((s) => s.data_type === "dialer_calls").map((s) => (s.is_active ? "tændt" : "SLUKKET – oprydningen kører ikke")).join("") || "ingen række"}.
+            Kører hver nat efter reglerne her; rensningstype for salg vælges under <Link to={OPBEVARING_LINK} className="text-primary underline">Compliance › Opbevaring</Link>. Status:{" "}
+            {system.filter((s) => s.data_type === "dialer_calls").map((s) => (s.is_active ? "tændt" : "SLUKKET – oprydningen kører ikke")).join("") || "ingen tænd/sluk-række"}. Hvad der ryddes, står bag infoknappen øverst.
           </CardDescription>
         </CardHeader>
       </Card>
 
+      <SletteregelDialog maal={dialogLive} aaben={dialogAaben} open={dialog != null} onOpenChange={(o) => { if (!o) setDialog(null); }} kanRedigere={kanRedigere} erSuperadmin={isSuperadmin} snapshots={snapshots} setSnapshot={gemSnapshot} />
       <Dialog open={aktiverIds != null} onOpenChange={(o) => { if (!o) setAktiverIds(null); }}>
         <DialogContent>
           <DialogHeader>
