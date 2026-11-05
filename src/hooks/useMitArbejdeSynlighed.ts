@@ -4,6 +4,7 @@ import { useIsSalgskonsulent } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useMinFiberRolle } from "@/hooks/useTdcFiberSales";
+import { straksbetalingSynlig } from "@/lib/straksbetalingSynlighed";
 
 /**
  * Fanesynlighed for samlesiderne i »Mit arbejde«. Hver fane følger præcis sin gamle rutes regel
@@ -33,7 +34,7 @@ export function useMitArbejdeSynlighed() {
   };
   const salg = {
     salg: !!isUnitedMember && p.canView("tab_registrer_salg_salg"),
-    straksbetaling: !!hasImmediatePaymentSales && p.canView("tab_registrer_salg_straksbetaling"),
+    straksbetaling: straksbetalingSynlig(p.canView("tab_registrer_salg_straksbetaling"), p.canView("tab_registrer_salg_straksbetaling_alle"), !!hasImmediatePaymentSales),
     fm: fmSalg,
     tdcFiber: !!fiberRolle || !!p.isOwner,
   };

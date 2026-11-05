@@ -24,6 +24,8 @@ import { da } from "date-fns/locale";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { toast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePositionPermissions";
+import { Input } from "@/components/ui/input";
 
 const ASE_CLIENT_ID = CLIENT_IDS["Ase"];
 
@@ -37,6 +39,7 @@ interface ImmediatePaymentSale {
   sale_item_id: string;
   matched_pricing_rule_id: string;
   is_immediate_payment: boolean;
+  agent_email: string | null;
 }
 
 function canActivateImmediate(saleDatetime: string): { allowed: boolean; reason?: string } {
@@ -54,6 +57,8 @@ export default function ImmediatePaymentASE() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [convertingSaleId, setConvertingSaleId] = useState<string | null>(null);
+  const seAlle = usePermissions().canView("tab_registrer_salg_straksbetaling_alle");
+  const [soeg, setSoeg] = useState("");
 
   // Mutation for converting to immediate payment
   const convertMutation = useMutation({
@@ -181,9 +186,9 @@ export default function ImmediatePaymentASE() {
   const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
 
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["immediate-payment-ase-sales", agentEmails],
+    queryKey: ["immediate-payment-ase-sales", agentEmails, seAlle],
     queryFn: async () => {
-      if (agentEmails.length === 0) return [];
+      if (!seAlle && agentEmails.length === 0) return [];
 
       const { data: aseCampaigns } = await supabase
         .from("client_campaigns")
@@ -218,7 +223,7 @@ export default function ImmediatePaymentASE() {
 
       if (!salesData) return [];
 
-      const filteredSales = salesData.filter(s =>
+      const filteredSales = salesData.filter(s => seAlle ||
         agentEmails.includes(s.agent_email?.toLowerCase?.() || "")
       );
 
@@ -262,13 +267,14 @@ export default function ImmediatePaymentASE() {
             sale_item_id: (matchingItem as any).id,
             matched_pricing_rule_id: (matchingItem as any).matched_pricing_rule_id,
             is_immediate_payment: (matchingItem as any).is_immediate_payment || false,
+            agent_email: sale.agent_email ?? null,
           });
         }
       }
 
       return result;
     },
-    enabled: agentEmails.length > 0,
+    enabled: seAlle || agentEmails.length > 0,
   });
 
   return (
@@ -295,12 +301,15 @@ export default function ImmediatePaymentASE() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Dine salg med straksbetaling</CardTitle>
+            <CardTitle>{seAlle ? "Alle sælgeres salg med straksbetaling" : "Dine salg med straksbetaling"}</CardTitle>
             <CardDescription>
               Salg fra de seneste 30 dage med mulighed for straksbetaling
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {seAlle && (
+              <Input className="mb-4 max-w-sm text-base" placeholder="Søg på sælger" value={soeg} onChange={(e) => setSoeg(e.target.value)} />
+            )}
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -318,6 +327,7 @@ export default function ImmediatePaymentASE() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Dato</TableHead>
+                    {seAlle && <TableHead>Sælger</TableHead>}
                     <TableHead>Regel</TableHead>
                     <TableHead>Medlemsnr.</TableHead>
                     <TableHead>Status</TableHead>
@@ -325,13 +335,14 @@ export default function ImmediatePaymentASE() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.map((sale) => {
+                  {sales.filter((sale) => !soeg || (sale.agent_email ?? "").toLowerCase().includes(soeg.toLowerCase())).map((sale) => {
                     const eligibility = canActivateImmediate(sale.sale_datetime);
                     return (
                       <TableRow key={sale.id}>
                         <TableCell>
                           {format(new Date(sale.sale_datetime), "d. MMM yyyy", { locale: da })}
                         </TableCell>
+                        {seAlle && <TableCell>{sale.agent_email || "-"}</TableCell>}
                         <TableCell>{sale.rule_name}</TableCell>
                         <TableCell>
                           {sale.member_number || "-"}

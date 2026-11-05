@@ -335,6 +335,7 @@ export const PERMISSION_KEYS = {
   tab_vagter_min_vagtplan: { label: 'Fane: Min vagtplan', section: 'mit_hjem', parent: 'menu_my_schedule' },
   tab_registrer_salg_salg: { label: 'Fane: Salg', section: 'fieldmarketing', parent: 'menu_fm_sales_registration' },
   tab_registrer_salg_straksbetaling: { label: 'Fane: Straksbetaling', section: 'fieldmarketing', parent: 'menu_fm_sales_registration' },
+  tab_registrer_salg_straksbetaling_alle: { label: 'Straksbetaling: se alle sælgeres salg', section: 'fieldmarketing', parent: 'tab_registrer_salg_straksbetaling' },
   tab_storkbook_feed: { label: 'Fane: Feed', section: 'mit_hjem', parent: 'menu_pulsen' },
   tab_storkbook_begivenheder: { label: 'Fane: Begivenheder', section: 'mit_hjem', parent: 'menu_pulsen' },
   tab_min_profil_profil: { label: 'Fane: Profil', section: 'mit_hjem', parent: 'menu_my_profile' },
