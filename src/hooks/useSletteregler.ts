@@ -11,7 +11,8 @@ import type { Database } from "@/integrations/supabase/types";
  */
 export type SletteregelAendring = Database["public"]["Tables"]["sb_sletteregel_aendring"]["Row"];
 export type KampagneAfgoerelse = Database["public"]["Tables"]["sb_kampagne_afgoerelse"]["Row"];
-export type SletteregelStatus = "kladde" | "proevet" | "godkendt" | "aktiv";
+export type SletteregelStatus = "kladde" | "proevet" | "godkendt" | "aktiverer" | "aktiv";
+export type AendringType = "frist" | "beskyt" | "ophaev";
 export type SletteregelMaal = { maal: "klient"; klient_id: string } | { maal: "kampagne"; klientkampagne_id: string } | { maal: "kolonne"; katalog_id: string };
 export type Klientfrist = Database["public"]["Tables"]["sb_klient_sletteregel"]["Row"];
 
@@ -19,6 +20,7 @@ export const SLETTEREGEL_STATUS: Record<SletteregelStatus, { label: string; vari
   kladde: { label: "Kladde", variant: "outline" },
   proevet: { label: "Prøvet", variant: "secondary" },
   godkendt: { label: "Godkendt", variant: "secondary" },
+  aktiverer: { label: "Aktiverer", variant: "secondary" },
   aktiv: { label: "Aktiv", variant: "default" },
 };
 
@@ -316,3 +318,136 @@ export function toerkoerselTekst(r: unknown): string {
   if (typeof o.bemaerkning === "string") dele.push(o.bemaerkning);
   return dele.join(" · ") || "–";
 }
+
+// ---------- SR3b: beskyttede kolonner ----------
+export type BeskyttelseTilstand = "ingen" | "flytter" | "beskyttet" | "ophaever";
+export const BESKYTTELSE_NOEGLE = "se_beskyttede_kaldsfelter";
+
+/** Trækker en kladde/prøvet/godkendt ændring tilbage (RPC sb_sletteregel_fortryd; aktiv/aktiverer kan ikke fortrydes). */
+export function useFortrydAendring() {
+  const invalider = useSletteregelInvalidering();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.rpc("sb_sletteregel_fortryd", { p_id: id });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => invalider(),
+    onError: (e) => toast.error("Ændringen kunne ikke fortrydes: " + fejltekst(e)),
+  });
+}
+
+/** Opretter en beskyt-/ophaev-ændring (kladde) for en katalogkolonne. */
+export function useOpretBeskyttelse() {
+  const invalider = useSletteregelInvalidering();
+  return useMutation({
+    mutationFn: async ({ katalog_id, type }: { katalog_id: string; type: "beskyt" | "ophaev" }) => {
+      const { data, error } = await supabase.from("sb_sletteregel_aendring").insert({ maal: "kolonne", katalog_id, aendring_type: type }).select("id").single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSuccess: () => invalider(),
+    onError: (e) => toast.error("Kladden kunne ikke oprettes: " + fejltekst(e)),
+  });
+}
+
+export type FlytRest = { katalog_id: string; retning: string; rest: number | null; flyttet: number; koert: string; fejl: string | null };
+/** Seneste flytter-journal pr. kolonne under flytning (»N tilbage«) – kun journaler fra den AKTUELLE aktivering (retning + efter beskyttelse_aendret); RLS: ledere læser.
+ *  Mens noget flytter, genhentes også katalog og ændringer, så »aktiverer« forsvinder, når flytteren er færdig (Codex UI r1). */
+export function useFlytRest(kolonner: { id: string; retning: string; siden: string | null }[], enabled = true) {
+  const qc = useQueryClient();
+  const ids = kolonner.map((k) => k.id);
+  return useQuery({
+    queryKey: ["sb-kald-flyt-rest", [...ids].sort().join(","), kolonner.map((k) => k.siden ?? "").join(",")],
+    enabled: enabled && ids.length > 0,
+    refetchInterval: 30 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sb_kald_flyt_log").select("katalog_id, retning, rest, flyttet, koert, fejl").in("katalog_id", ids).order("koert", { ascending: false }).limit(300);
+      if (error) throw error;
+      const m = new Map<string, FlytRest>();
+      for (const r of data ?? []) {
+        const k = kolonner.find((x) => x.id === r.katalog_id);
+        if (!k || r.retning !== k.retning || (k.siden && r.koert < k.siden)) continue;
+        if (!m.has(r.katalog_id)) m.set(r.katalog_id, r as FlytRest);
+      }
+      void qc.invalidateQueries({ queryKey: ["kald-felt-katalog"] });
+      void qc.invalidateQueries({ queryKey: SR_KEYS.aendringer });
+      return m;
+    },
+  });
+}
+
+/** Databasens ejerafgørelse (public.is_owner = RLS'ens; dækker også ejer via system_roles) – Codex UI r2 P2-5. */
+export function useErEjerDb() {
+  return useQuery({
+    queryKey: ["sb-er-ejer-db"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data, error } = await supabase.rpc("is_owner", { _user_id: u.user.id });
+      if (error) throw error;
+      return !!data;
+    },
+  });
+}
+
+/** Antal aktive brugere med rettighedsnøglen (rolle via stilling, personlige grants/denies, ejer via stilling ELLER system_roles) – spejler has_page_permission.
+ *  Kun retvisende for ejer/superadmin (RLS skjuler andres grants/denies og system_roles for øvrige) – kaldes derfor kun med enabled = ejer/superadmin (Codex UI r2 P2-6). */
+export function useNoegleBrugere(noegle: string, roller: string[] | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["sb-noegle-brugere", noegle, (roller ?? []).join(",")],
+    enabled: enabled && roller !== undefined,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const [ans, pos, upp, sr] = await Promise.all([
+        supabase.from("employee_master_data").select("auth_user_id, position_id, job_title, is_active").eq("is_active", true).not("auth_user_id", "is", null),
+        supabase.from("job_positions").select("id, system_role_key"),
+        supabase.from("user_page_permissions").select("user_id, mode, can_view").eq("permission_key", noegle),
+        supabase.from("system_roles").select("user_id, role").eq("role", "ejer"),
+      ]);
+      if (ans.error) throw ans.error; if (pos.error) throw pos.error; if (upp.error) throw upp.error; if (sr.error) throw sr.error;
+      const ejere = new Set((sr.data ?? []).map((r) => r.user_id as string));
+      const rolle = new Map((pos.data ?? []).map((p) => [p.id as string, p.system_role_key as string]));
+      const deny = new Set((upp.data ?? []).filter((u) => u.mode === "deny").map((u) => u.user_id as string));
+      const grant = new Set((upp.data ?? []).filter((u) => u.mode === "grant" && u.can_view).map((u) => u.user_id as string));
+      const r = new Set(roller ?? []);
+      return (ans.data ?? []).filter((e) => {
+        const uid = e.auth_user_id as string;
+        if (deny.has(uid)) return false;
+        if (grant.has(uid)) return true;
+        if (e.position_id && r.has(rolle.get(e.position_id as string) ?? "")) return true;
+        return (e.job_title ?? "").toLowerCase() === "ejer" || ejere.has(uid);
+      }).length;
+    },
+  });
+}
+
+export type BeskyttetLog = Database["public"]["Tables"]["sb_kald_beskyttet_log"]["Row"];
+/** Læs-spor for beskyttede kaldsfelter (RLS: ejer/superadmin). */
+export function useBeskyttetLog(enabled = true) {
+  return useQuery({
+    queryKey: ["sb-kald-beskyttet-log"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sb_kald_beskyttet_log").select("*").order("laest", { ascending: false }).limit(300);
+      if (error) throw error;
+      return (data ?? []) as BeskyttetLog[];
+    },
+  });
+}
+
+/** Roller, der har rettighedsnøglen (role_page_permissions.can_view) – til kolonnen »Adgang«. */
+export function useNoegleRoller(noegle: string, enabled = true) {
+  return useQuery({
+    queryKey: ["sb-noegle-roller", noegle],
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("role_page_permissions").select("role_key, can_view").eq("permission_key", noegle);
+      if (error) throw error;
+      return (data ?? []).filter((r) => r.can_view).map((r) => r.role_key as string).sort();
+    },
+  });
+}
+

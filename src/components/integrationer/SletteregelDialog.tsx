@@ -8,11 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   forklarToerkoersel,
   useAktiverSletteregel,
+  useFortrydAendring,
   useGaeldendeTaelling,
   useGemKladde,
   useGodkendSletteregel,
   useProevSletteregel,
-  useSletKladde,
   type SletteregelAendring,
   type SletteregelMaal,
   type SletteregelStatus,
@@ -45,7 +45,7 @@ export function SletteregelDialog({ maal, aaben, open, onOpenChange, kanRedigere
   /** snapshot af grundlaget ved »Prøv« pr. ændrings-id – ejes af fanen, så det overlever genåbning af dialogen (Codex SR2 r3 P1-2) */
   snapshots: Map<string, ProevSnapshot>; setSnapshot: (id: string, s: ProevSnapshot) => void;
 }) {
-  const gem = useGemKladde(); const slet = useSletKladde(); const proev = useProevSletteregel(); const godkend = useGodkendSletteregel(); const aktiver = useAktiverSletteregel();
+  const gem = useGemKladde(); const slet = useFortrydAendring(); const proev = useProevSletteregel(); const godkend = useGodkendSletteregel(); const aktiver = useAktiverSletteregel();
   const [frist, setFrist] = useState("");
   const [ingen, setIngen] = useState(false);
   const [begrundelse, setBegrundelse] = useState("");
@@ -103,12 +103,13 @@ export function SletteregelDialog({ maal, aaben, open, onOpenChange, kanRedigere
       else setFaerdig(nu.retention_dage == null ? "Kolonnen følger nu kampagnens frist." : `${nu.retention_dage} dage er nu gældende for kolonnen.`);
     } catch { /* toast */ }
   };
-  const sletNu = async () => { if (aaben && aaben.status === "kladde") { try { await slet.mutateAsync(aaben.id); onOpenChange(false); } catch { /* toast */ } } };
+  // SR3b (Mathias 5/11): enhver ikke-aktiveret ændring kan trækkes tilbage – også prøvet/godkendt (RPC sb_sletteregel_fortryd)
+  const sletNu = async () => { if (aaben && aaben.status !== "aktiv" && aaben.status !== "aktiverer") { try { await slet.mutateAsync(aaben.id); onOpenChange(false); } catch { /* toast */ } } };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader className="pr-8">
+        <DialogHeader className="pr-10">
           <DialogTitle className="break-words">{art === "klient" ? "Klientfrist" : art === "kampagne" ? "Kampagnefrist" : "Kolonnefrist"}: {maal.titel}</DialogTitle>
           <DialogDescription>
             {maal.gaeldende != null ? `Gældende i dag: ${maal.gaeldende} dage${maal.kilde === "klient" ? " (fra klient)" : maal.kilde === "kampagne" ? " (egen)" : ""}.` : "Ingen regel i dag."}
@@ -151,7 +152,7 @@ export function SletteregelDialog({ maal, aaben, open, onOpenChange, kanRedigere
         )}
         <DialogFooter className="flex-wrap gap-2 sm:justify-between">
           <div className="flex gap-2">
-            {aaben?.status === "kladde" && !faerdig && kanRedigere && <Button variant="ghost" className="text-destructive" disabled={travl} onClick={sletNu}>Slet kladde</Button>}
+            {aaben && aaben.status !== "aktiv" && aaben.status !== "aktiverer" && !faerdig && kanRedigere && <Button variant="ghost" className="text-destructive" disabled={travl} onClick={sletNu} title="Trækker ændringen tilbage (kladde, prøvet eller godkendt). Den gældende frist røres ikke.">Fortryd ændring</Button>}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>{faerdig ? "Luk" : "Annullér"}</Button>

@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Database as DatabaseIcon, Loader2 } from "lucide-react";
 import { ResponsiveTable } from "@/components/mobile/ResponsiveTable";
 import { SletteregelDialog, type ProevSnapshot, type SletteregelDialogMaal } from "@/components/integrationer/SletteregelDialog";
+import { BeskyttelseDialog } from "@/components/integrationer/BeskyttelseDialog";
 import { AendringInfo, Historik, erPersonfoelsom, useSletteregelRedigering } from "@/components/integrationer/sletteregelDele";
-import { useSletteregelAendringer, useSletteregelNavne, type SletteregelAendring } from "@/hooks/useSletteregler";
+import { BESKYTTELSE_NOEGLE, useErEjerDb, useFlytRest, useNoegleBrugere, useNoegleRoller, useSletteregelAendringer, useSletteregelNavne, type BeskyttelseTilstand, type SletteregelAendring } from "@/hooks/useSletteregler";
 import {
   KATALOG_ENDPOINTS,
   KATALOG_KLASSIFIKATIONER,
@@ -31,7 +32,8 @@ const STATUS_LABEL: Record<string, { label: string; variant: "default" | "second
 };
 
 const DAEKNING_DAGE = 7;
-type Visning = "alle" | "hentes" | "undlades" | "afventer" | "personfoelsom";
+type Visning = "alle" | "hentes" | "undlades" | "afventer" | "personfoelsom" | "beskyttet";
+const BESKYTTELSE_LABEL: Record<BeskyttelseTilstand, { label: string; variant: "default" | "secondary" | "outline" }> = { ingen: { label: "–", variant: "outline" }, flytter: { label: "aktiverer", variant: "secondary" }, beskyttet: { label: "beskyttet", variant: "default" }, ophaever: { label: "ophæves", variant: "secondary" } };
 
 function maalTekst(f: KatalogFelt): string {
   if (f.maal_kolonne) return `${f.maal_tabel}.${f.maal_kolonne}`;
@@ -125,8 +127,17 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
   // Codex SR3a r1 P2: ingen »Ret frist«, før ændringerne er læst – ellers kan en eksisterende ændring overses, fordi den ikke kunne hentes
   const kanRetteFrist = kanRedigere && kanSe && aendringerQ.isSuccess;
   const aendringer = useMemo(() => (kanSe ? aendringerQ.data ?? [] : []), [kanSe, aendringerQ.data]);
-  const aabenFor = (katalogId: string) => aendringer.find((a) => a.status !== "aktiv" && a.katalog_id === katalogId);
-  const historikFor = (katalogId: string) => aendringer.filter((a) => a.status === "aktiv" && a.katalog_id === katalogId).sort((a, b) => (b.aktiveret ?? "").localeCompare(a.aktiveret ?? ""));
+  const aabenFor = (katalogId: string) => aendringer.find((a) => a.status !== "aktiv" && a.katalog_id === katalogId && a.aendring_type === "frist");
+  const aabenBeskytFor = (katalogId: string) => aendringer.find((a) => a.status !== "aktiv" && a.katalog_id === katalogId && a.aendring_type !== "frist");
+  const [beskytDialog, setBeskytDialog] = useState<{ felt: KatalogFelt; retning: "beskyt" | "ophaev" } | null>(null);
+  const beskytFelt = beskytDialog ? (data ?? []).find((f) => f.id === beskytDialog.felt.id) ?? beskytDialog.felt : null;
+  const rollerQ = useNoegleRoller(BESKYTTELSE_NOEGLE, kanSe);
+  const erEjerDb = useErEjerDb();
+  const brugereQ = useNoegleBrugere(BESKYTTELSE_NOEGLE, rollerQ.data, kanSe && erEjerDb.data === true);  // tallet er kun retvisende for ejere (RLS: kun ejere læser alle grants/denies og system_roles) – Codex UI r3
+  const flytKolonner = useMemo(() => (data ?? []).filter((f) => f.beskyttelse === "flytter" || f.beskyttelse === "ophaever").map((f) => ({ id: f.id, retning: f.beskyttelse as string, siden: f.beskyttelse_aendret })), [data]);
+  const flytRestQ = useFlytRest(flytKolonner, kanSe);
+  const historikFor = (katalogId: string) => aendringer.filter((a) => a.status === "aktiv" && a.katalog_id === katalogId && a.aendring_type === "frist").sort((a, b) => (b.aktiveret ?? "").localeCompare(a.aktiveret ?? ""));  // frist-historik (beskyttelse vises i Beskyttet-cellen)
+  const aabenAlleFor = (katalogId: string) => aendringer.find((a) => a.status !== "aktiv" && a.katalog_id === katalogId);  // én åben ændring pr. mål uanset type (databasen håndhæver)
   const retFrist = (f: KatalogFelt) => setDialog({ maal: { maal: "kolonne", katalog_id: f.id }, titel: f.felt_navn, gaeldende: f.retention_dage, kampagner: [], klientkampagner: [] });
   const dialogKatalogId = dialog ? (dialog.maal as { katalog_id: string }).katalog_id : null;
   // dialogens gældende frist genberegnes fra aktuelle data (Codex SR2 r2 P1-1)
@@ -148,6 +159,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
       if (visning === "undlades" && f.hentes) continue;
       if (visning === "afventer" && f.status !== "forslag") continue;
       if (visning === "personfoelsom" && !erPersonfoelsom(f.klassifikation)) continue;
+      if (visning === "beskyttet" && f.beskyttelse === "ingen") continue;
       if (q && !`${f.felt_navn} ${f.felt_sti} ${f.beskrivelse ?? ""} ${f.metadata_noegle ?? ""} ${f.maal_kolonne ?? ""} ${f.kampagne_ekstern_id ?? ""}`.toLowerCase().includes(q)) continue;
       const liste = m.get(f.endpoint) ?? [];
       liste.push(f);
@@ -169,6 +181,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
   const uklassificeret = synlige.filter((f) => f.klassifikation === "ukendt").length;
   const personfoelsomme = synlige.filter((f) => erPersonfoelsom(f.klassifikation)).length;
   const medFrist = synlige.filter((f) => f.retention_dage != null).length;
+  const beskyttede = synlige.filter((f) => f.beskyttelse !== "ingen").length;
 
   const kolonner = [
     { key: "kolonne", header: "Kolonne", isTitle: true, cell: (f: KatalogFelt) => (
@@ -181,10 +194,27 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
     ) },
     { key: "hentes", header: "Hentes", isKey: true, cell: (f: KatalogFelt) => <HentesCelle felt={f} laast={laast} /> },
     { key: "klass", header: "Klassifikation", isKey: true, cell: (f: KatalogFelt) => <KlassCelle felt={f} laast={laast} /> },
-    { key: "beskyttet", header: "Beskyttet", isKey: true, cell: (f: KatalogFelt) => erPersonfoelsom(f.klassifikation)
-      ? <Badge variant="outline" title="Personfølsom kolonne (personoplysning, identifikator eller følsom). Beskyttelsen – lukket kolonne, adgangsnøgle og læselog – aktiveres pr. kolonne i næste leverance (SR3b); indtil da gælder kaldsdataens almindelige adgang.">foreslået</Badge>
-      : <span className="text-xs text-muted-foreground">–</span> },
+    { key: "beskyttet", header: "Beskyttet", isKey: true, cell: (f: KatalogFelt) => {
+      const t = (f.beskyttelse ?? "ingen") as BeskyttelseTilstand; const b = aabenBeskytFor(f.id); const rest = flytRestQ.data?.get(f.id);
+      return (
+        <div className="flex flex-col items-start gap-1 text-xs">
+          {t === "ingen"
+            ? (erPersonfoelsom(f.klassifikation)
+              ? <Badge variant="outline" title="Personfølsom kolonne (personoplysning, identifikator eller følsom) – foreslås beskyttet: værdierne flyttes til en lukket tabel, kun brugere med nøglen »se beskyttede kaldsfelter« kan slå dem op, og opslag logges.">foreslået</Badge>
+              : <span className="text-muted-foreground">–</span>)
+            : <Badge variant={BESKYTTELSE_LABEL[t].variant} title={t === "beskyttet" ? "Værdierne ligger i den lukkede tabel; opslag kræver nøglen og logges." : "Flytningen kører i baggrunden (batches hvert 2. minut)."}>{BESKYTTELSE_LABEL[t].label}{(t === "flytter" || t === "ophaever") ? (rest && rest.rest != null ? ` – ${rest.rest.toLocaleString("da-DK")} tilbage` : " – resttal kendes efter næste kørsel") : ""}</Badge>}
+          {(t === "flytter" || t === "ophaever") && rest?.fejl && <span className="text-destructive" title={rest.fejl}>seneste kørsel fejlede – prøves igen</span>}
+          {b && <AendringInfo a={b} />}
+        </div>
+      );
+    } },
     { key: "sletteregel", header: "Sletteregel", isKey: true, cell: (f: KatalogFelt) => <FristCelle felt={f} aaben={aabenFor(f.id)} historik={historikFor(f.id)} navne={navne} kanSe={kanSe} /> },
+    { key: "adgang", header: "Adgang", cell: (f: KatalogFelt) => (f.beskyttelse ?? "ingen") === "ingen"
+      ? <span className="text-xs text-muted-foreground">som kaldsdata (manager og opefter)</span>
+      : <span className="text-xs" title="Roller med nøglen »se beskyttede kaldsfelter« (role_page_permissions) + antal aktive brugere (rolle, personlige grants/denies, ejer). Rettes under Administration › Rettigheder.">
+          {!kanSe ? "nøgle: (kræver sletteregel-adgang)" : rollerQ.isLoading ? "nøgle: indlæser …" : rollerQ.isError ? "nøgle: kunne ikke hentes" : rollerQ.data?.length ? `nøgle: ${rollerQ.data.join(", ")}` : "nøgle: ingen roller"}
+          {kanSe && brugereQ.isSuccess ? ` · ${brugereQ.data} ${brugereQ.data === 1 ? "bruger" : "brugere"}` : kanSe && erEjerDb.data !== true ? " · antal brugere: kun for ejer" : ""}
+        </span> },
     { key: "type", header: "Type", cell: (f: KatalogFelt) => <span className="text-xs">{f.datatype}</span> },
     { key: "gemmes", header: "Gemmes i", cell: (f: KatalogFelt) => <div className="text-xs font-mono">{maalTekst(f)}{f.kanonisk_felt && <div className="text-muted-foreground mt-1">fælles: {f.kanonisk_felt}</div>}{f.eksempel && <div className="text-muted-foreground mt-1">fx {f.eksempel}</div>}</div> },
     { key: "daekning", header: `Dækning (${DAEKNING_DAGE} d)`, cell: (f: KatalogFelt) => <DaekningCelle felt={f} daekning={daekning} /> },
@@ -209,6 +239,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
           <Badge variant="outline">{hentes} hentes</Badge>
           <Badge variant="outline">{personfoelsomme} personfølsomme</Badge>
           <Badge variant="outline">{medFrist} med egen frist</Badge>
+          <Badge variant={beskyttede > 0 ? "default" : "outline"}>{beskyttede} beskyttede</Badge>
           <Badge variant={uklassificeret > 0 ? "destructive" : "outline"}>{uklassificeret} ikke klassificeret</Badge>
           <Select value={visning} onValueChange={(v) => setVisning(v as Visning)}>
             <SelectTrigger className="h-9 w-[190px] text-xs sm:ml-auto sm:h-8" aria-label="Visning"><SelectValue /></SelectTrigger>
@@ -217,6 +248,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
               <SelectItem value="hentes">Kun dem der hentes</SelectItem>
               <SelectItem value="undlades">Kun dem der undlades</SelectItem>
               <SelectItem value="personfoelsom">Kun personfølsomme</SelectItem>
+              <SelectItem value="beskyttet">Kun beskyttede</SelectItem>
               <SelectItem value="afventer">Afventer min afgørelse (forslag)</SelectItem>
             </SelectContent>
           </Select>
@@ -261,9 +293,23 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
                   columns={kolonner}
                   rows={prEndpoint.get(e.endpoint) ?? []}
                   rowKey={(f) => f.id}
-                  actions={(f) => kanRetteFrist && f.status !== "skabelon"
-                    ? <Button size="sm" variant={aabenFor(f.id) ? "default" : "outline"} className="h-9 text-xs sm:h-8" onClick={() => retFrist(f)}>{aabenFor(f.id) ? "Fortsæt ændring" : "Ret frist"}</Button>
-                    : null}
+                  actions={(f) => {
+                    if (!kanRetteFrist || f.status === "skabelon") return null;
+                    const aa = aabenAlleFor(f.id); const t = (f.beskyttelse ?? "ingen") as BeskyttelseTilstand;
+                    if (aa?.status === "aktiverer" || t === "flytter" || t === "ophaever") return <span className="text-xs text-muted-foreground">flytning i gang – ingen nye ændringer</span>;
+                    if (aa) {  // én åben ændring pr. mål uanset type: kun den kan fortsættes
+                      return aa.aendring_type === "frist"
+                        ? <Button size="sm" variant="default" className="h-9 text-xs sm:h-8" onClick={() => retFrist(f)}>Fortsæt ændring</Button>
+                        : <Button size="sm" variant="default" className="h-9 text-xs sm:h-8" onClick={() => setBeskytDialog({ felt: f, retning: aa.aendring_type === "beskyt" ? "beskyt" : "ophaev" })}>{aa.aendring_type === "beskyt" ? "Fortsæt beskyttelse" : "Fortsæt ophævelse"}</Button>;
+                    }
+                    return (
+                      <>
+                        <Button size="sm" variant="outline" className="h-9 text-xs sm:h-8" onClick={() => retFrist(f)}>Ret frist</Button>
+                        {f.metadata_noegle && t === "ingen" && f.hentes && f.status === "aktiv" && <Button size="sm" variant="outline" className="h-9 text-xs sm:h-8" onClick={() => setBeskytDialog({ felt: f, retning: "beskyt" })}>Beskyt</Button>}
+                        {f.metadata_noegle && t === "beskyttet" && <Button size="sm" variant="outline" className="h-9 text-xs sm:h-8" onClick={() => setBeskytDialog({ felt: f, retning: "ophaev" })}>Ophæv</Button>}
+                      </>
+                    );
+                  }}
                   empty={<div className="text-center text-muted-foreground py-6 text-sm">Ingen kolonner</div>}
                 />
               </TabsContent>
@@ -271,6 +317,7 @@ export function KaldFeltKatalog({ kilde, laast = false, indlejret = false, kampa
           </Tabs>
         )}
       </CardContent>
+      <BeskyttelseDialog felt={beskytFelt} retning={beskytDialog?.retning ?? "beskyt"} aaben={beskytFelt ? aabenBeskytFor(beskytFelt.id) : undefined} open={beskytDialog != null} onOpenChange={(o) => { if (!o) setBeskytDialog(null); }} kanRedigere={kanRetteFrist} erSuperadmin={isSuperadmin} roller={rollerQ.data ?? []} />
       <SletteregelDialog maal={dialogLive} aaben={dialogKatalogId ? aabenFor(dialogKatalogId) : undefined} open={dialog != null} onOpenChange={(o) => { if (!o) setDialog(null); }} kanRedigere={kanRetteFrist} erSuperadmin={isSuperadmin} snapshots={snapshots} setSnapshot={gemSnapshot} />
     </Card>
   );

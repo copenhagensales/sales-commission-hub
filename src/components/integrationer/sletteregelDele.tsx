@@ -33,6 +33,17 @@ export function fristTekst(d: number | null | undefined, tom = "ingen"): string 
 export function AendringInfo({ a }: { a?: SletteregelAendring }) {
   if (!a) return <span className="text-muted-foreground">–</span>;
   const s = SLETTEREGEL_STATUS[a.status as SletteregelStatus];
+  const type = (a as { aendring_type?: string }).aendring_type ?? "frist";
+  if (type !== "frist") {  // SR3b: beskyt/ophaev vises typebestemt – ikke som frist (Codex UI r1 P2)
+    const r = (a.proevet_resultat ?? null) as { raekker?: number } | null;
+    return (
+      <div className="text-xs space-y-0.5">
+        <div className="flex items-center gap-1"><Badge variant={s?.variant ?? "outline"}>{s?.label ?? a.status}</Badge><span>{type === "beskyt" ? "beskyttelse" : "ophævelse"}</span></div>
+        {a.proevet && <div className="text-muted-foreground" title={`Tørkørsel ${tid(a.proevet)}`}>{(r?.raekker ?? 0).toLocaleString("da-DK")} {r?.raekker === 1 ? "række" : "rækker"} {type === "beskyt" ? "flyttes til den lukkede tabel" : "flyttes tilbage"}</div>}
+        {a.godkendt && <div className="text-muted-foreground">Godkendt {tid(a.godkendt)}</div>}
+      </div>
+    );
+  }
   return (
     <div className="text-xs space-y-0.5">
       <div className="flex items-center gap-1"><Badge variant={s?.variant ?? "outline"}>{s?.label ?? a.status}</Badge><span>{fristTekst(a.frist_dage, a.maal === "klient" ? "fjern klientregel" : a.maal === "kampagne" ? "følg klienten / ingen" : "følg kampagnen")}</span></div>

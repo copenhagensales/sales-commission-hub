@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Eye, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useBeskyttetLog, useErEjerDb, useSletteregelNavne } from "@/hooks/useSletteregler";
+import { ResponsiveTable } from "@/components/mobile/ResponsiveTable";
+import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
@@ -19,6 +22,12 @@ const fieldLabels: Record<string, string> = {
 };
 
 export default function SensitiveAccessLog() {
+  // SR3b: opslag i beskyttede kaldsfelter (egen tabel; RLS ejer/superadmin) – adgangen tjekkes særskilt, så RLS' tomme svar ikke vises som »ingen opslag«
+  const { isSuperadmin } = useIsSuperadmin();
+  const erEjerDb = useErEjerDb();  // databasens ejerafgørelse (is_owner) = RLS'ens – ikke stillingsnavnet (Codex UI r2 P2-5)
+  const kanSeBeskyttetLog = erEjerDb.data === true || isSuperadmin;
+  const beskyttetLog = useBeskyttetLog(kanSeBeskyttetLog);
+  const { data: navne = new Map<string, string>() } = useSletteregelNavne(kanSeBeskyttetLog);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
@@ -160,6 +169,36 @@ export default function SensitiveAccessLog() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Opslag i beskyttede kaldsfelter</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">Hvert opslag i en beskyttet kolonne (fx kundens telefonnummer) via nøglen »se beskyttede kaldsfelter«. Loggen kan ikke ændres eller slettes.</p>
+            {erEjerDb.isLoading ? (
+              <p className="text-muted-foreground text-sm">Tjekker adgang...</p>
+            ) : !kanSeBeskyttetLog ? (
+              <p className="text-muted-foreground text-sm">Kun ejer og superadmin kan se denne log.</p>
+            ) : beskyttetLog.isLoading ? (
+              <p className="text-muted-foreground text-sm">Indlæser...</p>
+            ) : beskyttetLog.isError ? (
+              <p className="text-destructive text-sm">Loggen kunne ikke hentes: {(beskyttetLog.error as Error).message}</p>
+            ) : (
+              <ResponsiveTable
+                columns={[
+                  { key: "tid", header: "Tidspunkt", isTitle: true, cell: (l) => <span className="text-sm">{new Date(l.laest).toLocaleString("da-DK", { dateStyle: "short", timeStyle: "short" })}</span> },
+                  { key: "bruger", header: "Tilgået af", isKey: true, cell: (l) => <span className="text-sm">{navne.get(l.user_id) ?? l.user_id}</span> },
+                  { key: "tabel", header: "Tabel", isKey: true, cell: (l) => <span className="text-sm font-mono">{l.tabel}</span> },
+                  { key: "raekke", header: "Række", isKey: true, cell: (l) => <span className="text-sm font-mono">{l.external_id ?? l.raekke_id ?? "–"}</span> },
+                  { key: "noegler", header: "Nøgler", isKey: true, cell: (l) => <span className="text-sm font-mono">{l.noegler.join(", ")}</span> },
+                ]}
+                rows={beskyttetLog.data ?? []}
+                rowKey={(l) => String(l.id)}
+                empty={<p className="text-muted-foreground text-sm">Ingen opslag endnu.</p>}
+              />
             )}
           </CardContent>
         </Card>
