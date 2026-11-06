@@ -277,6 +277,8 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
   - Aktivering af en opbevaringsregel kræver superadmin. Opbevaringsregler går kladde → prøvet → godkendt → aktiv, og tørkørslen viser, hvor mange personer og rækker der rammes. Kun systemkolonner kan være permanente. Indtil en kolonne er bekræftet, hashes den i loggen som direkte persondata. En samtykkelog registrerer formål, kilde og tidspunkt pr. person og kandidat og håndhæves i 5.3 og 5.5.
 - **Bevis:** 3.419 af 3.419 kolonner har en række. Ingen af fase 1's kolonner er uafklarede. Loggen hasher præcis de direkte persondatafelter.
 
+- **Opbevaring af kaldsdata (tilføjet 6/11-2026, Mathias):** i 1.0's kolonnekatalog for kaldsdata beholdes kolonner klassificeret teknik eller forretning uden egen frist permanent, selv om dette trin siger, at kun systemkolonner kan være permanente. Kaldet anonymiseres efter kampagnens frist (koblingen til emnet og optagelseslinket fjernes), personfølsomme kolonner ryddes efter kampagnens eller deres egen kortere frist, og de beholdte kolonner er grundlaget for tal og historik. Når registret for alle kolonner lander i dette trin, får forretningsdata en lang standardfrist (fx 5 år) ét sted, og afvigelsen lukkes.
+
 #### Trin 1.2 Log på alle tabeller · M
 
 **Færdigt bagefter:** hver ændring i Storks data er logget pr. række med hvem, hvornår, hvad og hvorfor. Det gælder, uanset om ændringen kom fra en skærm, et job, en integration eller AI.
