@@ -2969,6 +2969,8 @@ async function handleMonthlyGoal(
 
     // Salgslinjer på klienten i perioden
     const items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate: string | null }[] = [];
+    // TDC: Relatel-sælgernes fiberleads tæller ikke på TDC-månedsmålet (samme regel som fibertavlen).
+    const tdcRelatelMap = clientId === TDC_ERHVERV_CLIENT_ID_EF ? await getRelatelEmailToEmployee(supabase) : null;
     try {
       const pageSize = 1000;
       let from = 0;
@@ -2992,6 +2994,11 @@ async function handleMonthlyGoal(
             ? new Date(row.sale_datetime).toLocaleDateString("en-CA", { timeZone: "Europe/Copenhagen" })
             : null;
           for (const item of row.sale_items || []) {
+            if (
+              tdcRelatelMap &&
+              item.product_id in RELATEL_FIBER_LEAD_POINTS_EF &&
+              relatelLeadCounts(tdcRelatelMap, String(row.agent_email ?? "").toLowerCase(), row.sale_datetime)
+            ) continue;
             items.push({
               agentEmail: row.agent_email ? String(row.agent_email).toLowerCase() : null,
               productId: item.product_id ?? null,
