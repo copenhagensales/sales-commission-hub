@@ -11409,6 +11409,9 @@ export type Database = {
           afledt_af: string[]
           begrundelse: string | null
           beskrivelse: string | null
+          beskyttelse: string
+          beskyttelse_aendret: string | null
+          beskyttelse_af: string | null
           datatype: string
           eksempel: string | null
           endpoint: string
@@ -11419,9 +11422,6 @@ export type Database = {
           id: string
           kampagne_ekstern_id: string | null
           kanonisk_felt: string | null
-          beskyttelse: string
-          beskyttelse_aendret: string | null
-          beskyttelse_af: string | null
           kilde: string
           klassifikation: string
           maal_kolonne: string | null
@@ -11439,6 +11439,9 @@ export type Database = {
           afledt_af?: string[]
           begrundelse?: string | null
           beskrivelse?: string | null
+          beskyttelse?: string
+          beskyttelse_aendret?: string | null
+          beskyttelse_af?: string | null
           datatype: string
           eksempel?: string | null
           endpoint: string
@@ -11449,9 +11452,6 @@ export type Database = {
           id?: string
           kampagne_ekstern_id?: string | null
           kanonisk_felt?: string | null
-          beskyttelse?: string
-          beskyttelse_aendret?: string | null
-          beskyttelse_af?: string | null
           kilde?: string
           klassifikation?: string
           maal_kolonne?: string | null
@@ -11469,6 +11469,9 @@ export type Database = {
           afledt_af?: string[]
           begrundelse?: string | null
           beskrivelse?: string | null
+          beskyttelse?: string
+          beskyttelse_aendret?: string | null
+          beskyttelse_af?: string | null
           datatype?: string
           eksempel?: string | null
           endpoint?: string
@@ -11479,9 +11482,6 @@ export type Database = {
           id?: string
           kampagne_ekstern_id?: string | null
           kanonisk_felt?: string | null
-          beskyttelse?: string
-          beskyttelse_aendret?: string | null
-          beskyttelse_af?: string | null
           kilde?: string
           klassifikation?: string
           maal_kolonne?: string | null
@@ -16856,6 +16856,99 @@ export type Database = {
         }
         Relationships: []
       }
+      sb_kald_beskyttet: {
+        Row: {
+          data: Json
+          dialer_name: string | null
+          external_id: string
+          integration_id: string | null
+          integration_type: string | null
+          opdateret: string
+          tabel: string
+        }
+        Insert: {
+          data?: Json
+          dialer_name?: string | null
+          external_id: string
+          integration_id?: string | null
+          integration_type?: string | null
+          opdateret?: string
+          tabel: string
+        }
+        Update: {
+          data?: Json
+          dialer_name?: string | null
+          external_id?: string
+          integration_id?: string | null
+          integration_type?: string | null
+          opdateret?: string
+          tabel?: string
+        }
+        Relationships: []
+      }
+      sb_kald_beskyttet_log: {
+        Row: {
+          external_id: string | null
+          id: number
+          laest: string
+          noegler: string[]
+          raekke_id: string | null
+          tabel: string
+          user_id: string
+        }
+        Insert: {
+          external_id?: string | null
+          id?: never
+          laest?: string
+          noegler: string[]
+          raekke_id?: string | null
+          tabel: string
+          user_id: string
+        }
+        Update: {
+          external_id?: string | null
+          id?: never
+          laest?: string
+          noegler?: string[]
+          raekke_id?: string | null
+          tabel?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sb_kald_flyt_log: {
+        Row: {
+          fejl: string | null
+          flyttet: number
+          id: number
+          katalog_id: string
+          koert: string
+          rest: number | null
+          retning: string
+          varighed_ms: number | null
+        }
+        Insert: {
+          fejl?: string | null
+          flyttet?: number
+          id?: never
+          katalog_id: string
+          koert?: string
+          rest?: number | null
+          retning: string
+          varighed_ms?: number | null
+        }
+        Update: {
+          fejl?: string | null
+          flyttet?: number
+          id?: never
+          katalog_id?: string
+          koert?: string
+          rest?: number | null
+          retning?: string
+          varighed_ms?: number | null
+        }
+        Relationships: []
+      }
       sb_kampagne_afgoerelse: {
         Row: {
           afgjort: string
@@ -16989,69 +17082,6 @@ export type Database = {
           kilde?: string
           kilde_id?: string
           slettet_at?: string
-        }
-        Relationships: []
-      }
-      sb_kald_beskyttet_log: {
-        Row: {
-          external_id: string | null
-          id: number
-          laest: string
-          noegler: string[]
-          raekke_id: string | null
-          tabel: string
-          user_id: string
-        }
-        Insert: {
-          external_id?: string | null
-          id?: never
-          laest?: string
-          noegler: string[]
-          raekke_id?: string | null
-          tabel: string
-          user_id: string
-        }
-        Update: {
-          external_id?: string | null
-          id?: never
-          laest?: string
-          noegler?: string[]
-          raekke_id?: string | null
-          tabel?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      sb_kald_flyt_log: {
-        Row: {
-          fejl: string | null
-          flyttet: number
-          id: number
-          katalog_id: string
-          koert: string
-          rest: number | null
-          retning: string
-          varighed_ms: number | null
-        }
-        Insert: {
-          fejl?: string | null
-          flyttet?: number
-          id?: never
-          katalog_id: string
-          koert?: string
-          rest?: number | null
-          retning: string
-          varighed_ms?: number | null
-        }
-        Update: {
-          fejl?: string | null
-          flyttet?: number
-          id?: never
-          katalog_id?: string
-          koert?: string
-          rest?: number | null
-          retning?: string
-          varighed_ms?: number | null
         }
         Relationships: []
       }
@@ -21988,6 +22018,10 @@ export type Database = {
         Args: { p_id: string; p_kilde: string; p_kode: string }
         Returns: string
       }
+      sb_beskyttede_noegler: {
+        Args: { p_kampagne: string; p_tabel: string }
+        Returns: string[]
+      }
       sb_bind_sti: {
         Args: {
           p_besked: string
@@ -22026,6 +22060,21 @@ export type Database = {
       sb_flag: { Args: { p_noegle: string }; Returns: boolean }
       sb_flag_laes: { Args: { p_noegle: string }; Returns: boolean }
       sb_handling: { Args: never; Returns: string }
+      sb_kald_beskyt_flyt: { Args: { p_batch?: number }; Returns: Json }
+      sb_kald_beskyttet_ider: {
+        Args: { p_tabel: string }
+        Returns: {
+          id: string
+          noegler: string[]
+        }[]
+      }
+      sb_kald_beskyttet_laes: {
+        Args: { p_ids: string[]; p_tabel: string }
+        Returns: {
+          data: Json
+          id: string
+        }[]
+      }
       sb_kan_moderere_opslag: { Args: { p_post: string }; Returns: boolean }
       sb_kilde_for_tabel: { Args: { p_tabel: string }; Returns: string }
       sb_kildetid: {
@@ -22113,19 +22162,11 @@ export type Database = {
         Returns: number
       }
       sb_sletteregel_adgang_skriv: { Args: never; Returns: undefined }
-      sb_kald_beskyttet_ider: {
-        Args: { p_tabel: string }
-        Returns: { id: string; noegler: string[] }[]
-      }
-      sb_kald_beskyttet_laes: {
-        Args: { p_ids: string[]; p_tabel: string }
-        Returns: { data: Json; id: string }[]
-      }
-      sb_sletteregel_fortryd: { Args: { p_id: string }; Returns: Json }
       sb_sletteregel_aktiver: {
         Args: { p_begrundelse: string; p_id: string }
         Returns: Json
       }
+      sb_sletteregel_fortryd: { Args: { p_id: string }; Returns: Json }
       sb_sletteregel_godkend: { Args: { p_id: string }; Returns: Json }
       sb_sletteregel_proev: { Args: { p_id: string }; Returns: Json }
       sb_sletteregel_taelling: {
