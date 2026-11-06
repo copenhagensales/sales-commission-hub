@@ -340,6 +340,8 @@ Fase 1 gør personer, organisation og rettigheder til strukturens. Ingen løn æ
 - **Bevis:** for hver agent i salg fra de seneste 90 dage giver resolveren samme person som 1.0, eller forskellen er en registreret konflikt. Et Microsoft-login giver samme medarbejder som 1.0's værn.
 - **SoMe-krav (tilføjet 29/10-2026, Mathias):** identiteterne skal også rumme rekrutteringens eksterne nøgler, så SoMe-attribution (trin 5.13) kan bygges uden ny identitetslogik: kandidat-id fra annonceplatform (Meta/TikTok/LinkedIn/Snap/Google), lead-id fra hjemmesidens formular og kampagne-id ved ansættelse. Samme regel som for agenter: nøglen peger på præcis én person, ellers »ikke matchet«. Kilde: fase0/some/plan-v5.md (1.0-bundtet bygges ikke; ligger som kildemateriale).
 
+- **Plecto-inspiration (tilføjet 6/11-2026, Mathias):** medarbejderlisten viser pr. person de eksterne identiteter som »dataleverandører« (dialer-agent pr. konto, arbejdsmail, Microsoft-konto) med filter. Mulige dubletter (samme navn, mail eller agent-id på to personer) samles i én handling, hvor en administrator vælger, hvilken person der beholdes. Sammenlægning er en handling i strukturen og logges.
+
 #### Trin 1.7 Organisationstræ med dateret historik · L
 
 **Færdigt bagefter:** Copenhagen Sales → afdelinger → teams → medarbejdere er ét træ med datoer. Man kan slå op, hvem der var i hvilket team, hvem der ledede det, og hvilket team der ejede en klient på en given dag. Teams lukkes, de slettes ikke.
@@ -831,6 +833,8 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Timebaserede tal før vagternes skæringsdato bygger på et historisk timegrundlag, som flytningen danner én gang efter 1.0's egen regel og markerer »udledt af 1.0«. Det bruges kun i tal og rapporter, aldrig i løn. Mangler grundlaget, vises »mangler grundlag«, aldrig 0.
 - **Bevis:** To genafspillede perioder og en uge live. Med 1.0's regler er tallene ens række for række, og hver forskel med strukturens regler har en årsag. Historiske timetal er ens med det, 1.0 viser i dag.
 
+- **Plecto-inspiration (tilføjet 6/11-2026, Mathias):** formelsystemets byggeklodser har som første lag en datafunktion (antal, sum, gennemsnit, mindste, største, antal unikke) over ét felt fra kolonnekataloget med filter og valgt datofelt. En KPI bestemmer ikke sin tidsperiode; perioden sættes af den tavle eller rapport, der viser den. Talformat, præfiks/suffiks og farveregler (grøn/gul/rød med tærskler eller procent af mål) hører til KPI'en og arves af alle tavler.
+
 #### Trin 5.2 Tavler, TV og mål · XL
 
 **Færdigt bagefter:** alle dashboards, TV-skærme og månedsmål-tavler viser tal fra 5.1. Hvem der ser hvilken tavle, styres i rettighederne. TV kører på nøgler, der kun åbner deres egne tavler og kan udløbe. Alle mål sættes i UI.
@@ -842,6 +846,9 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Klienttavlerne bevarer deres udseende og opdateres højst 60 sekunder bagud som i dag.
 - **Bevis:** To genafspillede perioder og en uge live pr. tavle, dag, klient og sælger. Adgangen pr. person og tavle er lig med 1.0's.
 
+- **Plecto-inspiration (tilføjet 6/11-2026, Mathias):** alle tavler er én tavletype: et gitter af widgets, hvor hver widget har data (en KPI), en valgfri målværdi (KPI eller fast tal), indstillinger (gruppér efter medarbejder eller team, filtrér team, sammenlign med forrige periode, forkort tal, skjul tomme) og en tidsperiode. Udseendet styres af et tema som data (farver, baggrund), så klienttavlerne ser ud som i dag. En tavle kan vises, som den så ud på en dato (historik fra tal-snapshots), og eksporteres som pdf.
+- Et TV viser et slideshow: en liste af tavler, hvor hvert dias har et tidsrum på dagen, og overlappende dias skifter efter et fast antal sekunder. TV'er står i en liste med navn, slideshow og sidste hjerteslag, og et nyt TV aktiveres ved at indtaste den kode, TV'et viser. Eksisterende koder bevares.
+
 #### Trin 5.3 Kommunikation og afsendelse · L
 
 **Færdigt bagefter:** al mail, sms og alle opkald går gennem én afsendelsesvej med status og genforsøg. Chat, sms-tråde, softphone og skabeloner kører som modul, og ingen kan slette eller rette kommunikationsloggen. Her bygges også den fælles adgangsnøgle uden login, som TV, kandidater, kontrakter og målinger bruger.
@@ -851,6 +858,9 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Chatten bevares, selvom den bruges lidt.
   - »Slet« i UI skjuler beskeden for brugeren. Rækken består, til opbevaringsreglen anonymiserer den.
 - **Bevis:** i en uge live er antal og modtagere pr. type ens. En sms, der gentages efter en timeout, sendes én gang.
+
+- **Plecto-inspiration (tilføjet 6/11-2026, Mathias):** fejringer og beskeder er regler som data: en udløser (ny registrering i en kilde med filter, en KPI der når et mål, eller et skema) og en eller flere handlinger (vis på tavle med overskrift, animation og lyd; opslag i feedet; besked i Teams eller mail; giv achievement; spin hjulet). Beskeder bruger variabler som medarbejdernavn og værdi. Alle handlinger går gennem afsendelsesvejen her, og en regel oprettes i to trin: handlinger først, betingelser bagefter. Krav 14b »alle tal live« bygges på de samme hændelser: hændelse → genberegn → vis.
+- Adgangsnøglen bruges også af et indgående API, hvor andre systemer sender registreringer til Stork: nøgle pr. konto, registrering med external_id (samme nøgle igen er en opdatering), højst 100 pr. kald, tællere for modtagne og afviste, og kvote pr. nøgle.
 
 #### Trin 5.4 Rapporter, eksport, klientrapporter og prognoser · L
 
@@ -862,6 +872,8 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Prognosen bruger 1.0's metode, men resterende arbejdsdage tages fra de planlagte vagter.
   - Churn og anciennitet regnes af ansættelsesperioderne. Teamlederens rapporter følger klientens nuværende team for salg og opkald og det frosne team for løn og DB.
 - **Bevis:** hver rapport er ens med 1.0 for to genafspillede perioder og en uge live. En teamleder, der kalder rapporten for et andet team, får kun egne rækker.
+
+- **Plecto-inspiration (tilføjet 6/11-2026, Mathias):** en rapport er en tavle af samme widgets med en adgangsramme (hvem må åbne den, og hvilke teams eller personer den viser data for) og en planlagt eksport (pdf på mail til personer i organisationen). Teamlederens begrænsning ovenfor er den samme ramme.
 
 #### Trin 5.5 Rekruttering · L
 
@@ -893,6 +905,8 @@ I fase 5 flyttes tallene (KPI, tavler, TV, rapporter og prognoser) og alle modul
   - Ligaens provision er de fælles tal. Afsluttede runder ændres ikke af senere annulleringer.
   - Streak-tærsklen (1.500 kr.) og Powerdag-tiderne bliver data.
 - **Bevis:** en genafspillet ligarunde med samme stilling pr. medarbejder som i 1.0.
+
+- **Plecto-inspiration (tilføjet 6/11-2026, Mathias):** en konkurrence er ét objekt: type (spiller eller team), KPI, deltagere, periode, præmie og tema, der kan vises som dias på tavler. Achievements (tildeling, medlemskab pr. periode eller rekord) og streaks (dage, arbejdsdage, registreringer eller uger i træk) beregnes af databasen og vises ved navnet på leaderboards. Hjulet er et værktøj, man spinder selv: et hjul har felter, der er valgte medarbejdere, valgte teams eller præmier, eventuelt vægtede. Det spindes fra tavlen eller en leders telefon, lander på ét felt med animation og lyd, og hvert spin logges med hjul, resultat, hvem der spandt og tidspunkt. Et felt kan fjernes efter et spin. Regler fra 5.3 kan udløse et spin, men det er ikke en forudsætning. Konkurrencetemaer (kapløb, bjergløb) venter til designopgraderingen. Reward store, coins, Philips Hue, Sonos, quizmodul og en-til-en bygges ikke.
 
 #### Trin 5.8 Kontrakter og e-signatur · M
 
@@ -1130,6 +1144,7 @@ De tekniske valg er mine. Hvert valg er afgjort og bevises i det trin, der bruge
 | UI-kontraktens første domænefunktioner | Bygges i prøveflytningen og til brugerens kontekst. Mønsteret bruges først bredt, når det er bevist | 0.7 og 1.5 |
 | Sikkerhedsreglerne | Afvisningerne sker med databasens egne udløsere ved skemaændringer, mens ændringen laves. Kan de ikke bruges i Lovable Cloud, et tjek hver time med alarm | 0.5: hvert forsøg afvises eller giver alarm inden for en time |
 | Bevis og kontrol | Codex skriver beviset for hvert trin som kode, uafhængigt af mig, og angriber hvert databasescript én gang, før det køres i drift. Codex læser kun repoet og arbejder på testkopien, aldrig mod driften | Hvert trins bevis er skrevet af Codex og kører grønt på testkopien, før scriptet køres i drift |
+| AI-assistent og MCP | Bygges først, når KPI'er, tavler og regler er data (5.1–5.3). Assistenten handler som brugeren inden for rettighederne og har et synligt månedsbudget; en MCP-server udstiller de samme objekter. Intet trin endnu (Plecto-inspiration, Mathias 6/11-2026) | Første handling gennem assistenten giver samme resultat som den samme handling i UI |
 
 ### Arbejdsregler i drift (godkendt 23/10)
 
